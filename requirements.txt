@@ -1,0 +1,8 @@
+google-cloud-speech
+googlemaps
+sounddevice
+librosa
+wavio
+numpy
+word2number
+shapely

@@ -204,7 +204,7 @@ export function HydrantsLayer({ visible }) {
     }, [visible, zoom, map, bbox]);
 
     // Custom Icon styling based on GIS status
-    const getHydrantIcon = (status) => {
+    const getHydrantIcon = (status, flowClass) => {
       let bgColor = '#ef4444'; // Default Operating (Red)
       let borderColor = '#ffffff';
       let emoji = '💧';
@@ -221,24 +221,49 @@ export function HydrantsLayer({ visible }) {
         borderStyle = '2px solid';
       }
 
+      // High-contrast rating label below the circular icon
+      const labelHtml = flowClass ? `
+        <div style="
+          margin-top: 2px;
+          font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, sans-serif;
+          font-weight: 900;
+          font-size: 10px;
+          color: #ffffff;
+          text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+          letter-spacing: 0.5px;
+          text-align: center;
+          line-height: 1;
+        ">${flowClass}</div>
+      ` : '';
+
       return L.divIcon({
-        className: 'custom-hydrant-icon',
-        html: `<div style="
-          background-color: ${bgColor};
-          border: ${borderStyle} ${borderColor};
-          border-radius: 50%;
-          width: 24px;
-          height: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-          font-size: 12px;
-          box-sizing: border-box;
-          opacity: ${opacity};
-        ">${emoji}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        className: 'custom-hydrant-icon-container',
+        html: `
+          <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="
+              background-color: ${bgColor};
+              border: ${borderStyle} ${borderColor};
+              border-radius: 50%;
+              width: 24px;
+              height: 24px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+              font-size: 12px;
+              box-sizing: border-box;
+              opacity: ${opacity};
+            ">${emoji}</div>
+            ${labelHtml}
+          </div>
+        `,
+        iconSize: [28, 38],
+        iconAnchor: [14, 12], // Centered on the circle (y: 12 is center of 24px circle)
         popupAnchor: [0, -12]
       });
     };
@@ -262,7 +287,7 @@ export function HydrantsLayer({ visible }) {
             <Marker 
               key={`${gisId}-${i}`} 
               position={coords} 
-              icon={getHydrantIcon(statusVal)}
+              icon={getHydrantIcon(statusVal, flowClass)}
             >
               <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
                 <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>

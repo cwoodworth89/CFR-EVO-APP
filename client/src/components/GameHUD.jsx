@@ -1,7 +1,7 @@
 import React from 'react';
 import { UNIT_COLORS } from './MapConstants';
 
-export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, toggleBlocks, showBlocks }) {
+export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, toggleBlocks, showBlocks, toggleHydrants, showHydrants }) {
   
   return (
     <div className="bg-slate-950 text-white p-3 shadow-md z-20 flex justify-between items-center border-b border-slate-800 h-16">
@@ -42,6 +42,18 @@ export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, togg
             }`}
           >
             {showBlocks ? "HIDE" : "LABELS"}
+          </button>
+
+          {/* Hydrants Toggle */}
+          <button 
+            onClick={() => toggleHydrants(!showHydrants)} 
+            className={`mr-4 px-3 py-1 text-xs font-bold rounded border transition-all ${
+              showHydrants 
+                ? "bg-sky-500 text-black border-sky-600" 
+                : "bg-slate-800 text-sky-500 border-sky-900 hover:border-sky-500"
+            }`}
+          >
+            {showHydrants ? "HIDE HYDRANTS" : "SHOW HYDRANTS"}
           </button>
 
           {/* Game Mode Buttons */}

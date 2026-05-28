@@ -5,7 +5,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, Sidebar } from './GameHUD';
 import { MODE_DEFAULTS, UNIT_COLORS } from './MapConstants';
@@ -29,6 +29,7 @@ export default function MapBoard() {
   const [gameMode, setGameMode] = useState("EXPLORE"); 
   const [mapStyle, setMapStyle] = useState("GREY"); 
   const [showLabels, setShowLabels] = useState(false); 
+  const [showHydrants, setShowHydrants] = useState(false); 
   
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
@@ -213,6 +214,7 @@ export default function MapBoard() {
       <Header 
         gameMode={gameMode} score={score} mapStyle={mapStyle} setMapStyle={setMapStyle} 
         startMode={startMode} toggleBlocks={setShowLabels} showBlocks={showLabels} 
+        toggleHydrants={setShowHydrants} showHydrants={showHydrants}
       />
 
       <div className="flex-grow relative">
@@ -226,6 +228,9 @@ export default function MapBoard() {
           <BaseMap style={mapStyle} />
           
           <CoquitlamOverlays visible={showLabels} />
+          
+          {/* Hydrants Visual GIS Overlay */}
+          <HydrantsLayer visible={showHydrants} />
           
           {/* 2. DEFINE CUSTOM PANES */}
           <Pane name="underlayPane" style={{ zIndex: 390 }} />

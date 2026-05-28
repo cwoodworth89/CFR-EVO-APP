@@ -2,37 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { dynamicMapLayer } from 'esri-leaflet';
-
-// 🗺️ BASE LAYERS (No-label basemaps)
-// Using Carto's 'nolabels' tiles so we don't show any road/place labels.
-// These are free/public and do not require an API key.
-export const BASE_LAYERS = {
-  GREY: {
-    type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 19,
-    maxZoom: 22,
-  },
-  DARK: {
-    type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 19,
-    maxZoom: 22,
-  },
-};
-
-// 🎮 DEFAULTS
-export const MODE_DEFAULTS = {
-    EXPLORE: "GREY",
-    QUIZ_ZONES: "DARK",
-    QUIZ_INTERSECTIONS: "GREY",
-    QUIZ_BLOCKS: "GREY",
-    QUIZ_ADDRESSES: "GREY"
-};
+import { BASE_LAYERS, MODE_DEFAULTS } from './MapConstants';
 
 // 🚒 STATIONS
 // Coordinates verified against official Coquitlam Fire Hall addresses
@@ -151,6 +121,27 @@ export function FireZonesLayer({ visible, pane }) {
           map.removeLayer(layer);
       };
     }, [map, visible, pane]); // Add pane to dependencies
+    
+    return null;
+}
+
+// 💧 NEW: WATER HYDRANTS GIS LAYER
+export function HydrantsLayer({ visible }) {
+    const map = useMap();
+    useEffect(() => {
+      if (!visible) return;
+      
+      const layer = dynamicMapLayer({
+          url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer",
+          layers: [2], // 2 = Water Hydrants
+          opacity: 0.9,
+          f: 'image'
+      }).addTo(map);
+
+      return () => { 
+          map.removeLayer(layer);
+      };
+    }, [map, visible]);
     
     return null;
 }

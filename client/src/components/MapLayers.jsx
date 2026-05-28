@@ -128,8 +128,32 @@ export function FireZonesLayer({ visible, pane }) {
 // 💧 NEW: WATER HYDRANTS GIS LAYER
 export function HydrantsLayer({ visible }) {
     const map = useMap();
-    useEffect(() => {
+    const [zoom, setZoom] = React.useState(map.getZoom());
+    const [hydrants, setHydrants] = React.useState([]);
+
+    // Track map zoom and movements
+    React.useEffect(() => {
       if (!visible) return;
+
+      const handleMapChange = () => {
+        setZoom(map.getZoom());
+      };
+
+      map.on('zoomend', handleMapChange);
+      map.on('moveend', handleMapChange);
+      
+      // Initialize
+      handleMapChange();
+
+      return () => {
+        map.off('zoomend', handleMapChange);
+        map.off('moveend', handleMapChange);
+      };
+    }, [map, visible]);
+
+    // 1. Zoom < 15: Render static Esri image overlay for high performance city-wide view
+    React.useEffect(() => {
+      if (!visible || zoom >= 15) return;
       
       const layer = dynamicMapLayer({
           url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer",
@@ -141,9 +165,129 @@ export function HydrantsLayer({ visible }) {
       return () => { 
           map.removeLayer(layer);
       };
-    }, [map, visible]);
-    
-    return null;
+    }, [map, visible, zoom]);
+
+    // 2. Zoom >= 15: Fetch dynamic bounding-box vector hydrants for detailed highlights
+    const bbox = visible && zoom >= 15 ? map.getBounds().toBBoxString() : "";
+    React.useEffect(() => {
+      if (!visible || zoom < 15 || !bbox) {
+        setHydrants([]);
+        return;
+      }
+
+      let active = true;
+      const bounds = map.getBounds();
+      const minLng = bounds.getSouthWest().lng;
+      const minLat = bounds.getSouthWest().lat;
+      const maxLng = bounds.getNorthEast().lng;
+      const maxLat = bounds.getNorthEast().lat;
+
+      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${minLng},${minLat},${maxLng},${maxLat}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
+
+      fetch(url)
+        .then(r => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(data => {
+          if (active && data && data.features) {
+            setHydrants(data.features);
+          }
+        })
+        .catch(err => {
+          console.warn("Failed to fetch viewport hydrants:", err);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [visible, zoom, map, bbox]);
+
+    // Custom Icon styling based on GIS status
+    const getHydrantIcon = (status) => {
+      let bgColor = '#ef4444'; // Default Operating (Red)
+      let borderColor = '#ffffff';
+      let emoji = '💧';
+      let opacity = '1.0';
+      let borderStyle = '2px solid';
+
+      if (status === 'PRIVATE') {
+        bgColor = '#f59e0b'; // Amber
+      } else if (status === 'ABANDONED' || status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
+        bgColor = '#374151'; // Dark gray
+        borderColor = '#ef4444'; // Red warning border
+        emoji = '⚠️';
+        opacity = '0.85';
+        borderStyle = '2px solid';
+      }
+
+      return L.divIcon({
+        className: 'custom-hydrant-icon',
+        html: `<div style="
+          background-color: ${bgColor};
+          border: ${borderStyle} ${borderColor};
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+          font-size: 12px;
+          box-sizing: border-box;
+          opacity: ${opacity};
+        ">${emoji}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12]
+      });
+    };
+
+    if (!visible) return null;
+
+    return (
+      <>
+        {zoom >= 15 && hydrants.map((h, i) => {
+          if (!h.geometry || h.geometry.x === undefined || h.geometry.y === undefined) return null;
+          const coords = [h.geometry.y, h.geometry.x];
+          const statusVal = (h.attributes.status || "").toUpperCase();
+          const gisId = h.attributes.gis_id || "Unknown";
+          const flowClass = h.attributes.flow_class || "";
+          
+          let label = "OPERATING";
+          if (statusVal === "PRIVATE") label = "PRIVATE";
+          if (statusVal === "ABANDONED" || statusVal === "OUT_OF_SERVICE" || statusVal === "INACTIVE") label = "OUT OF SERVICE";
+
+          return (
+            <Marker 
+              key={`${gisId}-${i}`} 
+              position={coords} 
+              icon={getHydrantIcon(statusVal)}
+            >
+              <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
+                <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
+                  <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">HYDRANT ID</span>
+                  <span className="text-white text-sm font-bold">{gisId}</span>
+                  
+                  <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">STATUS</span>
+                  <span className={`font-bold text-xs ${
+                    label === "OPERATING" ? "text-emerald-400" :
+                    label === "PRIVATE" ? "text-amber-400" : "text-rose-400"
+                  }`}>{label}</span>
+                  
+                  {flowClass && (
+                    <>
+                      <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">FLOW CLASS</span>
+                      <span className="text-sky-400 text-xs font-semibold">{flowClass}</span>
+                    </>
+                  )}
+                </div>
+              </Tooltip>
+            </Marker>
+          );
+        })}
+      </>
+    );
 }
 
 export function StationsLayer() {

@@ -62,39 +62,50 @@ export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, togg
           <button onClick={() => startMode("QUIZ_INTERSECTIONS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-emerald-500 border border-emerald-900 hover:bg-slate-700">INTXN</button>
           <button onClick={() => startMode("QUIZ_BLOCKS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-amber-500 border border-amber-900 hover:bg-slate-700">BLOCKS</button>
           <button onClick={() => startMode("QUIZ_ADDRESSES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-purple-400 border border-purple-900 hover:bg-slate-700">ADDRESS</button>
+          <button onClick={() => startMode("ROAD_CLOSURES")} className={`px-3 py-1 text-xs font-bold rounded border hover:bg-slate-750 transition-all ${
+            gameMode === "ROAD_CLOSURES"
+              ? "bg-rose-600 text-white border-rose-700"
+              : "bg-slate-800 text-rose-400 border-rose-950 hover:border-rose-700"
+          }`}>ROAD CLOSURES</button>
         </div>
     </div>
   );
 }
 
-export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clickedBlockData, onNext, onZoneGuess, map }) {
-    if (!currentQuestion) return null;
+export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clickedBlockData, onNext, onZoneGuess, map, roadClosures }) {
+    if (!currentQuestion && gameMode !== "ROAD_CLOSURES") return null;
 
     return (
         <div className="absolute top-4 right-4 z-[1000] w-72 bg-slate-900/95 backdrop-blur border border-slate-700 shadow-2xl rounded-xl overflow-hidden flex flex-col pointer-events-auto">
             
             {/* HEADER */}
             <div className="bg-slate-800 p-4 border-b border-slate-700 text-center">
-                {gameMode === "QUIZ_ZONES" && (
+                {gameMode === "ROAD_CLOSURES" && (
+                  <>
+                    <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-1">REAL-TIME TRAFFIC</div>
+                    <div className="text-lg text-rose-500 font-bold leading-tight uppercase">ROAD CLOSURES</div>
+                  </>
+                )}
+                {gameMode === "QUIZ_ZONES" && currentQuestion && (
                   <>
                     <h2 className="text-slate-500 text-[10px] uppercase font-bold">FIRST DUE</h2>
                     <div className="text-3xl text-white font-bold">Zone {currentQuestion.zone_id}</div>
                   </>
                 )}
-                {gameMode === "QUIZ_INTERSECTIONS" && (
+                {gameMode === "QUIZ_INTERSECTIONS" && currentQuestion && (
                   <>
                     <div className="text-slate-500 text-[10px] uppercase font-bold">LOCATE</div>
                     <div className="text-xl text-white font-bold">{currentQuestion.name}</div>
                   </>
                 )}
-                {gameMode === "QUIZ_BLOCKS" && (
+                {gameMode === "QUIZ_BLOCKS" && currentQuestion && (
                   <>
                     <div className="text-slate-500 text-[10px] uppercase font-bold">FIND THE BLOCK</div>
                     <div className="text-3xl text-amber-500 font-bold leading-tight">{currentQuestion.block}</div>
                     <div className="text-lg text-white font-bold">{currentQuestion.street}</div>
                   </>
                 )}
-                {gameMode === "QUIZ_ADDRESSES" && (
+                {gameMode === "QUIZ_ADDRESSES" && currentQuestion && (
                   <>
                     <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-1">FIND ADDRESS</div>
                     <div className="text-xl text-white font-bold leading-tight">{currentQuestion.address}</div>
@@ -104,6 +115,42 @@ export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clic
 
             {/* CONTENT AREA */}
             <div className="p-4">
+                {/* ROAD CLOSURES PANEL */}
+                {gameMode === "ROAD_CLOSURES" && (
+                    <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                        <div className="text-slate-400 text-xs font-semibold mb-1 uppercase font-mono tracking-wider">Active Alerts ({roadClosures ? roadClosures.length : 0})</div>
+                        {roadClosures && roadClosures.length > 0 ? (
+                            roadClosures.map((closure) => (
+                                <div 
+                                  key={closure.id} 
+                                  onClick={() => {
+                                    if (map) {
+                                      map.flyTo(closure.coordinates, 16, { animate: true });
+                                    }
+                                  }}
+                                  className="bg-slate-850 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-left p-3 rounded-lg shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group"
+                                >
+                                     <div className="flex justify-between items-center gap-1.5">
+                                         <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
+                                           closure.severity === 'MAJOR' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                           closure.severity === 'MODERATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                           'bg-slate-800/60 text-slate-300 border border-slate-700/30'
+                                         }`}>{closure.severity}</span>
+                                         <span className="text-[9px] text-slate-500 font-mono font-medium tracking-wide">{closure.source}</span>
+                                     </div>
+                                     <h4 className="font-bold text-xs text-amber-500 leading-snug group-hover:text-amber-400 transition-colors">{closure.headline}</h4>
+                                     <p className="text-[10px] text-slate-300 font-medium font-mono leading-none">{closure.street}</p>
+                                     <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed mt-0.5">{closure.description}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 text-slate-600 text-xs italic">
+                               Loading real-time feeds...
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ZONE BUTTONS */}
                 {gameMode === "QUIZ_ZONES" && (
                     <div className="flex flex-col gap-2">

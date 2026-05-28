@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'; // Added useRef and useCallback
-import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane } from 'react-leaflet';
+import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 import L from 'leaflet';
@@ -16,6 +16,27 @@ const getRandomElement = (arr) => {
   return arr[Math.floor(Math.random() * arr.length)];
 };
 
+// 🚧 Barricade Icon for Road Closures
+const closureIcon = L.divIcon({
+  className: 'custom-closure-icon',
+  html: `<div style="
+    background-color: #f59e0b;
+    border: 2px solid #000000;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    font-size: 15px;
+    box-sizing: border-box;
+  ">🚧</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14]
+});
+
 export default function MapBoard() {
   const [map, setMap] = useState(null);
 
@@ -24,6 +45,7 @@ export default function MapBoard() {
   const [intersections, setIntersections] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [addresses, setAddresses] = useState([]);
+  const [roadClosures, setRoadClosures] = useState([]);
   
   // GAME STATE
   const [gameMode, setGameMode] = useState("EXPLORE"); 
@@ -42,8 +64,68 @@ export default function MapBoard() {
   // ⏱️ TIMER REF (Prevents double-skipping if you hit Enter while waiting)
   const autoAdvanceTimer = useRef(null);
 
+  // LOAD ROAD CLOSURES
+  useEffect(() => {
+    const baseUrl = import.meta.env.BASE_URL;
+
+    // Fetch municipal local feed
+    const fetchMuni = fetch(`${baseUrl}data/road_closures.json?v=1`)
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => []);
+
+    // Fetch DriveBC live API
+    const fetchDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
+      .then(r => r.ok ? r.json() : { events: [] })
+      .then(data => {
+        if (!data || !data.events) return [];
+        // Filter to Coquitlam bounding box
+        return data.events
+          .filter(evt => {
+            if (!evt.geography || !evt.geography.coordinates) return false;
+            let coords = [];
+            if (evt.geography.type === "Point") {
+              coords = [evt.geography.coordinates];
+            } else if (evt.geography.type === "LineString") {
+              coords = evt.geography.coordinates;
+            } else {
+              return false;
+            }
+            return coords.some(([lng, lat]) => 
+              lat >= 49.20 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68
+            );
+          })
+          .map(evt => {
+            let lat = 49.28;
+            let lng = -122.80;
+            if (evt.geography.type === "Point") {
+              lng = evt.geography.coordinates[0];
+              lat = evt.geography.coordinates[1];
+            } else if (evt.geography.type === "LineString") {
+              const middleIndex = Math.floor(evt.geography.coordinates.length / 2);
+              lng = evt.geography.coordinates[middleIndex][0];
+              lat = evt.geography.coordinates[middleIndex][1];
+            }
+            
+            return {
+              id: evt.id || Math.random().toString(),
+              headline: evt.headline || "TRAFFIC ALERT",
+              street: evt.road_name || "Regional Road",
+              severity: (evt.severity || "MINOR").toUpperCase(),
+              description: evt.description || "Active traffic event.",
+              coordinates: [lat, lng],
+              source: "DriveBC Open511"
+            };
+          });
+      })
+      .catch(() => []);
+
+    Promise.all([fetchMuni, fetchDriveBC]).then(([muniEvents, bcEvents]) => {
+      setRoadClosures([...muniEvents, ...bcEvents]);
+    });
+  }, []);
+
   // LOAD DATA
- useEffect(() => {
+  useEffect(() => {
     // We use import.meta.env.BASE_URL to automatically add '/coquitlam-fire-trainer/' 
     // when deployed, but keep it as '/' when on localhost.
     const baseUrl = import.meta.env.BASE_URL;
@@ -121,6 +203,10 @@ export default function MapBoard() {
       if (mode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
       if (mode === "QUIZ_BLOCKS") nextBlockQuestion();
       if (mode === "QUIZ_ADDRESSES") nextQuestion(addresses);
+      if (mode === "ROAD_CLOSURES") {
+          setCurrentQuestion(null);
+          setFeedback(null);
+      }
   }, [zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
 
   // ⌨️ KEYBOARD LISTENER (Enter = Next) - Declared below goToNext to resolve TDZ hoisting bug
@@ -306,6 +392,31 @@ export default function MapBoard() {
                 )}
              </>
           )}
+
+          {/* ROAD CLOSURES LAYER */}
+          {gameMode === "ROAD_CLOSURES" && roadClosures.map((closure, i) => (
+            <Marker 
+              key={closure.id || i} 
+              position={closure.coordinates} 
+              icon={closureIcon}
+            >
+              <Popup className="road-closure-popup">
+                <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
+                      closure.severity === 'MAJOR' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                      closure.severity === 'MODERATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                      'bg-slate-800/60 text-slate-300 border border-slate-700/30'
+                    }`}>{closure.severity}</span>
+                    <span className="text-[9px] text-slate-400 font-mono font-medium">{closure.source}</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-amber-500 mt-2 leading-tight">{closure.headline}</h3>
+                  <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
+                  <p className="text-xs text-slate-300 mt-2 font-sans leading-relaxed border-t border-slate-850 pt-1.5">{closure.description}</p>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
 
         {/* SIDEBAR */}
@@ -314,6 +425,7 @@ export default function MapBoard() {
             distanceOff={distanceOff} clickedBlockData={clickedBlockData} map={map}
             onNext={goToNext} 
             onZoneGuess={handleZoneGuess}
+            roadClosures={roadClosures}
         />
 
       </div>

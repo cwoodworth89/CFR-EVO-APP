@@ -1,0 +1,29 @@
+[
+  {
+    "id": "muni_001",
+    "headline": "ROAD CLOSED (24/7)",
+    "street": "Cedar Drive",
+    "severity": "MAJOR",
+    "description": "Cedar Drive Upgrade (Phase 2): Full road closure between 4150 Cedar Drive and Gilleys Trail (north of Victoria Drive). Closed 24/7. Use alternative routes.",
+    "coordinates": [49.2972, -122.7302],
+    "source": "Municipal511 Coquitlam"
+  },
+  {
+    "id": "muni_002",
+    "headline": "ROAD OBSTRUCTION / UTILITY WORK",
+    "street": "Ranch Park Way",
+    "severity": "MODERATE",
+    "description": "Metro Vancouver Water Main Work: Ongoing lane closures and traffic restrictions on Ranch Park Way at Dewdney Trunk Road. Expect delays.",
+    "coordinates": [49.2682, -122.8051],
+    "source": "Municipal511 Coquitlam"
+  },
+  {
+    "id": "muni_003",
+    "headline": "LANE REDUCTIONS / UTILITY WORK",
+    "street": "Clarke Rd & Como Lake Ave",
+    "severity": "MINOR",
+    "description": "Intermittent utility work and lane reductions occurring around the intersection of Clarke Road and Como Lake Avenue.",
+    "coordinates": [49.2630, -122.8850],
+    "source": "Municipal511 Coquitlam"
+  }
+]

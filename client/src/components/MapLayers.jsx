@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Marker, Tooltip, useMap } from 'react-leaflet';
+import { Marker, Tooltip, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { dynamicMapLayer } from 'esri-leaflet';
 import { BASE_LAYERS, MODE_DEFAULTS } from './MapConstants';
@@ -204,7 +204,7 @@ export function HydrantsLayer({ visible }) {
     }, [visible, zoom, map, bbox]);
 
     // Custom Icon styling to highlight and overlay details on top of official city symbols
-    const getHydrantIcon = (status, flowClass, gisId) => {
+    const getHydrantIcon = (status, flowClass) => {
       let bgColor = 'transparent'; 
       let borderColor = 'transparent';
       let emoji = '';
@@ -223,19 +223,6 @@ export function HydrantsLayer({ visible }) {
         borderStyle = '2px solid';
       }
 
-      // Dynamic identifier label (e.g. M-255) in slate-300
-      const idHtml = gisId ? `
-        <div style="
-          font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, sans-serif;
-          font-weight: 700;
-          font-size: 8px;
-          color: #cbd5e1;
-          text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-          text-align: center;
-          line-height: 1;
-        ">${gisId}</div>
-      ` : '';
-
       // High-contrast rating label (e.g. AA) in white
       const ratingHtml = flowClass ? `
         <div style="
@@ -250,17 +237,15 @@ export function HydrantsLayer({ visible }) {
         ">${flowClass}</div>
       ` : '';
 
-      // Combined vertical stack label block
-      const labelHtml = (idHtml || ratingHtml) ? `
+      // Combined vertical stack label block (Only displaying rating under icon per user request)
+      const labelHtml = ratingHtml ? `
         <div style="
           display: flex; 
           flex-direction: column; 
           align-items: center; 
           margin-top: 2px; 
-          gap: 1.5px;
           pointer-events: none;
         ">
-          ${idHtml}
           ${ratingHtml}
         </div>
       ` : '';
@@ -317,7 +302,7 @@ export function HydrantsLayer({ visible }) {
             <Marker 
               key={`${gisId}-${i}`} 
               position={coords} 
-              icon={getHydrantIcon(statusVal, flowClass, gisId)}
+              icon={getHydrantIcon(statusVal, flowClass)}
             >
               <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
                 <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
@@ -338,6 +323,29 @@ export function HydrantsLayer({ visible }) {
                   )}
                 </div>
               </Tooltip>
+              <Popup className="hydrant-popup">
+                <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '180px', maxWidth: '240px' }}>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-[9px] text-slate-400 font-mono font-medium">HYDRANT DETAIL</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
+                      label === 'OPERATING' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                      label === 'PRIVATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                      'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    }`}>{label}</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">ID: {gisId}</h3>
+                  
+                  <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-xs">
+                    <span className="text-slate-400 font-sans">Flow Rating</span>
+                    <span className="text-white font-mono font-bold">{flowClass || "N/A"}</span>
+                  </div>
+                  
+                  <div className="mt-1 flex justify-between text-xs">
+                    <span className="text-slate-400 font-sans">Type/Status</span>
+                    <span className="text-slate-300 font-mono font-semibold">{statusVal}</span>
+                  </div>
+                </div>
+              </Popup>
             </Marker>
           );
         })}

@@ -56,6 +56,8 @@ export default function MapBoard() {
   const [mapStyle, setMapStyle] = useState("GREY"); 
   const [showLabels, setShowLabels] = useState(false); 
   const [showHydrants, setShowHydrants] = useState(false); 
+  const [showZones, setShowZones] = useState(false); 
+  const [showRoadClosures, setShowRoadClosures] = useState(false); 
   
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
@@ -203,14 +205,22 @@ export default function MapBoard() {
       // Only show labels automatically for Address Mode
       setShowLabels(mode === "QUIZ_ADDRESSES");
       
+      if (mode === "EXPLORE") {
+          setShowZones(false);
+          setShowHydrants(false);
+          setShowRoadClosures(false);
+          setCurrentQuestion(null);
+      } else {
+          // Quiz Modes: Hydrants ON by default, road closures icons ON by default, zones OFF
+          setShowHydrants(true);
+          setShowRoadClosures(true);
+          setShowZones(false);
+      }
+      
       if (mode === "QUIZ_ZONES") nextQuestion(zones);
       if (mode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
       if (mode === "QUIZ_BLOCKS") nextBlockQuestion();
       if (mode === "QUIZ_ADDRESSES") nextQuestion(addresses);
-      if (mode === "ROAD_CLOSURES") {
-          setCurrentQuestion(null);
-          setFeedback(null);
-      }
   }, [zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
 
   // ⌨️ KEYBOARD LISTENER (Enter = Next) - Declared below goToNext to resolve TDZ hoisting bug
@@ -307,6 +317,8 @@ export default function MapBoard() {
         gameMode={gameMode} score={score} mapStyle={mapStyle} setMapStyle={setMapStyle} 
         startMode={startMode} toggleBlocks={setShowLabels} showBlocks={showLabels} 
         toggleHydrants={setShowHydrants} showHydrants={showHydrants}
+        showZones={showZones} toggleZones={setShowZones}
+        showRoadClosures={showRoadClosures} toggleRoadClosures={setShowRoadClosures}
       />
 
       <div className="flex-grow relative">
@@ -332,12 +344,12 @@ export default function MapBoard() {
           
           {/* "Top Bun" - The Text Labels */}
           <FireZonesLayer 
-              visible={gameMode === "EXPLORE" || gameMode === "QUIZ_ZONES"} 
+              visible={gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)} 
               pane="labelsPane" 
           />
           
           {/* "Bottom Bun" - The Highlight */}
-          {gameMode === "QUIZ_ZONES" && zones.map((zone) => (
+          {(gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)) && zones.map((zone) => (
             <Polygon 
                 key={zone.zone_id} 
                 positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
@@ -398,7 +410,7 @@ export default function MapBoard() {
           )}
 
           {/* ROAD CLOSURES LAYER */}
-          {gameMode === "ROAD_CLOSURES" && roadClosures.map((closure, i) => (
+          {showRoadClosures && roadClosures.map((closure, i) => (
             <Marker 
               key={closure.id || i} 
               position={closure.coordinates} 
@@ -435,6 +447,7 @@ export default function MapBoard() {
             onNext={goToNext} 
             onZoneGuess={handleZoneGuess}
             roadClosures={roadClosures}
+            showRoadClosures={showRoadClosures}
         />
 
       </div>

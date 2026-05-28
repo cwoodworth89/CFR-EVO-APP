@@ -1,12 +1,26 @@
 import React from 'react';
 import { UNIT_COLORS } from './MapConstants';
 
-export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, toggleBlocks, showBlocks, toggleHydrants, showHydrants }) {
+export function Header({ 
+  gameMode, 
+  score, 
+  mapStyle, 
+  setMapStyle, 
+  startMode, 
+  toggleBlocks, 
+  showBlocks, 
+  toggleHydrants, 
+  showHydrants,
+  toggleZones,
+  showZones,
+  toggleRoadClosures,
+  showRoadClosures
+}) {
   
   return (
     <div className="bg-slate-950 text-white p-3 shadow-md z-20 flex justify-between items-center border-b border-slate-800 h-16">
-        <h1 className="text-lg font-bold tracking-wider">
-          FIRST DUE <span className="text-sky-500">TRAINER</span>
+        <h1 className="text-lg font-bold tracking-wider flex items-center gap-2">
+          FIRST DUE <span className="text-sky-500 font-extrabold">TRAINER</span>
         </h1>
         {gameMode !== "EXPLORE" && (
           <div className="font-mono text-sm text-slate-400">
@@ -21,9 +35,9 @@ export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, togg
                 <button 
                   key={style} 
                   onClick={() => setMapStyle(style)} 
-                  className={`px-2 py-1 text-[10px] font-bold rounded ${
+                  className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
                     mapStyle === style 
-                      ? "bg-slate-600 text-white" 
+                      ? "bg-slate-600 text-white shadow-sm" 
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -32,58 +46,107 @@ export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, togg
             ))}
           </div>
 
+          {/* Explore Mode Toggles */}
+          {gameMode === "EXPLORE" && (
+            <div className="flex gap-2 mr-4 border-r border-slate-800 pr-4">
+              {/* Zones Toggle */}
+              <button 
+                onClick={() => toggleZones(!showZones)} 
+                className={`px-3 py-1 text-xs font-bold rounded border transition-all ${
+                  showZones 
+                    ? "bg-sky-500 text-black border-sky-600 font-semibold shadow-lg shadow-sky-500/10" 
+                    : "bg-slate-800 text-sky-500 border-sky-900/50 hover:border-sky-500 hover:text-sky-400"
+                }`}
+              >
+                {showZones ? "HIDE ZONES" : "SHOW ZONES"}
+              </button>
+
+              {/* Hydrants Toggle */}
+              <button 
+                onClick={() => toggleHydrants(!showHydrants)} 
+                className={`px-3 py-1 text-xs font-bold rounded border transition-all ${
+                  showHydrants 
+                    ? "bg-emerald-500 text-black border-emerald-600 font-semibold shadow-lg shadow-emerald-500/10" 
+                    : "bg-slate-800 text-emerald-500 border-emerald-900/50 hover:border-emerald-500 hover:text-emerald-400"
+                }`}
+              >
+                {showHydrants ? "HIDE HYDRANTS" : "SHOW HYDRANTS"}
+              </button>
+
+              {/* Road Closures Toggle */}
+              <button 
+                onClick={() => toggleRoadClosures(!showRoadClosures)} 
+                className={`px-3 py-1 text-xs font-bold rounded border transition-all ${
+                  showRoadClosures 
+                    ? "bg-rose-600 text-white border-rose-700 font-semibold shadow-lg shadow-rose-600/15" 
+                    : "bg-slate-800 text-rose-400 border-rose-950/60 hover:border-rose-700 hover:text-rose-300"
+                }`}
+              >
+                {showRoadClosures ? "HIDE CLOSURES" : "SHOW CLOSURES"}
+              </button>
+            </div>
+          )}
+
           {/* Labels Toggle (Now controls Roads + Addresses + Parcels) */}
-          <button 
-            onClick={() => toggleBlocks(!showBlocks)} 
-            className={`mr-4 px-3 py-1 text-xs font-bold rounded border ${
-              showBlocks 
-                ? "bg-amber-500 text-black border-amber-600" 
-                : "bg-slate-800 text-amber-500 border-amber-900 hover:border-amber-500"
-            }`}
-          >
-            {showBlocks ? "HIDE" : "LABELS"}
-          </button>
+          {gameMode !== "EXPLORE" && (
+            <button 
+              onClick={() => toggleBlocks(!showBlocks)} 
+              className={`mr-4 px-3 py-1 text-xs font-bold rounded border transition-all ${
+                showBlocks 
+                  ? "bg-amber-500 text-black border-amber-600" 
+                  : "bg-slate-800 text-amber-500 border-amber-900 hover:border-amber-500"
+              }`}
+            >
+              {showBlocks ? "HIDE" : "LABELS"}
+            </button>
+          )}
 
           {/* Hydrants Toggle */}
-          <button 
-            onClick={() => toggleHydrants(!showHydrants)} 
-            className={`mr-4 px-3 py-1 text-xs font-bold rounded border transition-all ${
-              showHydrants 
-                ? "bg-sky-500 text-black border-sky-600" 
-                : "bg-slate-800 text-sky-500 border-sky-900 hover:border-sky-500"
-            }`}
-          >
-            {showHydrants ? "HIDE HYDRANTS" : "SHOW HYDRANTS"}
-          </button>
+          {gameMode !== "EXPLORE" && (
+            <button 
+              onClick={() => toggleHydrants(!showHydrants)} 
+              className={`mr-4 px-3 py-1 text-xs font-bold rounded border transition-all ${
+                showHydrants 
+                  ? "bg-sky-500 text-black border-sky-600" 
+                  : "bg-slate-800 text-sky-500 border-sky-900 hover:border-sky-500"
+              }`}
+            >
+              {showHydrants ? "HIDE HYDRANTS" : "SHOW HYDRANTS"}
+            </button>
+          )}
 
           {/* Game Mode Buttons */}
-          <button onClick={() => startMode("EXPLORE")} className="px-3 py-1 text-xs font-bold rounded bg-slate-700 text-white hover:bg-slate-600">EXPLORE</button>
-          <button onClick={() => startMode("QUIZ_ZONES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-sky-500 border border-sky-900 hover:bg-slate-700">ZONES</button>
-          <button onClick={() => startMode("QUIZ_INTERSECTIONS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-emerald-500 border border-emerald-900 hover:bg-slate-700">INTXN</button>
-          <button onClick={() => startMode("QUIZ_BLOCKS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-amber-500 border border-amber-900 hover:bg-slate-700">BLOCKS</button>
-          <button onClick={() => startMode("QUIZ_ADDRESSES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-purple-400 border border-purple-900 hover:bg-slate-700">ADDRESS</button>
-          <button onClick={() => startMode("ROAD_CLOSURES")} className={`px-3 py-1 text-xs font-bold rounded border hover:bg-slate-750 transition-all ${
-            gameMode === "ROAD_CLOSURES"
-              ? "bg-rose-600 text-white border-rose-700"
-              : "bg-slate-800 text-rose-400 border-rose-950 hover:border-rose-700"
-          }`}>ROAD CLOSURES</button>
+          <button 
+            onClick={() => startMode("EXPLORE")} 
+            className={`px-3 py-1 text-xs font-bold rounded transition-all ${
+              gameMode === "EXPLORE" 
+                ? "bg-slate-600 text-white border border-slate-500" 
+                : "bg-slate-700 text-white hover:bg-slate-600"
+            }`}
+          >
+            EXPLORE
+          </button>
+          <button onClick={() => startMode("QUIZ_ZONES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-sky-500 border border-sky-900 hover:bg-slate-700 transition-all">ZONES</button>
+          <button onClick={() => startMode("QUIZ_INTERSECTIONS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-emerald-500 border border-emerald-900 hover:bg-slate-700 transition-all">INTXN</button>
+          <button onClick={() => startMode("QUIZ_BLOCKS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-amber-500 border border-amber-900 hover:bg-slate-700 transition-all">BLOCKS</button>
+          <button onClick={() => startMode("QUIZ_ADDRESSES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-purple-400 border border-purple-900 hover:bg-slate-700 transition-all">ADDRESS</button>
         </div>
     </div>
   );
 }
 
-export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clickedBlockData, onNext, onZoneGuess, map, roadClosures }) {
-    if (!currentQuestion && gameMode !== "ROAD_CLOSURES") return null;
+export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clickedBlockData, onNext, onZoneGuess, map, roadClosures, showRoadClosures }) {
+    if (!currentQuestion && !(gameMode === "EXPLORE" && showRoadClosures)) return null;
 
     return (
         <div className="absolute top-4 right-4 z-[1000] w-72 bg-slate-900/95 backdrop-blur border border-slate-700 shadow-2xl rounded-xl overflow-hidden flex flex-col pointer-events-auto">
             
             {/* HEADER */}
             <div className="bg-slate-800 p-4 border-b border-slate-700 text-center">
-                {gameMode === "ROAD_CLOSURES" && (
+                {gameMode === "EXPLORE" && showRoadClosures && (
                   <>
                     <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-1">REAL-TIME TRAFFIC</div>
-                    <div className="text-lg text-rose-500 font-bold leading-tight uppercase">ROAD CLOSURES</div>
+                    <div className="text-lg text-rose-500 font-bold leading-tight uppercase font-sans tracking-wide">ROAD CLOSURES</div>
                   </>
                 )}
                 {gameMode === "QUIZ_ZONES" && currentQuestion && (
@@ -116,7 +179,7 @@ export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clic
             {/* CONTENT AREA */}
             <div className="p-4">
                 {/* ROAD CLOSURES PANEL */}
-                {gameMode === "ROAD_CLOSURES" && (
+                {gameMode === "EXPLORE" && showRoadClosures && (
                     <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                         <div className="text-slate-400 text-xs font-semibold mb-1 uppercase font-mono tracking-wider">Active Alerts ({roadClosures ? roadClosures.length : 0})</div>
                         {roadClosures && roadClosures.length > 0 ? (

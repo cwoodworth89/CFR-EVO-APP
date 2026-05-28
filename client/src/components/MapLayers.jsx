@@ -151,9 +151,9 @@ export function HydrantsLayer({ visible }) {
       };
     }, [map, visible]);
 
-    // 1. Zoom < 15: Render static Esri image overlay for high performance city-wide view
+    // 1. Render static Esri dynamic map overlay at all zoom levels for official hydrant icons
     React.useEffect(() => {
-      if (!visible || zoom >= 15) return;
+      if (!visible) return;
       
       const layer = dynamicMapLayer({
           url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer",
@@ -165,7 +165,7 @@ export function HydrantsLayer({ visible }) {
       return () => { 
           map.removeLayer(layer);
       };
-    }, [map, visible, zoom]);
+    }, [map, visible]);
 
     // 2. Zoom >= 15: Fetch dynamic bounding-box vector hydrants for detailed highlights
     const bbox = visible && zoom >= 15 ? map.getBounds().toBBoxString() : "";
@@ -203,21 +203,23 @@ export function HydrantsLayer({ visible }) {
       };
     }, [visible, zoom, map, bbox]);
 
-    // Custom Icon styling based on GIS status
+    // Custom Icon styling to highlight and overlay details on top of official city symbols
     const getHydrantIcon = (status, flowClass) => {
-      let bgColor = '#ef4444'; // Default Operating (Red)
-      let borderColor = '#ffffff';
-      let emoji = '💧';
+      let bgColor = 'transparent'; 
+      let borderColor = 'transparent';
+      let emoji = '';
       let opacity = '1.0';
-      let borderStyle = '2px solid';
+      let borderStyle = 'none';
 
       if (status === 'PRIVATE') {
-        bgColor = '#f59e0b'; // Amber
+        bgColor = 'rgba(245, 158, 11, 0.15)'; // Transparent amber highlight fill
+        borderColor = '#f59e0b'; // Amber highlighting ring
+        borderStyle = '2px solid';
       } else if (status === 'ABANDONED' || status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
-        bgColor = '#374151'; // Dark gray
-        borderColor = '#ef4444'; // Red warning border
+        bgColor = 'rgba(55, 65, 81, 0.6)'; // Dark semi-transparent caution mask
+        borderColor = '#ef4444'; // Red caution border
         emoji = '⚠️';
-        opacity = '0.85';
+        opacity = '0.9';
         borderStyle = '2px solid';
       }
 
@@ -254,8 +256,8 @@ export function HydrantsLayer({ visible }) {
               display: flex;
               align-items: center;
               justify-content: center;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-              font-size: 12px;
+              box-shadow: ${status === 'PRIVATE' || emoji ? '0 2px 4px rgba(0,0,0,0.4)' : 'none'};
+              font-size: 11px;
               box-sizing: border-box;
               opacity: ${opacity};
             ">${emoji}</div>

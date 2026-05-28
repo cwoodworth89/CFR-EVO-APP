@@ -144,8 +144,8 @@ export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clic
                         
                         {/* Show Picked Block if Wrong */}
                         {gameMode === "QUIZ_BLOCKS" && feedback === "WRONG" && clickedBlockData && (
-                            <div className="text-red-400 font-bold text-lg mb-4">
-                              Picked: {clickedBlockData.block}
+                            <div className="text-red-400 font-bold text-sm mb-4">
+                              Picked: {clickedBlockData.block} {clickedBlockData.street}
                             </div>
                         )}
 

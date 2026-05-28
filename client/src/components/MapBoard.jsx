@@ -177,9 +177,11 @@ export default function MapBoard() {
   const handleBlockClick = useCallback((blockData) => {
     if (!currentQuestion || gameMode !== "QUIZ_BLOCKS" || feedback) return;
     setClickedBlockData(blockData);
+    
+    const isCorrectStreet = currentQuestion.street === blockData.street;
     const diff = Math.abs(currentQuestion.block - blockData.block);
     
-    if (diff === 0) { 
+    if (isCorrectStreet && diff === 0) { 
         setFeedback("PERFECT"); 
         setScore(s => s + 1); 
         // Auto-advance
@@ -189,14 +191,14 @@ export default function MapBoard() {
   }, [currentQuestion, gameMode, feedback, nextBlockQuestion]);
 
   // --- RENDER HELPERS ---
-  const getBlockStyle = (block) => {
-    if (!feedback) return { color: mapStyle === "ORTHO" ? "#38bdf8" : "#64748b", weight: 8, opacity: 0.9 }; 
-    const isTarget = block.block === currentQuestion.block;
-    const isClicked = clickedBlockData && block.block === clickedBlockData.block;
-    if (isTarget) return { color: "#22c55e", weight: 14, opacity: 1 }; 
-    if (isClicked) return { color: "#ef4444", weight: 14, opacity: 1 }; 
-    return { color: "#94a3b8", weight: 4, opacity: 0.2 }; 
-  };
+  const getBlockStyle = useCallback((block) => {
+    if (!feedback) return { color: "#64748b", weight: 6, opacity: 0.8 }; 
+    const isTarget = block.block === currentQuestion.block && block.street === currentQuestion.street;
+    const isClicked = clickedBlockData && block.block === clickedBlockData.block && block.street === clickedBlockData.street;
+    if (isTarget) return { color: "#22c55e", weight: 12, opacity: 1 }; 
+    if (isClicked) return { color: "#ef4444", weight: 12, opacity: 1 }; 
+    return { color: "#475569", weight: 4, opacity: 0.15 }; 
+  }, [feedback, currentQuestion, clickedBlockData]);
 
   const getZoneStyle = (zone) => {
     if (gameMode === "QUIZ_ZONES") {
@@ -268,14 +270,27 @@ export default function MapBoard() {
 
           {/* GAME VISUALS: BLOCKS */}
           {gameMode === "QUIZ_BLOCKS" && currentQuestion && blocks && blocks.length > 0 && 
-            blocks.filter(b => b.street === currentQuestion.street).map((block, i) => (
+            blocks.map((block, i) => (
                 <Polyline 
                     key={`${block.street}-${block.block}-${i}`} 
                     positions={block.coordinates} 
-                    eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); handleBlockClick(block); } }} 
+                    eventHandlers={{ 
+                        click: (e) => { L.DomEvent.stopPropagation(e); handleBlockClick(block); },
+                        mouseover: (e) => { 
+                            if (!feedback) {
+                                e.target.setStyle({ color: "#f59e0b", weight: 10, opacity: 1 });
+                                e.target.bringToFront();
+                            }
+                        },
+                        mouseout: (e) => { 
+                            e.target.setStyle(getBlockStyle(block)); 
+                        }
+                    }} 
                     pathOptions={getBlockStyle(block)}
                 >
-                    <Tooltip sticky direction="top" className="font-bold text-xs bg-slate-900 text-white border-0">{feedback ? `Block ${block.block}` : "Block ???"}</Tooltip>
+                    <Tooltip sticky direction="top" className="font-bold text-xs bg-slate-900 text-white border-0">
+                        {feedback ? `${block.block} ${block.street}` : "Block ???"}
+                    </Tooltip>
                 </Polyline>
           ))}
 

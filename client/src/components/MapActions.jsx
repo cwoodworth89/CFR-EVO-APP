@@ -23,14 +23,20 @@ export function SmartZoom({ target, mode, allBlocks, allZones }) {
         map.flyTo(bounds.getCenter(), 13, { animate: true });
     }
 
-    // 2. BLOCKS: Zoom to the street segment
-    else if (mode === "QUIZ_BLOCKS" && allBlocks.length > 0) {
-      const streetSegments = allBlocks.filter(b => b.street === target.street);
-      if (streetSegments.length > 0) {
-        const allPoints = streetSegments.flatMap(s => s.coordinates);
-        bounds = L.latLngBounds(allPoints);
-        map.fitBounds(bounds, { paddingTopLeft: [50, 50], paddingBottomRight: [350, 50], maxZoom: 16, animate: true });
-      }
+    // 2. BLOCKS: Zoom to the correct neighborhood around the target segment with search jitter
+    else if (mode === "QUIZ_BLOCKS") {
+      // Calculate center of the target polyline
+      const start = target.coordinates[0];
+      const end = target.coordinates[1];
+      const centerLat = (start[0] + end[0]) / 2;
+      const centerLng = (start[1] + end[1]) / 2;
+
+      // Add a minor search jitter (+/- 150m) to avoid giving away the exact center
+      const latOffset = (Math.random() - 0.5) * 0.003;
+      const lngOffset = (Math.random() - 0.5) * 0.004;
+
+      const searchCenter = [centerLat + latOffset, centerLng + lngOffset];
+      map.flyTo(searchCenter, 15, { animate: true });
     }
 
     // 3. ADDRESSES: "Search Area" Style

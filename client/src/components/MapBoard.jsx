@@ -1,3 +1,4 @@
+/* global __BUILD_DATE__ */
 import React, { useEffect, useState, useRef, useCallback } from 'react'; // Added useRef and useCallback
 import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -39,6 +40,9 @@ const closureIcon = L.divIcon({
 
 export default function MapBoard() {
   const [map, setMap] = useState(null);
+
+  // Safe dynamic compile-time stamp
+  const buildTime = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'LOCAL_DEV';
 
   // DATA STATE
   const [zones, setZones] = useState([]);
@@ -418,6 +422,11 @@ export default function MapBoard() {
             </Marker>
           ))}
         </MapContainer>
+
+        {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
+        <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
+          FIRST DUE TRAINER | BUILD: {buildTime}
+        </div>
 
         {/* SIDEBAR */}
         <Sidebar 

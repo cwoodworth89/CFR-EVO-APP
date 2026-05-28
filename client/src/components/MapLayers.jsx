@@ -204,7 +204,7 @@ export function HydrantsLayer({ visible }) {
     }, [visible, zoom, map, bbox]);
 
     // Custom Icon styling to highlight and overlay details on top of official city symbols
-    const getHydrantIcon = (status, flowClass) => {
+    const getHydrantIcon = (status, flowClass, gisId) => {
       let bgColor = 'transparent'; 
       let borderColor = 'transparent';
       let emoji = '';
@@ -223,19 +223,46 @@ export function HydrantsLayer({ visible }) {
         borderStyle = '2px solid';
       }
 
-      // High-contrast rating label below the circular icon
-      const labelHtml = flowClass ? `
+      // Dynamic identifier label (e.g. M-255) in slate-300
+      const idHtml = gisId ? `
         <div style="
-          margin-top: 2px;
+          font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, sans-serif;
+          font-weight: 700;
+          font-size: 8px;
+          color: #cbd5e1;
+          text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+          text-align: center;
+          line-height: 1;
+        ">${gisId}</div>
+      ` : '';
+
+      // High-contrast rating label (e.g. AA) in white
+      const ratingHtml = flowClass ? `
+        <div style="
           font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, sans-serif;
           font-weight: 900;
-          font-size: 10px;
+          font-size: 9px;
           color: #ffffff;
           text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
           letter-spacing: 0.5px;
           text-align: center;
           line-height: 1;
         ">${flowClass}</div>
+      ` : '';
+
+      // Combined vertical stack label block
+      const labelHtml = (idHtml || ratingHtml) ? `
+        <div style="
+          display: flex; 
+          flex-direction: column; 
+          align-items: center; 
+          margin-top: 2px; 
+          gap: 1.5px;
+          pointer-events: none;
+        ">
+          ${idHtml}
+          ${ratingHtml}
+        </div>
       ` : '';
 
       return L.divIcon({
@@ -264,8 +291,9 @@ export function HydrantsLayer({ visible }) {
             ${labelHtml}
           </div>
         `,
-        iconSize: [28, 38],
-        iconAnchor: [14, 12], // Centered on the circle (y: 12 is center of 24px circle)
+        // Covers vertical height of circle (24px) + margin/text (~20px) = 44px
+        iconSize: [32, 48],
+        iconAnchor: [16, 12], // Centered horizontally (16) and vertically in the circle (12)
         popupAnchor: [0, -12]
       });
     };
@@ -289,7 +317,7 @@ export function HydrantsLayer({ visible }) {
             <Marker 
               key={`${gisId}-${i}`} 
               position={coords} 
-              icon={getHydrantIcon(statusVal, flowClass)}
+              icon={getHydrantIcon(statusVal, flowClass, gisId)}
             >
               <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
                 <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>

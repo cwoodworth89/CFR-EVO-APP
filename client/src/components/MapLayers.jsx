@@ -151,9 +151,9 @@ export function HydrantsLayer({ visible }) {
       };
     }, [map, visible]);
 
-    // 1. Render static Esri dynamic map overlay at all zoom levels for official hydrant icons
+    // 1. Render static Esri dynamic map overlay at zoom levels >= 17 for official hydrant icons
     React.useEffect(() => {
-      if (!visible) return;
+      if (!visible || zoom < 17) return;
       
       const layer = dynamicMapLayer({
           url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer",
@@ -165,12 +165,12 @@ export function HydrantsLayer({ visible }) {
       return () => { 
           map.removeLayer(layer);
       };
-    }, [map, visible]);
+    }, [map, visible, zoom]);
 
-    // 2. Zoom >= 15: Fetch dynamic bounding-box vector hydrants for detailed highlights
-    const bbox = visible && zoom >= 15 ? map.getBounds().toBBoxString() : "";
+    // 2. Zoom >= 17: Fetch dynamic bounding-box vector hydrants for detailed highlights
+    const bbox = visible && zoom >= 17 ? map.getBounds().toBBoxString() : "";
     React.useEffect(() => {
-      if (!visible || zoom < 15 || !bbox) {
+      if (!visible || zoom < 17 || !bbox) {
         setHydrants([]);
         return;
       }
@@ -274,7 +274,7 @@ export function HydrantsLayer({ visible }) {
 
     return (
       <>
-        {zoom >= 15 && hydrants.map((h, i) => {
+        {zoom >= 17 && hydrants.map((h, i) => {
           if (!h.geometry || h.geometry.x === undefined || h.geometry.y === undefined) return null;
           const coords = [h.geometry.y, h.geometry.x];
           const statusVal = (h.attributes.status || "").toUpperCase();

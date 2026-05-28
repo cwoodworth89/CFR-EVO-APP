@@ -140,7 +140,7 @@ export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clic
                                      </div>
                                      <h4 className="font-bold text-xs text-amber-500 leading-snug group-hover:text-amber-400 transition-colors">{closure.headline}</h4>
                                      <p className="text-[10px] text-slate-300 font-medium font-mono leading-none">{closure.street}</p>
-                                     <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed mt-0.5">{closure.description}</p>
+                                     <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">{closure.description}</p>
                                 </div>
                             ))
                         ) : (

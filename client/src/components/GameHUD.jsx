@@ -1,10 +1,5 @@
 import React from 'react';
-
-// 🎨 COLORS
-export const UNIT_COLORS = { 
-  "E1": "#ef4444", "E2": "#3b82f6", "E3": "#22c55e", 
-  "Q5": "#eab308", "E4": "#a855f7", "UNKNOWN": "#9ca3af" 
-};
+import { UNIT_COLORS } from './MapConstants';
 
 export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, toggleBlocks, showBlocks }) {
   
@@ -60,7 +55,7 @@ export function Header({ gameMode, score, mapStyle, setMapStyle, startMode, togg
   );
 }
 
-export function Sidebar({ gameMode, currentQuestion, feedback, roundScore, distanceOff, clickedBlockData, onNext, onZoneGuess, map }) {
+export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clickedBlockData, onNext, onZoneGuess, map }) {
     if (!currentQuestion) return null;
 
     return (

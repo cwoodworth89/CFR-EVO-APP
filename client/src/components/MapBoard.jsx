@@ -1,13 +1,20 @@
-import React, { useEffect, useState, useRef } from 'react'; // Added useRef
+import React, { useEffect, useState, useRef, useCallback } from 'react'; // Added useRef and useCallback
 import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BASE_LAYERS, MODE_DEFAULTS, BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
-import { Header, Sidebar, UNIT_COLORS } from './GameHUD';
+import { Header, Sidebar } from './GameHUD';
+import { MODE_DEFAULTS, UNIT_COLORS } from './MapConstants';
+
+// 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
+const getRandomElement = (arr) => {
+  if (!arr || arr.length === 0) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+};
 
 export default function MapBoard() {
   const [map, setMap] = useState(null);
@@ -73,20 +80,32 @@ export default function MapBoard() {
       .catch(e => console.error("Missing addresses.json", e));
   }, []);
 
-  // ⌨️ KEYBOARD LISTENER (Enter = Next)
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-        // If Enter is pressed AND we are showing feedback (waiting for next)
-        if (e.key === "Enter" && feedback && gameMode !== "EXPLORE") {
-            goToNext();
-        }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [feedback, gameMode, zones, intersections, blocks, addresses]);
+  // --- CONTROLLER LOGIC (Callbacks wrapped in useCallback to prevent unnecessary re-renders) ---
+  const nextQuestion = useCallback((dataset) => {
+      clearTimeout(autoAdvanceTimer.current); // Stop timer if manual click happened
+      if (!dataset || dataset.length === 0) return;
+      setCurrentQuestion(getRandomElement(dataset));
+      setFeedback(null);
+      setUserGuess(null);
+  }, []);
 
-  // --- CONTROLLER LOGIC ---
-  const startMode = (mode) => {
+  const nextBlockQuestion = useCallback(() => {
+    clearTimeout(autoAdvanceTimer.current);
+    if (!blocks || blocks.length === 0) return;
+    const valid = blocks.filter(b => b.block > 0);
+    setCurrentQuestion(getRandomElement(valid));
+    setFeedback(null);
+    setClickedBlockData(null);
+  }, [blocks]);
+
+  const goToNext = useCallback(() => {
+      if(gameMode === "QUIZ_ZONES") nextQuestion(zones);
+      if(gameMode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
+      if(gameMode === "QUIZ_BLOCKS") nextBlockQuestion();
+      if(gameMode === "QUIZ_ADDRESSES") nextQuestion(addresses);
+  }, [gameMode, zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
+
+  const startMode = useCallback((mode) => {
       clearTimeout(autoAdvanceTimer.current); // Clear any pending jumps
       setGameMode(mode);
       setScore(0);
@@ -101,35 +120,23 @@ export default function MapBoard() {
       if (mode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
       if (mode === "QUIZ_BLOCKS") nextBlockQuestion();
       if (mode === "QUIZ_ADDRESSES") nextQuestion(addresses);
-  };
+  }, [zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
 
-  // Helper to route to the correct "Next" function
-  const goToNext = () => {
-      if(gameMode === "QUIZ_ZONES") nextQuestion(zones);
-      if(gameMode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
-      if(gameMode === "QUIZ_BLOCKS") nextBlockQuestion();
-      if(gameMode === "QUIZ_ADDRESSES") nextQuestion(addresses);
-  };
-
-  const nextQuestion = (dataset) => {
-      clearTimeout(autoAdvanceTimer.current); // Stop timer if manual click happened
-      if (!dataset || dataset.length === 0) return;
-      setCurrentQuestion(dataset[Math.floor(Math.random() * dataset.length)]);
-      setFeedback(null);
-      setUserGuess(null);
-  };
-
-  const nextBlockQuestion = () => {
-    clearTimeout(autoAdvanceTimer.current);
-    if (!blocks || blocks.length === 0) return;
-    const valid = blocks.filter(b => b.block > 0);
-    setCurrentQuestion(valid[Math.floor(Math.random() * valid.length)]);
-    setFeedback(null);
-    setClickedBlockData(null);
-  };
+  // ⌨️ KEYBOARD LISTENER (Enter = Next) - Declared below goToNext to resolve TDZ hoisting bug
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+        // If Enter is pressed AND we are showing feedback (waiting for next)
+        if (e.key === "Enter" && feedback && gameMode !== "EXPLORE") {
+            goToNext();
+        }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [feedback, gameMode, goToNext]);
 
   // --- HANDLERS ---
-  const handleZoneGuess = (unitId) => {
+  const handleZoneGuess = useCallback((unitId) => {
+    if (!currentQuestion) return;
     if (unitId === currentQuestion.unit_id) { 
         setFeedback("CORRECT"); 
         setScore(s => s + 1); 
@@ -137,10 +144,10 @@ export default function MapBoard() {
         autoAdvanceTimer.current = setTimeout(() => nextQuestion(zones), 1000); 
     } 
     else { setFeedback("WRONG"); }
-  };
+  }, [currentQuestion, zones, nextQuestion]);
 
-  const handleMapClick = (latlng) => {
-    if ((gameMode !== "QUIZ_INTERSECTIONS" && gameMode !== "QUIZ_ADDRESSES") || feedback) return;
+  const handleMapClick = useCallback((latlng) => {
+    if (!currentQuestion || (gameMode !== "QUIZ_INTERSECTIONS" && gameMode !== "QUIZ_ADDRESSES") || feedback) return;
     setUserGuess(latlng);
     
     const from = turf.point([latlng.lng, latlng.lat]);
@@ -157,17 +164,17 @@ export default function MapBoard() {
     const result = distMeters === 0 ? "PERFECT" : points > 0 ? "OKAY" : "MISS";
     setFeedback(result);
 
-    // 🔽 NEW: Auto-advance for Intersection/Address modes too
+    // 🔽 Auto-advance for Intersection/Address modes too
     if (result === "PERFECT") {
         autoAdvanceTimer.current = setTimeout(() => {
             if (gameMode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
             if (gameMode === "QUIZ_ADDRESSES") nextQuestion(addresses);
         }, 1500);
     }
-  };
+  }, [currentQuestion, gameMode, feedback, intersections, addresses, nextQuestion]);
 
-  const handleBlockClick = (blockData) => {
-    if (gameMode !== "QUIZ_BLOCKS" || feedback) return;
+  const handleBlockClick = useCallback((blockData) => {
+    if (!currentQuestion || gameMode !== "QUIZ_BLOCKS" || feedback) return;
     setClickedBlockData(blockData);
     const diff = Math.abs(currentQuestion.block - blockData.block);
     
@@ -178,7 +185,7 @@ export default function MapBoard() {
         autoAdvanceTimer.current = setTimeout(nextBlockQuestion, 1500); 
     }
     else { setFeedback("WRONG"); setDistanceOff(diff); }
-  };
+  }, [currentQuestion, gameMode, feedback, nextBlockQuestion]);
 
   // --- RENDER HELPERS ---
   const getBlockStyle = (block) => {

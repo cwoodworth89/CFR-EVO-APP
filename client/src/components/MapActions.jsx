@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import * as turf from '@turf/turf';
 
 // COMPONENT: Handle Map Clicks
 export function MapClickEvents({ onMapClick }) {

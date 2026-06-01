@@ -315,10 +315,11 @@ export default function MapBoard() {
       
       <Header 
         gameMode={gameMode} score={score} mapStyle={mapStyle} setMapStyle={setMapStyle} 
-        startMode={startMode} toggleBlocks={setShowLabels} showBlocks={showLabels} 
-        toggleHydrants={setShowHydrants} showHydrants={showHydrants}
-        showZones={showZones} toggleZones={setShowZones}
-        showRoadClosures={showRoadClosures} toggleRoadClosures={setShowRoadClosures}
+        startMode={startMode} 
+        showLabels={showLabels} setShowLabels={setShowLabels} 
+        showHydrants={showHydrants} setShowHydrants={setShowHydrants}
+        showZones={showZones} setShowZones={setShowZones}
+        showRoadClosures={showRoadClosures} setShowRoadClosures={setShowRoadClosures}
       />
 
       <div className="flex-grow relative">
@@ -437,7 +438,7 @@ export default function MapBoard() {
 
         {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
         <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
-          FIRST DUE TRAINER | BUILD: {buildTime}
+          CFR EVO APP | BUILD: {buildTime}
         </div>
 
         {/* SIDEBAR */}

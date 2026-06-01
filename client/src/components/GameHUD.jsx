@@ -7,131 +7,192 @@ export function Header({
   mapStyle, 
   setMapStyle, 
   startMode, 
-  toggleBlocks, 
-  showBlocks, 
-  toggleHydrants, 
-  showHydrants,
-  toggleZones,
+  showLabels, 
+  setShowLabels, 
+  showHydrants, 
+  setShowHydrants,
   showZones,
-  toggleRoadClosures,
-  showRoadClosures
+  setShowZones,
+  showRoadClosures,
+  setShowRoadClosures
 }) {
-  
+  const [showLayersMenu, setShowLayersMenu] = React.useState(false);
+  const isExplore = gameMode === "EXPLORE";
+
   return (
-    <div className="bg-slate-950 text-white p-3 shadow-md z-20 flex justify-between items-center border-b border-slate-800 h-16">
-        <h1 className="text-lg font-bold tracking-wider flex items-center gap-2">
-          FIRST DUE <span className="text-sky-500 font-extrabold">TRAINER</span>
-        </h1>
-        {gameMode !== "EXPLORE" && (
-          <div className="font-mono text-sm text-slate-400">
-            SCORE: <span className="text-white text-lg">{score}</span>
-          </div>
-        )}
-        
-        <div className="flex gap-4 items-center">
-          {/* Layer Switcher - Simplified */}
-          <div className="flex bg-slate-800 rounded p-1 mr-4 border border-slate-700">
-            {['GREY', 'DARK'].map(style => (
-                <button 
-                  key={style} 
-                  onClick={() => setMapStyle(style)} 
-                  className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-                    mapStyle === style 
-                      ? "bg-slate-600 text-white shadow-sm" 
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {style}
-                </button>
-            ))}
-          </div>
+    <>
+      <div className="bg-slate-950 text-white p-3 shadow-md z-20 flex justify-between items-center border-b border-slate-800 h-16 relative">
+          {/* Rebranded App Logo */}
+          <h1 className="text-lg font-bold tracking-wider flex items-center gap-1.5 select-none">
+            CFR <span className="text-emerald-500 font-extrabold">EVO</span>
+            <span className="text-slate-500 font-normal text-xs uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2">APP</span>
+          </h1>
 
-          {/* Explore Mode Toggles */}
-          {gameMode === "EXPLORE" && (
-            <div className="flex gap-2 mr-4 border-r border-slate-800 pr-4">
-              {/* Zones Toggle */}
+          {/* Center Mode Controls */}
+          <div className="flex gap-4 items-center">
+            {/* Segmented Mode Switcher */}
+            <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5 shadow-inner">
               <button 
-                onClick={() => toggleZones(!showZones)} 
-                className={`px-3 py-1 text-xs font-bold rounded border transition-all ${
-                  showZones 
-                    ? "bg-sky-500 text-black border-sky-600 font-semibold shadow-lg shadow-sky-500/10" 
-                    : "bg-slate-800 text-sky-500 border-sky-900/50 hover:border-sky-500 hover:text-sky-400"
+                onClick={() => startMode("EXPLORE")} 
+                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  isExplore 
+                    ? "bg-slate-800 text-white shadow-sm" 
+                    : "text-slate-500 hover:text-slate-300"
                 }`}
               >
-                {showZones ? "HIDE ZONES" : "SHOW ZONES"}
+                🧭 EXPLORE
               </button>
-
-              {/* Hydrants Toggle */}
               <button 
-                onClick={() => toggleHydrants(!showHydrants)} 
-                className={`px-3 py-1 text-xs font-bold rounded border transition-all ${
-                  showHydrants 
-                    ? "bg-emerald-500 text-black border-emerald-600 font-semibold shadow-lg shadow-emerald-500/10" 
-                    : "bg-slate-800 text-emerald-500 border-emerald-900/50 hover:border-emerald-500 hover:text-emerald-400"
+                onClick={() => {
+                  if (isExplore) {
+                    startMode("QUIZ_ZONES"); // Default quiz type
+                  }
+                }} 
+                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  !isExplore 
+                    ? "bg-slate-800 text-white shadow-sm" 
+                    : "text-slate-500 hover:text-slate-300"
                 }`}
               >
-                {showHydrants ? "HIDE HYDRANTS" : "SHOW HYDRANTS"}
-              </button>
-
-              {/* Road Closures Toggle */}
-              <button 
-                onClick={() => toggleRoadClosures(!showRoadClosures)} 
-                className={`px-3 py-1 text-xs font-bold rounded border transition-all ${
-                  showRoadClosures 
-                    ? "bg-rose-600 text-white border-rose-700 font-semibold shadow-lg shadow-rose-600/15" 
-                    : "bg-slate-800 text-rose-400 border-rose-950/60 hover:border-rose-700 hover:text-rose-300"
-                }`}
-              >
-                {showRoadClosures ? "HIDE CLOSURES" : "SHOW CLOSURES"}
+                🎓 TRAINING
               </button>
             </div>
-          )}
 
-          {/* Labels Toggle (Now controls Roads + Addresses + Parcels) */}
-          {gameMode !== "EXPLORE" && (
-            <button 
-              onClick={() => toggleBlocks(!showBlocks)} 
-              className={`mr-4 px-3 py-1 text-xs font-bold rounded border transition-all ${
-                showBlocks 
-                  ? "bg-amber-500 text-black border-amber-600" 
-                  : "bg-slate-800 text-amber-500 border-amber-900 hover:border-amber-500"
+            {/* Training Topic Dropdown Select Menu */}
+            {!isExplore && (
+              <div className="relative animate-in fade-in slide-in-from-left-2 duration-150">
+                <select 
+                  value={gameMode} 
+                  onChange={(e) => startMode(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 hover:border-slate-600 text-white rounded-lg pl-3 pr-8 py-1.5 text-xs font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm appearance-none"
+                  style={{ 
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`, 
+                    backgroundPosition: 'right 8px center', 
+                    backgroundRepeat: 'no-repeat', 
+                    backgroundSize: '14px' 
+                  }}
+                >
+                  <option value="QUIZ_ZONES">⚡ STATION ZONES</option>
+                  <option value="QUIZ_INTERSECTIONS">📍 STREET INTERSECTIONS</option>
+                  <option value="QUIZ_BLOCKS">🛣️ BLOCK RANGES</option>
+                  <option value="QUIZ_ADDRESSES">🏠 PARCEL ADDRESSES</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-4 items-center">
+            {/* Score HUD (Training only) */}
+            {!isExplore && (
+              <div className="font-mono text-xs text-slate-400 mr-2 border border-slate-800 px-3 py-1.5 rounded-lg bg-slate-900/40 select-none">
+                SCORE: <span className="text-white font-bold text-sm">{score}</span>
+              </div>
+            )}
+
+            {/* Unified Map Options Dropdown */}
+            <div className="relative">
+               <button 
+                  onClick={() => setShowLayersMenu(!showLayersMenu)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 select-none ${
+                    showLayersMenu 
+                      ? "bg-slate-800 text-white border-slate-600 shadow-md" 
+                      : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
+                  }`}
+               >
+                  ⚙️ MAP OPTIONS
+               </button>
+               
+               {showLayersMenu && (
+                  <>
+                    {/* Seamless Backdrop Click-out */}
+                    <div className="fixed inset-0 z-[1050]" onClick={() => setShowLayersMenu(false)} />
+                    
+                    {/* Dropdown Options Card */}
+                    <div className="absolute right-0 mt-2 w-52 bg-slate-900/98 backdrop-blur border border-slate-800 rounded-xl p-3.5 shadow-2xl z-[1100] flex flex-col gap-3.5 select-none animate-in fade-in slide-in-from-top-2 duration-150">
+                       <div>
+                         <div className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider mb-1.5 font-mono">Basemap Style</div>
+                         <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850">
+                           {['GREY', 'DARK'].map(style => (
+                               <button 
+                                 key={style} 
+                                 onClick={() => { setMapStyle(style); setShowLayersMenu(false); }} 
+                                 className={`flex-1 py-1 text-[10px] font-black rounded-md transition-all ${
+                                   mapStyle === style 
+                                     ? "bg-slate-800 text-white shadow" 
+                                     : "text-slate-500 hover:text-slate-300"
+                                 }`}
+                               >
+                                 {style}
+                               </button>
+                           ))}
+                         </div>
+                       </div>
+                       
+                       <div className="border-t border-slate-850 pt-2.5">
+                         <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">Street Labels</span>
+                            <button 
+                               onClick={() => { setShowLabels(!showLabels); setShowLayersMenu(false); }}
+                               className={`px-2.5 py-1 rounded-md text-[9px] font-black border transition-all ${
+                                 showLabels 
+                                   ? "bg-amber-500 text-black border-amber-600 shadow-sm" 
+                                   : "bg-slate-950 text-slate-500 border-slate-850 hover:border-slate-700 hover:text-slate-400"
+                               }`}
+                            >
+                               {showLabels ? "ON" : "OFF"}
+                            </button>
+                         </div>
+                       </div>
+                    </div>
+                  </>
+               )}
+            </div>
+          </div>
+      </div>
+
+      {/* Secondary Explore Sub-Toolbar (Fades down when in Explore mode) */}
+      {isExplore && (
+        <div className="bg-slate-900/95 backdrop-blur border-b border-slate-850 py-2 px-4 flex justify-center items-center gap-3 z-10 shadow-inner select-none animate-in slide-in-from-top duration-200">
+           <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mr-2 font-bold">Explore Layers:</span>
+           
+           {/* ZONES pill */}
+           <button 
+              onClick={() => setShowZones(!showZones)}
+              className={`px-3 py-1 rounded-full text-[10px] font-black border transition-all shadow-sm ${
+                showZones 
+                  ? "bg-sky-500/20 text-sky-400 border-sky-500/40 shadow-sky-500/5" 
+                  : "bg-slate-950 text-slate-500 border-slate-850 hover:border-slate-700 hover:text-slate-400"
               }`}
-            >
-              {showBlocks ? "HIDE" : "LABELS"}
-            </button>
-          )}
+           >
+              ZONES
+           </button>
 
-          {/* Hydrants Toggle */}
-          {gameMode !== "EXPLORE" && (
-            <button 
-              onClick={() => toggleHydrants(!showHydrants)} 
-              className={`mr-4 px-3 py-1 text-xs font-bold rounded border transition-all ${
+           {/* HYDRANTS pill */}
+           <button 
+              onClick={() => setShowHydrants(!showHydrants)}
+              className={`px-3 py-1 rounded-full text-[10px] font-black border transition-all shadow-sm ${
                 showHydrants 
-                  ? "bg-sky-500 text-black border-sky-600" 
-                  : "bg-slate-800 text-sky-500 border-sky-900 hover:border-sky-500"
+                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-emerald-500/5" 
+                  : "bg-slate-950 text-slate-500 border-slate-850 hover:border-slate-700 hover:text-slate-400"
               }`}
-            >
-              {showHydrants ? "HIDE HYDRANTS" : "SHOW HYDRANTS"}
-            </button>
-          )}
+           >
+              HYDRANTS
+           </button>
 
-          {/* Game Mode Buttons */}
-          <button 
-            onClick={() => startMode("EXPLORE")} 
-            className={`px-3 py-1 text-xs font-bold rounded transition-all ${
-              gameMode === "EXPLORE" 
-                ? "bg-slate-600 text-white border border-slate-500" 
-                : "bg-slate-700 text-white hover:bg-slate-600"
-            }`}
-          >
-            EXPLORE
-          </button>
-          <button onClick={() => startMode("QUIZ_ZONES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-sky-500 border border-sky-900 hover:bg-slate-700 transition-all">ZONES</button>
-          <button onClick={() => startMode("QUIZ_INTERSECTIONS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-emerald-500 border border-emerald-900 hover:bg-slate-700 transition-all">INTXN</button>
-          <button onClick={() => startMode("QUIZ_BLOCKS")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-amber-500 border border-amber-900 hover:bg-slate-700 transition-all">BLOCKS</button>
-          <button onClick={() => startMode("QUIZ_ADDRESSES")} className="px-3 py-1 text-xs font-bold rounded bg-slate-800 text-purple-400 border border-purple-900 hover:bg-slate-700 transition-all">ADDRESS</button>
+           {/* ROAD CLOSURES pill */}
+           <button 
+              onClick={() => setShowRoadClosures(!showRoadClosures)}
+              className={`px-3 py-1 rounded-full text-[10px] font-black border transition-all shadow-sm ${
+                showRoadClosures 
+                  ? "bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-rose-500/5" 
+                  : "bg-slate-950 text-slate-500 border-slate-850 hover:border-slate-700 hover:text-slate-400"
+              }`}
+           >
+              ROAD CLOSURES
+           </button>
         </div>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -146,12 +207,12 @@ export function Sidebar({ gameMode, currentQuestion, feedback, distanceOff, clic
                 {gameMode === "EXPLORE" && showRoadClosures && (
                   <>
                     <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-1">REAL-TIME TRAFFIC</div>
-                    <div className="text-lg text-rose-500 font-bold leading-tight uppercase font-sans tracking-wide">ROAD CLOSURES</div>
+                    <div className="text-lg text-rose-500 font-bold leading-tight uppercase font-sans tracking-wide">CFR EVO ALERTS</div>
                   </>
                 )}
                 {gameMode === "QUIZ_ZONES" && currentQuestion && (
                   <>
-                    <h2 className="text-slate-500 text-[10px] uppercase font-bold">FIRST DUE</h2>
+                    <h2 className="text-slate-500 text-[10px] uppercase font-bold">CFR EVO</h2>
                     <div className="text-3xl text-white font-bold">Zone {currentQuestion.zone_id}</div>
                   </>
                 )}

@@ -8,7 +8,7 @@ import L from 'leaflet';
 // Import from your other components
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
-import { Header, Sidebar } from './GameHUD';
+import { Header, LeftSidebar, RightSidebar } from './GameHUD';
 import { MODE_DEFAULTS, UNIT_COLORS } from './MapConstants';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
@@ -59,6 +59,15 @@ export default function MapBoard() {
   const [showZones, setShowZones] = useState(false); 
   const [showRoadClosures, setShowRoadClosures] = useState(false); 
   
+  // COLLAPSIBLE SIDEBAR STATES
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+
+  // ROAD ACCESS FILTER STATES
+  const [filterNoAccess, setFilterNoAccess] = useState(true);
+  const [filterAccessOnly, setFilterAccessOnly] = useState(true);
+  const [filterCaution, setFilterCaution] = useState(true);
+
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState(null);
@@ -69,6 +78,16 @@ export default function MapBoard() {
 
   // ⏱️ TIMER REF (Prevents double-skipping if you hit Enter while waiting)
   const autoAdvanceTimer = useRef(null);
+
+  // Auto-resize Leaflet map container to prevent gray areas when sidebars open/close
+  useEffect(() => {
+    if (map) {
+      const timer = setTimeout(() => {
+        map.invalidateSize();
+      }, 350); // wait for transitions to settle
+      return () => clearTimeout(timer);
+    }
+  }, [map, leftSidebarOpen, rightSidebarOpen]);
 
   // LOAD ROAD CLOSURES
   useEffect(() => {
@@ -111,12 +130,21 @@ export default function MapBoard() {
               lng = evt.geography.coordinates[middleIndex][0];
               lat = evt.geography.coordinates[middleIndex][1];
             }
+
+            const severityVal = (evt.severity || "MINOR").toUpperCase();
+            let emergencyAccess = "CAUTION";
+            if (severityVal === "MAJOR") {
+              emergencyAccess = "NO_ACCESS";
+            } else if (severityVal === "MODERATE") {
+              emergencyAccess = "ACCESS_ONLY";
+            }
             
             return {
               id: evt.id || Math.random().toString(),
               headline: evt.headline || "TRAFFIC ALERT",
               street: evt.road_name || "Regional Road",
-              severity: (evt.severity || "MINOR").toUpperCase(),
+              severity: severityVal,
+              emergencyAccess: emergencyAccess,
               description: evt.description || "Active traffic event.",
               coordinates: [lat, lng],
               source: "DriveBC Open511"
@@ -132,8 +160,6 @@ export default function MapBoard() {
 
   // LOAD DATA
   useEffect(() => {
-    // We use import.meta.env.BASE_URL to automatically add '/coquitlam-fire-trainer/' 
-    // when deployed, but keep it as '/' when on localhost.
     const baseUrl = import.meta.env.BASE_URL;
 
     fetch(`${baseUrl}data/zones.json?v=2`)
@@ -210,11 +236,15 @@ export default function MapBoard() {
           setShowHydrants(false);
           setShowRoadClosures(false);
           setCurrentQuestion(null);
+          setLeftSidebarOpen(true);
+          setRightSidebarOpen(true);
       } else {
           // Quiz Modes: Hydrants ON by default, road closures icons ON by default, zones OFF
           setShowHydrants(true);
           setShowRoadClosures(true);
           setShowZones(false);
+          setLeftSidebarOpen(true);
+          setRightSidebarOpen(false); // Close alerts list panel for training focus
       }
       
       if (mode === "QUIZ_ZONES") nextQuestion(zones);
@@ -310,147 +340,214 @@ export default function MapBoard() {
     return { color: "#475569", fillOpacity: 0.05, weight: 1 };
   };
 
+  // Filter closures for map and alerts rendering
+  const activeClosures = roadClosures.filter(closure => {
+    if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
+    if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
+    if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
+    return true;
+  });
+
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-900 overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
       
       <Header 
-        gameMode={gameMode} score={score} mapStyle={mapStyle} setMapStyle={setMapStyle} 
+        gameMode={gameMode} 
         startMode={startMode} 
-        showLabels={showLabels} setShowLabels={setShowLabels} 
-        showHydrants={showHydrants} setShowHydrants={setShowHydrants}
-        showZones={showZones} setShowZones={setShowZones}
-        showRoadClosures={showRoadClosures} setShowRoadClosures={setShowRoadClosures}
+        mapStyle={mapStyle} 
+        setMapStyle={setMapStyle} 
+        showLabels={showLabels} 
+        setShowLabels={setShowLabels} 
+        leftSidebarOpen={leftSidebarOpen}
+        setLeftSidebarOpen={setLeftSidebarOpen}
+        rightSidebarOpen={rightSidebarOpen}
+        setRightSidebarOpen={setRightSidebarOpen}
+        alertsCount={showRoadClosures ? activeClosures.length : 0}
       />
 
-      <div className="flex-grow relative">
-        <MapContainer 
-            center={[49.28, -122.80]} 
-            zoom={12} 
-            style={{ height: "100%", width: "100%" }} 
-            className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
-        >
-          {/* 1. BASE MAP (z-index 200) */}
-          <BaseMap style={mapStyle} />
-          
-          <CoquitlamOverlays visible={showLabels} />
-          
-          {/* Hydrants Visual GIS Overlay */}
-          <HydrantsLayer visible={showHydrants} />
-          
-          {/* 2. DEFINE CUSTOM PANES */}
-          <Pane name="underlayPane" style={{ zIndex: 390 }} />
-          <Pane name="labelsPane" style={{ zIndex: 410 }} />
-          
-          {/* 3. LAYERS ASSIGNED TO PANES */}
-          
-          {/* "Top Bun" - The Text Labels */}
-          <FireZonesLayer 
-              visible={gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)} 
-              pane="labelsPane" 
-          />
-          
-          {/* "Bottom Bun" - The Highlight */}
-          {(gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)) && zones.map((zone) => (
-            <Polygon 
-                key={zone.zone_id} 
-                positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
-                pathOptions={getZoneStyle(zone)} 
-                pane="underlayPane" 
-            />
-          ))}
-
-          {/* HIDE STATIONS IN QUIZ MODE */}
-          {gameMode !== "QUIZ_ZONES" && <StationsLayer />}
-          
-          <MapClickEvents onMapClick={handleMapClick} />
-          
-          {!feedback && currentQuestion && (
-             <SmartZoom target={currentQuestion} mode={gameMode} allBlocks={blocks} allZones={zones} />
-          )}
-          {feedback === "WRONG" && gameMode === "QUIZ_BLOCKS" && clickedBlockData && (
-             <ZoomToFeedback guessBlock={clickedBlockData} targetBlock={blocks.find(b => b.block === currentQuestion.block && b.street === currentQuestion.street)} mode={gameMode} />
-          )}
-
-          {/* GAME VISUALS: BLOCKS */}
-          {gameMode === "QUIZ_BLOCKS" && currentQuestion && blocks && blocks.length > 0 && 
-            blocks.map((block, i) => (
-                <Polyline 
-                    key={`${block.street}-${block.block}-${i}`} 
-                    positions={block.coordinates} 
-                    eventHandlers={{ 
-                        click: (e) => { L.DomEvent.stopPropagation(e); handleBlockClick(block); },
-                        mouseover: (e) => { 
-                            if (!feedback) {
-                                e.target.setStyle({ color: "#f59e0b", weight: 10, opacity: 1 });
-                                e.target.bringToFront();
-                            }
-                        },
-                        mouseout: (e) => { 
-                            e.target.setStyle(getBlockStyle(block)); 
-                        }
-                    }} 
-                    pathOptions={getBlockStyle(block)}
-                >
-                    <Tooltip sticky direction="top" className="font-bold text-xs bg-slate-900 text-white border-0">
-                        {feedback ? `${block.block} ${block.street}` : "Block ???"}
-                    </Tooltip>
-                </Polyline>
-          ))}
-
-          {/* GAME VISUALS: PINS */}
-          {(gameMode === "QUIZ_INTERSECTIONS" || gameMode === "QUIZ_ADDRESSES") && userGuess && (
-             <>
-                <CircleMarker center={userGuess} radius={6} pathOptions={{ color: "white", fillColor: feedback === "PERFECT" ? "#22c55e" : "#ef4444", fillOpacity: 1, weight: 2 }} />
-                {feedback !== "PERFECT" && (
-                    <>
-                        <CircleMarker center={[currentQuestion.lat, currentQuestion.lng]} radius={6} pathOptions={{ color: "white", fillColor: "#22c55e", fillOpacity: 1, weight: 2 }} />
-                        <Polyline positions={[userGuess, [currentQuestion.lat, currentQuestion.lng]]} pathOptions={{ color: "#ef4444", dashArray: '10, 10', weight: 2, opacity: 0.8 }} />
-                    </>
-                )}
-             </>
-          )}
-
-          {/* ROAD CLOSURES LAYER */}
-          {showRoadClosures && roadClosures.map((closure, i) => (
-            <Marker 
-              key={closure.id || i} 
-              position={closure.coordinates} 
-              icon={closureIcon}
-            >
-              <Popup className="road-closure-popup">
-                <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
-                      closure.severity === 'MAJOR' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                      closure.severity === 'MODERATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                      'bg-slate-800/60 text-slate-300 border border-slate-700/30'
-                    }`}>{closure.severity}</span>
-                    <span className="text-[9px] text-slate-400 font-mono font-medium">{closure.source}</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-amber-500 mt-2 leading-tight">{closure.headline}</h3>
-                  <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
-                  <p className="text-xs text-slate-300 mt-2 font-sans leading-relaxed border-t border-slate-850 pt-1.5">{closure.description}</p>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-
-        {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
-        <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
-          CFR EVO APP | BUILD: {buildTime}
-        </div>
-
-        {/* SIDEBAR */}
-        <Sidebar 
-            gameMode={gameMode} currentQuestion={currentQuestion} feedback={feedback} 
-            distanceOff={distanceOff} clickedBlockData={clickedBlockData} map={map}
-            onNext={goToNext} 
-            onZoneGuess={handleZoneGuess}
-            roadClosures={roadClosures}
-            showRoadClosures={showRoadClosures}
+      <div className="flex flex-row flex-grow w-full h-[calc(100vh-4rem)] relative overflow-hidden">
+        {/* Left Control Panel & Option Toggles */}
+        <LeftSidebar 
+          leftSidebarOpen={leftSidebarOpen}
+          setLeftSidebarOpen={setLeftSidebarOpen}
+          gameMode={gameMode}
+          showZones={showZones}
+          setShowZones={setShowZones}
+          showHydrants={showHydrants}
+          setShowHydrants={setShowHydrants}
+          showRoadClosures={showRoadClosures}
+          setShowRoadClosures={setShowRoadClosures}
+          filterNoAccess={filterNoAccess}
+          setFilterNoAccess={setFilterNoAccess}
+          filterAccessOnly={filterAccessOnly}
+          setFilterAccessOnly={setFilterAccessOnly}
+          filterCaution={filterCaution}
+          setFilterCaution={setFilterCaution}
+          score={score}
+          currentQuestion={currentQuestion}
+          feedback={feedback}
+          distanceOff={distanceOff}
+          clickedBlockData={clickedBlockData}
+          onNext={goToNext}
+          onZoneGuess={handleZoneGuess}
+          map={map}
         />
 
+        {/* Map Container Wrapper */}
+        <div className="flex-grow h-full relative flex flex-col bg-slate-900 min-w-0">
+          <MapContainer 
+              center={[49.28, -122.80]} 
+              zoom={12} 
+              style={{ height: "100%", width: "100%" }} 
+              className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
+          >
+            {/* 1. BASE MAP (z-index 200) */}
+            <BaseMap style={mapStyle} />
+            
+            <CoquitlamOverlays visible={showLabels} />
+            
+            {/* Hydrants Visual GIS Overlay */}
+            <HydrantsLayer visible={showHydrants} />
+            
+            {/* 2. DEFINE CUSTOM PANES */}
+            <Pane name="underlayPane" style={{ zIndex: 390 }} />
+            <Pane name="labelsPane" style={{ zIndex: 410 }} />
+            
+            {/* 3. LAYERS ASSIGNED TO PANES */}
+            
+            {/* "Top Bun" - The Text Labels */}
+            <FireZonesLayer 
+                visible={gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)} 
+                pane="labelsPane" 
+            />
+            
+            {/* "Bottom Bun" - The Highlight */}
+            {(gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)) && zones.map((zone) => (
+              <Polygon 
+                  key={zone.zone_id} 
+                  positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
+                  pathOptions={getZoneStyle(zone)} 
+                  pane="underlayPane" 
+              />
+            ))}
+
+            {/* HIDE STATIONS IN QUIZ MODE */}
+            {gameMode !== "QUIZ_ZONES" && <StationsLayer />}
+            
+            <MapClickEvents onMapClick={handleMapClick} />
+            
+            {!feedback && currentQuestion && (
+               <SmartZoom target={currentQuestion} mode={gameMode} allBlocks={blocks} allZones={zones} />
+            )}
+            {feedback === "WRONG" && gameMode === "QUIZ_BLOCKS" && clickedBlockData && (
+               <ZoomToFeedback guessBlock={clickedBlockData} targetBlock={blocks.find(b => b.block === currentQuestion.block && b.street === currentQuestion.street)} mode={gameMode} />
+            )}
+
+            {/* GAME VISUALS: BLOCKS */}
+            {gameMode === "QUIZ_BLOCKS" && currentQuestion && blocks && blocks.length > 0 && 
+              blocks.map((block, i) => (
+                  <Polyline 
+                      key={`${block.street}-${block.block}-${i}`} 
+                      positions={block.coordinates} 
+                      eventHandlers={{ 
+                          click: (e) => { L.DomEvent.stopPropagation(e); handleBlockClick(block); },
+                          mouseover: (e) => { 
+                              if (!feedback) {
+                                  e.target.setStyle({ color: "#f59e0b", weight: 10, opacity: 1 });
+                                  e.target.bringToFront();
+                              }
+                          },
+                          mouseout: (e) => { 
+                              e.target.setStyle(getBlockStyle(block)); 
+                          }
+                      }} 
+                      pathOptions={getBlockStyle(block)}
+                  >
+                      <Tooltip sticky direction="top" className="font-bold text-xs bg-slate-900 text-white border-0">
+                          {feedback ? `${block.block} ${block.street}` : "Block ???"}
+                      </Tooltip>
+                  </Polyline>
+            ))}
+
+            {/* GAME VISUALS: PINS */}
+            {(gameMode === "QUIZ_INTERSECTIONS" || gameMode === "QUIZ_ADDRESSES") && userGuess && (
+               <>
+                  <CircleMarker center={userGuess} radius={6} pathOptions={{ color: "white", fillColor: feedback === "PERFECT" ? "#22c55e" : "#ef4444", fillOpacity: 1, weight: 2 }} />
+                  {feedback !== "PERFECT" && (
+                      <>
+                          <CircleMarker center={[currentQuestion.lat, currentQuestion.lng]} radius={6} pathOptions={{ color: "white", fillColor: "#22c55e", fillOpacity: 1, weight: 2 }} />
+                          <Polyline positions={[userGuess, [currentQuestion.lat, currentQuestion.lng]]} pathOptions={{ color: "#ef4444", dashArray: '10, 10', weight: 2, opacity: 0.8 }} />
+                      </>
+                  )}
+               </>
+            )}
+
+            {/* ROAD CLOSURES LAYER */}
+            {showRoadClosures && activeClosures.map((closure, i) => {
+              let color = "#ef4444"; // NO_ACCESS
+              if (closure.emergencyAccess === "ACCESS_ONLY") color = "#f59e0b"; // ACCESS_ONLY
+              if (closure.emergencyAccess === "CAUTION") color = "#eab308"; // CAUTION
+              
+              return (
+                <React.Fragment key={closure.id || i}>
+                  {closure.polyline && closure.polyline.length > 0 && (
+                    <Polyline 
+                      positions={closure.polyline} 
+                      pathOptions={{ 
+                        color: color, 
+                        weight: 6, 
+                        dashArray: "10, 10", 
+                        opacity: 0.85 
+                      }} 
+                    />
+                  )}
+                  <Marker 
+                    position={closure.coordinates} 
+                    icon={closureIcon}
+                  >
+                    <Popup className="road-closure-popup">
+                      <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${
+                            closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                            closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                            'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                          }`}>
+                            {closure.emergencyAccess === 'NO_ACCESS' ? 'NO EMERGENCY ACCESS' :
+                             closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
+                             'PASSABLE WITH CAUTION'}
+                          </span>
+                          <span className="text-[9px] text-slate-550 font-mono font-medium">{closure.source}</span>
+                        </div>
+                        <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
+                        <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
+                        <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5">{closure.description}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                </React.Fragment>
+              );
+            })}
+          </MapContainer>
+
+          {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
+          <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
+            CFR EVO APP | BUILD: {buildTime}
+          </div>
+        </div>
+
+        {/* Right Sidebar Alerts Panel */}
+        <RightSidebar 
+          rightSidebarOpen={rightSidebarOpen}
+          setRightSidebarOpen={setRightSidebarOpen}
+          gameMode={gameMode}
+          roadClosures={roadClosures}
+          showRoadClosures={showRoadClosures}
+          filterNoAccess={filterNoAccess}
+          filterAccessOnly={filterAccessOnly}
+          filterCaution={filterCaution}
+          map={map}
+        />
       </div>
     </div>
   );

@@ -61,7 +61,7 @@ export default function MapBoard() {
   
   // COLLAPSIBLE SIDEBAR STATES
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);
@@ -237,7 +237,7 @@ export default function MapBoard() {
           setShowRoadClosures(false);
           setCurrentQuestion(null);
           setLeftSidebarOpen(true);
-          setRightSidebarOpen(true);
+          setRightSidebarOpen(false);
       } else {
           // Quiz Modes: Hydrants ON by default, road closures icons ON by default, zones OFF
           setShowHydrants(true);
@@ -365,7 +365,7 @@ export default function MapBoard() {
         alertsCount={showRoadClosures ? activeClosures.length : 0}
       />
 
-      <div className="flex flex-row flex-grow w-full h-[calc(100vh-4rem)] relative overflow-hidden">
+      <div className="flex flex-row flex-grow w-full h-[calc(100vh-4rem)] relative overflow-hidden z-10">
         {/* Left Control Panel & Option Toggles */}
         <LeftSidebar 
           leftSidebarOpen={leftSidebarOpen}

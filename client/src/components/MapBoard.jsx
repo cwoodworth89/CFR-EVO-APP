@@ -41,10 +41,10 @@ const closureIcon = L.divIcon({
 
 // 🚒 Fire Hall coordinate mapping
 const STATIONS = {
-  "1": [49.291329039026046, -122.79161362016414], // Hall 1
-  "2": [49.26223510671969, -122.81725512755891],  // Hall 2
-  "3": [49.24804277980424, -122.86566519365569],  // Hall 3
-  "4": [49.2952132946437, -122.7425391041921]     // Hall 4
+  "1": [49.291329039026046, -122.79161362016414], // Town Centre Fire Hall (TCFH)
+  "2": [49.26223510671969, -122.81725512755891],  // Mariner Fire Hall
+  "3": [49.24804277980424, -122.86566519365569],  // Austin Heights Fire Hall
+  "4": [49.2952132946437, -122.7425391041921]     // Burke Mountain Fire Hall
 };
 
 // 🎯 Custom Target Address Icon

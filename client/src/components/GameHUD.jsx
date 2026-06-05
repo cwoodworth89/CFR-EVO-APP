@@ -54,7 +54,7 @@ export function Header({
               }}
             >
               <option value="EXPLORE">🧭 EXPLORE / DRIVERS AID</option>
-              <option value="QUIZ_ZONES">🎓 TRAINING: STATION ZONES</option>
+              <option value="QUIZ_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
               <option value="QUIZ_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
               <option value="QUIZ_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
               <option value="QUIZ_ADDRESSES">🎓 TRAINING: PARCEL ADDRESSES</option>
@@ -222,10 +222,10 @@ export function LeftSidebar({
                               onChange={(e) => setHomeHall(e.target.value)}
                               className="bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm w-full"
                            >
-                              <option value="1">Hall 1 (Headquarters)</option>
-                              <option value="2">Hall 2 (Austin Heights)</option>
-                              <option value="3">Hall 3 (Mariner)</option>
-                              <option value="4">Hall 4 (Burke Mountain)</option>
+                              <option value="1">Town Centre Fire Hall (TCFH)</option>
+                              <option value="2">Mariner Fire Hall</option>
+                              <option value="3">Austin Heights Fire Hall</option>
+                              <option value="4">Burke Mountain Fire Hall</option>
                            </select>
                         </div>
 
@@ -353,7 +353,7 @@ export function LeftSidebar({
                                 onChange={(e) => setShowZones(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-sky-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">📐 Station Boundaries</span>
+                             <span className="flex items-center gap-1.5">📐 Emergency Zones</span>
                           </label>
                        </div>
                     </div>
@@ -425,7 +425,7 @@ export function LeftSidebar({
                     <div className="flex flex-col gap-4 text-center">
                        {gameMode === "QUIZ_ZONES" && currentQuestion && (
                          <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl animate-in fade-in">
-                           <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest">Target Boundary</div>
+                           <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest">Target Zone</div>
                            <div className="text-3xl text-sky-400 font-extrabold mt-1">Zone {currentQuestion.zone_id}</div>
                          </div>
                        )}
@@ -594,27 +594,33 @@ export function RightSidebar({
                                       map.flyTo(closure.coordinates, 16, { animate: true });
                                     }
                                   }}
-                                  className="bg-slate-950 hover:bg-slate-850 border border-slate-850 hover:border-slate-750 text-left p-3.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-2 group relative overflow-hidden"
+                                  className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden"
                                 >
-                                     {/* Access Badge Indicator */}
-                                     <div className="flex justify-between items-center gap-1.5 flex-wrap">
-                                         <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${
-                                           closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                                           'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                     {/* Street Name (Prominent & Color-coded) & Source */}
+                                     <div className="flex justify-between items-center gap-1.5">
+                                         <span className={`text-xs font-black uppercase tracking-wide truncate ${
+                                           closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-500' :
+                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'text-amber-500' :
+                                           'text-yellow-500'
                                          }`}>
-                                           {closure.emergencyAccess === 'NO_ACCESS' ? 'NO EMERGENCY ACCESS' :
-                                            closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
-                                            'PASSABLE WITH CAUTION'}
+                                            {closure.street}
                                          </span>
-                                         <span className="text-[8px] text-slate-500 font-mono font-medium">{closure.source}</span>
+                                         <span className="text-[8px] text-slate-500 font-mono font-medium flex-shrink-0">{closure.source}</span>
                                      </div>
                                      
-                                     <div>
-                                        <h4 className="font-extrabold text-xs text-slate-200 leading-snug group-hover:text-white transition-colors">{closure.headline}</h4>
-                                        <p className="text-[9px] text-slate-400 font-medium font-mono leading-none mt-1">{closure.street}</p>
+                                     {/* Headline & Warning Type Pill */}
+                                     <div className="flex justify-between items-center text-[9px] font-mono font-bold text-slate-400">
+                                        <span className="truncate pr-1">{closure.headline}</span>
+                                        <span className={`text-[7px] px-1 py-0.2 rounded font-black tracking-wider flex-shrink-0 ${
+                                          closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                          closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                          'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                        }`}>
+                                          {closure.emergencyAccess === 'NO_ACCESS' ? 'NO ACCESS' :
+                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'LTD ACCESS' :
+                                           'CAUTION'}
+                                        </span>
                                      </div>
-                                     <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-900 pt-2">{closure.description}</p>
                                 </div>
                             ))
                         ) : (

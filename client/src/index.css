@@ -1,3 +1,27 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 🗺️ Custom Leaflet Tooltip Overrides */
+.leaflet-tooltip {
+  background-color: #020617 !important; /* slate-950 */
+  color: #f8fafc !important; /* slate-50 */
+  border: 1px solid #1e293b !important; /* slate-800 */
+  border-radius: 0.75rem !important; /* rounded-xl */
+  padding: 0.5rem 0.75rem !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Tooltip arrow/pointer color overrides to match dark theme */
+.leaflet-tooltip-top:before {
+  border-top-color: #020617 !important;
+}
+.leaflet-tooltip-bottom:before {
+  border-bottom-color: #020617 !important;
+}
+.leaflet-tooltip-left:before {
+  border-left-color: #020617 !important;
+}
+.leaflet-tooltip-right:before {
+  border-right-color: #020617 !important;
+}

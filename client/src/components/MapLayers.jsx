@@ -7,10 +7,10 @@ import { BASE_LAYERS, MODE_DEFAULTS } from './MapConstants';
 // 🚒 STATIONS
 // Coordinates verified against official Coquitlam Fire Hall addresses
 const STATIONS = [
-    { id: "1", name: "Hall 1", coords: [49.291329039026046, -122.79161362016414] },
-    { id: "2", name: "Hall 2", coords: [49.26223510671969, -122.81725512755891] },
-    { id: "3", name: "Hall 3", coords: [49.24804277980424, -122.86566519365569] },
-    { id: "4", name: "Hall 4", coords: [49.2952132946437, -122.7425391041921] }
+    { id: "1", name: "Town Centre Fire Hall (TCFH)", coords: [49.291329039026046, -122.79161362016414] },
+    { id: "2", name: "Mariner Fire Hall", coords: [49.26223510671969, -122.81725512755891] },
+    { id: "3", name: "Austin Heights Fire Hall", coords: [49.24804277980424, -122.86566519365569] },
+    { id: "4", name: "Burke Mountain Fire Hall", coords: [49.2952132946437, -122.7425391041921] }
 ];
 
 // 🎨 TUNED ICON (Fixed anchor centering)

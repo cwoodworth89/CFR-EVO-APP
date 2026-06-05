@@ -17,13 +17,12 @@ import logging
 # Ensure main directory is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from main import (
-    CoquitlamDataValidator,
-    process_full_dispatch,
+from cfr_dispatch.gis import CoquitlamDataValidator
+from cfr_dispatch.orchestration import process_full_dispatch, setup_logging
+from cfr_dispatch.config import (
     UNITS_VOCABULARY,
     ADDRESS_SHAPEFILE_PATH,
-    ZONES_SHAPEFILE_PATH,
-    setup_logging
+    ZONES_SHAPEFILE_PATH
 )
 
 def main():

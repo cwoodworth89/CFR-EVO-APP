@@ -26,17 +26,17 @@ ADDRESS_STREET_TYPE_COLUMN = 'STREETTYPE'
 ZONES_MAP_NAME_COLUMN = 'MAP_NAME'
 STREET_NAME_CONFIDENCE_THRESHOLD = 80
 
-# Import parser functions from main
-from main import (
-    CoquitlamDataValidator,
+# Import parser functions from cfr_dispatch
+from cfr_dispatch.gis import CoquitlamDataValidator
+from cfr_dispatch.parser import (
     sanitize_transcript,
     load_call_types,
     match_incident_type,
     parse_alarm_level,
     abbreviate_units,
-    parse_dispatch_announcement,
-    UNITS_VOCABULARY
+    parse_dispatch_announcement
 )
+from cfr_dispatch.config import UNITS_VOCABULARY
 
 # Setup logging to console for tests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

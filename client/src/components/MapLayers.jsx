@@ -2,16 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { Marker, Tooltip, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { dynamicMapLayer } from 'esri-leaflet';
-import { BASE_LAYERS, MODE_DEFAULTS } from './MapConstants';
+import * as turf from '@turf/turf';
+import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 
-// 🚒 STATIONS
-// Coordinates verified against official Coquitlam Fire Hall addresses
-const STATIONS = [
-    { id: "1", name: "Town Centre Fire Hall (TCFH)", coords: [49.291329039026046, -122.79161362016414] },
-    { id: "2", name: "Mariner Fire Hall", coords: [49.26223510671969, -122.81725512755891] },
-    { id: "3", name: "Austin Heights Fire Hall", coords: [49.24804277980424, -122.86566519365569] },
-    { id: "4", name: "Burke Mountain Fire Hall", coords: [49.2952132946437, -122.7425391041921] }
-];
+
 
 // 🎨 TUNED ICON (Fixed anchor centering)
 const stationIcon = L.divIcon({
@@ -34,7 +28,7 @@ const stationIcon = L.divIcon({
   popupAnchor: [0, -20]
 });
 
-// ≡ƒ¢á∩╕Å BASEMAP COMPONENT
+// 🗺️ BASEMAP COMPONENT
 export function BaseMap({ style }) {
     const map = useMap();
     const layerRef = useRef(null);
@@ -167,39 +161,72 @@ export function HydrantsLayer({ visible }) {
       };
     }, [map, visible, zoom]);
 
-    // 2. Zoom >= 17: Fetch dynamic bounding-box vector hydrants for detailed highlights
+    // 2. Zoom >= 17: Fetch dynamic bounding-box vector hydrants with debouncing & spatial thresholding
+    const lastCenterRef = React.useRef(null);
+    const lastZoomRef = React.useRef(null);
+    const debounceTimerRef = React.useRef(null);
     const bbox = visible && zoom >= 17 ? map.getBounds().toBBoxString() : "";
+
     React.useEffect(() => {
       if (!visible || zoom < 17 || !bbox) {
         setHydrants([]);
         return;
       }
 
-      let active = true;
-      const bounds = map.getBounds();
-      const minLng = bounds.getSouthWest().lng;
-      const minLat = bounds.getSouthWest().lat;
-      const maxLng = bounds.getNorthEast().lng;
-      const maxLat = bounds.getNorthEast().lat;
+      const currentCenter = map.getCenter();
+      const currentZoom = map.getZoom();
+      const lastCenter = lastCenterRef.current;
+      const lastZoom = lastZoomRef.current;
 
-      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${minLng},${minLat},${maxLng},${maxLat}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
+      let shouldFetch = false;
+      if (!lastCenter || lastZoom !== currentZoom) {
+        shouldFetch = true;
+      } else {
+        const from = turf.point([lastCenter.lng, lastCenter.lat]);
+        const to = turf.point([currentCenter.lng, currentCenter.lat]);
+        const distMeters = turf.distance(from, to, { units: 'kilometers' }) * 1000;
+        if (distMeters >= 75) {
+          shouldFetch = true;
+        }
+      }
 
-      fetch(url)
-        .then(r => {
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          return r.json();
-        })
-        .then(data => {
-          if (active && data && data.features) {
-            setHydrants(data.features);
-          }
-        })
-        .catch(err => {
-          console.warn("Failed to fetch viewport hydrants:", err);
-        });
+      if (!shouldFetch) return;
+
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(() => {
+        lastCenterRef.current = currentCenter;
+        lastZoomRef.current = currentZoom;
+
+        const bounds = map.getBounds();
+        const minLng = bounds.getSouthWest().lng;
+        const minLat = bounds.getSouthWest().lat;
+        const maxLng = bounds.getNorthEast().lng;
+        const maxLat = bounds.getNorthEast().lat;
+
+        const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${minLng},${minLat},${maxLng},${maxLat}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
+
+        fetch(url)
+          .then(r => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
+          .then(data => {
+            if (data && data.features) {
+              setHydrants(data.features);
+            }
+          })
+          .catch(err => {
+            console.warn("Failed to fetch viewport hydrants:", err);
+          });
+      }, 250); // 250ms debounce threshold
 
       return () => {
-        active = false;
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
       };
     }, [visible, zoom, map, bbox]);
 

@@ -9,7 +9,8 @@ import L from 'leaflet';
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './GameHUD';
-import { MODE_DEFAULTS, UNIT_COLORS } from './MapConstants';
+import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
+
 import { RoutingOverlay } from './RoutingOverlay';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
@@ -39,13 +40,6 @@ const closureIcon = L.divIcon({
   popupAnchor: [0, -14]
 });
 
-// 🚒 Fire Hall coordinate mapping
-const STATIONS = {
-  "1": [49.291329039026046, -122.79161362016414], // Town Centre Fire Hall (TCFH)
-  "2": [49.26223510671969, -122.81725512755891],  // Mariner Fire Hall
-  "3": [49.24804277980424, -122.86566519365569],  // Austin Heights Fire Hall
-  "4": [49.2952132946437, -122.7425391041921]     // Burke Mountain Fire Hall
-};
 
 // 🎯 Custom Target Address Icon
 const targetIcon = L.divIcon({
@@ -82,8 +76,10 @@ export default function MapBoard() {
   const [addresses, setAddresses] = useState([]);
   const [roadClosures, setRoadClosures] = useState([]);
   
-  // GAME STATE
-  const [gameMode, setGameMode] = useState("EXPLORE"); 
+  // APP/TERMINAL STATE
+  const [appMode, setAppMode] = useState("EXPLORE"); 
+  const [trainingDataLoaded, setTrainingDataLoaded] = useState(false);
+  const [loadingTraining, setLoadingTraining] = useState(false);
   const [mapStyle, setMapStyle] = useState("GREY"); 
   const [showLabels, setShowLabels] = useState(true); 
   const [showHydrants, setShowHydrants] = useState(true); 
@@ -165,12 +161,12 @@ export default function MapBoard() {
 
   // Adaptive Zooming: fit bounds to show both the selected Fire Hall (origin) and searched address (destination)
   useEffect(() => {
-    if (map && targetAddress && STATIONS[homeHall] && gameMode === "EXPLORE") {
+    if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE") {
       const origin = STATIONS[homeHall];
       const dest = [targetAddress.lat, targetAddress.lng];
       map.fitBounds([origin, dest], { padding: [50, 50], animate: true });
     }
-  }, [map, targetAddress, homeHall, gameMode]);
+  }, [map, targetAddress, homeHall, appMode]);
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);
@@ -267,42 +263,31 @@ export default function MapBoard() {
     });
   }, []);
 
-  // LOAD DATA
-  useEffect(() => {
+  // LAZY LOAD TRAINING DATA
+  const loadTrainingData = useCallback(() => {
+    if (trainingDataLoaded || loadingTraining) return;
+    setLoadingTraining(true);
     const baseUrl = import.meta.env.BASE_URL;
 
-    fetch(`${baseUrl}data/zones.json?v=2`)
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP 404");
-        return r.json();
-      })
-      .then(setZones)
-      .catch(e => console.error("Missing zones.json", e));
+    const fetchZones = fetch(`${baseUrl}data/zones.json?v=2`).then(r => r.ok ? r.json() : []);
+    const fetchIntersections = fetch(`${baseUrl}data/intersections.json?v=1`).then(r => r.ok ? r.json() : []);
+    const fetchBlocks = fetch(`${baseUrl}data/blocks.json?v=2`).then(r => r.ok ? r.json() : []);
+    const fetchAddresses = fetch(`${baseUrl}data/addresses.json?v=2`).then(r => r.ok ? r.json() : []);
 
-    fetch(`${baseUrl}data/intersections.json?v=1`)
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP 404");
-        return r.json();
+    Promise.all([fetchZones, fetchIntersections, fetchBlocks, fetchAddresses])
+      .then(([zonesData, intersectionsData, blocksData, addressesData]) => {
+        setZones(zonesData);
+        setIntersections(intersectionsData);
+        setBlocks(blocksData);
+        setAddresses(addressesData);
+        setTrainingDataLoaded(true);
+        setLoadingTraining(false);
       })
-      .then(setIntersections)
-      .catch(e => console.error("Missing intersections.json", e));
-
-    fetch(`${baseUrl}data/blocks.json?v=2`)
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP 404");
-        return r.json();
-      })
-      .then(setBlocks)
-      .catch(e => console.error("Missing blocks.json", e));
-
-    fetch(`${baseUrl}data/addresses.json?v=2`)
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP 404");
-        return r.json();
-      })
-      .then(setAddresses)
-      .catch(e => console.error("Missing addresses.json", e));
-  }, []);
+      .catch(err => {
+        console.error("Failed to load training data:", err);
+        setLoadingTraining(false);
+      });
+  }, [trainingDataLoaded, loadingTraining]);
 
   // --- CONTROLLER LOGIC (Callbacks wrapped in useCallback to prevent unnecessary re-renders) ---
   const nextQuestion = useCallback((dataset) => {
@@ -323,57 +308,68 @@ export default function MapBoard() {
   }, [blocks]);
 
   const goToNext = useCallback(() => {
-      if(gameMode === "QUIZ_ZONES") nextQuestion(zones);
-      if(gameMode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
-      if(gameMode === "QUIZ_BLOCKS") nextBlockQuestion();
-      if(gameMode === "QUIZ_ADDRESSES") nextQuestion(addresses);
-  }, [gameMode, zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
+      if(appMode === "TRAINING_ZONES") nextQuestion(zones);
+      if(appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
+      if(appMode === "TRAINING_BLOCKS") nextBlockQuestion();
+      if(appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
+  }, [appMode, zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
 
   const startMode = useCallback((mode) => {
       clearTimeout(autoAdvanceTimer.current); // Clear any pending jumps
-      setGameMode(mode);
+      setAppMode(mode);
       setScore(0);
       setFeedback(null);
       setUserGuess(null);
       setTargetAddress(null);
+      setCurrentQuestion(null);
+      setClickedBlockData(null);
       setMapStyle(MODE_DEFAULTS[mode]); 
       
       // Only show labels automatically for Address Mode and Explore
-      setShowLabels(mode === "QUIZ_ADDRESSES" || mode === "EXPLORE");
+      setShowLabels(mode === "TRAINING_ADDRESSES" || mode === "EXPLORE");
       
       if (mode === "EXPLORE") {
           setShowZones(false);
           setShowHydrants(true);
           setShowRoadClosures(true);
-          setCurrentQuestion(null);
           setLeftSidebarOpen(true);
           setRightSidebarOpen(false);
       } else {
-          // Quiz Modes: Hydrants ON by default, road closures icons ON by default, zones OFF
+          // Training Modes: Hydrants ON by default, road closures icons ON by default, zones OFF
           setShowHydrants(true);
           setShowRoadClosures(true);
           setShowZones(false);
           setLeftSidebarOpen(true);
           setRightSidebarOpen(false); // Close alerts list panel for training focus
+          
+          if (!trainingDataLoaded) {
+            loadTrainingData();
+          }
       }
-      
-      if (mode === "QUIZ_ZONES") nextQuestion(zones);
-      if (mode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
-      if (mode === "QUIZ_BLOCKS") nextBlockQuestion();
-      if (mode === "QUIZ_ADDRESSES") nextQuestion(addresses);
-  }, [zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
+  }, [trainingDataLoaded, loadTrainingData]);
+
+  // Reactive effect to set active question once training data downloads
+  useEffect(() => {
+    if (!trainingDataLoaded || appMode === "EXPLORE") return;
+    if (!currentQuestion) {
+      if (appMode === "TRAINING_ZONES") nextQuestion(zones);
+      if (appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
+      if (appMode === "TRAINING_BLOCKS") nextBlockQuestion();
+      if (appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
+    }
+  }, [trainingDataLoaded, appMode, zones, intersections, blocks, addresses, nextQuestion, nextBlockQuestion, currentQuestion]);
 
   // ⌨️ KEYBOARD LISTENER (Enter = Next) - Declared below goToNext to resolve TDZ hoisting bug
   useEffect(() => {
     const handleKeyDown = (e) => {
         // If Enter is pressed AND we are showing feedback (waiting for next)
-        if (e.key === "Enter" && feedback && gameMode !== "EXPLORE") {
+        if (e.key === "Enter" && feedback && appMode !== "EXPLORE") {
             goToNext();
         }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [feedback, gameMode, goToNext]);
+  }, [feedback, appMode, goToNext]);
 
   // --- HANDLERS ---
   const handleZoneGuess = useCallback((unitId) => {
@@ -388,14 +384,14 @@ export default function MapBoard() {
   }, [currentQuestion, zones, nextQuestion]);
 
   const handleMapClick = useCallback((latlng) => {
-    if (!currentQuestion || (gameMode !== "QUIZ_INTERSECTIONS" && gameMode !== "QUIZ_ADDRESSES") || feedback) return;
+    if (!currentQuestion || (appMode !== "TRAINING_INTERSECTIONS" && appMode !== "TRAINING_ADDRESSES") || feedback) return;
     setUserGuess(latlng);
     
     const from = turf.point([latlng.lng, latlng.lat]);
     const to = turf.point([currentQuestion.lng, currentQuestion.lat]);
     let distMeters = Math.round(turf.distance(from, to, { units: 'kilometers' }) * 1000);
     
-    const tolerance = gameMode === "QUIZ_ADDRESSES" ? 15 : 50;
+    const tolerance = appMode === "TRAINING_ADDRESSES" ? 15 : 50;
     if (distMeters <= tolerance) distMeters = 0;
     
     setDistanceOff(distMeters);
@@ -404,18 +400,18 @@ export default function MapBoard() {
     
     const result = distMeters === 0 ? "PERFECT" : points > 0 ? "OKAY" : "MISS";
     setFeedback(result);
-
+ 
     // 🔽 Auto-advance for Intersection/Address modes too
     if (result === "PERFECT") {
         autoAdvanceTimer.current = setTimeout(() => {
-            if (gameMode === "QUIZ_INTERSECTIONS") nextQuestion(intersections);
-            if (gameMode === "QUIZ_ADDRESSES") nextQuestion(addresses);
+            if (appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
+            if (appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
         }, 1500);
     }
-  }, [currentQuestion, gameMode, feedback, intersections, addresses, nextQuestion]);
-
+  }, [currentQuestion, appMode, feedback, intersections, addresses, nextQuestion]);
+ 
   const handleBlockClick = useCallback((blockData) => {
-    if (!currentQuestion || gameMode !== "QUIZ_BLOCKS" || feedback) return;
+    if (!currentQuestion || appMode !== "TRAINING_BLOCKS" || feedback) return;
     setClickedBlockData(blockData);
     
     const isCorrectStreet = currentQuestion.street === blockData.street;
@@ -428,8 +424,8 @@ export default function MapBoard() {
         autoAdvanceTimer.current = setTimeout(nextBlockQuestion, 1500); 
     }
     else { setFeedback("WRONG"); setDistanceOff(diff); }
-  }, [currentQuestion, gameMode, feedback, nextBlockQuestion]);
-
+  }, [currentQuestion, appMode, feedback, nextBlockQuestion]);
+ 
   // --- RENDER HELPERS ---
   const getBlockStyle = useCallback((block) => {
     if (!feedback) return { color: "#64748b", weight: 6, opacity: 0.8 }; 
@@ -439,9 +435,9 @@ export default function MapBoard() {
     if (isClicked) return { color: "#ef4444", weight: 12, opacity: 1 }; 
     return { color: "#475569", weight: 4, opacity: 0.15 }; 
   }, [feedback, currentQuestion, clickedBlockData]);
-
+ 
   const getZoneStyle = (zone) => {
-    if (gameMode === "QUIZ_ZONES") {
+    if (appMode === "TRAINING_ZONES") {
         if (currentQuestion && zone.zone_id === currentQuestion.zone_id) {
             return { color: "#06b6d4", fillOpacity: 0.5, weight: 0 }; 
         }
@@ -449,7 +445,7 @@ export default function MapBoard() {
     }
     return { color: "#475569", fillOpacity: 0.05, weight: 1 };
   };
-
+ 
   // Filter closures for map and alerts rendering
   const activeClosures = roadClosures.filter(closure => {
     if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
@@ -457,13 +453,13 @@ export default function MapBoard() {
     if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
     return true;
   });
-
+ 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
       
       <Header 
-        gameMode={gameMode} 
-        startMode={startMode} 
+        appMode={appMode} 
+        setAppMode={startMode} 
         mapStyle={mapStyle} 
         setMapStyle={setMapStyle} 
         showLabels={showLabels} 
@@ -480,7 +476,8 @@ export default function MapBoard() {
         <LeftSidebar 
           leftSidebarOpen={leftSidebarOpen}
           setLeftSidebarOpen={setLeftSidebarOpen}
-          gameMode={gameMode}
+          appMode={appMode}
+          loadingTraining={loadingTraining}
           showZones={showZones}
           setShowZones={setShowZones}
           showHydrants={showHydrants}
@@ -535,12 +532,12 @@ export default function MapBoard() {
             
             {/* "Top Bun" - The Text Labels */}
             <FireZonesLayer 
-                visible={gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)} 
+                visible={appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)} 
                 pane="labelsPane" 
             />
             
             {/* "Bottom Bun" - The Highlight */}
-            {(gameMode === "QUIZ_ZONES" || (gameMode === "EXPLORE" && showZones)) && zones.map((zone) => (
+            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && zones.map((zone) => (
               <Polygon 
                   key={zone.zone_id} 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
@@ -549,20 +546,20 @@ export default function MapBoard() {
               />
             ))}
 
-            {/* HIDE STATIONS IN QUIZ MODE */}
-            {gameMode !== "QUIZ_ZONES" && <StationsLayer />}
+            {/* HIDE STATIONS IN TRAINING MODE */}
+            {appMode !== "TRAINING_ZONES" && <StationsLayer />}
             
             <MapClickEvents onMapClick={handleMapClick} />
             
             {!feedback && currentQuestion && (
-               <SmartZoom target={currentQuestion} mode={gameMode} allBlocks={blocks} allZones={zones} />
+               <SmartZoom target={currentQuestion} mode={appMode} allBlocks={blocks} allZones={zones} />
             )}
-            {feedback === "WRONG" && gameMode === "QUIZ_BLOCKS" && clickedBlockData && (
-               <ZoomToFeedback guessBlock={clickedBlockData} targetBlock={blocks.find(b => b.block === currentQuestion.block && b.street === currentQuestion.street)} mode={gameMode} />
+            {feedback === "WRONG" && appMode === "TRAINING_BLOCKS" && clickedBlockData && (
+               <ZoomToFeedback guessBlock={clickedBlockData} targetBlock={blocks.find(b => b.block === currentQuestion.block && b.street === currentQuestion.street)} mode={appMode} />
             )}
 
-            {/* GAME VISUALS: BLOCKS */}
-            {gameMode === "QUIZ_BLOCKS" && currentQuestion && blocks && blocks.length > 0 && 
+            {/* TRAINING VISUALS: BLOCKS */}
+            {appMode === "TRAINING_BLOCKS" && currentQuestion && blocks && blocks.length > 0 && 
               blocks.map((block, i) => (
                   <Polyline 
                       key={`${block.street}-${block.block}-${i}`} 
@@ -587,8 +584,8 @@ export default function MapBoard() {
                   </Polyline>
             ))}
 
-            {/* GAME VISUALS: PINS */}
-            {(gameMode === "QUIZ_INTERSECTIONS" || gameMode === "QUIZ_ADDRESSES") && userGuess && (
+            {/* TRAINING VISUALS: PINS */}
+            {(appMode === "TRAINING_INTERSECTIONS" || appMode === "TRAINING_ADDRESSES") && userGuess && (
                <>
                   <CircleMarker center={userGuess} radius={6} pathOptions={{ color: "white", fillColor: feedback === "PERFECT" ? "#22c55e" : "#ef4444", fillOpacity: 1, weight: 2 }} />
                   {feedback !== "PERFECT" && (
@@ -648,7 +645,7 @@ export default function MapBoard() {
             })}
 
             {/* Active Target Address Marker & Suggested Route Overlay */}
-            {gameMode === "EXPLORE" && targetAddress && (
+            {appMode === "EXPLORE" && targetAddress && (
               <>
                 {targetPolygon ? (
                   <Polygon 
@@ -795,7 +792,7 @@ export default function MapBoard() {
         <RightSidebar 
           rightSidebarOpen={rightSidebarOpen}
           setRightSidebarOpen={setRightSidebarOpen}
-          gameMode={gameMode}
+          appMode={appMode}
           roadClosures={roadClosures}
           showRoadClosures={showRoadClosures}
           filterNoAccess={filterNoAccess}

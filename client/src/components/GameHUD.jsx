@@ -1,9 +1,10 @@
 import React from 'react';
-import { UNIT_COLORS } from './MapConstants';
+import { UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
+
 
 export function Header({ 
-  gameMode, 
-  startMode, 
+  appMode, 
+  setAppMode, 
   mapStyle, 
   setMapStyle, 
   showLabels, 
@@ -15,7 +16,7 @@ export function Header({
   alertsCount
 }) {
   const [showLayersMenu, setShowLayersMenu] = React.useState(false);
-  const isExplore = gameMode === "EXPLORE";
+  const isExplore = appMode === "EXPLORE";
 
   return (
     <div className="bg-slate-950 text-white p-3 shadow-md z-[1100] flex justify-between items-center border-b border-slate-800 h-16 relative select-none">
@@ -43,8 +44,8 @@ export function Header({
         <div className="flex items-center">
           <div className="relative">
             <select 
-              value={isExplore ? "EXPLORE" : gameMode} 
-              onChange={(e) => startMode(e.target.value)}
+              value={isExplore ? "EXPLORE" : appMode} 
+              onChange={(e) => setAppMode(e.target.value)}
               className="bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg pl-3 pr-8 py-1.5 text-xs font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm appearance-none min-w-[220px]"
               style={{ 
                 backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`, 
@@ -54,10 +55,10 @@ export function Header({
               }}
             >
               <option value="EXPLORE">🧭 EXPLORE / DRIVERS AID</option>
-              <option value="QUIZ_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
-              <option value="QUIZ_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
-              <option value="QUIZ_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
-              <option value="QUIZ_ADDRESSES">🎓 TRAINING: PARCEL ADDRESSES</option>
+              <option value="TRAINING_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
+              <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
+              <option value="TRAINING_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
+              <option value="TRAINING_ADDRESSES">🎓 TRAINING: PARCEL ADDRESSES</option>
             </select>
           </div>
         </div>
@@ -137,18 +138,13 @@ export function Header({
   );
 }
 
-// 🚒 Fire Hall coordinate mapping
-const STATIONS = {
-  "1": [49.291329039026046, -122.79161362016414], // Town Centre Fire Hall (TCFH)
-  "2": [49.26223510671969, -122.81725512755891],  // Mariner Fire Hall
-  "3": [49.24804277980424, -122.86566519365569],  // Austin Heights Fire Hall
-  "4": [49.2952132946437, -122.7425391041921]     // Burke Mountain Fire Hall
-};
+
 
 export function LeftSidebar({ 
   leftSidebarOpen, 
   setLeftSidebarOpen, 
-  gameMode, 
+  appMode, 
+  loadingTraining,
   // Explore layer toggles
   showZones, 
   setShowZones, 
@@ -180,7 +176,7 @@ export function LeftSidebar({
   onZoneGuess,
   map
 }) {
-  const isExplore = gameMode === "EXPLORE";
+  const isExplore = appMode === "EXPLORE";
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(-1);
@@ -556,30 +552,38 @@ export function LeftSidebar({
                        </div>
                     </div>
                   </>
-                ) : (
+                 ) : loadingTraining ? (
+                   <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+                      <span className="flex h-5 w-5 relative">
+                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                         <span className="relative inline-flex rounded-full h-5 w-5 bg-sky-500"></span>
+                      </span>
+                      <span className="text-[10px] font-bold font-mono tracking-widest animate-pulse">LOADING TRAINING DATA...</span>
+                   </div>
+                 ) : (
                   <>
-                    {/* Quiz Details Panel */}
+                    {/* Training Details Panel */}
                     <div className="flex flex-col gap-4 text-center">
-                       {gameMode === "QUIZ_ZONES" && currentQuestion && (
+                       {appMode === "TRAINING_ZONES" && currentQuestion && (
                          <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl animate-in fade-in">
                            <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest">Target Zone</div>
                            <div className="text-3xl text-sky-400 font-extrabold mt-1">Zone {currentQuestion.zone_id}</div>
                          </div>
                        )}
-                       {gameMode === "QUIZ_INTERSECTIONS" && currentQuestion && (
+                       {appMode === "TRAINING_INTERSECTIONS" && currentQuestion && (
                          <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl text-left animate-in fade-in">
                            <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1 text-center">Locate Intersection</div>
                            <div className="text-sm text-white font-black text-center mt-1 leading-snug">{currentQuestion.name}</div>
                          </div>
                        )}
-                       {gameMode === "QUIZ_BLOCKS" && currentQuestion && (
+                       {appMode === "TRAINING_BLOCKS" && currentQuestion && (
                          <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl animate-in fade-in">
                            <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest">Target Block Range</div>
                            <div className="text-3xl text-amber-500 font-black mt-1">{currentQuestion.block}</div>
                            <div className="text-sm text-white font-bold mt-1 font-mono">{currentQuestion.street}</div>
                          </div>
                        )}
-                       {gameMode === "QUIZ_ADDRESSES" && currentQuestion && (
+                       {appMode === "TRAINING_ADDRESSES" && currentQuestion && (
                          <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl text-left animate-in fade-in">
                            <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1 text-center">Find Target Address</div>
                            <div className="text-base text-white font-black text-center mt-1 leading-snug">{currentQuestion.address}</div>
@@ -589,7 +593,7 @@ export function LeftSidebar({
 
                     {/* Active Option Inputs / Buttons */}
                     <div className="flex-grow flex flex-col justify-center gap-3">
-                       {gameMode === "QUIZ_ZONES" && (
+                       {appMode === "TRAINING_ZONES" && (
                            <div className="flex flex-col gap-2">
                                {Object.keys(UNIT_COLORS).filter(u => u !== "UNKNOWN").map((unit) => (
                                    <button 
@@ -636,7 +640,7 @@ export function LeftSidebar({
                                </div>
                             )}
 
-                            {gameMode === "QUIZ_BLOCKS" && feedback === "WRONG" && clickedBlockData && (
+                            {appMode === "TRAINING_BLOCKS" && feedback === "WRONG" && clickedBlockData && (
                                 <div className="text-rose-400 font-semibold text-xs mt-1 border-t border-slate-900 pt-1.5">
                                   Selected: {clickedBlockData.block} {clickedBlockData.street}
                                 </div>
@@ -651,14 +655,14 @@ export function LeftSidebar({
                         </div>
                     ) : (
                         <div className="text-center text-slate-500 text-[10px] italic border-t border-slate-850/50 pt-4">
-                            {gameMode === "QUIZ_INTERSECTIONS" && "Tap matching intersection point on the map..."}
-                            {gameMode === "QUIZ_BLOCKS" && "Click correct highlighted road segment..."}
-                            {gameMode === "QUIZ_ADDRESSES" && "Zoom in and tap correct parcel boundary..."}
+                            {appMode === "TRAINING_INTERSECTIONS" && "Tap matching intersection point on the map..."}
+                            {appMode === "TRAINING_BLOCKS" && "Click correct highlighted road segment..."}
+                            {appMode === "TRAINING_ADDRESSES" && "Zoom in and tap correct parcel boundary..."}
                         </div>
                     )}
 
                     {/* ZOOM UTILITIES */}
-                    {gameMode === "QUIZ_ADDRESSES" && !feedback && currentQuestion && (
+                    {appMode === "TRAINING_ADDRESSES" && !feedback && currentQuestion && (
                         <button 
                           onClick={() => map.setView([currentQuestion.lat, currentQuestion.lng], 20, { animate: true })} 
                           className="bg-slate-950 hover:bg-slate-850 text-[10px] text-white font-bold py-2.5 px-4 rounded-lg w-full border border-slate-800 flex items-center justify-center gap-1.5 transition-all mt-auto"
@@ -687,7 +691,7 @@ export function LeftSidebar({
 export function RightSidebar({ 
   rightSidebarOpen, 
   setRightSidebarOpen, 
-  gameMode, 
+  appMode, 
   roadClosures, 
   showRoadClosures, 
   filterNoAccess,
@@ -695,7 +699,7 @@ export function RightSidebar({
   filterCaution,
   map 
 }) {
-  const isExplore = gameMode === "EXPLORE";
+  const isExplore = appMode === "EXPLORE";
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode
 
   // Filter closures to match active filters

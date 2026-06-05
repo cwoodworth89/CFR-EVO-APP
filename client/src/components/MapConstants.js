@@ -27,9 +27,24 @@ export const BASE_LAYERS = {
 // 🎮 DEFAULTS
 export const MODE_DEFAULTS = {
     EXPLORE: "GREY",
-    QUIZ_ZONES: "DARK",
-    QUIZ_INTERSECTIONS: "GREY",
-    QUIZ_BLOCKS: "GREY",
-    QUIZ_ADDRESSES: "GREY",
+    TRAINING_ZONES: "DARK",
+    TRAINING_INTERSECTIONS: "GREY",
+    TRAINING_BLOCKS: "GREY",
+    TRAINING_ADDRESSES: "GREY",
     ROAD_CLOSURES: "GREY"
 };
+
+// 🚒 FIRE STATIONS COORDINATES
+// Verified coordinates for Coquitlam Fire Halls
+export const STATIONS = [
+  { id: "1", name: "Town Centre Fire Hall (TCFH)", coords: [49.29109654571679, -122.79072561861948] },
+  { id: "2", name: "Mariner Fire Hall", coords: [49.2622197420057, -122.81747986099539] },
+  { id: "3", name: "Austin Heights Fire Hall", coords: [49.24803974681661, -122.86546062387211] },
+  { id: "4", name: "Burke Mountain Fire Hall", coords: [49.29510006403205, -122.74247651791484] }
+];
+
+export const STATIONS_MAP = STATIONS.reduce((acc, stn) => {
+  acc[stn.id] = stn.coords;
+  return acc;
+}, {});
+

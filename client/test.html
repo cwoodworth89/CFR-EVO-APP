@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Leaflet Esri Basemap Test</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { height: 100vh; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet core -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Esri Leaflet core -->
+  <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+  <!-- Esri Leaflet Vector -->
+  <script src="https://unpkg.com/esri-leaflet-vector@4.2.3/dist/esri-leaflet-vector.js"></script>
+
+  <script>
+    const apiKey = "AAPTxy8BH1VEsoebNVZXo8HurAtUqBEibvXQ49H44V9cLFtzb0pM0R7Irvcz01qtVtkq_CX-2rEpI98MLoOBQ5ejn3IHo_mORrJmreRkcTDpZ-R5viLZsLDH6CKntq474fDQCEFQUsc9hxGpFKzU1lTXr7j7X-cq9_J8zovttCbUBhJ8mdQ4U5lOPb8nTp_2Tm_Y4NwUFCACfEUhOOO4H66F7CA_NDylGfcpfiW5Y-8C-F11Rjlis2oy5pcklsWikwaPAT1_ZmlRyAzl";
+
+    const map = L.map('map').setView([49.28, -122.8], 12);
+
+    // Correct helper for Leaflet + Esri Leaflet Vector
+    const layer = L.esri.Vector.vectorBasemapLayer("ArcGIS:LightGray", {
+      apikey: apiKey
+    });
+
+    console.log("Esri basemap layer options:", layer.options);
+
+    layer.addTo(map);
+
+    map.attributionControl.addAttribution("© Esri & contributors");
+  </script>
+</body>
+</html>

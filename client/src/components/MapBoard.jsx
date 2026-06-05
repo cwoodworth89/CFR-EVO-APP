@@ -12,6 +12,7 @@ import { Header, LeftSidebar, RightSidebar } from './GameHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
 
 import { RoutingOverlay } from './RoutingOverlay';
+import DispatchReview from './DispatchReview';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
 const getRandomElement = (arr) => {
@@ -323,7 +324,7 @@ export default function MapBoard() {
       setTargetAddress(null);
       setCurrentQuestion(null);
       setClickedBlockData(null);
-      setMapStyle(MODE_DEFAULTS[mode]); 
+      setMapStyle(MODE_DEFAULTS[mode] || "GREY"); 
       
       // Only show labels automatically for Address Mode and Explore
       setShowLabels(mode === "TRAINING_ADDRESSES" || mode === "EXPLORE");
@@ -801,6 +802,19 @@ export default function MapBoard() {
           map={map}
         />
       </div>
+
+      {appMode === "ADMIN_DISPATCHES" && (
+        <DispatchReview 
+          onClose={() => startMode("EXPLORE")} 
+          onLocateAddress={(target) => {
+            startMode("EXPLORE");
+            updateTargetAddress(target);
+            if (map && target.lat && target.lng) {
+              map.flyTo([target.lat, target.lng], 17, { animate: true });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

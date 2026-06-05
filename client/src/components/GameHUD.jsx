@@ -59,6 +59,7 @@ export function Header({
               <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
               <option value="TRAINING_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
               <option value="TRAINING_ADDRESSES">🎓 TRAINING: PARCEL ADDRESSES</option>
+              <option value="ADMIN_DISPATCHES">🛡️ ADMIN: DISPATCH REVIEW</option>
             </select>
           </div>
         </div>

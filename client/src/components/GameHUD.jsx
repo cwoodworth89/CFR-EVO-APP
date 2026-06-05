@@ -158,7 +158,6 @@ export function LeftSidebar({
   setShowRoadClosures,
   showLabels,
   setShowLabels,
-  addresses,
   homeHall,
   setHomeHall,
   targetAddress,
@@ -185,20 +184,73 @@ export function LeftSidebar({
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(-1);
+  const [suggestions, setSuggestions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
 
   // Reset activeIndex whenever query changes or suggestions show status shifts
   React.useEffect(() => {
     setActiveIndex(-1);
   }, [searchQuery, showSuggestions]);
 
-  // Filter addresses based on query
-  const filteredAddresses = React.useMemo(() => {
-    if (!searchQuery.trim() || !addresses) return [];
-    const query = searchQuery.toLowerCase().trim();
-    return addresses
-      .filter(item => item.address && item.address.toLowerCase().includes(query))
-      .slice(0, 5);
-  }, [searchQuery, addresses]);
+  // Debounced effect to fetch address suggestions from GIS server
+  React.useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    setLoading(true);
+    const delayDebounce = setTimeout(() => {
+      const upperQuery = query.toUpperCase().replace(/'/g, "''");
+      const encodedWhere = encodeURIComponent(`UPPER(ADDRESS) LIKE '%${upperQuery}%'`);
+      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=${encodedWhere}&outFields=ADDRESS&returnGeometry=true&outSR=4326&resultRecordCount=5&f=json`;
+
+      fetch(url)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.features) {
+            const items = data.features.map(f => {
+              const address = f.attributes.ADDRESS;
+              const geom = f.geometry;
+              let lat = 0;
+              let lng = 0;
+              let rings = null;
+              if (geom && geom.rings && geom.rings.length > 0) {
+                rings = geom.rings;
+                // Calculate center (centroid) of the first ring
+                const ring = geom.rings[0];
+                let latSum = 0;
+                let lngSum = 0;
+                ring.forEach(pt => {
+                  lngSum += pt[0];
+                  latSum += pt[1];
+                });
+                lat = latSum / ring.length;
+                lng = lngSum / ring.length;
+              }
+              return {
+                address,
+                lat,
+                lng,
+                rings
+              };
+            });
+            setSuggestions(items);
+          } else {
+            setSuggestions([]);
+          }
+          setLoading(false);
+        })
+        .catch(err => {
+          console.warn("Failed to fetch autocomplete addresses:", err);
+          setSuggestions([]);
+          setLoading(false);
+        });
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
 
   // Unified select address handler
   const handleSelectAddress = React.useCallback((item) => {
@@ -210,26 +262,26 @@ export function LeftSidebar({
 
   // Keyboard navigation handler for autocomplete list
   const handleKeyDown = React.useCallback((e) => {
-    if (!showSuggestions || filteredAddresses.length === 0) return;
+    if (!showSuggestions || suggestions.length === 0) return;
     
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex(prev => (prev + 1) % filteredAddresses.length);
+      setActiveIndex(prev => (prev + 1) % suggestions.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex(prev => (prev - 1 + filteredAddresses.length) % filteredAddresses.length);
+      setActiveIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
       const idx = activeIndex === -1 ? 0 : activeIndex;
-      if (idx >= 0 && idx < filteredAddresses.length) {
-        handleSelectAddress(filteredAddresses[idx]);
+      if (idx >= 0 && idx < suggestions.length) {
+        handleSelectAddress(suggestions[idx]);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
       setShowSuggestions(false);
       setActiveIndex(-1);
     }
-  }, [showSuggestions, filteredAddresses, activeIndex, handleSelectAddress]);
+  }, [showSuggestions, suggestions, activeIndex, handleSelectAddress]);
 
   return (
     <div className={`relative h-full flex flex-row transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${leftSidebarOpen ? 'w-80 border-r border-slate-800' : 'w-0'}`}>
@@ -291,6 +343,12 @@ export function LeftSidebar({
                                  onKeyDown={handleKeyDown}
                                  className="w-full bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg pl-3 pr-8 py-1.5 text-xs focus:outline-none focus:border-sky-500 placeholder-slate-500"
                               />
+                              {loading && (
+                                 <span className="absolute right-8 top-1/2 -translate-y-1/2 flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                                 </span>
+                              )}
                               {searchQuery && (
                                  <button 
                                     onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
@@ -302,11 +360,11 @@ export function LeftSidebar({
                            </div>
 
                            {/* Autocomplete Suggestions Dropdown */}
-                           {showSuggestions && filteredAddresses.length > 0 && (
+                           {showSuggestions && suggestions.length > 0 && (
                               <>
                                  <div className="fixed inset-0 z-[1010]" onClick={() => setShowSuggestions(false)} />
                                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-[1020] overflow-hidden select-none max-h-48 overflow-y-auto">
-                                    {filteredAddresses.map((item, idx) => (
+                                    {suggestions.map((item, idx) => (
                                        <div 
                                           key={idx}
                                           onClick={() => handleSelectAddress(item)}

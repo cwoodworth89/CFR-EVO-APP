@@ -100,61 +100,39 @@ export default function MapBoard() {
   });
   const [targetAddress, setTargetAddress] = useState(null);
   const [targetPolygon, setTargetPolygon] = useState(null);
-  const [nearestHydrant, setNearestHydrant] = useState(null);
+  const [nearestHydrants, setNearestHydrants] = useState([]);
 
   const updateTargetAddress = useCallback((addr) => {
     setTargetAddress(addr);
-    setTargetPolygon(null);
-    setNearestHydrant(null);
+    if (addr && addr.rings) {
+      const leafletPolygon = addr.rings.map(ring => 
+        ring.map(coord => [coord[1], coord[0]])
+      );
+      setTargetPolygon(leafletPolygon);
+    } else {
+      setTargetPolygon(null);
+    }
+    setNearestHydrants([]);
   }, []);
 
   useEffect(() => {
     localStorage.setItem('home_hall', homeHall);
   }, [homeHall]);
 
-  // Query Property Polygon and Nearest Hydrant on targetAddress change
+  // Query Nearby Hydrants on targetAddress change
   useEffect(() => {
     if (!targetAddress) return;
 
-    const addressStr = targetAddress.address;
     const lat = targetAddress.lat;
     const lng = targetAddress.lng;
 
-    // 1. Fetch Property Polygon from Layer 15 (Property Information)
-    const upperAddress = addressStr.toUpperCase().replace(/'/g, "''");
-    const propUrl = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=UPPER(ADDRESS)='${encodeURIComponent(upperAddress)}'&outFields=ADDRESS,GIS_ID&returnGeometry=true&outSR=4326&f=json`;
-
-    fetch(propUrl)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data && data.features && data.features.length > 0) {
-          const geom = data.features[0].geometry;
-          if (geom && geom.rings) {
-            // Convert ESRI rings [lng, lat] to Leaflet coordinates [lat, lng]
-            const leafletPolygon = geom.rings.map(ring => 
-              ring.map(coord => [coord[1], coord[0]])
-            );
-            setTargetPolygon(leafletPolygon);
-          } else {
-            setTargetPolygon(null);
-          }
-        } else {
-          setTargetPolygon(null);
-        }
-      })
-      .catch(err => {
-        console.warn("Failed to fetch property boundary polygon:", err);
-        setTargetPolygon(null);
-      });
-
-    // 2. Fetch Nearby Hydrants from Layer 2 (within 150m)
+    // Fetch Nearby Hydrants from Layer 2 (within 150m)
     const hydUrl = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&distance=150&units=esriSRUnit_Meter&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
 
     fetch(hydUrl)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data && data.features && data.features.length > 0) {
-          // Calculate distance using Turf
           const fromPoint = turf.point([lng, lat]);
           
           const sortedHydrants = data.features.map(f => {
@@ -173,18 +151,15 @@ export default function MapBoard() {
             };
           }).sort((a, b) => a.distance - b.distance);
 
-          if (sortedHydrants.length > 0) {
-            setNearestHydrant(sortedHydrants[0]);
-          } else {
-            setNearestHydrant(null);
-          }
+          // Save top 3 closest hydrants
+          setNearestHydrants(sortedHydrants.slice(0, 3));
         } else {
-          setNearestHydrant(null);
+          setNearestHydrants([]);
         }
       })
       .catch(err => {
         console.warn("Failed to fetch nearby hydrants:", err);
-        setNearestHydrant(null);
+        setNearestHydrants([]);
       });
   }, [targetAddress]);
 
@@ -519,7 +494,7 @@ export default function MapBoard() {
           setHomeHall={setHomeHall}
           targetAddress={targetAddress}
           setTargetAddress={updateTargetAddress}
-          nearestHydrant={nearestHydrant}
+          nearestHydrant={nearestHydrants[0] || null}
           filterNoAccess={filterNoAccess}
           setFilterNoAccess={setFilterNoAccess}
           filterAccessOnly={filterAccessOnly}
@@ -694,17 +669,17 @@ export default function MapBoard() {
                         <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
                         <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
                         
-                        {nearestHydrant && (
+                        {nearestHydrants.length > 0 && (
                           <div className="mt-2.5 pt-2 border-t border-slate-900 flex flex-col gap-1">
                             <span className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono">💧 Nearest Hydrant</span>
                             <div className="flex justify-between text-xs mt-0.5">
                               <span className="text-slate-400">ID / Distance</span>
-                              <span className="text-white font-mono font-bold">{nearestHydrant.gisId} ({nearestHydrant.distance}m)</span>
+                              <span className="text-white font-mono font-bold">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
                             </div>
-                            {nearestHydrant.flowClass && (
+                            {nearestHydrants[0].flowClass && (
                               <div className="flex justify-between text-xs">
                                 <span className="text-slate-400">Flow Rating</span>
-                                <span className="text-sky-400 font-mono font-bold">{nearestHydrant.flowClass}</span>
+                                <span className="text-sky-400 font-mono font-bold">{nearestHydrants[0].flowClass}</span>
                               </div>
                             )}
                           </div>
@@ -737,17 +712,17 @@ export default function MapBoard() {
                         <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
                         <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
                         
-                        {nearestHydrant && (
+                        {nearestHydrants.length > 0 && (
                           <div className="mt-2.5 pt-2 border-t border-slate-900 flex flex-col gap-1">
                             <span className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono">💧 Nearest Hydrant</span>
                             <div className="flex justify-between text-xs mt-0.5">
                               <span className="text-slate-400">ID / Distance</span>
-                              <span className="text-white font-mono font-bold">{nearestHydrant.gisId} ({nearestHydrant.distance}m)</span>
+                              <span className="text-white font-mono font-bold">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
                             </div>
-                            {nearestHydrant.flowClass && (
+                            {nearestHydrants[0].flowClass && (
                               <div className="flex justify-between text-xs">
                                 <span className="text-slate-400">Flow Rating</span>
-                                <span className="text-sky-400 font-mono font-bold">{nearestHydrant.flowClass}</span>
+                                <span className="text-sky-400 font-mono font-bold">{nearestHydrants[0].flowClass}</span>
                               </div>
                             )}
                           </div>
@@ -768,47 +743,37 @@ export default function MapBoard() {
                   </Marker>
                 )}
 
-                {nearestHydrant && (
-                  <>
-                    {/* Dashed Tracer Line from Target Address to Closest Hydrant */}
-                    <Polyline 
-                      positions={[
-                        [targetAddress.lat, targetAddress.lng],
-                        [nearestHydrant.lat, nearestHydrant.lng]
-                      ]} 
-                      pathOptions={{ 
-                        color: '#06b6d4', 
-                        weight: 3, 
-                        dashArray: '5, 10', 
-                        opacity: 0.8 
-                      }} 
-                    />
-                    
-                    {/* Glowing outline around the closest hydrant */}
+                {/* Highlight Top 3 closest hydrants (No tracer line) */}
+                {nearestHydrants.map((hyd, idx) => {
+                  const isPrimary = idx === 0;
+                  return (
                     <CircleMarker 
-                      center={[nearestHydrant.lat, nearestHydrant.lng]} 
-                      radius={16} 
+                      key={`${hyd.gisId}-${idx}`}
+                      center={[hyd.lat, hyd.lng]} 
+                      radius={isPrimary ? 16 : 12} 
                       pathOptions={{ 
-                        color: '#06b6d4', 
-                        fillColor: '#22d3ee', 
-                        fillOpacity: 0.15, 
-                        weight: 2,
-                        className: 'animate-pulse' 
+                        color: isPrimary ? '#06b6d4' : '#c084fc', // Cyan for closest, Lavender for others
+                        fillColor: isPrimary ? '#22d3ee' : '#e9d5ff', 
+                        fillOpacity: isPrimary ? 0.15 : 0.1, 
+                        weight: isPrimary ? 2 : 1.5,
+                        className: isPrimary ? 'animate-pulse' : '' 
                       }} 
                     >
                       <Tooltip direction="top" className="font-bold text-xs bg-slate-950 text-white border border-slate-800 p-2 shadow-xl">
                         <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
-                          <span className="text-[9px] text-cyan-400 uppercase font-mono tracking-wider">NEAREST HYDRANT</span>
-                          <span className="text-white text-sm font-bold">{nearestHydrant.gisId}</span>
-                          <span className="text-slate-400 text-[10px] mt-1 font-mono">Distance: {nearestHydrant.distance}m</span>
-                          {nearestHydrant.flowClass && (
-                            <span className="text-sky-400 text-xs font-semibold">Flow Class: {nearestHydrant.flowClass}</span>
+                          <span className={`text-[9px] uppercase font-mono tracking-wider ${isPrimary ? 'text-cyan-400' : 'text-purple-400'}`}>
+                            {isPrimary ? 'NEAREST HYDRANT' : `HYDRANT OPTION #${idx + 1}`}
+                          </span>
+                          <span className="text-white text-sm font-bold">{hyd.gisId}</span>
+                          <span className="text-slate-400 text-[10px] mt-1 font-mono">Distance: {hyd.distance}m</span>
+                          {hyd.flowClass && (
+                            <span className="text-sky-400 text-xs font-semibold">Flow Class: {hyd.flowClass}</span>
                           )}
                         </div>
                       </Tooltip>
                     </CircleMarker>
-                  </>
-                )}
+                  );
+                })}
 
                 {STATIONS[homeHall] && (
                   <RoutingOverlay 

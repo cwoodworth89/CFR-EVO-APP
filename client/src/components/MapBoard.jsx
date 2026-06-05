@@ -10,6 +10,7 @@ import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLaye
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './GameHUD';
 import { MODE_DEFAULTS, UNIT_COLORS } from './MapConstants';
+import { RoutingOverlay } from './RoutingOverlay';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
 const getRandomElement = (arr) => {
@@ -38,6 +39,36 @@ const closureIcon = L.divIcon({
   popupAnchor: [0, -14]
 });
 
+// 🚒 Fire Hall coordinate mapping
+const STATIONS = {
+  "1": [49.291329039026046, -122.79161362016414], // Hall 1
+  "2": [49.26223510671969, -122.81725512755891],  // Hall 2
+  "3": [49.24804277980424, -122.86566519365569],  // Hall 3
+  "4": [49.2952132946437, -122.7425391041921]     // Hall 4
+};
+
+// 🎯 Custom Target Address Icon
+const targetIcon = L.divIcon({
+  className: 'custom-target-icon',
+  html: `<div style="
+    background-color: #4f46e5;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    font-size: 13px;
+    box-sizing: border-box;
+    color: white;
+  ">🎯</div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -12]
+});
+
 export default function MapBoard() {
   const [map, setMap] = useState(null);
 
@@ -62,6 +93,16 @@ export default function MapBoard() {
   // COLLAPSIBLE SIDEBAR STATES
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+
+  // NAVIGATION & ROUTING STATES
+  const [homeHall, setHomeHall] = useState(() => {
+    return localStorage.getItem('home_hall') || "1";
+  });
+  const [targetAddress, setTargetAddress] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('home_hall', homeHall);
+  }, [homeHall]);
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);
@@ -226,6 +267,7 @@ export default function MapBoard() {
       setScore(0);
       setFeedback(null);
       setUserGuess(null);
+      setTargetAddress(null);
       setMapStyle(MODE_DEFAULTS[mode]); 
       
       // Only show labels automatically for Address Mode and Explore
@@ -379,6 +421,11 @@ export default function MapBoard() {
           setShowRoadClosures={setShowRoadClosures}
           showLabels={showLabels}
           setShowLabels={setShowLabels}
+          addresses={addresses}
+          homeHall={homeHall}
+          setHomeHall={setHomeHall}
+          targetAddress={targetAddress}
+          setTargetAddress={setTargetAddress}
           filterNoAccess={filterNoAccess}
           setFilterNoAccess={setFilterNoAccess}
           filterAccessOnly={filterAccessOnly}
@@ -530,6 +577,45 @@ export default function MapBoard() {
                 </React.Fragment>
               );
             })}
+
+            {/* Active Target Address Marker & Suggested Route Overlay */}
+            {gameMode === "EXPLORE" && targetAddress && (
+              <>
+                <Marker 
+                  position={[targetAddress.lat, targetAddress.lng]} 
+                  icon={targetIcon}
+                >
+                  <Popup className="target-address-popup">
+                    <div className="bg-slate-950 text-white p-3 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-[9px] text-slate-400 font-mono font-medium">SEARCH TARGET</span>
+                        <span className="text-emerald-400 text-[9px] font-bold tracking-wider">ACTIVE ROUTE</span>
+                      </div>
+                      <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
+                      <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
+                      
+                      <div className="mt-3 pt-2 border-t border-slate-900">
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md"
+                        >
+                          🚙 NAVIGATE (GPS)
+                        </a>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+
+                {STATIONS[homeHall] && (
+                  <RoutingOverlay 
+                    from={STATIONS[homeHall]} 
+                    to={[targetAddress.lat, targetAddress.lng]} 
+                  />
+                )}
+              </>
+            )}
           </MapContainer>
 
           {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}

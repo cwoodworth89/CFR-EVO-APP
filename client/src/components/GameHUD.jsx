@@ -150,6 +150,11 @@ export function LeftSidebar({
   setShowRoadClosures,
   showLabels,
   setShowLabels,
+  addresses,
+  homeHall,
+  setHomeHall,
+  targetAddress,
+  setTargetAddress,
   // Road access filter toggles
   filterNoAccess,
   setFilterNoAccess,
@@ -168,6 +173,17 @@ export function LeftSidebar({
   map
 }) {
   const isExplore = gameMode === "EXPLORE";
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+
+  // Filter addresses based on query
+  const filteredAddresses = React.useMemo(() => {
+    if (!searchQuery.trim() || !addresses) return [];
+    const query = searchQuery.toLowerCase().trim();
+    return addresses
+      .filter(item => item.address && item.address.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [searchQuery, addresses]);
 
   return (
     <div className={`relative h-full flex flex-row transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${leftSidebarOpen ? 'w-80 border-r border-slate-800' : 'w-0'}`}>
@@ -194,6 +210,92 @@ export function LeftSidebar({
              <div className="p-5 flex-grow flex flex-col gap-6 overflow-y-auto">
                 {isExplore ? (
                   <>
+                     {/* Search & Routing Section */}
+                     <div className="flex flex-col gap-3 bg-slate-950 p-4 border border-slate-800 rounded-xl flex-shrink-0">
+                        <div className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">NAVIGATION SEARCH</div>
+                        
+                        {/* 1. Home Hall Selector */}
+                        <div className="flex flex-col gap-1.5 mt-1">
+                           <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">Home Station (Origin)</label>
+                           <select 
+                              value={homeHall}
+                              onChange={(e) => setHomeHall(e.target.value)}
+                              className="bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm w-full"
+                           >
+                              <option value="1">Hall 1 (Headquarters)</option>
+                              <option value="2">Hall 2 (Austin Heights)</option>
+                              <option value="3">Hall 3 (Mariner)</option>
+                              <option value="4">Hall 4 (Burke Mountain)</option>
+                           </select>
+                        </div>
+
+                        {/* 2. Address Search Input */}
+                        <div className="flex flex-col gap-1.5 mt-2 relative">
+                           <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">Target Address / Block</label>
+                           <div className="relative">
+                              <input 
+                                 type="text"
+                                 placeholder="Search address (e.g. 4150 Cedar...)"
+                                 value={searchQuery}
+                                 onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setShowSuggestions(true);
+                                 }}
+                                 onFocus={() => setShowSuggestions(true)}
+                                 className="w-full bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg pl-3 pr-8 py-1.5 text-xs focus:outline-none focus:border-sky-500 placeholder-slate-500"
+                              />
+                              {searchQuery && (
+                                 <button 
+                                    onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs font-bold cursor-pointer"
+                                 >
+                                    ✕
+                                 </button>
+                              )}
+                           </div>
+
+                           {/* Autocomplete Suggestions Dropdown */}
+                           {showSuggestions && filteredAddresses.length > 0 && (
+                              <>
+                                 <div className="fixed inset-0 z-[1010]" onClick={() => setShowSuggestions(false)} />
+                                 <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-[1020] overflow-hidden select-none max-h-48 overflow-y-auto">
+                                    {filteredAddresses.map((item, idx) => (
+                                       <div 
+                                          key={idx}
+                                          onClick={() => {
+                                             setTargetAddress(item);
+                                             setSearchQuery("");
+                                             setShowSuggestions(false);
+                                             if (map) {
+                                                map.flyTo([item.lat, item.lng], 18, { animate: true });
+                                             }
+                                          }}
+                                          className="p-2.5 text-xs text-slate-350 hover:text-white hover:bg-slate-800 cursor-pointer border-b border-slate-850/50 last:border-0 font-medium transition-all"
+                                       >
+                                          📍 {item.address}
+                                       </div>
+                                    ))}
+                                 </div>
+                              </>
+                           )}
+                        </div>
+
+                        {/* Active Target Banner / Reset Button */}
+                        {targetAddress && (
+                           <div className="flex justify-between items-center bg-slate-900/60 border border-slate-850 p-2.5 rounded-lg mt-2 animate-in fade-in duration-200">
+                              <div className="flex flex-col min-w-0">
+                                 <span className="text-[8px] text-emerald-400 font-extrabold uppercase tracking-wider font-mono">Routing Active</span>
+                                 <span className="text-xs text-white font-bold truncate pr-1">{targetAddress.address}</span>
+                              </div>
+                              <button 
+                                 onClick={() => setTargetAddress(null)}
+                                 className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-rose-400 hover:text-rose-300 rounded text-[9px] font-black tracking-wider transition-all cursor-pointer"
+                              >
+                                 CLEAR
+                              </button>
+                           </div>
+                        )}
+                     </div>
                     {/* 1. Time Filters */}
                     <div className="flex flex-col gap-2">
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">TIME FILTERS</h3>

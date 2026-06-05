@@ -1,0 +1,83 @@
+[
+  {
+    "id": "muni_001",
+    "headline": "ROAD CLOSED (24/7)",
+    "street": "Cedar Drive",
+    "severity": "MAJOR",
+    "emergencyAccess": "NO_ACCESS",
+    "description": "Cedar Drive Upgrade (Phase 2): Full road closure between 4150 Cedar Drive and Gilleys Trail (north of Victoria Drive). Closed 24/7. Use alternative routes.",
+    "coordinates": [49.29856224562068, -122.71469542910462],
+    "polyline": [
+      [49.297550967609105, -122.71668144410674],
+      [49.29856224562068, -122.71469542910462],
+      [49.29917874787207, -122.71156922262435]
+    ],
+    "source": "Municipal511 Coquitlam"
+  },
+  {
+    "id": "muni_002",
+    "headline": "ROAD OBSTRUCTION / UTILITY WORK",
+    "street": "Ranch Park Way",
+    "severity": "MODERATE",
+    "emergencyAccess": "ACCESS_ONLY",
+    "description": "Metro Vancouver Water Main Work: Ongoing lane closures and traffic restrictions on Ranch Park Way at Dewdney Trunk Road. Expect delays.",
+    "coordinates": [49.27082662538678, -122.80318149326058],
+    "polyline": [
+      [49.268121014532255, -122.80319644840301],
+      [49.27082662538678, -122.80318149326058],
+      [49.271874364036556, -122.80315527358091],
+      [49.27205079129624, -122.8030127247976]
+    ],
+    "source": "Municipal511 Coquitlam"
+  },
+  {
+    "id": "muni_003",
+    "headline": "LANE REDUCTIONS / UTILITY WORK",
+    "street": "Clarke Rd & Como Lake Ave",
+    "severity": "MINOR",
+    "emergencyAccess": "CAUTION",
+    "description": "Intermittent utility work and lane reductions occurring around the intersection of Clarke Road and Como Lake Avenue.",
+    "coordinates": [49.26320567876534, -122.8879746921003],
+    "polyline": [
+      [49.263123247158205, -122.88932013693692],
+      [49.26320567876534, -122.8879746921003],
+      [49.26326265114897, -122.88682405416681],
+      [49.26343340357868, -122.88354007251957]
+    ],
+    "source": "Municipal511 Coquitlam"
+  },
+  {
+    "id": "muni_004",
+    "headline": "WATERMAIN REPLACEMENT",
+    "street": "Pipeline Road",
+    "severity": "MAJOR",
+    "emergencyAccess": "NO_ACCESS",
+    "description": "Full road closure on Pipeline Road between David Ave and Guildford Way for critical watermain upgrades. Local traffic only, emergency vehicles detour via Johnson St.",
+    "coordinates": [49.288577661155465, -122.78322790423425],
+    "polyline": [
+      [49.29282983314125, -122.78112059253975],
+      [49.291379536090254, -122.78184475571823],
+      [49.288577661155465, -122.78322790423425],
+      [49.28788964075447, -122.78357044913429],
+      [49.28575636156138, -122.78472222669272]
+    ],
+    "source": "Municipal511 Coquitlam"
+  },
+  {
+    "id": "muni_005",
+    "headline": "PAVEMENT REHABILITATION",
+    "street": "Westwood Street",
+    "severity": "MODERATE",
+    "emergencyAccess": "ACCESS_ONLY",
+    "description": "Single lane alternating traffic on Westwood Street between Lougheed Highway and Dewdney Trunk Road. Speed limit reduced to 30km/h. Expect minor delays.",
+    "coordinates": [49.265565040306, -122.7907479202281],
+    "polyline": [
+      [49.2630969435634, -122.79436893771016],
+      [49.2632571474562, -122.79396653716292],
+      [49.26517619922558, -122.79085039970394],
+      [49.265565040306, -122.7907479202281],
+      [49.26804470328261, -122.79063817617451]
+    ],
+    "source": "Municipal511 Coquitlam"
+  }
+]

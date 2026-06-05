@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   // IMPORTANT: Replace 'coquitlam-fire-trainer' with your EXACT repo name
-  base: '/coquitlam-fire-trainer/', 
+  base: '/CFR-EVO-APP/', 
   define: {
     __BUILD_DATE__: JSON.stringify(new Date().toLocaleString('en-CA', { 
       timeZone: 'America/Vancouver', 

@@ -137,6 +137,14 @@ export function Header({
   );
 }
 
+// 🚒 Fire Hall coordinate mapping
+const STATIONS = {
+  "1": [49.291329039026046, -122.79161362016414], // Town Centre Fire Hall (TCFH)
+  "2": [49.26223510671969, -122.81725512755891],  // Mariner Fire Hall
+  "3": [49.24804277980424, -122.86566519365569],  // Austin Heights Fire Hall
+  "4": [49.2952132946437, -122.7425391041921]     // Burke Mountain Fire Hall
+};
+
 export function LeftSidebar({ 
   leftSidebarOpen, 
   setLeftSidebarOpen, 
@@ -155,6 +163,7 @@ export function LeftSidebar({
   setHomeHall,
   targetAddress,
   setTargetAddress,
+  nearestHydrant,
   // Road access filter toggles
   filterNoAccess,
   setFilterNoAccess,
@@ -175,6 +184,12 @@ export function LeftSidebar({
   const isExplore = gameMode === "EXPLORE";
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [activeIndex, setActiveIndex] = React.useState(-1);
+
+  // Reset activeIndex whenever query changes or suggestions show status shifts
+  React.useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchQuery, showSuggestions]);
 
   // Filter addresses based on query
   const filteredAddresses = React.useMemo(() => {
@@ -185,6 +200,37 @@ export function LeftSidebar({
       .slice(0, 5);
   }, [searchQuery, addresses]);
 
+  // Unified select address handler
+  const handleSelectAddress = React.useCallback((item) => {
+    setTargetAddress(item);
+    setSearchQuery("");
+    setShowSuggestions(false);
+    setActiveIndex(-1);
+  }, [setTargetAddress]);
+
+  // Keyboard navigation handler for autocomplete list
+  const handleKeyDown = React.useCallback((e) => {
+    if (!showSuggestions || filteredAddresses.length === 0) return;
+    
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex(prev => (prev + 1) % filteredAddresses.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex(prev => (prev - 1 + filteredAddresses.length) % filteredAddresses.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const idx = activeIndex === -1 ? 0 : activeIndex;
+      if (idx >= 0 && idx < filteredAddresses.length) {
+        handleSelectAddress(filteredAddresses[idx]);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setShowSuggestions(false);
+      setActiveIndex(-1);
+    }
+  }, [showSuggestions, filteredAddresses, activeIndex, handleSelectAddress]);
+
   return (
     <div className={`relative h-full flex flex-row transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${leftSidebarOpen ? 'w-80 border-r border-slate-800' : 'w-0'}`}>
        {/* Sidebar Body Wrapper (animates width and uses overflow-hidden to prevent contents sticking out when collapsed) */}
@@ -194,15 +240,15 @@ export function LeftSidebar({
              {/* Header Title */}
              <div className="bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0">
                 {isExplore ? (
-                  <>
-                    <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO SYSTEM</div>
-                    <div className="text-lg text-emerald-500 font-extrabold uppercase font-sans tracking-wide">MAP CONTROLS</div>
-                  </>
+                   <>
+                     <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO SYSTEM</div>
+                     <div className="text-lg text-emerald-500 font-extrabold uppercase font-sans tracking-wide">MAP CONTROLS</div>
+                   </>
                 ) : (
-                  <>
-                    <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO TRAINING</div>
-                    <div className="text-lg text-sky-400 font-extrabold uppercase font-sans tracking-wide">ACTIVE SESSION</div>
-                  </>
+                   <>
+                     <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO TRAINING</div>
+                     <div className="text-lg text-sky-400 font-extrabold uppercase font-sans tracking-wide">ACTIVE SESSION</div>
+                   </>
                 )}
              </div>
 
@@ -242,6 +288,7 @@ export function LeftSidebar({
                                     setShowSuggestions(true);
                                  }}
                                  onFocus={() => setShowSuggestions(true)}
+                                 onKeyDown={handleKeyDown}
                                  className="w-full bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg pl-3 pr-8 py-1.5 text-xs focus:outline-none focus:border-sky-500 placeholder-slate-500"
                               />
                               {searchQuery && (
@@ -262,15 +309,12 @@ export function LeftSidebar({
                                     {filteredAddresses.map((item, idx) => (
                                        <div 
                                           key={idx}
-                                          onClick={() => {
-                                             setTargetAddress(item);
-                                             setSearchQuery("");
-                                             setShowSuggestions(false);
-                                             if (map) {
-                                                map.flyTo([item.lat, item.lng], 18, { animate: true });
-                                             }
-                                          }}
-                                          className="p-2.5 text-xs text-slate-350 hover:text-white hover:bg-slate-800 cursor-pointer border-b border-slate-850/50 last:border-0 font-medium transition-all"
+                                          onClick={() => handleSelectAddress(item)}
+                                          className={`p-2.5 text-xs border-b border-slate-850/50 last:border-0 font-medium transition-all cursor-pointer ${
+                                             idx === activeIndex 
+                                               ? "bg-slate-800 text-white" 
+                                               : "text-slate-350 hover:text-white hover:bg-slate-800"
+                                          }`}
                                        >
                                           📍 {item.address}
                                        </div>
@@ -280,19 +324,54 @@ export function LeftSidebar({
                            )}
                         </div>
 
-                        {/* Active Target Banner / Reset Button */}
+                        {/* Active Target Banner / Reset Button & Nearest Hydrant Details */}
                         {targetAddress && (
-                           <div className="flex justify-between items-center bg-slate-900/60 border border-slate-850 p-2.5 rounded-lg mt-2 animate-in fade-in duration-200">
-                              <div className="flex flex-col min-w-0">
+                           <div className="flex flex-col gap-2.5 bg-slate-950 p-3 border border-slate-800 rounded-lg mt-2 animate-in fade-in duration-200">
+                              <div className="flex justify-between items-center">
                                  <span className="text-[8px] text-emerald-400 font-extrabold uppercase tracking-wider font-mono">Routing Active</span>
-                                 <span className="text-xs text-white font-bold truncate pr-1">{targetAddress.address}</span>
+                                 <button 
+                                    onClick={() => setTargetAddress(null)}
+                                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-rose-400 hover:text-rose-300 rounded text-[8px] font-black tracking-wider transition-all cursor-pointer border border-slate-750"
+                                 >
+                                    CLEAR
+                                 </button>
                               </div>
-                              <button 
-                                 onClick={() => setTargetAddress(null)}
-                                 className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-rose-400 hover:text-rose-300 rounded text-[9px] font-black tracking-wider transition-all cursor-pointer"
-                              >
-                                 CLEAR
-                              </button>
+                              <div className="text-xs text-white font-bold leading-tight truncate">{targetAddress.address}</div>
+                              
+                              {/* GPS Navigation Button */}
+                              {STATIONS[homeHall] && (
+                                 <a 
+                                    href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold py-1.5 px-3 rounded-md text-[10px] flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
+                                 >
+                                    🚙 NAVIGATE (GPS)
+                                 </a>
+                              )}
+                              
+                              {/* Nearest Hydrant Info */}
+                              {nearestHydrant && (
+                                 <div className="border-t border-slate-900 pt-2 flex flex-col gap-1.5">
+                                    <div className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
+                                       <span>💧 Nearest Hydrant</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1 bg-slate-900/60 p-1.5 rounded border border-slate-850 text-center">
+                                       <div>
+                                          <div className="text-[7px] text-slate-500 font-extrabold uppercase tracking-wider">ID</div>
+                                          <div className="text-[10px] text-white font-bold font-mono">{nearestHydrant.gisId}</div>
+                                       </div>
+                                       <div>
+                                          <div className="text-[7px] text-slate-500 font-extrabold uppercase tracking-wider">Distance</div>
+                                          <div className="text-[10px] text-emerald-400 font-bold font-mono">{nearestHydrant.distance}m</div>
+                                       </div>
+                                       <div>
+                                          <div className="text-[7px] text-slate-500 font-extrabold uppercase tracking-wider">Class</div>
+                                          <div className="text-[10px] text-sky-400 font-bold font-mono">{nearestHydrant.flowClass || "N/A"}</div>
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
                            </div>
                         )}
                      </div>

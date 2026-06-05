@@ -148,6 +148,8 @@ export function LeftSidebar({
   setShowHydrants, 
   showRoadClosures, 
   setShowRoadClosures,
+  showLabels,
+  setShowLabels,
   // Road access filter toggles
   filterNoAccess,
   setFilterNoAccess,
@@ -232,6 +234,15 @@ export function LeftSidebar({
                                 className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5">💧 Fire Hydrants</span>
+                          </label>
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                             <input 
+                                type="checkbox" 
+                                checked={showLabels} 
+                                onChange={(e) => setShowLabels(e.target.checked)} 
+                                className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                             />
+                             <span className="flex items-center gap-1.5">🏷️ Road Names & Addresses</span>
                           </label>
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 

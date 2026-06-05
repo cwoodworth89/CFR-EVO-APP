@@ -54,10 +54,10 @@ export default function MapBoard() {
   // GAME STATE
   const [gameMode, setGameMode] = useState("EXPLORE"); 
   const [mapStyle, setMapStyle] = useState("GREY"); 
-  const [showLabels, setShowLabels] = useState(false); 
-  const [showHydrants, setShowHydrants] = useState(false); 
+  const [showLabels, setShowLabels] = useState(true); 
+  const [showHydrants, setShowHydrants] = useState(true); 
   const [showZones, setShowZones] = useState(false); 
-  const [showRoadClosures, setShowRoadClosures] = useState(false); 
+  const [showRoadClosures, setShowRoadClosures] = useState(true); 
   
   // COLLAPSIBLE SIDEBAR STATES
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
@@ -228,13 +228,13 @@ export default function MapBoard() {
       setUserGuess(null);
       setMapStyle(MODE_DEFAULTS[mode]); 
       
-      // Only show labels automatically for Address Mode
-      setShowLabels(mode === "QUIZ_ADDRESSES");
+      // Only show labels automatically for Address Mode and Explore
+      setShowLabels(mode === "QUIZ_ADDRESSES" || mode === "EXPLORE");
       
       if (mode === "EXPLORE") {
           setShowZones(false);
-          setShowHydrants(false);
-          setShowRoadClosures(false);
+          setShowHydrants(true);
+          setShowRoadClosures(true);
           setCurrentQuestion(null);
           setLeftSidebarOpen(true);
           setRightSidebarOpen(false);
@@ -377,6 +377,8 @@ export default function MapBoard() {
           setShowHydrants={setShowHydrants}
           showRoadClosures={showRoadClosures}
           setShowRoadClosures={setShowRoadClosures}
+          showLabels={showLabels}
+          setShowLabels={setShowLabels}
           filterNoAccess={filterNoAccess}
           setFilterNoAccess={setFilterNoAccess}
           filterAccessOnly={filterAccessOnly}

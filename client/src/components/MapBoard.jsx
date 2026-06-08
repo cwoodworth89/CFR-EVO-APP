@@ -134,11 +134,32 @@ export default function MapBoard() {
         if (data && data.features && data.features.length > 0) {
           const fromPoint = turf.point([lng, lat]);
           
+          // Try to construct a line string from the parcel's outer boundary ring coords
+          let parcelLine = null;
+          if (targetAddress.rings && targetAddress.rings.length > 0) {
+            try {
+              const ringCoords = targetAddress.rings[0];
+              if (ringCoords.length >= 2) {
+                parcelLine = turf.lineString(ringCoords);
+              }
+            } catch (e) {
+              console.warn("Could not construct parcel boundary line for hydrant distance:", e);
+            }
+          }
+
           const sortedHydrants = data.features.map(f => {
             const hLng = f.geometry.x;
             const hLat = f.geometry.y;
             const toPoint = turf.point([hLng, hLat]);
-            const distMeters = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
+            
+            let distMeters;
+            if (parcelLine) {
+              // Calculate distance to closest point on the property boundary (Alpha side / street frontage)
+              distMeters = Math.round(turf.pointToLineDistance(toPoint, parcelLine, { units: 'meters' }));
+            } else {
+              // Fallback to straight-line distance to centroid
+              distMeters = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
+            }
             
             return {
               gisId: f.attributes.gis_id || "Unknown",

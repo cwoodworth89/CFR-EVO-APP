@@ -174,6 +174,16 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
                 )}
               </p>
             )}
+            
+            <div className="flex items-center gap-1.5 mt-1.5 text-[9px] font-mono border-t border-slate-900 pt-1.5">
+              <span className="text-slate-400">🚒 FIRE TRUCK:</span>
+              <span className={`font-black ${
+                closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-400' : 'text-emerald-400'
+              }`}>
+                {closure.emergencyAccess === 'NO_ACCESS' ? 'BLOCKED ❌' : 'PASSABLE ✓'}
+              </span>
+            </div>
+
             <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent" style={{ whiteSpace: 'pre-line', maxHeight: '200px' }}>{closure.description}</p>
           </div>
         </Popup>
@@ -494,8 +504,6 @@ export default function MapBoard() {
             let emergencyAccess = "CAUTION";
             if (severityVal === "MAJOR") {
               emergencyAccess = "NO_ACCESS";
-            } else if (severityVal === "MODERATE") {
-              emergencyAccess = "ACCESS_ONLY";
             }
 
             let startDate = null;
@@ -573,13 +581,24 @@ export default function MapBoard() {
               highestBit = 1 << Math.floor(Math.log2(rct));
             }
 
+            const desc = issue.Description || {};
+            const descLower = (desc.BaseDescription || "").toLowerCase();
+            const headlineLower = (desc.Headline || "").toLowerCase();
+            const isRoadClosedText = descLower.includes("road closed") || 
+                                     descLower.includes("full closure") || 
+                                     headlineLower.includes("road closed") || 
+                                     headlineLower.includes("full closure");
+
             let emergencyAccess = "CAUTION";
             let severity = "MINOR";
 
             if (highestBit === 262144) {
               emergencyAccess = "NO_ACCESS";
               severity = "MAJOR";
-            } else if (highestBit === 65536 || highestBit === 32768 || highestBit === 16384 || highestBit === 8192) {
+            } else if (highestBit === 65536 || highestBit === 32768 || highestBit === 16384) {
+              emergencyAccess = "ACCESS_ONLY";
+              severity = "MODERATE";
+            } else if (isRoadClosedText) {
               emergencyAccess = "ACCESS_ONLY";
               severity = "MODERATE";
             } else if (issue.Priority >= 4) {
@@ -589,7 +608,6 @@ export default function MapBoard() {
             }
 
             // Dates conversion
-            const desc = issue.Description || {};
             let startDate = null;
             let endDate = null;
             if (desc.ProposedStartTimeUtcEpochMillis) {

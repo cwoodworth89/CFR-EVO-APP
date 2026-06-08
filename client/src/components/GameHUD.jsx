@@ -494,25 +494,22 @@ export function LeftSidebar({
 
                     {/* 3. Access Level Filter (Enabled only when Road Closures are toggled) */}
                     <div className={`flex flex-col gap-2 transition-all duration-300 ${!showRoadClosures && 'opacity-35 pointer-events-none'}`}>
-                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">ROAD EMERGENCY ACCESS</h3>
+                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">ROAD HAZARDS & CLOSURES</h3>
                        <div className="flex flex-col gap-2.5 mt-1.5">
                           <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
                              <input 
                                 type="checkbox" 
-                                checked={filterNoAccess} 
-                                onChange={(e) => setFilterNoAccess(e.target.checked)} 
+                                checked={filterNoAccess || filterAccessOnly} 
+                                onChange={(e) => {
+                                   setFilterNoAccess(e.target.checked);
+                                   setFilterAccessOnly(e.target.checked);
+                                }} 
                                 className="rounded border-slate-850 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>No Emergency Access</span>
-                          </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
-                             <input 
-                                type="checkbox" 
-                                checked={filterAccessOnly} 
-                                onChange={(e) => setFilterAccessOnly(e.target.checked)} 
-                                className="rounded border-slate-850 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
-                          />
-                             <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>Emergency Access Only</span>
+                             <span className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+                                <span>Full Closures</span>
+                             </span>
                           </label>
                           <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
                              <input 
@@ -521,7 +518,10 @@ export function LeftSidebar({
                                 onChange={(e) => setFilterCaution(e.target.checked)} 
                                 className="rounded border-slate-850 bg-slate-950 text-yellow-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>Passable with Caution</span>
+                             <span className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
+                                <span>Lane Closures</span>
+                             </span>
                           </label>
                        </div>
                     </div>
@@ -532,15 +532,15 @@ export function LeftSidebar({
                        <div className="flex flex-col gap-3 font-mono text-[9px] text-slate-400">
                           <div className="flex items-center gap-2.5">
                              <div className="w-6 border-b-2 border-dashed border-red-500"></div>
-                             <span>No Emergency Access Road</span>
+                             <span>Full Road Closure (No Emergency Access) - Fire Truck Blocked</span>
                           </div>
                           <div className="flex items-center gap-2.5">
                              <div className="w-6 border-b-2 border-dashed border-amber-500"></div>
-                             <span>Emergency Access Only Road</span>
+                             <span>Restricted Road Closure (Emergency/Local Only) - Fire Truck Passable</span>
                           </div>
                           <div className="flex items-center gap-2.5">
                              <div className="w-6 border-b-2 border-dashed border-yellow-500"></div>
-                             <span>Passable with Caution Road</span>
+                             <span>Lane Closure & Construction - Passable</span>
                           </div>
                           <div className="flex items-center gap-2.5">
                              <div className="w-4 h-4 rounded-full bg-slate-900 border border-slate-750 flex items-center justify-center text-[8px] font-bold text-sky-400">💧</div>
@@ -852,6 +852,16 @@ export function RightSidebar({
                                           {closure.emergencyAccess === 'NO_ACCESS' ? 'NO ACCESS' :
                                            closure.emergencyAccess === 'ACCESS_ONLY' ? 'LTD ACCESS' :
                                            'CAUTION'}
+                                        </span>
+                                     </div>
+
+                                     {/* Fire Truck Passability */}
+                                     <div className="flex justify-between items-center text-[9px] font-mono border-t border-slate-900/50 pt-1.5 mt-0.5">
+                                        <span className="text-slate-400">🚒 Fire Truck:</span>
+                                        <span className={`text-[8px] font-black ${
+                                          closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-400' : 'text-emerald-400'
+                                        }`}>
+                                          {closure.emergencyAccess === 'NO_ACCESS' ? 'BLOCKED ❌' : 'PASSABLE ✓'}
                                         </span>
                                      </div>
 

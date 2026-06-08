@@ -105,39 +105,41 @@ def transcribe_audio_file(file_path: str) -> str:
         return ""
 
 def parse_address_from_transcript(transcript: str) -> str | None:
-    # ... (code is identical to previous version)
-    address_pattern = re.compile(
-        r"((?:\d+)|(?:[A-Za-z]+\s*)+)\s+([A-Za-z\s]+?)\s+(Street|Avenue|Drive|Way|Road|Crescent|Boulevard|Place|Court)",
-        re.IGNORECASE
-    )
-    matches = address_pattern.findall(transcript)
-    if not matches:
-        print("Address Parsing: No potential addresses found.")
-        return None
-    print(f"Address Parsing: Found {len(matches)} potential address(es).")
-    parsed_addresses = []
-    for match in matches:
-        number_part, street_name, street_type = match
-        number_part = number_part.strip()
-        street_name = street_name.strip()
-        try:
-            street_number = w2n.word_to_num(number_part)
-        except ValueError:
-            try:
-                digits = [str(w2n.word_to_num(word)) for word in number_part.split()]
-                street_number = "".join(digits)
-            except ValueError:
-                street_number = number_part
-        full_address = f"{street_number} {street_name} {street_type}, Coquitlam, BC"
-        parsed_addresses.append({"number": str(street_number), "name": street_name, "full": full_address})
-    print("--- Parsed Address Details ---")
-    for i, addr in enumerate(parsed_addresses):
-        print(f"  Match {i+1}: {addr['full']}")
+    from cfr_dispatch.parser import sanitize_transcript, parse_dispatch_announcement
+    from cfr_dispatch.config import UNITS_VOCABULARY
+    
+    sanitized = sanitize_transcript(transcript)
+    print(f"Sanitized Transcript: '{sanitized}'")
+    
+    # Split by 'coquitlam' just like the production loop
+    announcements = re.split(r'\bcoquitlam\b', sanitized, flags=re.IGNORECASE)
+    all_candidates = []
+    for text in announcements:
+        if len(text.split()) > 2:
+            all_candidates.extend(parse_dispatch_announcement(text, UNITS_VOCABULARY))
+            
+    print("--- Production Parser Output Details ---")
+    for i, d in enumerate(all_candidates):
+        print(f"  Candidate {i+1}:")
+        print(f"    - Units:        {d.units}")
+        print(f"    - Response:     {d.response_type}")
+        print(f"    - Call Type:    {d.call_type}")
+        print(f"    - Address:      {d.address}")
+        print(f"    - Intersection: {d.intersection}")
+        print(f"    - Radio Channel: {d.radio_channel}")
+        print(f"    - Map Grid:     {d.map_grid}")
     print("-" * 30)
-    if parsed_addresses:
-        validated_address = parsed_addresses[0]['full']
-        print(f"Validation successful. Using first found address: '{validated_address}'")
-        return validated_address
+    
+    unique_addresses = []
+    for d in all_candidates:
+        if d.address and d.address not in unique_addresses:
+            unique_addresses.append(d.address)
+        if d.intersection and d.intersection not in unique_addresses:
+            unique_addresses.append(d.intersection)
+            
+    if unique_addresses:
+        print(f"Validation successful. Found address: '{unique_addresses[0]}'")
+        return unique_addresses[0]
     return None
 
 def geocode_address(address: str, api_key: str) -> dict | None:

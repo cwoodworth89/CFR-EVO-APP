@@ -16,10 +16,27 @@ from cfr_dispatch.config import (
 
 def sanitize_transcript(text: str) -> str:
     """
-    Cleans a transcript by converting to lowercase, mapping verbal numbers
-    to digits, removing non-alphanumeric punctuation, and normalizing whitespace.
+    Cleans a transcript by converting to lowercase, applying phonetic corrections,
+    mapping verbal numbers to digits, removing non-alphanumeric punctuation,
+    and normalizing whitespace.
     """
     text = text.lower()
+
+    # Apply phonetic corrections for common mishearings in dispatch templates
+    phonetic_corrections = {
+        r'\brespawns?\b': 'respond',
+        r'\bresponses?\b': 'respond',
+        r'\bvan\s+ruitens?\b': 'routine',
+        r'\bmath\s+grids?\b': 'map grid',
+        r'\bmath\s+grades?\b': 'map grid',
+        r'\bmap\s+grades?\b': 'map grid',
+        r'\btalk\s*groups?\b': 'talk group',
+        r'\btorque\s+groups?\b': 'talk group',
+        r'\bcross\s+roads?\b': 'cross roads',
+        r'\bcross\s+streets?\b': 'cross roads',
+    }
+    for pattern, replacement in phonetic_corrections.items():
+        text = re.sub(pattern, replacement, text)
 
     number_words = {
         'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
@@ -36,12 +53,23 @@ def sanitize_transcript(text: str) -> str:
     # Strip punctuation
     text = re.sub(r'[^a-z0-9\s]', '', text)
     
+    # Join consecutive single digits separated by spaces (e.g. "4 2 8" -> "428")
+    text = re.sub(r'\b(\d)\s+(?=\d\b)', r'\1', text)
+    
     # Trim and normalize spaces
     return ' '.join(text.split())
 
 def load_call_types(filepath="call_types.txt") -> List[str]:
     """Loads and returns sorted call types list from a text file, longest first."""
     call_types = []
+    
+    # Resolve default filepath relative to the parent directory of this module (agent/)
+    if filepath == "call_types.txt":
+        package_dir = os.path.dirname(os.path.abspath(__file__))
+        resolved_path = os.path.join(os.path.dirname(package_dir), "call_types.txt")
+        if os.path.exists(resolved_path):
+            filepath = resolved_path
+
     if os.path.exists(filepath):
         try:
             with open(filepath, 'r') as f:
@@ -205,11 +233,122 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
 def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) -> List[DispatchData]:
     """
     Parses sanitized text for dispatch fields, including addresses, intersections, units,
-    response priority types, and map response grids.
+    response priority types, and map response grids. Attempts template-aligned anchor
+    segmentation first, and falls back to standard regex parsing if necessary.
     """
     text = announcement_text.strip()
+    
+    # Normalize spaces
+    text = ' '.join(text.split())
+    
     street_types = r"street|avenue|drive|way|road|crescent|boulevard|place|court|highway|lane"
     
+    # --- 1. Try Template-Aligned Anchor Segmentation ---
+    # Template: [Units] respond [priority] [incident_type] [address] near/cross roads [cross_roads] use talk group [channel] map grid [grid]
+    respond_match = re.search(r'\brespond\s+(routine|emergency)\b', text, re.IGNORECASE)
+    if respond_match:
+        try:
+            respond_idx = respond_match.start()
+            respond_len = len(respond_match.group(0))
+            
+            # Units segment: text preceding 'respond'
+            units_segment = text[:respond_idx].strip()
+            
+            # Remainder of the announcement after 'respond [priority]'
+            remainder = text[respond_idx + respond_len:].strip()
+            
+            # Find boundary anchors
+            cross_roads_match = re.search(r'\b(cross\s+roads|near|cross\s+street)\b', remainder, re.IGNORECASE)
+            talk_group_match = re.search(r'\b(use\s+talk\s+group|talk\s+group)\b', remainder, re.IGNORECASE)
+            map_grid_match = re.search(r'\bmap\s+grid\b', remainder, re.IGNORECASE)
+            
+            # Determine end of Call Type + Address segment
+            address_end_idx = len(remainder)
+            if cross_roads_match:
+                address_end_idx = min(address_end_idx, cross_roads_match.start())
+            elif talk_group_match:
+                address_end_idx = min(address_end_idx, talk_group_match.start())
+            elif map_grid_match:
+                address_end_idx = min(address_end_idx, map_grid_match.start())
+                
+            call_type_and_address_segment = remainder[:address_end_idx].strip()
+            
+            # Match Call Type within the segment to isolate the Address
+            matched_call_type = None
+            address_part = call_type_and_address_segment
+            
+            # Sort call types by length descending to match longest phrases first
+            for ct in CALL_TYPES:
+                ct_clean = sanitize_transcript(ct)
+                if ct_clean in call_type_and_address_segment:
+                    matched_call_type = ct
+                    address_part = call_type_and_address_segment.replace(ct_clean, "").strip()
+                    break
+            else:
+                # If call type didn't match exactly, isolate address by finding the first digits (house number)
+                digit_match = re.search(r'\b\d+\b', call_type_and_address_segment)
+                if digit_match:
+                    address_part = call_type_and_address_segment[digit_match.start():].strip()
+                    call_type_part = call_type_and_address_segment[:digit_match.start()].strip()
+                    matched_call_type = match_incident_type(call_type_part, CALL_TYPES)
+                else:
+                    matched_call_type = "Unknown Incident"
+            
+            # Clean and normalize isolated address
+            address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
+            normalized_address = normalize_street_suffix(address_part)
+            
+            # Extract Cross Roads segment
+            cross_roads_str = None
+            if cross_roads_match:
+                cross_roads_start = cross_roads_match.start() + len(cross_roads_match.group(0))
+                cross_roads_end = len(remainder)
+                if talk_group_match:
+                    cross_roads_end = min(cross_roads_end, talk_group_match.start())
+                elif map_grid_match:
+                    cross_roads_end = min(cross_roads_end, map_grid_match.start())
+                cross_roads_raw = remainder[cross_roads_start:cross_roads_end].strip()
+                cross_roads_clean = clean_location_text(cross_roads_raw, CALL_TYPES, units_vocab)
+                cross_roads_str = normalize_street_suffix(cross_roads_clean)
+                
+            # Extract Talk Group (Radio channel)
+            talk_group_str = None
+            if talk_group_match:
+                talk_group_start = talk_group_match.start() + len(talk_group_match.group(0))
+                talk_group_end = len(remainder)
+                if map_grid_match:
+                    talk_group_end = min(talk_group_end, map_grid_match.start())
+                talk_group_raw = remainder[talk_group_start:talk_group_end].strip()
+                tg_digits = re.search(r'\d+', talk_group_raw)
+                if tg_digits:
+                    talk_group_str = tg_digits.group(0)
+                    
+            # Extract Map Grid
+            map_grid_str = None
+            if map_grid_match:
+                map_grid_start = map_grid_match.start() + len(map_grid_match.group(0))
+                map_grid_raw = remainder[map_grid_start:].strip()
+                grid_digits = re.search(r'\d+', map_grid_raw)
+                if grid_digits:
+                    map_grid_str = grid_digits.group(0)
+                    
+            dispatch = DispatchData(
+                raw_text=text,
+                units=units_segment if units_segment else None,
+                response_type=respond_match.group(1).strip(),
+                call_type=matched_call_type,
+                address=normalized_address if normalized_address and "and" not in normalized_address.lower() else None,
+                intersection=normalized_address if normalized_address and "and" in normalized_address.lower() else cross_roads_str,
+                map_grid=map_grid_str,
+                radio_channel=talk_group_str
+            )
+            
+            if dispatch.address or dispatch.intersection:
+                return [dispatch]
+        except Exception as e:
+            logging.warning(f"Template parsing failed: {e}. Falling back to regex parser.")
+
+    # --- 2. Fallback to Standard Regex Parsing ---
     unit_lookbehind = '|'.join(UNIT_PARSING_IGNORE_LIST)
     
     address_pattern = re.compile(

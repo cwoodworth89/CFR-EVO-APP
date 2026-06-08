@@ -807,7 +807,7 @@ export function RightSidebar({
     <div className={`relative h-full flex flex-row-reverse transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${rightSidebarOpen ? 'w-80 border-l border-slate-800' : 'w-0'}`}>
        {/* Sidebar Body Wrapper (animates width and uses overflow-hidden to prevent contents sticking out when collapsed) */}
        <div className={`h-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${rightSidebarOpen ? 'w-80' : 'w-0'}`}>
-          <div className="w-80 h-full flex flex-col overflow-y-auto overflow-x-hidden">
+          <div className="w-80 h-full flex flex-col overflow-hidden">
              {/* Header Title */}
              <div className="bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0">
                 <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO ALERTS</div>
@@ -815,9 +815,9 @@ export function RightSidebar({
              </div>
 
              {/* Alerts Card List */}
-             <div className="p-4 flex-grow overflow-y-auto">
+             <div className="p-4 flex-grow overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 {showRoadClosures ? (
-                    <div className="flex flex-col gap-2.5 max-h-[78vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                    <div className="flex flex-col gap-2.5 pr-1">
                         <div className="text-slate-400 text-[10px] font-semibold mb-1 uppercase font-mono tracking-wider">Filtered Alerts ({processedClosures.length})</div>
                         {processedClosures.length > 0 ? (
                             processedClosures.map((closure) => (
@@ -831,7 +831,7 @@ export function RightSidebar({
                                       onSelectClosure(closure);
                                     }
                                   }}
-                                  className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden"
+                                  className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden flex-shrink-0"
                                 >
                                      {/* Street Name (Prominent & Color-coded) & Source */}
                                      <div className="flex justify-between items-center gap-1.5">

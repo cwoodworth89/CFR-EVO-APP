@@ -362,27 +362,13 @@ export default function MapBoard() {
 
   // LOAD ROAD CLOSURES
   useEffect(() => {
-    const baseUrl = import.meta.env.BASE_URL;
-
-    // Fetch curated local municipal road closures directly (instead of Capital Projects GIS layer)
-    const fetchMuni = fetch(`${baseUrl}data/road_closures.json?v=1`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        return data.map(evt => ({
-          ...evt,
-          startDate: evt.startDate || null,
-          endDate: evt.endDate || null
-        }));
-      })
-      .catch(() => []);
-
     // Fetch DriveBC live API
-    const fetchDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
+    fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
       .then(r => r.ok ? r.json() : { events: [] })
       .then(data => {
-        if (!data || !data.events) return [];
+        if (!data || !data.events) return;
         // Filter to Coquitlam bounding box
-        return data.events
+        const bcEvents = data.events
           .filter(evt => {
             if (!evt.geography || !evt.geography.coordinates) return false;
             let coords = [];
@@ -400,10 +386,12 @@ export default function MapBoard() {
           .map(evt => {
             let lat = 49.28;
             let lng = -122.80;
+            let polyline = [];
             if (evt.geography.type === "Point") {
               lng = evt.geography.coordinates[0];
               lat = evt.geography.coordinates[1];
             } else if (evt.geography.type === "LineString") {
+              polyline = evt.geography.coordinates.map(pt => [pt[1], pt[0]]);
               const middleIndex = Math.floor(evt.geography.coordinates.length / 2);
               lng = evt.geography.coordinates[middleIndex][0];
               lat = evt.geography.coordinates[middleIndex][1];
@@ -442,142 +430,141 @@ export default function MapBoard() {
               emergencyAccess: emergencyAccess,
               description: evt.description || "Active traffic event.",
               coordinates: [lat, lng],
+              polyline: polyline,
               source: "DriveBC Open511",
               startDate: startDate,
               endDate: endDate
             };
           });
+
+        const now = new Date();
+
+        // 1. Process dates, active status, duration, and isExpired
+        const processed = bcEvents.map(evt => {
+          const start = evt.startDate ? new Date(evt.startDate) : null;
+          const end = evt.endDate ? new Date(evt.endDate) : null;
+
+          let isActive = false;
+          let isFuture = false;
+          let isExpired = false;
+          let durationMs = Infinity;
+
+          if (!start) {
+            isActive = true;
+          } else if (now < start) {
+            isFuture = true;
+          } else if (end && now > end) {
+            isExpired = true;
+          } else {
+            isActive = true;
+          }
+
+          if (start && end) {
+            durationMs = end.getTime() - start.getTime();
+          }
+
+          return {
+            ...evt,
+            start,
+            end,
+            isActive,
+            isFuture,
+            isExpired,
+            durationMs
+          };
+        });
+
+        // 2. Filter out expired ones
+        const unexpired = processed.filter(evt => !evt.isExpired);
+
+        // 3. Deduplicate events at the exact same location (coordinates rounded to 4 decimal places)
+        const groups = {};
+        unexpired.forEach(evt => {
+          const latKey = evt.coordinates[0].toFixed(4);
+          const lngKey = evt.coordinates[1].toFixed(4);
+          const key = `${latKey}_${lngKey}`;
+
+          if (!groups[key]) {
+            groups[key] = [];
+          }
+          groups[key].push(evt);
+        });
+
+        const deduplicated = Object.values(groups).map(group => {
+          if (group.length === 1) return group[0];
+
+          // Merge duplicates:
+          const first = group[0];
+          
+          // Find highest severity: MAJOR > MODERATE > MINOR
+          const severityOrder = { "MAJOR": 3, "MODERATE": 2, "MINOR": 1 };
+          let highestSeverity = "MINOR";
+          let maxSeverityVal = 0;
+          group.forEach(evt => {
+            const sVal = severityOrder[evt.severity] || 0;
+            if (sVal > maxSeverityVal) {
+              maxSeverityVal = sVal;
+              highestSeverity = evt.severity;
+            }
+          });
+
+          // Find most restrictive emergency access: NO_ACCESS > ACCESS_ONLY > CAUTION
+          const accessOrder = { "NO_ACCESS": 3, "ACCESS_ONLY": 2, "CAUTION": 1 };
+          let mostRestrictiveAccess = "CAUTION";
+          let maxAccessVal = 0;
+          group.forEach(evt => {
+            const aVal = accessOrder[evt.emergencyAccess] || 0;
+            if (aVal > maxAccessVal) {
+              maxAccessVal = aVal;
+              mostRestrictiveAccess = evt.emergencyAccess;
+            }
+          });
+
+          // Combine unique descriptions with clean bullet points
+          const uniqueDescriptions = [...new Set(group.map(evt => evt.description.trim()))];
+          const combinedDescription = uniqueDescriptions.length > 1
+            ? uniqueDescriptions.map(desc => `• ${desc}`).join('\n')
+            : uniqueDescriptions[0];
+
+          // Find earliest start date and latest end date
+          let earliestStart = null;
+          let latestEnd = null;
+          group.forEach(evt => {
+            if (evt.start) {
+              if (!earliestStart || evt.start < earliestStart) {
+                earliestStart = evt.start;
+              }
+            }
+            if (evt.end) {
+              if (!latestEnd || evt.end > latestEnd) {
+                latestEnd = evt.end;
+              }
+            }
+          });
+
+          // Check if any merged event is active
+          const anyActive = group.some(evt => evt.isActive);
+
+          return {
+            ...first,
+            severity: highestSeverity,
+            emergencyAccess: mostRestrictiveAccess,
+            description: combinedDescription,
+            startDate: earliestStart ? earliestStart.toISOString() : null,
+            endDate: latestEnd ? latestEnd.toISOString() : null,
+            start: earliestStart,
+            end: latestEnd,
+            isActive: anyActive,
+            isFuture: !anyActive && group.some(evt => evt.isFuture),
+            durationMs: earliestStart && latestEnd ? latestEnd.getTime() - earliestStart.getTime() : Infinity
+          };
+        });
+
+        setRoadClosures(deduplicated);
       })
-      .catch(() => []);
-
-    Promise.all([fetchMuni, fetchDriveBC]).then(([muniEvents, bcEvents]) => {
-      const allEvents = [...muniEvents, ...bcEvents];
-      const now = new Date();
-
-      // 1. Process dates, active status, duration, and isExpired
-      const processed = allEvents.map(evt => {
-        const start = evt.startDate ? new Date(evt.startDate) : null;
-        const end = evt.endDate ? new Date(evt.endDate) : null;
-
-        let isActive = false;
-        let isFuture = false;
-        let isExpired = false;
-        let durationMs = Infinity;
-
-        if (!start) {
-          // Fallback: closures with no start date are treated as active
-          isActive = true;
-        } else if (now < start) {
-          isFuture = true;
-        } else if (end && now > end) {
-          isExpired = true;
-        } else {
-          isActive = true;
-        }
-
-        if (start && end) {
-          durationMs = end.getTime() - start.getTime();
-        }
-
-        return {
-          ...evt,
-          start,
-          end,
-          isActive,
-          isFuture,
-          isExpired,
-          durationMs
-        };
+      .catch((err) => {
+        console.warn("Failed to fetch DriveBC Open511 events:", err);
       });
-
-      // 2. Filter out expired ones
-      const unexpired = processed.filter(evt => !evt.isExpired);
-
-      // 3. Deduplicate events at the exact same location (coordinates rounded to 4 decimal places)
-      const groups = {};
-      unexpired.forEach(evt => {
-        const lat = evt.coordinates[0].toFixed(4);
-        const lng = evt.coordinates[1].toFixed(4);
-        const key = `${lat}_${lng}`;
-
-        if (!groups[key]) {
-          groups[key] = [];
-        }
-        groups[key].push(evt);
-      });
-
-      const deduplicated = Object.values(groups).map(group => {
-        if (group.length === 1) return group[0];
-
-        // Merge duplicates:
-        const first = group[0];
-        
-        // Find highest severity: MAJOR > MODERATE > MINOR
-        const severityOrder = { "MAJOR": 3, "MODERATE": 2, "MINOR": 1 };
-        let highestSeverity = "MINOR";
-        let maxSeverityVal = 0;
-        group.forEach(evt => {
-          const sVal = severityOrder[evt.severity] || 0;
-          if (sVal > maxSeverityVal) {
-            maxSeverityVal = sVal;
-            highestSeverity = evt.severity;
-          }
-        });
-
-        // Find most restrictive emergency access: NO_ACCESS > ACCESS_ONLY > CAUTION
-        const accessOrder = { "NO_ACCESS": 3, "ACCESS_ONLY": 2, "CAUTION": 1 };
-        let mostRestrictiveAccess = "CAUTION";
-        let maxAccessVal = 0;
-        group.forEach(evt => {
-          const aVal = accessOrder[evt.emergencyAccess] || 0;
-          if (aVal > maxAccessVal) {
-            maxAccessVal = aVal;
-            mostRestrictiveAccess = evt.emergencyAccess;
-          }
-        });
-
-        // Combine unique descriptions with clean bullet points
-        const uniqueDescriptions = [...new Set(group.map(evt => evt.description.trim()))];
-        const combinedDescription = uniqueDescriptions.length > 1
-          ? uniqueDescriptions.map(desc => `• ${desc}`).join('\n')
-          : uniqueDescriptions[0];
-
-        // Find earliest start date and latest end date
-        let earliestStart = null;
-        let latestEnd = null;
-        group.forEach(evt => {
-          if (evt.start) {
-            if (!earliestStart || evt.start < earliestStart) {
-              earliestStart = evt.start;
-            }
-          }
-          if (evt.end) {
-            if (!latestEnd || evt.end > latestEnd) {
-              latestEnd = evt.end;
-            }
-          }
-        });
-
-        // Check if any merged event is active
-        const anyActive = group.some(evt => evt.isActive);
-
-        return {
-          ...first,
-          severity: highestSeverity,
-          emergencyAccess: mostRestrictiveAccess,
-          description: combinedDescription,
-          startDate: earliestStart ? earliestStart.toISOString() : null,
-          endDate: latestEnd ? latestEnd.toISOString() : null,
-          start: earliestStart,
-          end: latestEnd,
-          isActive: anyActive,
-          isFuture: !anyActive && group.some(evt => evt.isFuture),
-          durationMs: earliestStart && latestEnd ? latestEnd.getTime() - earliestStart.getTime() : Infinity
-        };
-      });
-
-      setRoadClosures(deduplicated);
-    });
   }, []);
 
   // LAZY LOAD TRAINING DATA

@@ -168,7 +168,7 @@ if __name__ == "__main__":
     gmaps_api_key = os.environ.get("GOOGLE_API_KEY")
     join_api_key = os.environ.get("JOIN_API_KEY") # Get the Join key
     
-    audio_file_name = "test_dispatch.wav"
+    audio_file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_dispatch.wav")
     full_transcript = transcribe_audio_file(audio_file_name)
 
     if full_transcript:

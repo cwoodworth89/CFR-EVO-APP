@@ -148,8 +148,8 @@ export default function MapBoard() {
             };
           }).sort((a, b) => a.distance - b.distance);
 
-          // Save top 3 closest hydrants
-          setNearestHydrants(sortedHydrants.slice(0, 3));
+          // Save only the single closest hydrant
+          setNearestHydrants(sortedHydrants.slice(0, 1));
         } else {
           setNearestHydrants([]);
         }

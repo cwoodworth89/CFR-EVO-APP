@@ -186,3 +186,5 @@ scratch/
 temp_dispatch_*.wav
 temp_dispatch_full.wav
 *.log
+agent/*.json
+*.json.key

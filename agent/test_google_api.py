@@ -3,7 +3,7 @@ import sys
 import re
 import googlemaps
 import requests # We still use requests
-from google.cloud import speech
+from google.cloud import speech, speech_v2
 from word2number import w2n
 
 # Automatically load environment variables and resolve credentials absolute path
@@ -19,10 +19,25 @@ except ImportError:
     except ImportError:
         pass
 
+# Import speech adaptation parameters
+try:
+    from agent.cfr_dispatch.config import (
+        ADAPTATION_RESOURCE_IDS,
+        BOOST_MAPPING,
+        GCP_PROJECT_ID,
+        RECOGNIZER_RESOURCE_NAME
+    )
+except ImportError:
+    from cfr_dispatch.config import (
+        ADAPTATION_RESOURCE_IDS,
+        BOOST_MAPPING,
+        GCP_PROJECT_ID,
+        RECOGNIZER_RESOURCE_NAME
+    )
+
 # --- All previous functions (transcribe_audio_file, parse_address_from_transcript, geocode_address) remain unchanged ---
 # ... (omitting for brevity) ...
 def transcribe_audio_file(file_path: str) -> str:
-    # ... (code is identical to previous version)
     if not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         print("Error: The GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.")
         return ""
@@ -30,30 +45,61 @@ def transcribe_audio_file(file_path: str) -> str:
         print(f"Error: Audio file not found at '{file_path}'")
         return ""
     try:
-        client = speech.SpeechClient()
+        client = speech_v2.SpeechClient()
+
+        phrases_to_boost = []
+        for resource_id in ADAPTATION_RESOURCE_IDS:
+            base_id = next((key for key in BOOST_MAPPING if resource_id.startswith(key)), None)
+            boost_value = BOOST_MAPPING.get(base_id, 10)
+            
+            full_resource_name = f"projects/{GCP_PROJECT_ID}/locations/global/customClasses/{resource_id}"
+            phrases_to_boost.append({"value": f"${full_resource_name}", "boost": boost_value})
+
+        inline_set = speech_v2.types.PhraseSet(phrases=phrases_to_boost)
+        adaptation_phrase_set_dict = {"inline_phrase_set": inline_set}
+        adaptation_config = speech_v2.SpeechAdaptation(
+            phrase_sets=[adaptation_phrase_set_dict]
+        )
+        
+        config = speech_v2.RecognitionConfig(
+            auto_decoding_config={},
+            language_codes=["en-CA"],
+            model="long",
+            features=speech_v2.RecognitionFeatures(
+                enable_automatic_punctuation=True,
+            ),
+            adaptation=adaptation_config
+        )
+
         with open(file_path, "rb") as audio_file:
             content = audio_file.read()
-        audio = speech.RecognitionAudio(content=content)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=44100,
-            language_code="en-CA",
-            enable_automatic_punctuation=True,
+        
+        request = speech_v2.types.RecognizeRequest(
+            recognizer=RECOGNIZER_RESOURCE_NAME,
+            config=config,
+            content=content,
         )
-        print("Sending audio to Google Speech-to-Text API...")
-        response = client.recognize(config=config, audio=audio)
+        
+        print("Sending audio to Google Speech-to-Text API v2 with adaptation...")
+        response = client.recognize(request=request)
         print("API Response Received.")
-        if not response.results:
+
+        if not response or not response.results:
             print("Warning: API returned no results.")
             return ""
-        first_result = response.results[0]
-        transcript = first_result.alternatives[0].transcript
-        confidence = first_result.alternatives[0].confidence
+        
+        transcripts = []
+        for result in response.results:
+            if result.alternatives:
+                transcripts.append(result.alternatives[0].transcript)
+                print(f"Segment Transcript: {result.alternatives[0].transcript}")
+                print(f"Segment Confidence: {result.alternatives[0].confidence:.2%}")
+        
+        full_transcript = " ".join(transcripts).strip()
         print("-" * 30)
-        print(f"Transcript: {transcript}")
-        print(f"Confidence: {confidence:.2%}")
+        print(f"Full Combined Transcript: {full_transcript}")
         print("-" * 30)
-        return transcript
+        return full_transcript
     except Exception as e:
         print(f"An API error occurred: {e}")
         return ""

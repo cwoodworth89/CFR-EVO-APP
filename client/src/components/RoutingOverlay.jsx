@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet-routing-machine';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 
-export function RoutingOverlay({ from, to }) {
+export function RoutingOverlay({ from, to, onRouteCalculated }) {
   const map = useMap();
 
   useEffect(() => {
@@ -35,6 +35,16 @@ export function RoutingOverlay({ from, to }) {
         missingRouteTolerance: 10
       }
     }).addTo(map);
+
+    routingControl.on('routesfound', (e) => {
+      const routes = e.routes;
+      if (routes && routes.length > 0) {
+        const coordinates = routes[0].coordinates; // array of L.LatLng
+        if (onRouteCalculated) {
+          onRouteCalculated(coordinates);
+        }
+      }
+    });
 
     // Force-hide the LRM instruction container container if it ignores the 'show' parameter
     const container = routingControl.getContainer();

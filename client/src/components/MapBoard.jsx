@@ -1,5 +1,5 @@
 /* global __BUILD_DATE__ */
-import React, { useEffect, useState, useRef, useCallback } from 'react'; // Added useRef and useCallback
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
 import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
@@ -97,7 +97,8 @@ export default function MapBoard() {
   });
   const [targetAddress, setTargetAddress] = useState(null);
   const [targetPolygon, setTargetPolygon] = useState(null);
-  const [nearestHydrants, setNearestHydrants] = useState([]);
+  const [allNearbyHydrants, setAllNearbyHydrants] = useState([]);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
 
   const updateTargetAddress = useCallback((addr) => {
     setTargetAddress(addr);
@@ -109,7 +110,8 @@ export default function MapBoard() {
     } else {
       setTargetPolygon(null);
     }
-    setNearestHydrants([]);
+    setAllNearbyHydrants([]);
+    setRouteCoordinates([]);
   }, []);
 
   useEffect(() => {
@@ -123,8 +125,8 @@ export default function MapBoard() {
     const lat = targetAddress.lat;
     const lng = targetAddress.lng;
 
-    // Fetch Nearby Hydrants from Layer 2 (within 150m)
-    const hydUrl = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&distance=150&units=esriSRUnit_Meter&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
+    // Fetch Nearby Hydrants from Layer 2 (within 300m / ~1000ft to capture hydrants further along route)
+    const hydUrl = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&distance=300&units=esriSRUnit_Meter&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
 
     fetch(hydUrl)
       .then(r => r.ok ? r.json() : null)
@@ -148,17 +150,43 @@ export default function MapBoard() {
             };
           }).sort((a, b) => a.distance - b.distance);
 
-          // Save only the single closest hydrant
-          setNearestHydrants(sortedHydrants.slice(0, 1));
+          setAllNearbyHydrants(sortedHydrants);
         } else {
-          setNearestHydrants([]);
+          setAllNearbyHydrants([]);
         }
       })
       .catch(err => {
         console.warn("Failed to fetch nearby hydrants:", err);
-        setNearestHydrants([]);
+        setAllNearbyHydrants([]);
       });
   }, [targetAddress]);
+
+  // Filter nearby hydrants to get the closest hydrant along the recommended route
+  const nearestHydrants = useMemo(() => {
+    if (allNearbyHydrants.length === 0) return [];
+
+    if (routeCoordinates && routeCoordinates.length > 1) {
+      try {
+        const routeLine = turf.lineString(routeCoordinates.map(c => [c.lng, c.lat]));
+        const onRouteHydrants = allNearbyHydrants.map(hyd => {
+          const pt = turf.point([hyd.lng, hyd.lat]);
+          const distanceToRoute = turf.pointToLineDistance(pt, routeLine, { units: 'meters' });
+          return { ...hyd, distanceToRoute };
+        }).filter(hyd => hyd.distanceToRoute <= 25); // 25m threshold (approx. 82ft) to confirm it is along the street of the route
+
+        if (onRouteHydrants.length > 0) {
+          // Sort by geographic distance to the destination address
+          onRouteHydrants.sort((a, b) => a.distance - b.distance);
+          return [onRouteHydrants[0]]; // Return single closest hydrant on route
+        }
+      } catch (e) {
+        console.error("Error filtering hydrants by route line:", e);
+      }
+    }
+
+    // Fallback to absolute closest geographic hydrant if routing coordinates are not loaded yet or no hydrants are on-route
+    return allNearbyHydrants.slice(0, 1);
+  }, [allNearbyHydrants, routeCoordinates]);
 
   // Adaptive Zooming: fit bounds to show both the selected Fire Hall (origin) and searched address (destination)
   useEffect(() => {
@@ -777,6 +805,7 @@ export default function MapBoard() {
                   <RoutingOverlay 
                     from={STATIONS[homeHall]} 
                     to={[targetAddress.lat, targetAddress.lng]} 
+                    onRouteCalculated={setRouteCoordinates}
                   />
                 )}
               </>

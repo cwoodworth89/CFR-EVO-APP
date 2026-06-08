@@ -157,9 +157,9 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
                 closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
                 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
               }`}>
-                {closure.emergencyAccess === 'NO_ACCESS' ? 'NO EMERGENCY ACCESS' :
+                {closure.emergencyAccess === 'NO_ACCESS' ? 'FULL CLOSURE' :
                  closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
-                 'PASSABLE WITH CAUTION'}
+                 'LANE CLOSURE'}
               </span>
               <span className="text-[9px] text-slate-550 font-mono font-medium">{closure.source}</span>
             </div>
@@ -174,16 +174,6 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
                 )}
               </p>
             )}
-            
-            <div className="flex items-center gap-1.5 mt-1.5 text-[9px] font-mono border-t border-slate-900 pt-1.5">
-              <span className="text-slate-400">🚒 FIRE TRUCK:</span>
-              <span className={`font-black ${
-                closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-400' : 'text-emerald-400'
-              }`}>
-                {closure.emergencyAccess === 'NO_ACCESS' ? 'BLOCKED ❌' : 'PASSABLE ✓'}
-              </span>
-            </div>
-
             <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent" style={{ whiteSpace: 'pre-line', maxHeight: '200px' }}>{closure.description}</p>
           </div>
         </Popup>
@@ -452,13 +442,25 @@ export default function MapBoard() {
         return { events: [] };
       });
 
-    // 2. Fetch Municipal 511 API via proxy
-    const fetchMuni511 = fetch("https://api.codetabs.com/v1/proxy?quest=https://bc.municipal511.ca/Dynamic/jsonData0.txt")
-      .then(r => r.ok ? r.json() : Promise.reject("Primary proxy failed"))
+    // 2. Fetch Municipal 511 API via proxy (Dynamic versioned filename parser to bypass caching)
+    const fetchMuni511 = fetch("https://api.codetabs.com/v1/proxy?quest=https://bc.municipal511.ca/")
+      .then(r => r.ok ? r.text() : Promise.reject("Primary HTML proxy failed"))
+      .then(html => {
+        const match = html.match(/"jsonData0\.txt"\s*:\s*"([^"]+)"/);
+        const hashedFilename = match ? match[1] : "jsonData0.txt";
+        return fetch(`https://api.codetabs.com/v1/proxy?quest=https://bc.municipal511.ca/Dynamic/${hashedFilename}`)
+          .then(r => r.ok ? r.json() : Promise.reject("Primary Data proxy failed"));
+      })
       .catch(err => {
         console.warn("Primary CORS proxy failed, trying fallback...", err);
-        return fetch("https://api.allorigins.win/raw?url=https://bc.municipal511.ca/Dynamic/jsonData0.txt")
-          .then(r => r.ok ? r.json() : { Issues: [], CoordsEncoded: "" });
+        return fetch("https://api.allorigins.win/raw?url=https://bc.municipal511.ca/")
+          .then(r => r.ok ? r.text() : Promise.reject("Fallback HTML proxy failed"))
+          .then(html => {
+            const match = html.match(/"jsonData0\.txt"\s*:\s*"([^"]+)"/);
+            const hashedFilename = match ? match[1] : "jsonData0.txt";
+            return fetch(`https://api.allorigins.win/raw?url=https://bc.municipal511.ca/Dynamic/${hashedFilename}`)
+              .then(r => r.ok ? r.json() : Promise.reject("Fallback Data proxy failed"));
+          });
       })
       .catch(err => {
         console.warn("All CORS proxies failed to fetch Municipal 511:", err);
@@ -660,10 +662,11 @@ export default function MapBoard() {
 
           if (start && now < start) {
             isFuture = true;
+          } else if (end && now > end) {
+            isExpired = true;
           } else {
             isActive = true;
           }
-          isExpired = false;
 
           if (start && end) {
             durationMs = end.getTime() - start.getTime();

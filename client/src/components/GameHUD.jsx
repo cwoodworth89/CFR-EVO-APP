@@ -725,10 +725,11 @@ export function RightSidebar({
 
         if (start && now < start) {
           isFuture = true;
+        } else if (end && now > end) {
+          isExpired = true;
         } else {
           isActive = true;
         }
-        isExpired = false;
 
         if (start && end) {
           durationMs = end.getTime() - start.getTime();
@@ -849,19 +850,9 @@ export function RightSidebar({
                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                                           'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                                         }`}>
-                                          {closure.emergencyAccess === 'NO_ACCESS' ? 'NO ACCESS' :
-                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'LTD ACCESS' :
-                                           'CAUTION'}
-                                        </span>
-                                     </div>
-
-                                     {/* Fire Truck Passability */}
-                                     <div className="flex justify-between items-center text-[9px] font-mono border-t border-slate-900/50 pt-1.5 mt-0.5">
-                                        <span className="text-slate-400">🚒 Fire Truck:</span>
-                                        <span className={`text-[8px] font-black ${
-                                          closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-400' : 'text-emerald-400'
-                                        }`}>
-                                          {closure.emergencyAccess === 'NO_ACCESS' ? 'BLOCKED ❌' : 'PASSABLE ✓'}
+                                          {closure.emergencyAccess === 'NO_ACCESS' ? 'FULL CLOSURE' :
+                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
+                                           'LANE CLOSURE'}
                                         </span>
                                      </div>
 

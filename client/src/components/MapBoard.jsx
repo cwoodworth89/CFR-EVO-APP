@@ -64,6 +64,28 @@ const targetIcon = L.divIcon({
   popupAnchor: [0, -12]
 });
 
+// 🏠 Find the Alpha side segment of a parcel boundary (clockwise ordering)
+// rings: targetAddress.rings[0], referencePt: [lng, lat] (from route end or fallback)
+function getAlphaSegment(rings, referencePt) {
+  if (!rings || rings.length < 2) return null;
+  
+  const refPt = turf.point(referencePt);
+  let minDistance = Infinity;
+  let alphaSeg = null;
+  
+  for (let i = 0; i < rings.length - 1; i++) {
+    const p1 = rings[i];
+    const p2 = rings[i+1];
+    const segment = turf.lineString([p1, p2]);
+    const dist = turf.pointToLineDistance(refPt, segment, { units: 'meters' });
+    if (dist < minDistance) {
+      minDistance = dist;
+      alphaSeg = segment;
+    }
+  }
+  return alphaSeg;
+}
+
 export default function MapBoard() {
   const [map, setMap] = useState(null);
 
@@ -118,7 +140,7 @@ export default function MapBoard() {
     localStorage.setItem('home_hall', homeHall);
   }, [homeHall]);
 
-  // Query Nearby Hydrants on targetAddress change
+  // Query Nearby Hydrants on targetAddress change (storing raw features only)
   useEffect(() => {
     if (!targetAddress) return;
 
@@ -132,46 +154,14 @@ export default function MapBoard() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data && data.features && data.features.length > 0) {
-          const fromPoint = turf.point([lng, lat]);
-          
-          // Try to construct a line string from the parcel's outer boundary ring coords
-          let parcelLine = null;
-          if (targetAddress.rings && targetAddress.rings.length > 0) {
-            try {
-              const ringCoords = targetAddress.rings[0];
-              if (ringCoords.length >= 2) {
-                parcelLine = turf.lineString(ringCoords);
-              }
-            } catch (e) {
-              console.warn("Could not construct parcel boundary line for hydrant distance:", e);
-            }
-          }
-
-          const sortedHydrants = data.features.map(f => {
-            const hLng = f.geometry.x;
-            const hLat = f.geometry.y;
-            const toPoint = turf.point([hLng, hLat]);
-            
-            let distMeters;
-            if (parcelLine) {
-              // Calculate distance to closest point on the property boundary (Alpha side / street frontage)
-              distMeters = Math.round(turf.pointToLineDistance(toPoint, parcelLine, { units: 'meters' }));
-            } else {
-              // Fallback to straight-line distance to centroid
-              distMeters = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
-            }
-            
-            return {
-              gisId: f.attributes.gis_id || "Unknown",
-              lat: hLat,
-              lng: hLng,
-              distance: distMeters,
-              flowClass: f.attributes.flow_class || "",
-              status: f.attributes.status || ""
-            };
-          }).sort((a, b) => a.distance - b.distance);
-
-          setAllNearbyHydrants(sortedHydrants);
+          const rawHydrants = data.features.map(f => ({
+            gisId: f.attributes.gis_id || "Unknown",
+            lat: f.geometry.y,
+            lng: f.geometry.x,
+            flowClass: f.attributes.flow_class || "",
+            status: f.attributes.status || ""
+          }));
+          setAllNearbyHydrants(rawHydrants);
         } else {
           setAllNearbyHydrants([]);
         }
@@ -182,32 +172,84 @@ export default function MapBoard() {
       });
   }, [targetAddress]);
 
-  // Filter nearby hydrants to get the closest hydrant along the recommended route
+  // Filter and sort nearby hydrants dynamically with Alpha-segment logic
   const nearestHydrants = useMemo(() => {
-    if (allNearbyHydrants.length === 0) return [];
+    if (allNearbyHydrants.length === 0 || !targetAddress) return [];
 
+    const fromPoint = turf.point([targetAddress.lng, targetAddress.lat]);
+
+    // Try to construct parcel boundary components
+    let parcelLine = null;
+    let ringCoords = null;
+    if (targetAddress.rings && targetAddress.rings.length > 0) {
+      try {
+        ringCoords = targetAddress.rings[0];
+        if (ringCoords.length >= 2) {
+          parcelLine = turf.lineString(ringCoords);
+        }
+      } catch (e) {
+        console.warn("Could not construct parcel boundary line for hydrant calculations:", e);
+      }
+    }
+
+    // Determine target frontage reference point if route is loaded
+    let commonFrontagePt = null;
+    if (routeCoordinates && routeCoordinates.length > 0) {
+      const lastRouteCoord = routeCoordinates[routeCoordinates.length - 1];
+      commonFrontagePt = [lastRouteCoord.lng, lastRouteCoord.lat];
+    }
+
+    // Process each hydrant to compute distances to Alpha line
+    const hydrantsWithDistances = allNearbyHydrants.map(hyd => {
+      const toPoint = turf.point([hyd.lng, hyd.lat]);
+      let distance;
+
+      if (ringCoords && ringCoords.length >= 2) {
+        // Find Alpha segment closest to either the common frontage (route end) or this hydrant itself
+        const refPt = commonFrontagePt || [hyd.lng, hyd.lat];
+        const alphaSeg = getAlphaSegment(ringCoords, refPt);
+        
+        if (alphaSeg) {
+          distance = Math.round(turf.pointToLineDistance(toPoint, alphaSeg, { units: 'meters' }));
+        } else if (parcelLine) {
+          distance = Math.round(turf.pointToLineDistance(toPoint, parcelLine, { units: 'meters' }));
+        } else {
+          distance = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
+        }
+      } else {
+        distance = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
+      }
+
+      return {
+        ...hyd,
+        distance
+      };
+    });
+
+    // Sort by Alpha distance
+    hydrantsWithDistances.sort((a, b) => a.distance - b.distance);
+
+    // Filter by route line if available
     if (routeCoordinates && routeCoordinates.length > 1) {
       try {
         const routeLine = turf.lineString(routeCoordinates.map(c => [c.lng, c.lat]));
-        const onRouteHydrants = allNearbyHydrants.map(hyd => {
+        const onRouteHydrants = hydrantsWithDistances.map(hyd => {
           const pt = turf.point([hyd.lng, hyd.lat]);
           const distanceToRoute = turf.pointToLineDistance(pt, routeLine, { units: 'meters' });
           return { ...hyd, distanceToRoute };
-        }).filter(hyd => hyd.distanceToRoute <= 25); // 25m threshold (approx. 82ft) to confirm it is along the street of the route
+        }).filter(hyd => hyd.distanceToRoute <= 25); // 25m threshold along route
 
         if (onRouteHydrants.length > 0) {
-          // Sort by geographic distance to the destination address
           onRouteHydrants.sort((a, b) => a.distance - b.distance);
-          return [onRouteHydrants[0]]; // Return single closest hydrant on route
+          return onRouteHydrants.slice(0, 3); // Return up to 3 hydrants on route
         }
       } catch (e) {
         console.error("Error filtering hydrants by route line:", e);
       }
     }
 
-    // Fallback to absolute closest geographic hydrant if routing coordinates are not loaded yet or no hydrants are on-route
-    return allNearbyHydrants.slice(0, 1);
-  }, [allNearbyHydrants, routeCoordinates]);
+    return hydrantsWithDistances.slice(0, 3); // Return up to 3 closest hydrants
+  }, [allNearbyHydrants, targetAddress, routeCoordinates]);
 
   const targetCoords = useMemo(() => {
     return targetAddress ? [targetAddress.lat, targetAddress.lng] : null;

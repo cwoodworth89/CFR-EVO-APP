@@ -794,7 +794,7 @@ export function RightSidebar({
   const formatDateRange = (start, end) => {
     if (!start) return "Ongoing";
     
-    const options = { month: 'short', day: 'numeric' };
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
     const startStr = start.toLocaleDateString('en-US', options);
     
     if (!end) {
@@ -802,7 +802,7 @@ export function RightSidebar({
     }
     
     const endStr = end.toLocaleDateString('en-US', options);
-    if (startStr === endStr) {
+    if (start.toDateString() === end.toDateString()) {
       return startStr;
     }
     

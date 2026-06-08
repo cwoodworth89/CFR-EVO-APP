@@ -165,6 +165,15 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
             </div>
             <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
             <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
+            {closure.startDate && (
+              <p className="text-[9px] text-sky-400/90 font-mono mt-1 flex items-center gap-1 font-bold">
+                📅 {closure.endDate ? (
+                  `${new Date(closure.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${new Date(closure.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                ) : (
+                  `Started ${new Date(closure.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                )}
+              </p>
+            )}
             <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent" style={{ whiteSpace: 'pre-line', maxHeight: '200px' }}>{closure.description}</p>
           </div>
         </Popup>

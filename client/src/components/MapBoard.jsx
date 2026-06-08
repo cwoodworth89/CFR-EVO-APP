@@ -20,6 +20,69 @@ const getRandomElement = (arr) => {
   return arr[Math.floor(Math.random() * arr.length)];
 };
 
+// 🗺️ GeometryDecoder decodes Municipal 511 encoded coordinates sequentially
+class GeometryDecoder {
+  constructor(encoded) {
+    this.points = [];
+    this.index = 0;
+    if (!encoded) return;
+    let u = 0;
+    const c = encoded.length;
+    let f = 0;
+    let e = 0;
+    while (u < c) {
+      let r = 0;
+      let t = 0;
+      let i;
+      do {
+        i = encoded.charCodeAt(u++) - 63;
+        t |= (i & 31) << r;
+        r += 5;
+      } while (i >= 32);
+      const o = (t & 1) !== 0 ? ~(t >> 1) : t >> 1;
+      f += o;
+
+      r = 0;
+      t = 0;
+      do {
+        i = encoded.charCodeAt(u++) - 63;
+        t |= (i & 31) << r;
+        r += 5;
+      } while (i >= 32);
+      const s = (t & 1) !== 0 ? ~(t >> 1) : t >> 1;
+      e += s;
+
+      this.points.push([f / 1e5, e / 1e5]);
+    }
+  }
+
+  getNPoints(n) {
+    const pts = this.points.slice(this.index, this.index + n);
+    this.index += n;
+    return pts;
+  }
+}
+
+// helper for road closure type names from Municipal 511
+const getClosureTypeName = (bit) => {
+  switch (bit) {
+    case 1: return "Detour";
+    case 8: return "Sidewalk Closed";
+    case 16: return "Bike Lane Closed";
+    case 32:
+    case 256:
+    case 512: return "Lane(s) Closed";
+    case 2048: return "Alternating Traffic";
+    case 8192: return "One Direction Closed";
+    case 16384: return "Local Traffic Only";
+    case 32768:
+    case 65536: return "Emergency Access Only";
+    case 131072: return "Intermittent Blockage";
+    case 262144: return "No Emergency Access";
+    default: return "";
+  }
+};
+
 // 🚧 Barricade Icon for Road Closures
 const closureIcon = L.divIcon({
   className: 'custom-closure-icon',
@@ -362,13 +425,34 @@ export default function MapBoard() {
 
   // LOAD ROAD CLOSURES
   useEffect(() => {
-    // Fetch DriveBC live API
-    fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
+    // 1. Fetch DriveBC live API
+    const fetchDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
       .then(r => r.ok ? r.json() : { events: [] })
-      .then(data => {
-        if (!data || !data.events) return;
-        // Filter to Coquitlam bounding box
-        const bcEvents = data.events
+      .catch(err => {
+        console.warn("Failed to fetch DriveBC Open511 events:", err);
+        return { events: [] };
+      });
+
+    // 2. Fetch Municipal 511 API via proxy
+    const fetchMuni511 = fetch("https://api.codetabs.com/v1/proxy?quest=https://bc.municipal511.ca/Dynamic/jsonData0.txt")
+      .then(r => r.ok ? r.json() : Promise.reject("Primary proxy failed"))
+      .catch(err => {
+        console.warn("Primary CORS proxy failed, trying fallback...", err);
+        return fetch("https://api.allorigins.win/raw?url=https://bc.municipal511.ca/Dynamic/jsonData0.txt")
+          .then(r => r.ok ? r.json() : { Issues: [], CoordsEncoded: "" });
+      })
+      .catch(err => {
+        console.warn("All CORS proxies failed to fetch Municipal 511:", err);
+        return { Issues: [], CoordsEncoded: "" };
+      });
+
+    Promise.all([fetchDriveBC, fetchMuni511])
+      .then(([dbData, muniData]) => {
+        const combinedEvents = [];
+        const now = new Date();
+
+        // --- Process DriveBC Events ---
+        const dbEvents = (dbData.events || [])
           .filter(evt => {
             if (!evt.geography || !evt.geography.coordinates) return false;
             let coords = [];
@@ -405,7 +489,6 @@ export default function MapBoard() {
               emergencyAccess = "ACCESS_ONLY";
             }
 
-            // Extract start and end dates from schedule intervals or created fallback
             let startDate = null;
             let endDate = null;
             if (evt.schedule && Array.isArray(evt.schedule.intervals) && evt.schedule.intervals.length > 0) {
@@ -421,7 +504,7 @@ export default function MapBoard() {
               const c = new Date(evt.created);
               if (!isNaN(c.getTime())) startDate = c.toISOString();
             }
-            
+
             return {
               id: evt.id || Math.random().toString(),
               headline: evt.headline || "TRAFFIC ALERT",
@@ -437,10 +520,109 @@ export default function MapBoard() {
             };
           });
 
-        const now = new Date();
+        combinedEvents.push(...dbEvents);
 
-        // 1. Process dates, active status, duration, and isExpired
-        const processed = bcEvents.map(evt => {
+        // --- Process Municipal 511 Events ---
+        const muniIssues = muniData.Issues || [];
+        const coordsEncoded = muniData.CoordsEncoded || "";
+        const decoder = new GeometryDecoder(coordsEncoded);
+
+        muniIssues.forEach(issue => {
+          const geoms = issue.Geometry || [];
+          geoms.forEach((geom, geomIdx) => {
+            const numPoints = geom.NumPoints || 0;
+            const pathPoints = decoder.getNPoints(numPoints); // Array of [lat, lng]
+
+            // Check if any point falls inside Coquitlam bounding box
+            const inCoquitlam = pathPoints.some(([lat, lng]) => 
+              lat >= 49.20 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68
+            );
+
+            if (!inCoquitlam) return;
+
+            // Determine midpoint coordinates for pin placement
+            let lat = 49.28;
+            let lng = -122.80;
+            let polyline = [];
+
+            if (pathPoints.length === 1) {
+              lat = pathPoints[0][0];
+              lng = pathPoints[0][1];
+            } else if (pathPoints.length > 1) {
+              polyline = pathPoints;
+              const middleIndex = Math.floor(pathPoints.length / 2);
+              lat = pathPoints[middleIndex][0];
+              lng = pathPoints[middleIndex][1];
+            } else {
+              return; // Empty geometry, skip
+            }
+
+            // Map RoadClosureType flags to emergencyAccess level
+            const rct = geom.MarkerInfo?.RoadClosureType || 0;
+            let highestBit = 0;
+            if (rct > 0) {
+              highestBit = 1 << Math.floor(Math.log2(rct));
+            }
+
+            let emergencyAccess = "CAUTION";
+            let severity = "MINOR";
+
+            if (highestBit === 262144) {
+              emergencyAccess = "NO_ACCESS";
+              severity = "MAJOR";
+            } else if (highestBit === 65536 || highestBit === 32768 || highestBit === 16384 || highestBit === 8192) {
+              emergencyAccess = "ACCESS_ONLY";
+              severity = "MODERATE";
+            } else if (issue.Priority >= 4) {
+              severity = "MAJOR";
+            } else if (issue.Priority === 3) {
+              severity = "MODERATE";
+            }
+
+            // Dates conversion
+            const desc = issue.Description || {};
+            let startDate = null;
+            let endDate = null;
+            if (desc.ProposedStartTimeUtcEpochMillis) {
+              startDate = new Date(desc.ProposedStartTimeUtcEpochMillis).toISOString();
+            }
+            if (desc.ProposedEndTimeUtcEpochMillis) {
+              endDate = new Date(desc.ProposedEndTimeUtcEpochMillis).toISOString();
+            }
+            if (!startDate && desc.UpdateTimeUtcEpochMillis) {
+              startDate = new Date(desc.UpdateTimeUtcEpochMillis).toISOString();
+            }
+
+            // Headline, street and description
+            const locationName = geom.MarkerInfo?.LocationName || "";
+            const streetName = issue.TableViewInfo?.Location || locationName || desc.BaseLocationDescription || "Local Road";
+            
+            const closureTypeName = getClosureTypeName(highestBit);
+            let descriptionText = desc.BaseDescription ? desc.BaseDescription.trim() : "";
+            if (!descriptionText) {
+              descriptionText = closureTypeName ? `Local activity/road work. Status: ${closureTypeName}.` : "Local construction or road activity.";
+            }
+
+            const item = {
+              id: `${issue.IssueId}_${geomIdx}`,
+              headline: desc.Headline || closureTypeName || "ROAD WORK / CONSTRUCTION",
+              street: streetName,
+              severity: severity,
+              emergencyAccess: emergencyAccess,
+              description: descriptionText,
+              coordinates: [lat, lng],
+              polyline: polyline,
+              source: issue.Source || "City of Coquitlam",
+              startDate: startDate,
+              endDate: endDate
+            };
+
+            combinedEvents.push(item);
+          });
+        });
+
+        // --- Post-process: Expiry, deduplication and sorting preparation ---
+        const processed = combinedEvents.map(evt => {
           const start = evt.startDate ? new Date(evt.startDate) : null;
           const end = evt.endDate ? new Date(evt.endDate) : null;
 
@@ -474,10 +656,10 @@ export default function MapBoard() {
           };
         });
 
-        // 2. Filter out expired ones
+        // Filter out expired ones
         const unexpired = processed.filter(evt => !evt.isExpired);
 
-        // 3. Deduplicate events at the exact same location (coordinates rounded to 4 decimal places)
+        // Group & merge events at the same location (rounded to 4 decimal places)
         const groups = {};
         unexpired.forEach(evt => {
           const latKey = evt.coordinates[0].toFixed(4);
@@ -493,26 +675,24 @@ export default function MapBoard() {
         const deduplicated = Object.values(groups).map(group => {
           if (group.length === 1) return group[0];
 
-          // Merge duplicates:
           const first = group[0];
-          
-          // Find highest severity: MAJOR > MODERATE > MINOR
+
+          // Merge severity and emergencyAccess
           const severityOrder = { "MAJOR": 3, "MODERATE": 2, "MINOR": 1 };
           let highestSeverity = "MINOR";
           let maxSeverityVal = 0;
+
+          const accessOrder = { "NO_ACCESS": 3, "ACCESS_ONLY": 2, "CAUTION": 1 };
+          let mostRestrictiveAccess = "CAUTION";
+          let maxAccessVal = 0;
+
           group.forEach(evt => {
             const sVal = severityOrder[evt.severity] || 0;
             if (sVal > maxSeverityVal) {
               maxSeverityVal = sVal;
               highestSeverity = evt.severity;
             }
-          });
 
-          // Find most restrictive emergency access: NO_ACCESS > ACCESS_ONLY > CAUTION
-          const accessOrder = { "NO_ACCESS": 3, "ACCESS_ONLY": 2, "CAUTION": 1 };
-          let mostRestrictiveAccess = "CAUTION";
-          let maxAccessVal = 0;
-          group.forEach(evt => {
             const aVal = accessOrder[evt.emergencyAccess] || 0;
             if (aVal > maxAccessVal) {
               maxAccessVal = aVal;
@@ -520,29 +700,22 @@ export default function MapBoard() {
             }
           });
 
-          // Combine unique descriptions with clean bullet points
           const uniqueDescriptions = [...new Set(group.map(evt => evt.description.trim()))];
           const combinedDescription = uniqueDescriptions.length > 1
             ? uniqueDescriptions.map(desc => `• ${desc}`).join('\n')
             : uniqueDescriptions[0];
 
-          // Find earliest start date and latest end date
           let earliestStart = null;
           let latestEnd = null;
           group.forEach(evt => {
             if (evt.start) {
-              if (!earliestStart || evt.start < earliestStart) {
-                earliestStart = evt.start;
-              }
+              if (!earliestStart || evt.start < earliestStart) earliestStart = evt.start;
             }
             if (evt.end) {
-              if (!latestEnd || evt.end > latestEnd) {
-                latestEnd = evt.end;
-              }
+              if (!latestEnd || evt.end > latestEnd) latestEnd = evt.end;
             }
           });
 
-          // Check if any merged event is active
           const anyActive = group.some(evt => evt.isActive);
 
           return {
@@ -563,7 +736,7 @@ export default function MapBoard() {
         setRoadClosures(deduplicated);
       })
       .catch((err) => {
-        console.warn("Failed to fetch DriveBC Open511 events:", err);
+        console.error("Critical error in road closures loading workflow:", err);
       });
   }, []);
 

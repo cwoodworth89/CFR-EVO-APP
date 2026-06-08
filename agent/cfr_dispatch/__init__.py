@@ -20,6 +20,19 @@ def _load_env():
                     # Strip quotes if they surround the value
                     if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
                         value = value[1:-1]
+                    
+                    # Convert GOOGLE_APPLICATION_CREDENTIALS relative path to absolute
+                    if key == "GOOGLE_APPLICATION_CREDENTIALS" and value and not os.path.isabs(value):
+                        # Try to resolve relative to agent/ folder (root_dir)
+                        abs_path = os.path.abspath(os.path.join(root_dir, value))
+                        if os.path.exists(abs_path):
+                            value = abs_path
+                        else:
+                            # Try to resolve relative to workspace root (parent of root_dir)
+                            abs_path_parent = os.path.abspath(os.path.join(os.path.dirname(root_dir), value))
+                            if os.path.exists(abs_path_parent):
+                                value = abs_path_parent
+                    
                     os.environ[key] = value
 
 _load_env()

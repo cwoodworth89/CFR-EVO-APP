@@ -1,9 +1,23 @@
 import os
+import sys
 import re
 import googlemaps
 import requests # We still use requests
 from google.cloud import speech
 from word2number import w2n
+
+# Automatically load environment variables and resolve credentials absolute path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+try:
+    import agent.cfr_dispatch
+except ImportError:
+    try:
+        import cfr_dispatch
+    except ImportError:
+        pass
 
 # --- All previous functions (transcribe_audio_file, parse_address_from_transcript, geocode_address) remain unchanged ---
 # ... (omitting for brevity) ...

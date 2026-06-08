@@ -636,7 +636,13 @@ export default function MapBoard() {
           } else if (now < start) {
             isFuture = true;
           } else if (end && now > end) {
-            isExpired = true;
+            // Live Municipal 511 feeds can have tentative database end dates in the past
+            // but are still active and should be displayed. Only expire DriveBC events.
+            if (evt.source === "DriveBC Open511") {
+              isExpired = true;
+            } else {
+              isActive = true;
+            }
           } else {
             isActive = true;
           }

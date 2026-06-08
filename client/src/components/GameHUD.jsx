@@ -729,13 +729,7 @@ export function RightSidebar({
         } else if (now < start) {
           isFuture = true;
         } else if (end && now > end) {
-          // Live Municipal 511 feeds can have tentative database end dates in the past
-          // but are still active and should be displayed. Only expire DriveBC events.
-          if (closure.source === "DriveBC Open511") {
-            isExpired = true;
-          } else {
-            isActive = true;
-          }
+          isExpired = true;
         } else {
           isActive = true;
         }

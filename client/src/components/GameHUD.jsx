@@ -723,16 +723,12 @@ export function RightSidebar({
         let isExpired = false;
         let durationMs = Infinity;
 
-        if (!start) {
-          // Fallback: closures with no start date are treated as active
-          isActive = true;
-        } else if (now < start) {
+        if (start && now < start) {
           isFuture = true;
-        } else if (end && now > end) {
-          isExpired = true;
         } else {
           isActive = true;
         }
+        isExpired = false;
 
         if (start && end) {
           durationMs = end.getTime() - start.getTime();

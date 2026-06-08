@@ -698,7 +698,8 @@ export function RightSidebar({
   filterNoAccess,
   filterAccessOnly,
   filterCaution,
-  map 
+  map,
+  onSelectClosure
 }) {
   const isExplore = appMode === "EXPLORE";
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode
@@ -825,6 +826,9 @@ export function RightSidebar({
                                   onClick={() => {
                                     if (map) {
                                       map.flyTo(closure.coordinates, 16, { animate: true });
+                                    }
+                                    if (onSelectClosure) {
+                                      onSelectClosure(closure);
                                     }
                                   }}
                                   className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden"

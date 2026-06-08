@@ -42,6 +42,75 @@ const closureIcon = L.divIcon({
 });
 
 
+// 🚧 Sub-component to manage openPopup on selection
+function RoadClosureMarker({ closure, isSelected, onSelect }) {
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    if (isSelected && markerRef.current) {
+      const timer = setTimeout(() => {
+        if (markerRef.current) {
+          markerRef.current.openPopup();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isSelected]);
+
+  let color = "#ef4444"; // NO_ACCESS
+  if (closure.emergencyAccess === "ACCESS_ONLY") color = "#f59e0b"; // ACCESS_ONLY
+  if (closure.emergencyAccess === "CAUTION") color = "#eab308"; // CAUTION
+
+  return (
+    <React.Fragment>
+      {closure.polyline && closure.polyline.length > 0 && (
+        <Polyline 
+          positions={closure.polyline} 
+          pathOptions={{ 
+            color: color, 
+            weight: 6, 
+            dashArray: "10, 10", 
+            opacity: 0.85 
+          }} 
+        />
+      )}
+      <Marker 
+        ref={markerRef}
+        position={closure.coordinates} 
+        icon={closureIcon}
+        eventHandlers={{
+          click: () => {
+            onSelect(closure);
+          }
+        }}
+      >
+        <Popup className="road-closure-popup" onClose={() => {
+          if (isSelected) onSelect(null);
+        }}>
+          <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
+            <div className="flex justify-between items-center gap-2">
+              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${
+                closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+              }`}>
+                {closure.emergencyAccess === 'NO_ACCESS' ? 'NO EMERGENCY ACCESS' :
+                 closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
+                 'PASSABLE WITH CAUTION'}
+              </span>
+              <span className="text-[9px] text-slate-550 font-mono font-medium">{closure.source}</span>
+            </div>
+            <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
+            <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
+            <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line" style={{ whiteSpace: 'pre-line' }}>{closure.description}</p>
+          </div>
+        </Popup>
+      </Marker>
+    </React.Fragment>
+  );
+}
+
+
 // 🎯 Custom Target Address Icon
 const targetIcon = L.divIcon({
   className: 'custom-target-icon',
@@ -98,6 +167,7 @@ export default function MapBoard() {
   const [blocks, setBlocks] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [roadClosures, setRoadClosures] = useState([]);
+  const [selectedClosure, setSelectedClosure] = useState(null);
   
   // APP/TERMINAL STATE
   const [appMode, setAppMode] = useState("EXPLORE"); 
@@ -846,51 +916,14 @@ export default function MapBoard() {
             )}
 
             {/* ROAD CLOSURES LAYER */}
-            {showRoadClosures && activeClosures.map((closure, i) => {
-              let color = "#ef4444"; // NO_ACCESS
-              if (closure.emergencyAccess === "ACCESS_ONLY") color = "#f59e0b"; // ACCESS_ONLY
-              if (closure.emergencyAccess === "CAUTION") color = "#eab308"; // CAUTION
-              
-              return (
-                <React.Fragment key={closure.id || i}>
-                  {closure.polyline && closure.polyline.length > 0 && (
-                    <Polyline 
-                      positions={closure.polyline} 
-                      pathOptions={{ 
-                        color: color, 
-                        weight: 6, 
-                        dashArray: "10, 10", 
-                        opacity: 0.85 
-                      }} 
-                    />
-                  )}
-                  <Marker 
-                    position={closure.coordinates} 
-                    icon={closureIcon}
-                  >
-                    <Popup className="road-closure-popup">
-                      <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${
-                            closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                            closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                            'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                          }`}>
-                            {closure.emergencyAccess === 'NO_ACCESS' ? 'NO EMERGENCY ACCESS' :
-                             closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
-                             'PASSABLE WITH CAUTION'}
-                          </span>
-                          <span className="text-[9px] text-slate-550 font-mono font-medium">{closure.source}</span>
-                        </div>
-                        <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
-                        <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
-                        <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line" style={{ whiteSpace: 'pre-line' }}>{closure.description}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                </React.Fragment>
-              );
-            })}
+            {showRoadClosures && activeClosures.map((closure, i) => (
+              <RoadClosureMarker 
+                key={closure.id || i}
+                closure={closure}
+                isSelected={selectedClosure !== null && selectedClosure.id === closure.id}
+                onSelect={setSelectedClosure}
+              />
+            ))}
 
             {/* Active Target Address Marker & Suggested Route Overlay */}
             {appMode === "EXPLORE" && targetAddress && (
@@ -1048,6 +1081,7 @@ export default function MapBoard() {
           filterAccessOnly={filterAccessOnly}
           filterCaution={filterCaution}
           map={map}
+          onSelectClosure={setSelectedClosure}
         />
       </div>
 

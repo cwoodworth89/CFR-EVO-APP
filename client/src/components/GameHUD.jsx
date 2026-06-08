@@ -703,13 +703,104 @@ export function RightSidebar({
   const isExplore = appMode === "EXPLORE";
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode
 
-  // Filter closures to match active filters
-  const filteredClosures = roadClosures.filter(closure => {
-    if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
-    if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
-    if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
-    return true;
-  });
+  // Process and sort closures:
+  // 1. Parse start and end dates.
+  // 2. Identify if ACTIVE, FUTURE or EXPIRED (based on new Date()).
+  // 3. Exclude expired closures to keep map and list clean.
+  // 4. Sort: ACTIVE closures first (ordered by duration ascending, i.e., shortest duration first),
+  //    then FUTURE closures (ordered by start date ascending, i.e., starting soonest first).
+  const processedClosures = React.useMemo(() => {
+    const now = new Date();
+
+    return roadClosures
+      .map(closure => {
+        const start = closure.startDate ? new Date(closure.startDate) : null;
+        const end = closure.endDate ? new Date(closure.endDate) : null;
+
+        let isActive = false;
+        let isFuture = false;
+        let isExpired = false;
+        let durationMs = Infinity;
+
+        if (!start) {
+          // Fallback: closures with no start date are treated as active
+          isActive = true;
+        } else if (now < start) {
+          isFuture = true;
+        } else if (end && now > end) {
+          isExpired = true;
+        } else {
+          isActive = true;
+        }
+
+        if (start && end) {
+          durationMs = end.getTime() - start.getTime();
+        }
+
+        return {
+          ...closure,
+          start,
+          end,
+          isActive,
+          isFuture,
+          isExpired,
+          durationMs
+        };
+      })
+      .filter(closure => {
+        // Hide expired closures
+        if (closure.isExpired) return false;
+
+        // Apply emergencyAccess filters
+        if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
+        if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
+        if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        // Active closures first, then future
+        if (a.isActive && !b.isActive) return -1;
+        if (!a.isActive && b.isActive) return 1;
+
+        if (a.isActive && b.isActive) {
+          // Sort active closures by duration ascending (shortest first)
+          if (a.durationMs !== b.durationMs) {
+            return a.durationMs - b.durationMs;
+          }
+          // Fallback: sort by start date ascending
+          const aTime = a.start ? a.start.getTime() : 0;
+          const bTime = b.start ? b.start.getTime() : 0;
+          return aTime - bTime;
+        }
+
+        if (a.isFuture && b.isFuture) {
+          // Sort future closures by start date ascending (soonest first)
+          const aTime = a.start ? a.start.getTime() : 0;
+          const bTime = b.start ? b.start.getTime() : 0;
+          return aTime - bTime;
+        }
+
+        return 0;
+      });
+  }, [roadClosures, filterNoAccess, filterAccessOnly, filterCaution]);
+
+  const formatDateRange = (start, end) => {
+    if (!start) return "Ongoing";
+    
+    const options = { month: 'short', day: 'numeric' };
+    const startStr = start.toLocaleDateString('en-US', options);
+    
+    if (!end) {
+      return `Started ${startStr}`;
+    }
+    
+    const endStr = end.toLocaleDateString('en-US', options);
+    if (startStr === endStr) {
+      return startStr;
+    }
+    
+    return `${startStr} - ${endStr}`;
+  };
 
   return (
     <div className={`relative h-full flex flex-row-reverse transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${rightSidebarOpen ? 'w-80 border-l border-slate-800' : 'w-0'}`}>
@@ -726,9 +817,9 @@ export function RightSidebar({
              <div className="p-4 flex-grow overflow-y-auto">
                 {showRoadClosures ? (
                     <div className="flex flex-col gap-2.5 max-h-[78vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                        <div className="text-slate-400 text-[10px] font-semibold mb-1 uppercase font-mono tracking-wider">Filtered Alerts ({filteredClosures.length})</div>
-                        {filteredClosures.length > 0 ? (
-                            filteredClosures.map((closure) => (
+                        <div className="text-slate-400 text-[10px] font-semibold mb-1 uppercase font-mono tracking-wider">Filtered Alerts ({processedClosures.length})</div>
+                        {processedClosures.length > 0 ? (
+                            processedClosures.map((closure) => (
                                 <div 
                                   key={closure.id} 
                                   onClick={() => {
@@ -762,6 +853,24 @@ export function RightSidebar({
                                            closure.emergencyAccess === 'ACCESS_ONLY' ? 'LTD ACCESS' :
                                            'CAUTION'}
                                         </span>
+                                     </div>
+
+                                     {/* Date Range & Status Pill */}
+                                     <div className="flex justify-between items-center text-[9px] font-mono border-t border-slate-900/50 pt-1.5 mt-0.5">
+                                        <span className="text-slate-400 flex items-center gap-1">
+                                          📅 {formatDateRange(closure.start, closure.end)}
+                                        </span>
+                                        {closure.isActive ? (
+                                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                                            ACTIVE
+                                          </span>
+                                        ) : (
+                                          <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
+                                            FUTURE
+                                          </span>
+                                        )}
                                      </div>
                                 </div>
                             ))

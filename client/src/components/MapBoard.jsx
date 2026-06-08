@@ -364,103 +364,17 @@ export default function MapBoard() {
   useEffect(() => {
     const baseUrl = import.meta.env.BASE_URL;
 
-    // Fetch live municipal capital projects from Coquitlam ArcGIS server (with local JSON fallback)
-    const fetchMuniActive = (layerId, sourceName) => {
-      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/CapitalProjects/MapServer/${layerId}/query?where=` + encodeURIComponent("STATUS = 'Under Construction'") + "&outFields=*&returnGeometry=true&outSR=4326&f=json";
-      return fetch(url)
-        .then(r => r.ok ? r.json() : { features: [] })
-        .then(data => {
-          if (!data || !data.features) return [];
-          return data.features.map(f => {
-            const attrs = f.attributes;
-            const name = attrs.PROJECT_NAME || "Capital Project";
-            const comments = attrs.COMMENTS || "";
-            const typePublic = attrs.PROJECT_TYPE_PUBLIC || attrs.PROJECT_TYPE || "Utility Work";
-            
-            // Exclude pump stations, reservoirs, or other facilities that don't affect roads
-            const isFacility = /pump station|treatment plant|reservoir|facility/i.test(name + " " + typePublic);
-            if (isFacility) return null;
-
-            let polyline = [];
-            let coordinates = [];
-            if (f.geometry && Array.isArray(f.geometry.paths) && f.geometry.paths.length > 0) {
-              const rawPath = f.geometry.paths[0];
-              polyline = rawPath.map(pt => [pt[1], pt[0]]);
-              const midIdx = Math.floor(polyline.length / 2);
-              coordinates = polyline[midIdx];
-            } else {
-              return null;
-            }
-
-            // Determine Emergency Access and Severity
-            let emergencyAccess = "CAUTION";
-            let severity = "MINOR";
-            
-            const text = (name + " " + comments).toLowerCase();
-            
-            if (/full\s+road\s+closure|fully\s+closed|no\s+access|road\s+closed/i.test(text)) {
-              emergencyAccess = "NO_ACCESS";
-              severity = "MAJOR";
-            } else if (/lane\s+closure|alternating|utility\s+work|restrictions|access\s+only|local\s+traffic/i.test(text)) {
-              emergencyAccess = "ACCESS_ONLY";
-              severity = "MODERATE";
-            } else if (/pavement|repaving|rehabilitation|upgrade/i.test(text)) {
-              emergencyAccess = "CAUTION";
-              severity = "MODERATE";
-            }
-
-            const currentYear = new Date().getFullYear();
-            const startYear = attrs.CONSTRUCTION_START_YEAR ? parseInt(attrs.CONSTRUCTION_START_YEAR) : currentYear;
-            const endYear = attrs.CONSTRUCTION_END_YEAR ? parseInt(attrs.CONSTRUCTION_END_YEAR) : currentYear;
-            
-            const startDate = new Date(`${startYear}-01-01T00:00:00Z`).toISOString();
-            const endDate = new Date(`${endYear}-12-31T23:59:59Z`).toISOString();
-
-            let street = "Coquitlam Road";
-            const streetRegex = /(?:on|along|between)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Drive|Avenue|Street|Road|Dr|Ave|St|Rd|Way|Crescent|Cres|Pl|Place|Court|Ct|Boulevard|Blvd))/i;
-            const match = (name + " " + comments).match(streetRegex);
-            if (match && match[1]) {
-              street = match[1];
-            } else {
-              street = name.split(" - ")[0].split(" (")[0].split(" Pavement")[0].substring(0, 30);
-            }
-
-            return {
-              id: `coq_gis_${attrs.PROJECT_NUMBER || attrs.OBJECTID}`,
-              headline: name.toUpperCase(),
-              street: street,
-              severity: severity,
-              emergencyAccess: emergencyAccess,
-              description: comments || `${typePublic} under construction.`,
-              coordinates: coordinates,
-              polyline: polyline,
-              source: sourceName,
-              startDate: startDate,
-              endDate: endDate
-            };
-          }).filter(Boolean);
-        })
-        .catch(() => []);
-    };
-
-    const fetchMuni = Promise.all([
-      fetchMuniActive(7, "Coquitlam Transportation GIS"),
-      fetchMuniActive(8, "Coquitlam Utility GIS"),
-      fetchMuniActive(9, "Coquitlam Third Party GIS")
-    ]).then(([trans, util, third]) => {
-      const merged = [...trans, ...util, ...third];
-      if (merged.length > 0) return merged;
-      
-      // Fallback to local JSON if no features returned (e.g. offline or GIS down)
-      return fetch(`${baseUrl}data/road_closures.json?v=1`)
-        .then(r => r.ok ? r.json() : [])
-        .catch(() => []);
-    }).catch(() => {
-      // Catch all fallback to local JSON
-      return fetch(`${baseUrl}data/road_closures.json?v=1`)
-        .then(r => r.ok ? r.json() : [])
-        .catch(() => []);
-    });
+    // Fetch curated local municipal road closures directly (instead of Capital Projects GIS layer)
+    const fetchMuni = fetch(`${baseUrl}data/road_closures.json?v=1`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        return data.map(evt => ({
+          ...evt,
+          startDate: evt.startDate || null,
+          endDate: evt.endDate || null
+        }));
+      })
+      .catch(() => []);
 
     // Fetch DriveBC live API
     const fetchDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-routing-machine';
@@ -7,8 +7,19 @@ import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 export function RoutingOverlay({ from, to, onRouteCalculated }) {
   const map = useMap();
 
+  const fromLat = from ? from[0] : null;
+  const fromLng = from ? from[1] : null;
+  const toLat = to ? to[0] : null;
+  const toLng = to ? to[1] : null;
+
+  // Store the callback in a ref to avoid infinite re-renders or stale closures
+  const onRouteCalculatedRef = useRef(onRouteCalculated);
   useEffect(() => {
-    if (!map || !from || !to) return;
+    onRouteCalculatedRef.current = onRouteCalculated;
+  });
+
+  useEffect(() => {
+    if (!map || fromLat === null || fromLng === null || toLat === null || toLng === null) return;
 
     // Check if L.Routing is available (loaded via CDN)
     if (!L.Routing || !L.Routing.control) {
@@ -18,8 +29,8 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
 
     const routingControl = L.Routing.control({
       waypoints: [
-        L.latLng(from[0], from[1]),
-        L.latLng(to[0], to[1])
+        L.latLng(fromLat, fromLng),
+        L.latLng(toLat, toLng)
       ],
       routeWhileDragging: false,
       addWaypoints: false,
@@ -40,8 +51,8 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
       const routes = e.routes;
       if (routes && routes.length > 0) {
         const coordinates = routes[0].coordinates; // array of L.LatLng
-        if (onRouteCalculated) {
-          onRouteCalculated(coordinates);
+        if (onRouteCalculatedRef.current) {
+          onRouteCalculatedRef.current(coordinates);
         }
       }
     });
@@ -59,7 +70,7 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
         console.warn("Clean up Leaflet routing control error:", e);
       }
     };
-  }, [map, from, to]);
+  }, [map, fromLat, fromLng, toLat, toLng]);
 
   return null;
 }

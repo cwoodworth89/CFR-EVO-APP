@@ -188,6 +188,10 @@ export default function MapBoard() {
     return allNearbyHydrants.slice(0, 1);
   }, [allNearbyHydrants, routeCoordinates]);
 
+  const targetCoords = useMemo(() => {
+    return targetAddress ? [targetAddress.lat, targetAddress.lng] : null;
+  }, [targetAddress]);
+
   // Adaptive Zooming: fit bounds to show both the selected Fire Hall (origin) and searched address (destination)
   useEffect(() => {
     if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE") {
@@ -804,7 +808,7 @@ export default function MapBoard() {
                 {STATIONS[homeHall] && (
                   <RoutingOverlay 
                     from={STATIONS[homeHall]} 
-                    to={[targetAddress.lat, targetAddress.lng]} 
+                    to={targetCoords} 
                     onRouteCalculated={setRouteCoordinates}
                   />
                 )}

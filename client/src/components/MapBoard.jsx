@@ -408,8 +408,8 @@ export default function MapBoard() {
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);
-  const [filterAccessOnly, setFilterAccessOnly] = useState(true);
-  const [filterCaution, setFilterCaution] = useState(true);
+  const [filterAccessOnly, setFilterAccessOnly] = useState(false);
+  const [filterCaution, setFilterCaution] = useState(false);
 
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
@@ -873,10 +873,13 @@ export default function MapBoard() {
   useEffect(() => {
     if (!trainingDataLoaded || appMode === "EXPLORE") return;
     if (!currentQuestion) {
-      if (appMode === "TRAINING_ZONES") nextQuestion(zones);
-      if (appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
-      if (appMode === "TRAINING_BLOCKS") nextBlockQuestion();
-      if (appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
+      const timer = setTimeout(() => {
+        if (appMode === "TRAINING_ZONES") nextQuestion(zones);
+        if (appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
+        if (appMode === "TRAINING_BLOCKS") nextBlockQuestion();
+        if (appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [trainingDataLoaded, appMode, zones, intersections, blocks, addresses, nextQuestion, nextBlockQuestion, currentQuestion]);
 

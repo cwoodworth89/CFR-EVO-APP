@@ -22,18 +22,64 @@ def sanitize_transcript(text: str) -> str:
     """
     text = text.lower()
 
-    # Apply phonetic corrections for common mishearings in dispatch templates
+    # Apply phonetic corrections for common mishearings in dispatch templates and names
     phonetic_corrections = {
+        # Unit number homophones
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+to\b': r'\1 2',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+for\b': r'\1 4',
+
+        # Responding units & Coquitlam mishearings
+        r'\bcolquitt\s+loom\b': 'coquitlam',
+        r'\bcorporate\s+loan\b': 'coquitlam',
+        r'\bcocoa\b': 'coquitlam',
+        r'\bcocoon\b': 'coquitlam',
+        r'\bkirk\s+whitman\b': 'coquitlam',
+        r'\bquickly\b': 'coquitlam',
+        r'\bcopeland\b': 'coquitlam',
+        r'\bhoquiam\b': 'coquitlam',
+        r'\bcrazy\s+an\b': 'coquitlam',
+        r'\bcoquit\s*loom\b': 'coquitlam',
+        r'\bpoit\s*loma\b': 'coquitlam',
+        r'\bpoint\s+loma\b': 'coquitlam',
+        
+        # Respond & Priority
         r'\brespawns?\b': 'respond',
         r'\bresponses?\b': 'respond',
+        r'\bresign\b': 'respond',
+        r'\bwe\s+found\b': 'respond',
+        r'\bregency\b': 'emergency',
         r'\bvan\s+ruitens?\b': 'routine',
+        
+        # Cross streets and roads
+        r'\bcross\s+roads?\b': 'cross roads',
+        r'\bcross\s+streets?\b': 'cross roads',
+        r'\b(?:cross|across)\s+up\b': 'cross of',
+        r'\b(?:cross|across)\s+ark\b': 'cross of',
+        r'\b(?:cross|across)\s+of\b': 'cross of',
+        
+        # Talk Group (channel)
+        r'\buse\s+tax\b': 'use talk group',
+        r'\buse\s+tack\b': 'use talk group',
+        r'\bnews\s+tack\b': 'use talk group',
+        r'\bmens\s+table\b': 'use talk group',
+        r'\btalk\s*groups?\b': 'talk group',
+        r'\btorque\s+groups?\b': 'talk group',
+        
+        # Map Grid
         r'\bmath\s+grids?\b': 'map grid',
         r'\bmath\s+grades?\b': 'map grid',
         r'\bmap\s+grades?\b': 'map grid',
-        r'\btalk\s*groups?\b': 'talk group',
-        r'\btorque\s+groups?\b': 'talk group',
-        r'\bcross\s+roads?\b': 'cross roads',
-        r'\bcross\s+streets?\b': 'cross roads',
+        
+        # Street suffixes
+        r'\bpresidents?\b': 'crescent',
+        r'\bpresents?\b': 'crescent',
+        r'\bpresence?\b': 'crescent',
+        
+        # Specific major streets / locations
+        r'\bbroke\s+mirror\b': 'brookmere',
+        r'\bdo\s+we\s+need\s+from\s+growing\b': 'dewdney trunk road',
+        r'\bdo\s+we\s+need\s+from\s+bro\b': 'dewdney trunk road',
+        r'\bdo\s+we\s+need\s+from\b': 'dewdney trunk road',
     }
     for pattern, replacement in phonetic_corrections.items():
         text = re.sub(pattern, replacement, text)
@@ -50,7 +96,7 @@ def sanitize_transcript(text: str) -> str:
     pattern = r'\b(' + '|'.join(number_words.keys()) + r')\b'
     text = re.sub(pattern, lambda m: number_words[m.group(0)], text)
 
-    # Strip punctuation
+    # Strip punctuation except alphanumeric characters and spaces
     text = re.sub(r'[^a-z0-9\s]', '', text)
     
     # Join consecutive single digits separated by spaces (e.g. "4 2 8" -> "428")
@@ -188,7 +234,7 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
             if ct_clean:
                 call_type_phrases.append(ct_clean)
                 
-    incident_words = {"fire", "medical", "rescue", "accident", "crash", "leak", "assist", "arrest", "mvi"}
+    incident_words = {"fire", "medical", "rescue", "accident", "crash", "leak", "assist", "arrest", "mvi", "incident", "patients", "patient", "multiple"}
     
     unit_words = set(u.lower() for u in units_vocab) if units_vocab else set()
     unit_words.update({"engine", "ladder", "squad", "medic", "rescue", "tender", "hazmat", "quint", "car", "command"})
@@ -253,12 +299,14 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             
             # Units segment: text preceding 'respond'
             units_segment = text[:respond_idx].strip()
+            # Clean up trailing and leading "and" from units segment
+            units_segment = re.sub(r'^(?:and\s+)+|(?:and\s*)+$', '', units_segment, flags=re.IGNORECASE).strip()
             
             # Remainder of the announcement after 'respond [priority]'
             remainder = text[respond_idx + respond_len:].strip()
             
             # Find boundary anchors
-            cross_roads_match = re.search(r'\b(cross\s+roads|near|cross\s+street)\b', remainder, re.IGNORECASE)
+            cross_roads_match = re.search(r'\b(cross\s+roads|near|cross\s+street|cross\s+of)\b', remainder, re.IGNORECASE)
             talk_group_match = re.search(r'\b(use\s+talk\s+group|talk\s+group)\b', remainder, re.IGNORECASE)
             map_grid_match = re.search(r'\bmap\s+grid\b', remainder, re.IGNORECASE)
             

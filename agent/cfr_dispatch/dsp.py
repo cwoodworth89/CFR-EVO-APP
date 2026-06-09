@@ -20,8 +20,8 @@ def get_rms(data: np.ndarray) -> float:
 def analyze_live_audio(data: bytes, num_peaks: int = NUM_PEAKS_TO_FIND) -> set:
     """
     Analyzes an audio byte buffer for frequency peaks.
-    Applies a high-pass Butterworth filter to eliminate baseline noise/static
-    before computing the Fast Fourier Transform (FFT).
+    Applies a high-pass Butterworth filter, a Hamming window to prevent spectral leakage,
+    and uses Scipy's find_peaks to extract distinct frequency components.
     """
     audio_array = np.frombuffer(data, dtype=np.int16)
     if len(audio_array) == 0:
@@ -34,15 +34,31 @@ def analyze_live_audio(data: bytes, num_peaks: int = NUM_PEAKS_TO_FIND) -> set:
     b, a = signal.butter(5, normal_cutoff, btype='high', analog=False)
     filtered_signal = signal.lfilter(b, a, audio_array)
     
-    fft_data = np.fft.rfft(filtered_signal)
-    fft_freqs = np.fft.rfftfreq(len(filtered_signal), 1.0 / AUDIO_SAMPLE_RATE)
+    # Apply Hamming window to prevent spectral leakage
+    window = np.hamming(len(filtered_signal))
+    windowed_signal = filtered_signal * window
+    
+    fft_data = np.fft.rfft(windowed_signal)
+    fft_freqs = np.fft.rfftfreq(len(windowed_signal), 1.0 / AUDIO_SAMPLE_RATE)
     fft_magnitude = np.abs(fft_data)
     
+    # Enforce minimum peak separation distance of 15 Hz to avoid duplicate adjacent bin detections
+    bin_spacing = AUDIO_SAMPLE_RATE / len(filtered_signal)
+    min_distance_bins = max(1, int(15.0 / bin_spacing))
+    
     try:
-        peak_indices = np.argpartition(fft_magnitude, -num_peaks)[-num_peaks:]
-        return set(int(f) for f in fft_freqs[peak_indices])
-    except (ValueError, IndexError):
-        return set()
+        # Find local peaks that stand out (prominence filter)
+        peaks, _ = signal.find_peaks(fft_magnitude, distance=min_distance_bins, prominence=np.max(fft_magnitude) * 0.05)
+        # Sort found peaks by magnitude descending and take top num_peaks
+        sorted_peaks = sorted(peaks, key=lambda p: fft_magnitude[p], reverse=True)[:num_peaks]
+        return set(int(fft_freqs[p]) for p in sorted_peaks)
+    except Exception:
+        # Fallback to partition if find_peaks fails or is unavailable
+        try:
+            peak_indices = np.argpartition(fft_magnitude, -num_peaks)[-num_peaks:]
+            return set(int(f) for f in fft_freqs[peak_indices])
+        except (ValueError, IndexError):
+            return set()
 
 def get_best_match(live_frequencies: set) -> tuple[str, float] | tuple[None, None]:
     """
@@ -66,7 +82,7 @@ def get_best_match(live_frequencies: set) -> tuple[str, float] | tuple[None, Non
 
 def filter_known_tones(audio_data: np.ndarray, tone_name: str, sample_rate: int) -> np.ndarray:
     """
-    Applies zero-phase IIR notch filters at the golden fingerprint frequencies
+    Applies causal forward IIR notch filters at the golden fingerprint frequencies
     associated with tone_name to clean up voice transcriptions.
     """
     if not tone_name or tone_name not in GOLDEN_FINGERPRINTS:

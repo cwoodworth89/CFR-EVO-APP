@@ -6,17 +6,16 @@ from dataclasses import dataclass
 from typing import Optional
 
 # -- Integration Settings --
-STT_ENGINE = "whisper"                # Options: "google", "whisper"
+STT_ENGINE = os.environ.get("STT_ENGINE", "whisper")  # Options: "google", "whisper"
 WHISPER_MODEL = "base"                # Options: "tiny", "base", "small"
 INTEGRATION_PAYLOAD_OPTION = 2        # 1: Lightweight address, 2: Fully geocoded parcel rings
 ENABLE_GOOGLE_MAPS_FALLBACK = False   # Keep offline-first by disabling fallback
 ENABLE_NTFY_PUSH = True               # Free Tasker push notifications
-ENABLE_JOIN_PUSH = False              # Legacy push notifications
-
 # -- Audio Settings --
 USE_INTELLIGENT_PARSER = True
 AUDIO_SAMPLE_RATE = 16000
-DEVICE_ID = 0                         # Default audio hardware device ID
+# Default audio hardware device ID (checks environment or defaults to system default None)
+DEVICE_ID = int(os.environ.get("AUDIO_DEVICE_ID")) if os.environ.get("AUDIO_DEVICE_ID") is not None else None
 NOISE_AMPLITUDE_THRESHOLD = 1500
 SUSTAINED_LOUDNESS_WINDOW = 5
 SUSTAINED_LOUDNESS_CHUNKS_REQUIRED = 5
@@ -25,6 +24,8 @@ MAX_DISPATCH_DURATION_S = 59
 END_OF_DISPATCH_SILENCE_S = 3.0
 END_OF_DISPATCH_RMS_THRESHOLD = 450
 POST_EVENT_RESET_SILENCE_S = 3.0
+PHASE_1_CHECK_INTERVAL_S = 3.0
+MIN_PHASE_1_DURATION_S = 10.0
 
 # -- Tone Fingerprints & Matching --
 MATCH_THRESHOLD_PERCENT = 0.65

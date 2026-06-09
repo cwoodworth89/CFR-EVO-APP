@@ -1,14 +1,16 @@
-# CFR EVO: Coquitlam Fire Responder Evolution App
+# CFR EVO: Coquitlam Fire Rescue Emergency Vehicle Operator App
 
-An interactive, real-time emergency dispatch mapping assistant and driver training platform designed for Coquitlam Fire Rescue.
+An interactive, real-time emergency dispatch mapping assistant and geographical training platform designed for **Emergency Vehicle Operators (EVOs)**.
 
 ---
 
 ## 🧭 What is CFR EVO?
 
-CFR EVO bridges the gap between station-side dispatch audio and visual mapping. It captures dispatch announcements, processes the location data, and immediately provides responders with live navigation maps, hydrant coordinates, and road closures.
+CFR EVO bridges the gap between station-side dispatch audio and visual mapping for fire apparatus drivers. It captures radio dispatch announcements, processes the location data, and immediately pushes routing metadata to operators' personal mobile devices. 
 
-Furthermore, it doubles as a geography training simulator, helping responders memorize response zones, street intersections, block numbers, and parcel shapes through interactive training games.
+Designed to operate on personal phones rather than official truck hardware, it provides responders with live navigation paths, hydrant coordinates, and road closures during their response.
+
+Furthermore, it doubles as a geographical training simulator, helping drivers memorize response zones, street intersections, block numbers, and parcel shapes through interactive training games.
 
 ---
 
@@ -61,3 +63,20 @@ The project is split into two main subdirectories:
 For detailed developer setup instructions, credential configuration, and dependencies, please refer to the README files inside the respective subfolders:
 - Read [**Agent Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/agent/README.md) for running the listener.
 - Read [**Client Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/README.md) for running or deploying the website.
+
+---
+
+## 🗓️ Future Roadmap
+- **Two-Phase Dispatch Pipeline**: Implement a Quick-Alert (Phase 1) that slices the first 12 seconds of dispatch audio to geocode and push routing to personal devices within 15 seconds, followed by a Full-Verification (Phase 2) that transcribes the entire call to verify details and push corrections if necessary.
+- **Station Touchscreen Kiosk Display**: Display the live routing overlays, active construction hazards, and nearest fire hydrants locally on dedicated touch screen monitors mounted inside each fire hall.
+- **Apparatus Shift Subscription**: Implement a web interface allowing drivers to subscribe their personal phones to specific apparatuses (e.g., Engine 1, Ladder 1) for the duration of a shift, filtering alerts to only active responders.
+
+---
+
+## ⚖️ Open Data, Privacy & Compliance
+
+This application operates strictly using completely open, public, and non-sensitive information:
+1. **Public Audio Announcements**: Dispatch voice pages are broadcast over open airwaves and station speakers, making them audible to the general public.
+2. **Open Geodata**: All parcel layers, boundaries, street grids, and fire hydrant locations are retrieved from public municipal datasets (e.g., Coquitlam Open Data).
+3. **Open Road Closure Feeds**: Closed-road information and construction alerts are pulled from public traffic APIs (e.g., DriveBC Open511, Municipal 511).
+4. **FOI/Public Record Metadata**: Supporting metadata such as call classification terms, apparatus lists, and station locations are gathered from public records and Freedom of Information (FOI) disclosures.

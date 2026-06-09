@@ -2,6 +2,7 @@
 # System orchestration, audio capture, and background process worker loops
 
 import os
+import io
 import re
 import time
 import uuid
@@ -22,7 +23,6 @@ from cfr_dispatch.config import (
     INTEGRATION_PAYLOAD_OPTION,
     ENABLE_GOOGLE_MAPS_FALLBACK,
     ENABLE_NTFY_PUSH,
-    ENABLE_JOIN_PUSH,
     AUDIO_SAMPLE_RATE,
     NOISE_AMPLITUDE_THRESHOLD,
     SUSTAINED_LOUDNESS_WINDOW,
@@ -32,6 +32,8 @@ from cfr_dispatch.config import (
     END_OF_DISPATCH_SILENCE_S,
     END_OF_DISPATCH_RMS_THRESHOLD,
     POST_EVENT_RESET_SILENCE_S,
+    PHASE_1_CHECK_INTERVAL_S,
+    MIN_PHASE_1_DURATION_S,
     DEVICE_ID,
     UNITS_VOCABULARY,
     ADDRESS_SHAPEFILE_PATH,
@@ -59,7 +61,8 @@ from cfr_dispatch.gis import CoquitlamDataValidator
 from cfr_dispatch.integration import (
     post_to_supabase,
     post_to_ntfy,
-    launch_navigation_on_phone
+    update_supabase_record,
+    upload_to_supabase_storage
 )
 
 # Global queue for background multiprocessing worker
@@ -84,8 +87,8 @@ def setup_logging():
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
-def transcribe_audio_file(file_path: str) -> str | None:
-    """Transcribes audio using Google Cloud Speech-to-Text v2 with custom phrase adaptation."""
+def transcribe_audio_bytes(content: bytes) -> str | None:
+    """Transcribes raw WAV audio bytes using Google Cloud Speech-to-Text v2 with custom phrase adaptation."""
     try:
         from google.cloud import speech_v2
         client = speech_v2.SpeechClient()
@@ -113,9 +116,6 @@ def transcribe_audio_file(file_path: str) -> str | None:
             ),
             adaptation=adaptation_config
         )
-
-        with open(file_path, "rb") as audio_file:
-            content = audio_file.read()
         
         request = speech_v2.types.RecognizeRequest(
             recognizer=RECOGNIZER_RESOURCE_NAME,
@@ -141,46 +141,79 @@ def transcribe_audio_file(file_path: str) -> str | None:
         logging.error(f"Google STT API error: {e}", exc_info=True)
         return None
 
-def transcribe_audio_file_local(file_path: str) -> str | None:
+def transcribe_audio_file(file_path: str) -> str | None:
+    """Transcribes audio file using Google Cloud Speech-to-Text v2."""
+    try:
+        with open(file_path, "rb") as audio_file:
+            content = audio_file.read()
+        return transcribe_audio_bytes(content)
+    except Exception as e:
+        logging.error(f"Failed to read audio file: {e}", exc_info=True)
+        return None
+
+def transcribe_audio_local(audio_data, model=None) -> str | None:
     """
-    Transcribes audio locally using faster-whisper if available, falling back to
-    standard openai-whisper as a secondary option.
+    Transcribes audio (NumPy array or file path) locally using a pre-loaded/cached
+    faster-whisper or openai-whisper model.
     """
     try:
-        from faster_whisper import WhisperModel
-        logging.info(f"Loading local faster-whisper model '{WHISPER_MODEL}'...")
-        model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
-        logging.info(f"Transcribing '{file_path}' using faster-whisper...")
-        segments, info = model.transcribe(file_path, beam_size=5)
-        text = " ".join([segment.text for segment in segments])
-        return text.strip() or None
-    except ImportError:
-        try:
-            import whisper
-            logging.info(f"Loading local openai-whisper model '{WHISPER_MODEL}'...")
-            model = whisper.load_model(WHISPER_MODEL)
-            logging.info(f"Transcribing '{file_path}' using standard Whisper...")
-            result = model.transcribe(file_path, language="en")
+        if model is None:
+            # On-demand fallback
+            from faster_whisper import WhisperModel
+            logging.info(f"Loading local faster-whisper model '{WHISPER_MODEL}' on demand...")
+            model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+
+        is_faster_whisper = hasattr(model, 'transcribe') and not hasattr(model, 'load_model')
+        
+        if is_faster_whisper:
+            logging.info("Transcribing using cached faster-whisper model...")
+            segments, info = model.transcribe(audio_data, beam_size=2)
+            text = " ".join([segment.text for segment in segments])
+            return text.strip() or None
+        else:
+            logging.info("Transcribing using cached standard Whisper model...")
+            if isinstance(audio_data, str):
+                import whisper
+                audio_data = whisper.load_audio(audio_data)
+            result = model.transcribe(audio_data, language="en", beam_size=2)
             return result.get("text", "").strip() or None
-        except ImportError:
-            logging.error("Neither faster-whisper nor openai-whisper is installed. Please run 'pip install faster-whisper' for local STT.")
-            return None
+            
     except Exception as e:
         logging.error(f"Local transcription error: {e}", exc_info=True)
         return None
 
-def capture_full_dispatch(stream, blocksize, initial_buffer=None):
-    """Captures continuous dispatch audio until END_OF_DISPATCH_SILENCE_S is reached."""
-    logging.info("STATE: CAPTURING DISPATCH")
+def transcribe_audio_file_local(file_path: str, model=None) -> str | None:
+    """Transcribes local audio file path using Whisper (backwards compatibility)."""
+    return transcribe_audio_local(file_path, model=model)
+
+def capture_full_dispatch(stream, blocksize, dispatch_queue, dispatch_id, matched_tone, initial_buffer=None):
+    """Captures continuous dispatch audio until END_OF_DISPATCH_SILENCE_S is reached, pushing Phase 1 checks periodically."""
+    logging.info(f"STATE: CAPTURING DISPATCH (ID: {dispatch_id})")
     audio_buffer = initial_buffer if initial_buffer is not None else []
     max_chunks = int((AUDIO_SAMPLE_RATE / blocksize) * MAX_DISPATCH_DURATION_S)
     start_chunk = len(audio_buffer)
     silence_start_time = None
+    last_check_time = time.time()
     
     for i in range(start_chunk, max_chunks):
         try:
             pcm, _ = stream.read(blocksize)
             audio_buffer.append(pcm)
+            
+            # Periodic Phase 1 Check trigger
+            current_time = time.time()
+            duration_s = (len(audio_buffer) * blocksize) / AUDIO_SAMPLE_RATE
+            if duration_s >= MIN_PHASE_1_DURATION_S and (current_time - last_check_time >= PHASE_1_CHECK_INTERVAL_S):
+                last_check_time = current_time
+                logging.debug(f"Queueing intermediate audio buffer for Phase 1 check ({len(audio_buffer)} blocks, {duration_s:.1f}s)...")
+                dispatch_queue.put({
+                    "type": "phase_1_check",
+                    "dispatch_id": dispatch_id,
+                    "buffer": list(audio_buffer),
+                    "tone_name": matched_tone,
+                    "units_vocab": UNITS_VOCABULARY
+                })
+
             volume = get_rms(pcm)
             if volume < END_OF_DISPATCH_RMS_THRESHOLD:
                 if silence_start_time is None:
@@ -197,47 +230,41 @@ def capture_full_dispatch(stream, blocksize, initial_buffer=None):
     logging.info(f"MAX DURATION ({MAX_DISPATCH_DURATION_S}s) REACHED.")
     return audio_buffer
 
-def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: str, units_vocabulary: List[str]):
-    """Processes a completed dispatch buffer: transcribes, geocodes, and posts integrations."""
-    dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
-    temp_filename = f"temp_dispatch_{dispatch_id}.wav"
-    
+
+def google_geocode_fallback(address: str, api_key: str) -> tuple[dict | None, str | None]:
+    """Helper to geocode address using Google Geocoding API as fallback."""
+    if not api_key:
+        return None, None
     try:
-        logging.info(f"--- STARTING DISPATCH PROCESSING (ID: {dispatch_id}) ---")
-        if not buffer:
-            logging.warning("Buffer empty, nothing to process.")
-            return
-            
-        # 1. Combine and Filter Audio
-        full_dispatch_audio = np.concatenate(buffer)
-        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
-        
-        # 2. Write to Unique Temp File
-        wavio.write(temp_filename, filtered_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
-        logging.info(f"Dispatch audio saved to unique file '{temp_filename}'.")
-        
-        # 3. Transcribe Audio
-        raw_transcript = None
-        if STT_ENGINE == "google":
-            raw_transcript = transcribe_audio_file(temp_filename)
-        elif STT_ENGINE == "whisper":
-            raw_transcript = transcribe_audio_file_local(temp_filename)
-            
-        if not raw_transcript:
-            logging.error("Transcription failed.")
-            return
-            
-        logging.info(f"Original Transcript: '{raw_transcript}'")
-        transcript = sanitize_transcript(raw_transcript)
-        logging.info(f"Sanitized Transcript: '{transcript}'")
-        
-        # 4. Parse announcements
-        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
-        all_candidates = []
-        for text in announcements:
-            if len(text.split()) > 2:
-                all_candidates.extend(parse_dispatch_announcement(text, units_vocabulary))
-                
+        import googlemaps
+        gmaps = googlemaps.Client(key=api_key)
+        search_query = f"{address}, Coquitlam, BC"
+        geocode_result = gmaps.geocode(search_query)
+        if not geocode_result:
+            return None, None
+        first_result = geocode_result[0]
+        location_type = first_result["geometry"]["location_type"]
+        good_location_types = ["ROOFTOP", "RANGE_INTERPOLATED", "GEOMETRIC_CENTER"]
+        if location_type not in good_location_types:
+             return None, None
+        location_data = {
+            "geometry": {
+                "location": {
+                    "lat": first_result["geometry"]["location"]["lat"],
+                    "lng": first_result["geometry"]["location"]["lng"]
+                }
+            }
+        }
+        corrected_label = first_result.get("formatted_address")
+        return location_data, corrected_label
+    except Exception as e:
+        logging.error(f"Google maps fallback geocoding error: {e}")
+        return None, None
+
+
+def process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None):
+    """Common logic for geocoding, preparing DB payload, and posting to Supabase/NTFY."""
+    try:
         unique_addresses = []
         for d in all_candidates:
             if d.address and d.address not in unique_addresses:
@@ -263,7 +290,7 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
                 unique_addresses = ["Unknown Location"]
             else:
                 logging.error("Could not parse any address or intersection from transcript, and no dispatch details found. Aborting.")
-                return
+                return None, []
             
         # 5. Geocode Local-First (100% Offline)
         local_geocode_result = None
@@ -314,7 +341,7 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
                 if gmaps_api_key:
                     for i, candidate_address in enumerate(unique_addresses):
                         logging.info(f"Attempting Google maps fallback for: '{candidate_address}'")
-                        location_data, corrected_address_label = geocode_address(candidate_address, gmaps_api_key)
+                        location_data, corrected_address_label = google_geocode_fallback(candidate_address, gmaps_api_key)
                         if location_data:
                             lat = location_data['geometry']['location']['lat']
                             lng = location_data['geometry']['location']['lng']
@@ -340,6 +367,9 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
                 confidence_score = 0.0
                 verify_location = True
             
+        if verify_location_override is not None:
+            verify_location = verify_location_override
+
         # 7. Extract incident details and build metadata
         best_address = local_geocode_result["address"]
         lat = local_geocode_result["lat"]
@@ -356,10 +386,10 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
                 else:
                     logging.warning(f"[Post-Check] GRID MISMATCH: Location is NOT inside grids {parsed_grids}")
             else:
-                logging.info(f"[Post-Check] Grid Check skipped for grids {parsed_grids} because location coordinates are null (intersection or missing address).")
+                logging.info(f"[Post-Check] Grid Check skipped for grids {parsed_grids} because location coordinates are null.")
                 
         # 8. Construct Payloads
-        timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+        timestamp = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat() + "Z"
         
         target_payload = {
             "address": best_address,
@@ -379,6 +409,11 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
             "verify_location": verify_location
         }
         
+        if audio_url is not None:
+            db_payload["audio_url"] = audio_url
+        if audio_duration is not None:
+            db_payload["audio_duration"] = audio_duration
+        
         if INTEGRATION_PAYLOAD_OPTION == 1:
             db_payload["address"] = best_address
         else:
@@ -396,25 +431,431 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
             if ntfy_topic:
                 post_to_ntfy(db_payload, ntfy_topic, ntfy_token)
                 
-        if ENABLE_JOIN_PUSH:
-            join_key = os.environ.get("JOIN_API_KEY")
-            if join_key and lat and lng:
-                launch_navigation_on_phone(target_payload, best_address, join_key)
+        return db_payload, responding_units
 
     except Exception as e:
+        logging.error(f"Error in process_and_post_payload: {e}", exc_info=True)
+        return None, []
+
+
+def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str) -> tuple[str | None, float]:
+    """
+    Concatenates recorded audio buffer chunks, saves a .wav file locally
+    (to client/public/recordings/ and agent/audio_files/recordings/),
+    uploads it to Supabase Storage, and returns the public audio URL (or local path)
+    and audio duration in seconds.
+    """
+    try:
+        import numpy as np
+        import wavio
+        import io
+        import os
+        
+        # Combine chunks
+        full_dispatch_audio = np.concatenate(buffer)
+        
+        # Calculate duration
+        duration_seconds = round(len(full_dispatch_audio) / AUDIO_SAMPLE_RATE, 2)
+        logging.info(f"Recorded audio duration: {duration_seconds}s")
+        
+        # Filter tones to create clean listening wav (same as what gets transcribed)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        
+        # Convert to WAV bytes in memory
+        wav_io = io.BytesIO()
+        wavio.write(wav_io, filtered_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
+        audio_bytes = wav_io.getvalue()
+        
+        # 1. Save locally to client/public/recordings/ for local playback fallback
+        local_url_path = f"/recordings/{dispatch_id}.wav"
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            local_dir = os.path.join(base_dir, "client", "public", "recordings")
+            os.makedirs(local_dir, exist_ok=True)
+            local_file_path = os.path.join(local_dir, f"{dispatch_id}.wav")
+            logging.info(f"Saving audio locally to {local_file_path}...")
+            with open(local_file_path, "wb") as f:
+                f.write(audio_bytes)
+        except Exception as e:
+            logging.warning(f"Could not save audio locally to client/public/recordings: {e}")
+            
+        # Also save to agent/audio_files/recordings/ for agent records/debugging
+        try:
+            agent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio_files", "recordings")
+            os.makedirs(agent_dir, exist_ok=True)
+            agent_file_path = os.path.join(agent_dir, f"{dispatch_id}.wav")
+            with open(agent_file_path, "wb") as f:
+                f.write(audio_bytes)
+        except Exception as e:
+            logging.warning(f"Could not save audio locally to agent/audio_files/recordings: {e}")
+            
+        # 2. Upload to Supabase Storage
+        supabase_url = os.environ.get("SUPABASE_URL")
+        supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+        
+        public_url = None
+        if supabase_url and supabase_key:
+            public_url = upload_to_supabase_storage(audio_bytes, f"{dispatch_id}.wav", supabase_url, supabase_key)
+            
+        # If upload succeeded, return the Supabase public URL. Otherwise, return the local fallback path.
+        audio_url = public_url if public_url else local_url_path
+        return audio_url, duration_seconds
+        
+    except Exception as e:
+        logging.error(f"Error in save_and_upload_audio: {e}", exc_info=True)
+        return None, 0.0
+
+def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: str, units_vocabulary: List[str], stt_model=None):
+    """Processes a completed dispatch buffer: transcribes, geocodes, and posts integrations."""
+    dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
+    try:
+        logging.info(f"--- STARTING DISPATCH PROCESSING (ID: {dispatch_id}) ---")
+        if not buffer:
+            logging.warning("Buffer empty, nothing to process.")
+            return
+            
+        # 1. Combine and Filter Audio
+        full_dispatch_audio = np.concatenate(buffer)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        
+        # 2. Transcribe Audio (100% In-Memory)
+        raw_transcript = None
+        if STT_ENGINE == "google":
+            wav_io = io.BytesIO()
+            wavio.write(wav_io, filtered_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
+            audio_bytes = wav_io.getvalue()
+            raw_transcript = transcribe_audio_bytes(audio_bytes)
+        elif STT_ENGINE == "whisper":
+            audio_float = filtered_audio.astype(np.float32) / 32768.0
+            if len(audio_float.shape) > 1:
+                audio_float = audio_float.squeeze()
+            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+            
+        if not raw_transcript:
+            logging.error("Transcription failed.")
+            return
+            
+        transcript = sanitize_transcript(raw_transcript)
+        
+        # 3. Parse announcements
+        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+        all_candidates = []
+        for text in announcements:
+            if len(text.split()) > 2:
+                all_candidates.extend(parse_dispatch_announcement(text, units_vocabulary))
+                
+        # 4. Save and Upload Audio
+        audio_url, audio_duration = save_and_upload_audio(dispatch_id, buffer, tone_name)
+        
+        # 5. Geocode and Post
+        process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocabulary,
+                                 audio_url=audio_url, audio_duration=audio_duration)
+    except Exception as e:
         logging.error(f"Error processing dispatch ID {dispatch_id}: {e}", exc_info=True)
-    finally:
-        if os.path.exists(temp_filename):
+
+
+def is_round_1_complete_check(dispatch_list: List[DispatchData], raw_transcript: str) -> bool:
+    """Determines if the first round of the dispatch announcement is complete using map grid and unit repetition heuristics."""
+    if not dispatch_list:
+        return False
+    
+    # We need at least one candidate with a parsed address or intersection
+    candidate = next((d for d in dispatch_list if d.address or d.intersection), None)
+    if not candidate:
+        return False
+        
+    # Check if we have units and call type
+    has_units = candidate.units is not None and len(candidate.units) > 0
+    has_call_type = candidate.call_type is not None and candidate.call_type != "Unknown Incident"
+    
+    if has_units and has_call_type:
+        # Primary Trigger: "Map Grid < 200"
+        has_grid_less_than_200 = False
+        if candidate.map_grid:
             try:
-                os.remove(temp_filename)
-                logging.info(f"Cleaned up unique audio file '{temp_filename}'")
-            except Exception as e:
-                logging.warning(f"Could not delete unique audio file '{temp_filename}': {e}")
+                # Remove non-digits
+                clean_grid = "".join(filter(str.isdigit, candidate.map_grid))
+                if clean_grid:
+                    grid_num = int(clean_grid)
+                    if grid_num < 200:
+                        has_grid_less_than_200 = True
+            except ValueError:
+                pass
+        
+        # Fallback check raw_transcript for "grid" and some digits
+        if not has_grid_less_than_200:
+            grid_matches = re.findall(r'\b(?:grid|grade)\s*(\d{1,3})\b', raw_transcript.lower())
+            for gm in grid_matches:
+                try:
+                    if int(gm) < 200:
+                        has_grid_less_than_200 = True
+                        break
+                except ValueError:
+                    pass
+                    
+        # Secondary Trigger: Unit repetition (the exact same unit+number appears twice, e.g. "engine 2" ... "engine 2")
+        has_unit_repetition = False
+        unit_vocab_pattern = '|'.join(u.lower() for u in UNITS_VOCABULARY)
+        unit_pairs = re.findall(rf'\b({unit_vocab_pattern})\s+(\d+)\b', raw_transcript.lower())
+        if unit_pairs:
+            from collections import Counter
+            counts = Counter(unit_pairs)
+            if any(count >= 2 for count in counts.values()):
+                has_unit_repetition = True
+                
+        if has_grid_less_than_200 or has_unit_repetition:
+            return True
+            
+    return False
+
+
+def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_model, triggered_phase_1_ids: set, phase_1_trigger_lengths: dict, phase_1_candidates: dict):
+    """Worker function to transcribe, parse, and trigger Phase 1 if complete."""
+    dispatch_id = task["dispatch_id"]
+    buffer = task["buffer"]
+    tone_name = task["tone_name"]
+    units_vocab = task["units_vocab"]
+    
+    if dispatch_id in triggered_phase_1_ids:
+        return
+        
+    try:
+        # 1. Combine and Filter Audio
+        full_dispatch_audio = np.concatenate(buffer)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        
+        # 2. Transcribe Audio (100% In-Memory)
+        raw_transcript = None
+        if STT_ENGINE == "google":
+            wav_io = io.BytesIO()
+            wavio.write(wav_io, filtered_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
+            audio_bytes = wav_io.getvalue()
+            raw_transcript = transcribe_audio_bytes(audio_bytes)
+        elif STT_ENGINE == "whisper":
+            audio_float = filtered_audio.astype(np.float32) / 32768.0
+            if len(audio_float.shape) > 1:
+                audio_float = audio_float.squeeze()
+            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+            
+        if not raw_transcript:
+            return
+            
+        transcript = sanitize_transcript(raw_transcript)
+        
+        # 3. Parse announcements
+        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+        all_candidates = []
+        for text in announcements:
+            if len(text.split()) > 2:
+                all_candidates.extend(parse_dispatch_announcement(text, units_vocab))
+                
+        # 4. Check if complete
+        if is_round_1_complete_check(all_candidates, transcript):
+            logging.info(f"--- PHASE 1 SEMANTIC TRIGGER MET FOR DISPATCH {dispatch_id} ---")
+            
+            # Post Phase 1 payload to Supabase
+            db_payload, responding_units = process_and_post_payload(
+                dispatch_id, transcript, all_candidates, validator, units_vocab, verify_location_override=False
+            )
+            
+            if db_payload:
+                # Success! Save state in worker memory
+                triggered_phase_1_ids.add(dispatch_id)
+                phase_1_trigger_lengths[dispatch_id] = len(buffer)
+                phase_1_candidates[dispatch_id] = {
+                    "transcript": transcript,
+                    "candidates": all_candidates,
+                    "units": responding_units,
+                    "target": db_payload.get("target") or {"address": db_payload.get("address")}
+                }
+    except Exception as e:
+        logging.error(f"Error in process_phase_1_check for ID {dispatch_id}: {e}", exc_info=True)
+
+
+def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_model, triggered_phase_1_ids: set, phase_1_trigger_lengths: dict, phase_1_candidates: dict):
+    """Worker function to process the completed dispatch audio, verify, and correct if necessary."""
+    dispatch_id = task["dispatch_id"]
+    buffer = task["buffer"]
+    tone_name = task["tone_name"]
+    units_vocab = task["units_vocab"]
+    
+    try:
+        logging.info(f"--- STARTING PHASE 2 FINALIZE PROCESSING (ID: {dispatch_id}) ---")
+        
+        # Save and Upload Audio
+        audio_url, audio_duration = save_and_upload_audio(dispatch_id, buffer, tone_name)
+        
+        # Retrieve Phase 1 trigger point
+        p1_len = phase_1_trigger_lengths.get(dispatch_id, 0)
+        p1_data = phase_1_candidates.get(dispatch_id)
+        
+        # If Phase 1 triggered, we slice and transcribe the second round only to bypass de-duplication
+        if p1_data and p1_len > 0 and p1_len < len(buffer):
+            logging.info(f"Phase 1 was triggered at block {p1_len}/{len(buffer)}. Slicing buffer for Round 2.")
+            second_round_buffer = buffer[p1_len:]
+        else:
+            logging.info("Phase 1 was not triggered (or buffer invalid). Transcribing full audio as fallback.")
+            second_round_buffer = buffer
+            p1_data = None
+            
+        # 1. Combine and Filter Audio
+        full_dispatch_audio = np.concatenate(second_round_buffer)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        
+        # 2. Transcribe Audio (100% In-Memory)
+        raw_transcript = None
+        if STT_ENGINE == "google":
+            wav_io = io.BytesIO()
+            wavio.write(wav_io, filtered_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
+            audio_bytes = wav_io.getvalue()
+            raw_transcript = transcribe_audio_bytes(audio_bytes)
+        elif STT_ENGINE == "whisper":
+            audio_float = filtered_audio.astype(np.float32) / 32768.0
+            if len(audio_float.shape) > 1:
+                audio_float = audio_float.squeeze()
+            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+            
+        if not raw_transcript:
+            logging.warning("Phase 2 transcription failed.")
+            raw_transcript = ""
+            
+        transcript = sanitize_transcript(raw_transcript)
+        logging.info(f"Phase 2 Sanitized Transcript: '{transcript}'")
+        
+        # 3. Parse announcements
+        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+        all_candidates = []
+        for text in announcements:
+            if len(text.split()) > 2:
+                all_candidates.extend(parse_dispatch_announcement(text, units_vocab))
+                
+        # 4. Handle DB insertion/update
+        if not p1_data:
+            # Fallback: Phase 1 never triggered, so we just treat this as a standard single-phase run
+            logging.info("Phase 1 fallback: Inserting new record in single-phase mode.")
+            process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocab,
+                                     audio_url=audio_url, audio_duration=audio_duration)
+        else:
+            # Phase 1 did trigger! We compare Phase 2 with Phase 1 to verify or correct
+            p1_candidate = next((d for d in p1_data["candidates"] if d.address or d.intersection), None)
+            p2_candidate = next((d for d in all_candidates if d.address or d.intersection), None)
+            
+            p1_addr = (p1_candidate.address or p1_candidate.intersection or "").lower() if p1_candidate else ""
+            p2_addr = (p2_candidate.address or p2_candidate.intersection or "").lower() if p2_candidate else ""
+            
+            # Compare addresses
+            addresses_match = p1_addr == p2_addr and p1_addr != ""
+            
+            supabase_url = os.environ.get("SUPABASE_URL")
+            supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+            
+            if addresses_match:
+                logging.info(f"Phase 2 verification: Address matches Phase 1 ('{p1_candidate.address or p1_candidate.intersection}'). Updating database record to verified.")
+                # Update Supabase record status to verified (verify_location=False)
+                if supabase_url and supabase_key:
+                    update_payload = {
+                        "verify_location": False,
+                        "confidence_score": 100.0,  # Boost confidence to 100% since both rounds verified it
+                        "audio_url": audio_url,
+                        "audio_duration": audio_duration
+                    }
+                    update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+            else:
+                logging.warning(f"Phase 2 verification MISMATCH: Phase 1 address was '{p1_addr}', Phase 2 is '{p2_addr}'.")
+                
+                # If Phase 2 geocoding succeeds and has a valid candidate, correct the record!
+                if p2_candidate:
+                    logging.info("Attempting geocoding for Phase 2 corrected address...")
+                    unique_addresses = [p2_candidate.address or p2_candidate.intersection]
+                    
+                    # Run offline geocoding
+                    res = validator.local_geocode(unique_addresses[0])
+                    if res:
+                        logging.info(f"Phase 2 geocoding corrected match SUCCEEDED: '{res['address']}' (Score: {res['confidence']}%)")
+                        target_payload = {
+                            "address": res["address"],
+                            "lat": res["lat"],
+                            "lng": res["lng"],
+                            "rings": res["rings"]
+                        }
+                        
+                        # Prepare update payload
+                        update_payload = {
+                            "verify_location": False,
+                            "confidence_score": float(res["confidence"]),
+                            "audio_url": audio_url,
+                            "audio_duration": audio_duration
+                        }
+                        if INTEGRATION_PAYLOAD_OPTION == 1:
+                            update_payload["address"] = res["address"]
+                        else:
+                            update_payload["target"] = target_payload
+                            
+                        # Update Supabase
+                        if supabase_url and supabase_key:
+                            update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                            
+                        # Send correction push notification
+                        if ENABLE_NTFY_PUSH:
+                            ntfy_topic = os.environ.get("NTFY_TOPIC")
+                            ntfy_token = os.environ.get("NTFY_TOKEN")
+                            if ntfy_topic:
+                                corr_payload = {
+                                    "dispatch_id": dispatch_id,
+                                    "incident_type": match_incident_type(transcript, CALL_TYPES),
+                                    "alarm_level": parse_alarm_level(transcript),
+                                    "responding_units": abbreviate_units(p2_candidate.units),
+                                    "lat": res["lat"],
+                                    "lng": res["lng"],
+                                    "target": target_payload
+                                }
+                                # Customize title for correction
+                                headers = {
+                                    "Title": f"CORRECTION: Dispatch {dispatch_id}",
+                                    "Priority": "5",
+                                    "Tags": "warning,rotating_light",
+                                    "Click": f"google.navigation:q={res['lat']},{res['lng']}"
+                                }
+                                if ntfy_token:
+                                    headers["Authorization"] = f"Bearer {ntfy_token}"
+                                try:
+                                    requests.post(f"https://ntfy.sh/{ntfy_topic}", headers=headers, data=json.dumps(corr_payload), timeout=10)
+                                except Exception as n_err:
+                                    logging.error(f"Failed to post correction to Ntfy: {n_err}")
+                    else:
+                        # Geocoding failed for Phase 2 as well, keep Phase 1 but mark as verify_location=True
+                        logging.warning("Phase 2 geocoding failed. Keeping Phase 1 data but flagging verify_location=True.")
+                        if supabase_url and supabase_key:
+                            update_payload = {
+                                "verify_location": True,
+                                "audio_url": audio_url,
+                                "audio_duration": audio_duration
+                            }
+                            update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                else:
+                    # No Phase 2 candidate found (e.g. dispatcher override, noise, cutoff)
+                    # Gracefully fallback: keep Phase 1 data, mark as verified=True
+                    logging.info("No valid candidate in Phase 2. Keeping Phase 1 data as verified.")
+                    if supabase_url and supabase_key:
+                        update_payload = {
+                            "verify_location": False,
+                            "audio_url": audio_url,
+                            "audio_duration": audio_duration
+                        }
+                        update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                        
+    except Exception as e:
+        logging.error(f"Error in process_phase_2_finalize for ID {dispatch_id}: {e}", exc_info=True)
+    finally:
+        # Clean up memory state
+        triggered_phase_1_ids.discard(dispatch_id)
+        phase_1_trigger_lengths.pop(dispatch_id, None)
+        phase_1_candidates.pop(dispatch_id, None)
 
 def background_worker_loop(task_queue: multiprocessing.Queue):
     """
     Background worker loop. Run in a separate Process.
-    Initializes GIS validator once at startup and waits for dispatch capture events.
+    Initializes GIS validator and loads/caches the speech-to-text models once at startup.
     """
     logging.info("Background Dispatch Worker process starting...")
     try:
@@ -424,13 +865,56 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
         logging.critical(f"Failed to initialize validator in worker process: {e}", exc_info=True)
         return
         
+    stt_model = None
+    if STT_ENGINE == "whisper":
+        try:
+            device = "cpu"
+            compute_type = "int8"
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    device = "cuda"
+                    compute_type = "float16"
+            except ImportError:
+                pass
+            
+            logging.info(f"Pre-loading local STT engine '{WHISPER_MODEL}' on {device} ({compute_type})...")
+            try:
+                from faster_whisper import WhisperModel
+                stt_model = WhisperModel(WHISPER_MODEL, device=device, compute_type=compute_type)
+                logging.info("faster-whisper model pre-loaded successfully.")
+            except ImportError:
+                import whisper
+                stt_model = whisper.load_model(WHISPER_MODEL, device=device)
+                logging.info("standard whisper model pre-loaded successfully.")
+        except Exception as e:
+            logging.error(f"Failed to pre-load Whisper model: {e}. Will load on demand.", exc_info=True)
+
+    triggered_phase_1_ids = set()
+    phase_1_trigger_lengths = {}
+    phase_1_candidates = {}
+
     while True:
         try:
             task = task_queue.get()
             if task is None: # Poison pill
                 break
-            buffer, tone_name, units_vocab = task
-            process_full_dispatch(buffer, validator, tone_name, units_vocab)
+            if isinstance(task, dict):
+                task_type = task.get("type")
+                if task_type == "phase_1_check":
+                    process_phase_1_check(
+                        task, validator, stt_model,
+                        triggered_phase_1_ids, phase_1_trigger_lengths, phase_1_candidates
+                    )
+                elif task_type == "phase_2_finalize":
+                    process_phase_2_finalize(
+                        task, validator, stt_model,
+                        triggered_phase_1_ids, phase_1_trigger_lengths, phase_1_candidates
+                    )
+            else:
+                # Backwards compatibility
+                buffer, tone_name, units_vocab = task
+                process_full_dispatch(buffer, validator, tone_name, units_vocab, stt_model)
         except Exception as e:
             logging.error(f"Error in background worker processing task: {e}", exc_info=True)
 
@@ -452,9 +936,7 @@ def run_dispatch_system():
         logging.critical("FATAL ERROR: ENABLE_NTFY_PUSH is True but NTFY_TOPIC is not set.")
         return
         
-    if ENABLE_JOIN_PUSH and not os.environ.get("JOIN_API_KEY"):
-        logging.critical("FATAL ERROR: ENABLE_JOIN_PUSH is True but JOIN_API_KEY is not set.")
-        return
+
     
     # Spawn background processor process
     global dispatch_queue
@@ -479,6 +961,10 @@ def run_dispatch_system():
                 loudness_history = deque(maxlen=SUSTAINED_LOUDNESS_WINDOW)
                 history_audio_buffer = deque(maxlen=SUSTAINED_LOUDNESS_WINDOW)
                 is_capturing_tone, analysis_buffer, last_log_time, matched_tone = False, [], 0, None
+                
+                # Rolling history of quiet RMS values to compute adaptive baseline
+                baseline_rms_history = deque(maxlen=50)
+                baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
 
                 while True:
                     if is_capturing_tone:
@@ -495,6 +981,9 @@ def run_dispatch_system():
                             else:
                                 logging.info("Triggered sound was not a recognized tone, resetting.")
                                 is_capturing_tone = False
+                                # Reset baseline when false-trigger occurs to prevent bias
+                                baseline_rms_history.clear()
+                                baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
                                 continue
                         else:
                             continue
@@ -502,12 +991,21 @@ def run_dispatch_system():
                     pcm, _ = stream.read(blocksize)
                     history_audio_buffer.append(pcm)
                     rms = get_rms(pcm)
+                    
+                    # Update background quiet noise baseline if current RMS is not abnormally high
+                    if rms < NOISE_AMPLITUDE_THRESHOLD * 1.5:
+                        baseline_rms_history.append(rms)
+                        
+                    current_baseline = np.mean(baseline_rms_history) if baseline_rms_history else (NOISE_AMPLITUDE_THRESHOLD / 2.5)
+                    # Adaptive threshold is at least the noise floor threshold, or 2.5x the rolling background noise baseline
+                    current_threshold = max(NOISE_AMPLITUDE_THRESHOLD, current_baseline * 2.5)
+
                     current_time = time.time()
                     if current_time - last_log_time >= 5.0:
-                        logging.debug(f"Listening... RMS: {int(rms):<5} | Loud Chunks: {sum(loudness_history)}/{SUSTAINED_LOUDNESS_CHUNKS_REQUIRED}")
+                        logging.debug(f"Listening... RMS: {int(rms):<5} | Threshold: {int(current_threshold):<5} | Loud Chunks: {sum(loudness_history)}/{SUSTAINED_LOUDNESS_CHUNKS_REQUIRED}")
                         last_log_time = current_time
 
-                    is_currently_loud = rms > NOISE_AMPLITUDE_THRESHOLD
+                    is_currently_loud = rms > current_threshold
                     loudness_history.append(is_currently_loud)
                     
                     if not is_capturing_tone and sum(loudness_history) >= SUSTAINED_LOUDNESS_CHUNKS_REQUIRED:
@@ -517,10 +1015,17 @@ def run_dispatch_system():
                         loudness_history.clear()
 
                 # Dispatch Capture
-                dispatch_buffer = capture_full_dispatch(stream, blocksize, initial_buffer=analysis_buffer)
+                dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
+                dispatch_buffer = capture_full_dispatch(stream, blocksize, dispatch_queue, dispatch_id, matched_tone, initial_buffer=analysis_buffer)
                 if dispatch_buffer:
-                    logging.info("Queueing captured dispatch for background processor core...")
-                    dispatch_queue.put((list(dispatch_buffer), matched_tone, UNITS_VOCABULARY))
+                    logging.info(f"Queueing finalized dispatch ID {dispatch_id} for background processor core...")
+                    dispatch_queue.put({
+                        "type": "phase_2_finalize",
+                        "dispatch_id": dispatch_id,
+                        "buffer": list(dispatch_buffer),
+                        "tone_name": matched_tone,
+                        "units_vocab": UNITS_VOCABULARY
+                    })
 
                 logging.info(f"Waiting for {POST_EVENT_RESET_SILENCE_S}s of silence before resetting...")
                 silence_chunks_needed = int((AUDIO_SAMPLE_RATE / blocksize) * POST_EVENT_RESET_SILENCE_S)

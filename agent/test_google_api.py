@@ -178,43 +178,11 @@ def geocode_address(address: str, api_key: str) -> dict | None:
         print(f"An API error occurred during geocoding: {e}")
         return None
 
-# REVISED FUNCTION to use Join and Tasker
-def launch_navigation_on_phone(location_data: dict, join_api_key: str):
-    """
-    Sends a message to an Android phone via Join to trigger a Tasker action.
 
-    Args:
-        location_data: A dictionary containing the geocoded location info.
-        join_api_key: The personal API key for the Join service.
-    """
-    if not join_api_key:
-        print("Error: JOIN_API_KEY environment variable not set.")
-        return
-
-    # The 'text' payload for Join will be our command ("dispatch") followed
-    # by the coordinates that Tasker will use.
-    coordinates = f"{location_data['latitude']},{location_data['longitude']}"
-    text_payload = f"dispatch=:={coordinates}"
-
-    base_url = "https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush"
-    params = {
-        'apikey': join_api_key,
-        'deviceId': 'group.phone', # This sends to all your phones
-        'text': text_payload
-    }
-
-    try:
-        print(f"Sending Join message to trigger navigation for: {coordinates}")
-        response = requests.get(base_url, params=params)
-        response.raise_for_status()
-        print("Join message sent successfully.")
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred sending Join message: {e}")
 
 # --- MODIFIED MAIN BLOCK ---
 if __name__ == "__main__":
     gmaps_api_key = os.environ.get("GOOGLE_API_KEY")
-    join_api_key = os.environ.get("JOIN_API_KEY") # Get the Join key
     
     audio_file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_dispatch.wav")
     full_transcript = transcribe_audio_file(audio_file_name)
@@ -229,9 +197,6 @@ if __name__ == "__main__":
             location_info = geocode_address(correct_address_for_test, gmaps_api_key)
 
             if location_info:
-                # Step 4: Launch navigation on the phone
-                launch_navigation_on_phone(location_info, join_api_key)
-                
-                print("\nSUCCESS! Audio to remote navigation launch test complete.")
+                print("\nSUCCESS! Audio to address geocode test complete.")
             else:
                 print("\nFAILURE: Could not obtain a precise location for the address.")

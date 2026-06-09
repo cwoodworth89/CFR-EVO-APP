@@ -22,15 +22,15 @@ ALTER publication supabase_realtime ADD TABLE public.simulation_requests;
 -- 4. Enable Row-Level Security (RLS) on simulation_requests
 ALTER TABLE public.simulation_requests ENABLE ROW LEVEL SECURITY;
 
--- 5. Create RLS Policies for simulation_requests (Explicitly granting to anon and authenticated roles)
+-- 5. Create RLS Policies for simulation_requests (Restricting access to authenticated users to prevent leaks)
 DROP POLICY IF EXISTS "Allow public select on simulation_requests" ON public.simulation_requests;
-CREATE POLICY "Allow public select on simulation_requests" 
-ON public.simulation_requests FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow authenticated select on simulation_requests" 
+ON public.simulation_requests FOR SELECT TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "Allow public insert on simulation_requests" ON public.simulation_requests;
-CREATE POLICY "Allow public insert on simulation_requests" 
-ON public.simulation_requests FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Allow authenticated insert on simulation_requests" 
+ON public.simulation_requests FOR INSERT TO authenticated WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow public update on simulation_requests" ON public.simulation_requests;
-CREATE POLICY "Allow public update on simulation_requests" 
-ON public.simulation_requests FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow authenticated update on simulation_requests" 
+ON public.simulation_requests FOR UPDATE TO authenticated USING (true) WITH CHECK (true);

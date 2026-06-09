@@ -8,11 +8,12 @@ import L from 'leaflet';
 // Import from your other components
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
-import { Header, LeftSidebar, RightSidebar } from './GameHUD';
+import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
 
 import { RoutingOverlay } from './RoutingOverlay';
 import DispatchReview from './DispatchReview';
+import { supabase } from '../supabaseClient';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
 const getRandomElement = (arr) => {
@@ -243,6 +244,7 @@ export default function MapBoard() {
   
   // APP/TERMINAL STATE
   const [appMode, setAppMode] = useState("EXPLORE"); 
+  const [activeDispatch, setActiveDispatch] = useState(null);
   const [trainingDataLoaded, setTrainingDataLoaded] = useState(false);
   const [loadingTraining, setLoadingTraining] = useState(false);
   const [mapStyle, setMapStyle] = useState("GREY"); 
@@ -281,6 +283,64 @@ export default function MapBoard() {
   useEffect(() => {
     localStorage.setItem('home_hall', homeHall);
   }, [homeHall]);
+
+  // Subscribe to live dispatches from Supabase
+  useEffect(() => {
+    const channel = supabase
+      .channel('live-calls-realtime-map')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'live_calls' },
+        (payload) => {
+          console.log("Realtime Dispatch Event:", payload);
+          if (payload.eventType === 'INSERT') {
+            const newCall = payload.new;
+            if (newCall) {
+              setActiveDispatch(newCall);
+              const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.latitude || 49.28, lng: newCall.longitude || -122.80 } : null);
+              if (target) {
+                updateTargetAddress(target);
+                if (map && target.lat && target.lng) {
+                  map.flyTo([target.lat, target.lng], 17, { animate: true });
+                }
+              }
+              setLeftSidebarOpen(true);
+              setRightSidebarOpen(false);
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedCall = payload.new;
+            setActiveDispatch(curr => {
+              if (curr && curr.id === updatedCall.id) {
+                const oldTarget = curr.target;
+                const newTarget = updatedCall.target;
+                if (newTarget && (!oldTarget || oldTarget.lat !== newTarget.lat || oldTarget.lng !== newTarget.lng)) {
+                  updateTargetAddress(newTarget);
+                  if (map && newTarget.lat && newTarget.lng) {
+                    map.flyTo([newTarget.lat, newTarget.lng], 17, { animate: true });
+                  }
+                }
+                return updatedCall;
+              }
+              return curr;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const deletedCall = payload.old;
+            setActiveDispatch(curr => {
+              if (curr && curr.id === deletedCall.id) {
+                updateTargetAddress(null);
+                return null;
+              }
+              return curr;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [map, updateTargetAddress]);
 
   // Query Nearby Hydrants on targetAddress change (storing raw features only)
   useEffect(() => {
@@ -838,6 +898,7 @@ export default function MapBoard() {
   const startMode = useCallback((mode) => {
       clearTimeout(autoAdvanceTimer.current); // Clear any pending jumps
       setAppMode(mode);
+      setActiveDispatch(null);
       setScore(0);
       setFeedback(null);
       setUserGuess(null);
@@ -1002,6 +1063,8 @@ export default function MapBoard() {
           leftSidebarOpen={leftSidebarOpen}
           setLeftSidebarOpen={setLeftSidebarOpen}
           appMode={appMode}
+          activeDispatch={activeDispatch}
+          setActiveDispatch={setActiveDispatch}
           loadingTraining={loadingTraining}
           showZones={showZones}
           setShowZones={setShowZones}
@@ -1017,6 +1080,7 @@ export default function MapBoard() {
           targetAddress={targetAddress}
           setTargetAddress={updateTargetAddress}
           nearestHydrant={nearestHydrants[0] || null}
+          nearestHydrants={nearestHydrants}
           filterNoAccess={filterNoAccess}
           setFilterNoAccess={setFilterNoAccess}
           filterAccessOnly={filterAccessOnly}
@@ -1295,12 +1359,18 @@ export default function MapBoard() {
       {appMode === "ADMIN_DISPATCHES" && (
         <DispatchReview 
           onClose={() => startMode("EXPLORE")} 
-          onLocateAddress={(target) => {
+          onLocateAddress={(call) => {
             startMode("EXPLORE");
-            updateTargetAddress(target);
-            if (map && target.lat && target.lng) {
-              map.flyTo([target.lat, target.lng], 17, { animate: true });
+            setActiveDispatch(call);
+            const target = call?.target || call;
+            if (target) {
+              updateTargetAddress(target);
+              if (map && target.lat && target.lng) {
+                map.flyTo([target.lat, target.lng], 17, { animate: true });
+              }
             }
+            setLeftSidebarOpen(true);
+            setRightSidebarOpen(false);
           }}
         />
       )}

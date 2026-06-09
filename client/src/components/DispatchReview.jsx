@@ -15,6 +15,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedAlarm, setVerifiedAlarm] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [showSimulator, setShowSimulator] = useState(false);
 
   // Load calls from Supabase
   useEffect(() => {
@@ -125,11 +126,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
 
   const handleViewOnMap = () => {
     if (!selectedCall) return;
-    const target = selectedCall.target;
-    if (target && target.lat && target.lng) {
-      onLocateAddress(target);
-      onClose(); // Close the review overlay to show map
-    }
+    onLocateAddress(selectedCall);
+    onClose(); // Close the review overlay to show map
   };
 
   const handleSubmitReview = async (e) => {
@@ -203,12 +201,22 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             Provide ground-truth feedback, edit location anomalies, check audio quality, and review STT performance.
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
-        >
-          ✕ CLOSE DASHBOARD
-        </button>
+        <div className="flex gap-3 items-center">
+          <button
+            type="button"
+            onClick={() => setShowSimulator(true)}
+            className="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer shadow-md flex items-center gap-1 border border-amber-600"
+          >
+            ⚡ SIMULATE DISPATCH
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
+          >
+            ✕ CLOSE DASHBOARD
+          </button>
+        </div>
       </div>
 
       {/* Main Grid */}
@@ -319,7 +327,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               {call.target?.lat && call.target?.lng && (
                                 <button
                                   onClick={() => {
-                                    onLocateAddress(call.target);
+                                    onLocateAddress(call);
                                     onClose();
                                   }}
                                   className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-500/50 transition-all flex items-center gap-0.5 cursor-pointer shadow"
@@ -531,6 +539,352 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             </form>
           )}
         </div>
+      </div>
+      {showSimulator && (
+        <LiveDispatchSimulator 
+          onClose={() => setShowSimulator(false)}
+          onTriggered={(simCall) => {
+            setShowSimulator(false);
+            onLocateAddress(simCall);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+const PRESETS = [
+  {
+    name: "Preset 1: Structure Fire at 4150 Cedar Ave",
+    transcript: "Town Centre Engine 1, Ladder 1 respond to a structure fire at 4150 Cedar Ave. Smoke reported coming from the roof of the residential dwelling. Main intersection is Cedar Ave and Victoria Dr. Alarm level 2.",
+    address: "4150 CEDAR AVE",
+    incidentType: "Structure Fire",
+    respondingUnits: "E1, L1, C1",
+    alarmLevel: "2"
+  },
+  {
+    name: "Preset 2: MVA with Rescue at Lougheed Highway",
+    transcript: "Engine 2, Rescue 2, Mariner Battalion 1, respond to a motor vehicle incident multiple vehicle collision on Lougheed Highway and Dewdney Trunk Rd. Reports of entrapment, extrication required. Heavy traffic backlog.",
+    address: "LOUGHEED HWY",
+    incidentType: "MVA - Rescue Required",
+    respondingUnits: "E2, R2, B1",
+    alarmLevel: "1"
+  },
+  {
+    name: "Preset 3: Commercial Fire Alarm at 2929 Barnet Hwy",
+    transcript: "Engine 3, Engine 1, Mariner Battalion 1 respond to a commercial automatic fire alarm activation at Coquitlam Centre Mall, 2929 Barnet Hwy. Pull station activation in Sector C.",
+    address: "2929 BARNET HWY",
+    incidentType: "Commercial Alarm",
+    respondingUnits: "E3, E1, B1",
+    alarmLevel: "1"
+  }
+];
+
+async function queryAddress(addressText) {
+  const upperQuery = addressText.trim().toUpperCase().replace(/'/g, "''");
+  const encodedWhere = encodeURIComponent(`ADDRESS LIKE '%${upperQuery}%'`);
+  const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=${encodedWhere}&outFields=ADDRESS&returnGeometry=true&outSR=4326&resultRecordCount=1&f=json`;
+  
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Geocoding service error");
+  const data = await response.json();
+  if (data && data.features && data.features.length > 0) {
+    const feature = data.features[0];
+    const address = feature.attributes.ADDRESS;
+    const geom = feature.geometry;
+    let lat = 0;
+    let lng = 0;
+    let rings = null;
+    if (geom && geom.rings && geom.rings.length > 0) {
+      rings = geom.rings;
+      const ring = geom.rings[0];
+      let latSum = 0;
+      let lngSum = 0;
+      ring.forEach(pt => {
+        lngSum += pt[0];
+        latSum += pt[1];
+      });
+      lat = latSum / ring.length;
+      lng = lngSum / ring.length;
+    }
+    return { address, lat, lng, rings };
+  }
+  return null;
+}
+
+function LiveDispatchSimulator({ onClose, onTriggered }) {
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [address, setAddress] = useState("");
+  const [incidentType, setIncidentType] = useState("Structure Fire");
+  const [respondingUnits, setRespondingUnits] = useState("E1, L1");
+  const [alarmLevel, setAlarmLevel] = useState("1");
+  const [audioFile, setAudioFile] = useState(null);
+  const [simulating, setSimulating] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
+
+  const handlePresetChange = (e) => {
+    const val = e.target.value;
+    setSelectedPreset(val);
+    if (val !== "") {
+      const preset = PRESETS[parseInt(val)];
+      setTranscript(preset.transcript);
+      setAddress(preset.address);
+      setIncidentType(preset.incidentType);
+      setRespondingUnits(preset.respondingUnits);
+      setAlarmLevel(preset.alarmLevel);
+    }
+  };
+
+  const handleTrigger = async (e) => {
+    e.preventDefault();
+    if (!address.trim()) {
+      alert("Please enter a target address for routing.");
+      return;
+    }
+
+    setSimulating(true);
+    setStatusMsg("Uploading call audio...");
+
+    try {
+      // 1. Upload audio if present
+      let audioPath = "";
+      if (audioFile) {
+        const fileExt = audioFile.name.split('.').pop();
+        const fileName = `sim-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('dispatch-audio')
+          .upload(fileName, audioFile);
+          
+        if (uploadError) {
+          console.warn("Audio upload failed, continuing with mock:", uploadError);
+        }
+        audioPath = fileName;
+      }
+
+      // 2. Geocode address via Coquitlam GIS
+      setStatusMsg("Geocoding target address...");
+      let target = null;
+      try {
+        const geocodeResult = await queryAddress(address);
+        if (geocodeResult) {
+          target = geocodeResult;
+        } else {
+          console.warn("Address not found in Coquitlam GIS, using fallback center.");
+          target = {
+            address: address.toUpperCase(),
+            lat: 49.28,
+            lng: -122.80,
+            rings: null
+          };
+        }
+      } catch (err) {
+        console.warn("Geocoding error, using fallback:", err);
+        target = {
+          address: address.toUpperCase(),
+          lat: 49.28,
+          lng: -122.80,
+          rings: null
+        };
+      }
+
+      // 3. Insert simulated call into Supabase
+      setStatusMsg("Publishing dispatch simulation...");
+      const unitsArray = respondingUnits
+        .split(",")
+        .map((u) => u.trim())
+        .filter((u) => u.length > 0);
+
+      const { data, error } = await supabase
+        .from('live_calls')
+        .insert([{
+          dispatch_id: `SIM-${Date.now().toString().slice(-4)}`,
+          timestamp: new Date().toISOString(),
+          raw_transcript: transcript || "Simulation dispatch active.",
+          incident_type: incidentType,
+          responding_units: unitsArray,
+          alarm_level: parseInt(alarmLevel),
+          audio_url: audioPath || null,
+          audio_duration: 25,
+          target: target,
+          origins: ['TCFH'],
+          verify_location: false,
+          confidence_score: 100
+        }])
+        .select();
+
+      if (error) throw error;
+
+      setStatusMsg("Simulation broadcasted!");
+      setTimeout(() => {
+        if (data && data.length > 0) {
+          onTriggered(data[0]);
+        } else {
+          onClose();
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.error("Simulation failed:", err);
+      alert(`Simulation failed to trigger: ${err.message}`);
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[2500] flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl w-full max-w-lg text-left animate-in zoom-in-95 duration-155 flex flex-col max-h-[90vh] text-slate-100">
+        <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4 flex-shrink-0">
+          <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            ⚡ LIVE DISPATCH SIMULATION GATEWAY
+          </h3>
+          <button 
+            type="button"
+            onClick={onClose} 
+            disabled={simulating}
+            className="text-slate-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+          >
+            ✕ CLOSE
+          </button>
+        </div>
+
+        <form onSubmit={handleTrigger} className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1">
+          {/* Preset Selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+              Load Realistic Presets
+            </label>
+            <select
+              value={selectedPreset}
+              onChange={handlePresetChange}
+              disabled={simulating}
+              className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none cursor-pointer hover:border-slate-700 w-full"
+            >
+              <option value="">-- Select template or type custom below --</option>
+              {PRESETS.map((p, idx) => (
+                <option key={idx} value={idx}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Audio File Selection */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+              Upload Call Audio (.wav / .mp3 - Optional)
+            </label>
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={(e) => setAudioFile(e.target.files[0])}
+              disabled={simulating}
+              className="bg-slate-950 border border-slate-800 text-xs text-slate-400 rounded-lg p-2 file:bg-slate-850 file:border-0 file:text-white file:text-xs file:font-bold file:px-3 file:py-1 file:rounded-md file:cursor-pointer file:mr-3 hover:border-slate-700 w-full"
+            />
+          </div>
+
+          {/* Transcript */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+              Dispatch Transcript Text
+            </label>
+            <textarea
+              rows={3}
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              disabled={simulating}
+              placeholder="e.g. Engine 1 respond to a structure fire..."
+              className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-amber-500 font-mono resize-none leading-relaxed"
+            />
+          </div>
+
+          {/* Grid fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+                Address / Location Name
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                disabled={simulating}
+                placeholder="e.g. 4150 Cedar Ave"
+                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 font-bold uppercase w-full"
+              />
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+                Incident Call Type
+              </label>
+              <input
+                type="text"
+                value={incidentType}
+                onChange={(e) => setIncidentType(e.target.value)}
+                disabled={simulating}
+                placeholder="e.g. Structure Fire"
+                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 font-bold w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+                Responding Units (comma list)
+              </label>
+              <input
+                type="text"
+                value={respondingUnits}
+                onChange={(e) => setRespondingUnits(e.target.value)}
+                disabled={simulating}
+                placeholder="e.g. E1, L1"
+                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 font-mono uppercase w-full"
+              />
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
+                Alarm Level
+              </label>
+              <select
+                value={alarmLevel}
+                onChange={(e) => setAlarmLevel(e.target.value)}
+                disabled={simulating}
+                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none cursor-pointer focus:border-amber-500 w-full"
+              >
+                <option value="1">1st Alarm</option>
+                <option value="2">2nd Alarm</option>
+                <option value="3">3rd Alarm</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Trigger Button & Status */}
+          <div className="border-t border-slate-800 pt-4 mt-auto flex flex-col gap-3">
+            {statusMsg && (
+              <div className="text-[10px] text-amber-400 font-mono font-bold text-center animate-pulse">
+                ⚙️ {statusMsg}
+              </div>
+            )}
+            
+            <button
+              type="submit"
+              disabled={simulating}
+              className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-xl w-full transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-amber-600"
+            >
+              {simulating ? (
+                <>
+                  <span className="animate-spin border-2 border-black border-t-transparent h-4 w-4 rounded-full"></span>
+                  RUNNING SIMULATION...
+                </>
+              ) : (
+                "🚀 TRIGGER SIMULATION DISPATCH"
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

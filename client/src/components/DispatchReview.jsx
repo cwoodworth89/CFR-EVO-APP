@@ -553,192 +553,152 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   );
 }
 
-const PRESETS = [
-  {
-    name: "Preset 1: Structure Fire at 4150 Cedar Ave",
-    transcript: "Town Centre Engine 1, Ladder 1 respond to a structure fire at 4150 Cedar Ave. Smoke reported coming from the roof of the residential dwelling. Main intersection is Cedar Ave and Victoria Dr. Alarm level 2.",
-    address: "4150 CEDAR AVE",
-    incidentType: "Structure Fire",
-    respondingUnits: "E1, L1, C1",
-    alarmLevel: "2"
-  },
-  {
-    name: "Preset 2: MVA with Rescue at Lougheed Highway",
-    transcript: "Engine 2, Rescue 2, Mariner Battalion 1, respond to a motor vehicle incident multiple vehicle collision on Lougheed Highway and Dewdney Trunk Rd. Reports of entrapment, extrication required. Heavy traffic backlog.",
-    address: "LOUGHEED HWY",
-    incidentType: "MVA - Rescue Required",
-    respondingUnits: "E2, R2, B1",
-    alarmLevel: "1"
-  },
-  {
-    name: "Preset 3: Commercial Fire Alarm at 2929 Barnet Hwy",
-    transcript: "Engine 3, Engine 1, Mariner Battalion 1 respond to a commercial automatic fire alarm activation at Coquitlam Centre Mall, 2929 Barnet Hwy. Pull station activation in Sector C.",
-    address: "2929 BARNET HWY",
-    incidentType: "Commercial Alarm",
-    respondingUnits: "E3, E1, B1",
-    alarmLevel: "1"
-  }
-];
-
-async function queryAddress(addressText) {
-  const upperQuery = addressText.trim().toUpperCase().replace(/'/g, "''");
-  const encodedWhere = encodeURIComponent(`ADDRESS LIKE '%${upperQuery}%'`);
-  const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=${encodedWhere}&outFields=ADDRESS&returnGeometry=true&outSR=4326&resultRecordCount=1&f=json`;
-  
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Geocoding service error");
-  const data = await response.json();
-  if (data && data.features && data.features.length > 0) {
-    const feature = data.features[0];
-    const address = feature.attributes.ADDRESS;
-    const geom = feature.geometry;
-    let lat = 0;
-    let lng = 0;
-    let rings = null;
-    if (geom && geom.rings && geom.rings.length > 0) {
-      rings = geom.rings;
-      const ring = geom.rings[0];
-      let latSum = 0;
-      let lngSum = 0;
-      ring.forEach(pt => {
-        lngSum += pt[0];
-        latSum += pt[1];
-      });
-      lat = latSum / ring.length;
-      lng = lngSum / ring.length;
-    }
-    return { address, lat, lng, rings };
-  }
-  return null;
-}
-
 function LiveDispatchSimulator({ onClose, onTriggered }) {
-  const [selectedPreset, setSelectedPreset] = useState("");
-  const [transcript, setTranscript] = useState("");
-  const [address, setAddress] = useState("");
-  const [incidentType, setIncidentType] = useState("Structure Fire");
-  const [respondingUnits, setRespondingUnits] = useState("E1, L1");
-  const [alarmLevel, setAlarmLevel] = useState("1");
   const [audioFile, setAudioFile] = useState(null);
+  const [verifiedTranscript, setVerifiedTranscript] = useState('');
   const [simulating, setSimulating] = useState(false);
-  const [statusMsg, setStatusMsg] = useState("");
-
-  const handlePresetChange = (e) => {
-    const val = e.target.value;
-    setSelectedPreset(val);
-    if (val !== "") {
-      const preset = PRESETS[parseInt(val)];
-      setTranscript(preset.transcript);
-      setAddress(preset.address);
-      setIncidentType(preset.incidentType);
-      setRespondingUnits(preset.respondingUnits);
-      setAlarmLevel(preset.alarmLevel);
-    }
-  };
+  const [statusMsg, setStatusMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [simulationResult, setSimulationResult] = useState(null);
 
   const handleTrigger = async (e) => {
     e.preventDefault();
-    if (!address.trim()) {
-      alert("Please enter a target address for routing.");
+    if (!audioFile) {
+      alert("Please upload a .wav or .mp3 audio file to run the simulation.");
       return;
     }
 
     setSimulating(true);
-    setStatusMsg("Uploading call audio...");
+    setErrorMsg('');
+    setSimulationResult(null);
+    setStatusMsg("Uploading audio recording to Supabase storage...");
 
     try {
-      // 1. Upload audio if present
-      let audioPath = "";
-      if (audioFile) {
-        const fileExt = audioFile.name.split('.').pop();
-        const fileName = `sim-${Date.now()}.${fileExt}`;
+      // 1. Upload audio to 'dispatch-audio' bucket
+      const fileExt = audioFile.name.split('.').pop();
+      const fileName = `sim-${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('dispatch-audio')
+        .upload(fileName, audioFile);
         
-        const { error: uploadError } = await supabase.storage
-          .from('dispatch-audio')
-          .upload(fileName, audioFile);
-          
-        if (uploadError) {
-          console.warn("Audio upload failed, continuing with mock:", uploadError);
-        }
-        audioPath = fileName;
-      }
+      if (uploadError) throw uploadError;
 
-      // 2. Geocode address via Coquitlam GIS
-      setStatusMsg("Geocoding target address...");
-      let target = null;
-      try {
-        const geocodeResult = await queryAddress(address);
-        if (geocodeResult) {
-          target = geocodeResult;
-        } else {
-          console.warn("Address not found in Coquitlam GIS, using fallback center.");
-          target = {
-            address: address.toUpperCase(),
-            lat: 49.28,
-            lng: -122.80,
-            rings: null
-          };
-        }
-      } catch (err) {
-        console.warn("Geocoding error, using fallback:", err);
-        target = {
-          address: address.toUpperCase(),
-          lat: 49.28,
-          lng: -122.80,
-          rings: null
-        };
-      }
+      // Get public URL of the uploaded file
+      const { data: publicUrlData } = supabase.storage
+        .from('dispatch-audio')
+        .getPublicUrl(fileName);
+        
+      const audioUrl = publicUrlData.publicUrl;
 
-      // 3. Insert simulated call into Supabase
-      setStatusMsg("Publishing dispatch simulation...");
-      const unitsArray = respondingUnits
-        .split(",")
-        .map((u) => u.trim())
-        .filter((u) => u.length > 0);
-
-      const { data, error } = await supabase
-        .from('live_calls')
+      // 2. Insert simulation request into 'simulation_requests'
+      setStatusMsg("Queueing request for Python pipeline...");
+      const { data: insertData, error: insertError } = await supabase
+        .from('simulation_requests')
         .insert([{
-          dispatch_id: `SIM-${Date.now().toString().slice(-4)}`,
-          timestamp: new Date().toISOString(),
-          raw_transcript: transcript || "Simulation dispatch active.",
-          incident_type: incidentType,
-          responding_units: unitsArray,
-          alarm_level: parseInt(alarmLevel),
-          audio_url: audioPath || null,
-          audio_duration: 25,
-          target: target,
-          origins: ['TCFH'],
-          verify_location: false,
-          confidence_score: 100
+          audio_url: audioUrl,
+          verified_transcript: verifiedTranscript.trim() || null,
+          status: 'pending'
         }])
         .select();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+      if (!insertData || insertData.length === 0) {
+        throw new Error("Failed to create simulation request in database.");
+      }
 
-      setStatusMsg("Simulation broadcasted!");
-      setTimeout(() => {
-        if (data && data.length > 0) {
-          onTriggered(data[0]);
-        } else {
-          onClose();
+      const requestId = insertData[0].id;
+      setStatusMsg("Waiting for Python agent to pickup request...");
+
+      // 3. Subscribe to real-time updates for this specific request
+      const channel = supabase
+        .channel(`sim-${requestId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'simulation_requests',
+            filter: `id=eq.${requestId}`
+          },
+          (payload) => {
+            const updated = payload.new;
+            if (updated.status === 'processing') {
+              setStatusMsg("Speech-to-Text & geocoding in progress...");
+            } else if (updated.status === 'completed') {
+              setSimulationResult(updated.result);
+              setSimulating(false);
+              setStatusMsg("");
+              supabase.removeChannel(channel);
+            } else if (updated.status === 'failed') {
+              setErrorMsg(updated.error_message || "Simulation failed in the backend pipeline.");
+              setSimulating(false);
+              setStatusMsg("");
+              supabase.removeChannel(channel);
+            }
+          }
+        )
+        .subscribe();
+
+      // Fallback polling in case realtime websocket fails or has delay
+      const pollInterval = setInterval(async () => {
+        try {
+          const { data: pollData, error: pollError } = await supabase
+            .from('simulation_requests')
+            .select('*')
+            .eq('id', requestId)
+            .single();
+
+          if (!pollError && pollData) {
+            if (pollData.status === 'completed') {
+              clearInterval(pollInterval);
+              setSimulationResult(pollData.result);
+              setSimulating(false);
+              setStatusMsg("");
+              supabase.removeChannel(channel);
+            } else if (pollData.status === 'failed') {
+              clearInterval(pollInterval);
+              setErrorMsg(pollData.error_message || "Simulation failed in the backend pipeline.");
+              setSimulating(false);
+              setStatusMsg("");
+              supabase.removeChannel(channel);
+            } else if (pollData.status === 'processing') {
+              setStatusMsg("Speech-to-Text & geocoding in progress...");
+            }
+          }
+        } catch (err) {
+          console.warn("Polling error:", err);
         }
-      }, 1000);
+      }, 3000);
+
+      // Clean up interval on component unmount
+      return () => {
+        clearInterval(pollInterval);
+        supabase.removeChannel(channel);
+      };
 
     } catch (err) {
-      console.error("Simulation failed:", err);
-      alert(`Simulation failed to trigger: ${err.message}`);
-    } finally {
+      console.error("Simulation request failed:", err);
+      setErrorMsg(err.message || "Failed to trigger simulation.");
       setSimulating(false);
+      setStatusMsg("");
     }
+  };
+
+  const getConfidenceColor = (score) => {
+    if (score >= 80) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+    if (score >= 40) return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+    return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
   };
 
   return (
     <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[2500] flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl w-full max-w-lg text-left animate-in zoom-in-95 duration-155 flex flex-col max-h-[90vh] text-slate-100">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl w-full max-w-4xl text-left animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] text-slate-100">
+        
+        {/* Header */}
         <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4 flex-shrink-0">
           <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            ⚡ LIVE DISPATCH SIMULATION GATEWAY
+            ⚡ LIVE PIPELINE DISPATCH SIMULATION
           </h3>
           <button 
             type="button"
@@ -750,141 +710,243 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
           </button>
         </div>
 
-        <form onSubmit={handleTrigger} className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1">
-          {/* Preset Selector */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-              Load Realistic Presets
-            </label>
-            <select
-              value={selectedPreset}
-              onChange={handlePresetChange}
-              disabled={simulating}
-              className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none cursor-pointer hover:border-slate-700 w-full"
-            >
-              <option value="">-- Select template or type custom below --</option>
-              {PRESETS.map((p, idx) => (
-                <option key={idx} value={idx}>{p.name}</option>
-              ))}
-            </select>
-          </div>
+        {/* Content Area */}
+        <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-5">
+          {!simulationResult ? (
+            <form onSubmit={handleTrigger} className="flex flex-col gap-4">
+              <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                Upload a raw audio recording file (.wav or .mp3) of a dispatch announcement to process it through the actual Speech-to-Text, parsing, geocoding, and dual-round alert matching backend.
+              </p>
 
-          {/* Audio File Selection */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-              Upload Call Audio (.wav / .mp3 - Optional)
-            </label>
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={(e) => setAudioFile(e.target.files[0])}
-              disabled={simulating}
-              className="bg-slate-950 border border-slate-800 text-xs text-slate-400 rounded-lg p-2 file:bg-slate-850 file:border-0 file:text-white file:text-xs file:font-bold file:px-3 file:py-1 file:rounded-md file:cursor-pointer file:mr-3 hover:border-slate-700 w-full"
-            />
-          </div>
-
-          {/* Transcript */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-              Dispatch Transcript Text
-            </label>
-            <textarea
-              rows={3}
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              disabled={simulating}
-              placeholder="e.g. Engine 1 respond to a structure fire..."
-              className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-amber-500 font-mono resize-none leading-relaxed"
-            />
-          </div>
-
-          {/* Grid fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-                Address / Location Name
-              </label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                disabled={simulating}
-                placeholder="e.g. 4150 Cedar Ave"
-                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 font-bold uppercase w-full"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-                Incident Call Type
-              </label>
-              <input
-                type="text"
-                value={incidentType}
-                onChange={(e) => setIncidentType(e.target.value)}
-                disabled={simulating}
-                placeholder="e.g. Structure Fire"
-                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 font-bold w-full"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-                Responding Units (comma list)
-              </label>
-              <input
-                type="text"
-                value={respondingUnits}
-                onChange={(e) => setRespondingUnits(e.target.value)}
-                disabled={simulating}
-                placeholder="e.g. E1, L1"
-                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 font-mono uppercase w-full"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-                Alarm Level
-              </label>
-              <select
-                value={alarmLevel}
-                onChange={(e) => setAlarmLevel(e.target.value)}
-                disabled={simulating}
-                className="bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none cursor-pointer focus:border-amber-500 w-full"
-              >
-                <option value="1">1st Alarm</option>
-                <option value="2">2nd Alarm</option>
-                <option value="3">3rd Alarm</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Trigger Button & Status */}
-          <div className="border-t border-slate-800 pt-4 mt-auto flex flex-col gap-3">
-            {statusMsg && (
-              <div className="text-[10px] text-amber-400 font-mono font-bold text-center animate-pulse">
-                ⚙️ {statusMsg}
-              </div>
-            )}
-            
-            <button
-              type="submit"
-              disabled={simulating}
-              className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-xl w-full transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-amber-600"
-            >
-              {simulating ? (
-                <>
-                  <span className="animate-spin border-2 border-black border-t-transparent h-4 w-4 rounded-full"></span>
-                  RUNNING SIMULATION...
-                </>
-              ) : (
-                "🚀 TRIGGER SIMULATION DISPATCH"
+              {/* Error Message */}
+              {errorMsg && (
+                <div className="bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl p-3 text-xs font-mono font-bold animate-in shake duration-150">
+                  ❌ Error: {errorMsg}
+                </div>
               )}
-            </button>
-          </div>
-        </form>
+
+              {/* Audio File Input */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                  Select Call Audio Recording (.wav / .mp3)
+                </label>
+                <div className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-all flex flex-col items-center justify-center border-dashed relative">
+                  <input
+                    type="file"
+                    accept="audio/wav, audio/mpeg, audio/mp3"
+                    onChange={(e) => setAudioFile(e.target.files[0])}
+                    disabled={simulating}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <span className="text-2xl mb-1">🎙️</span>
+                  <span className="text-xs font-bold text-slate-300">
+                    {audioFile ? audioFile.name : "Drag & drop or click to choose audio file"}
+                  </span>
+                  {audioFile && (
+                    <span className="text-[10px] text-slate-500 font-mono mt-1">
+                      Size: {(audioFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Verified Transcript Input */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                  Verification Transcript (Optional Ground Truth)
+                </label>
+                <textarea
+                  rows={4}
+                  value={verifiedTranscript}
+                  onChange={(e) => setVerifiedTranscript(e.target.value)}
+                  disabled={simulating}
+                  placeholder="Paste the expected ground truth text here. The pipeline will compare the Speech-to-Text output against this to verify accuracy..."
+                  className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-xl p-2.5 focus:outline-none focus:border-amber-500 font-mono resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* Status & Submit */}
+              <div className="border-t border-slate-850 pt-4 mt-2 flex flex-col gap-3">
+                {statusMsg && (
+                  <div className="flex flex-col items-center justify-center py-4 text-amber-400 gap-2">
+                    <span className="flex h-3 w-3 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                    <span className="text-[10px] font-bold font-mono tracking-widest uppercase mt-1 animate-pulse">
+                      ⚙️ {statusMsg}
+                    </span>
+                  </div>
+                )}
+                
+                <button
+                  type="submit"
+                  disabled={simulating || !audioFile}
+                  className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black py-3 px-6 rounded-xl w-full transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-amber-600 uppercase text-xs tracking-wider"
+                >
+                  {simulating ? (
+                    <>
+                      <span className="animate-spin border-2 border-black border-t-transparent h-4 w-4 rounded-full"></span>
+                      RUNNING SIMULATION PIPELINE...
+                    </>
+                  ) : (
+                    "🚀 RUN PIPELINE SIMULATION"
+                  )}
+                </button>
+              </div>
+            </form>
+          ) : (
+            // Simulation Report Screen
+            <div className="flex flex-col gap-5 animate-in fade-in duration-200">
+              
+              {/* Alert Header */}
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex justify-between items-center">
+                <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  SIMULATION PROCESSING PIPELINE COMPLETED SUCCESSFULLY
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">
+                  ID: {simulationResult.dispatch_id}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                
+                {/* Left Column: Extracted Metadata */}
+                <div className="flex flex-col gap-4 bg-slate-950/50 border border-slate-850 p-4 rounded-xl">
+                  <h4 className="text-[10px] text-sky-400 font-extrabold uppercase tracking-widest border-b border-slate-850 pb-1.5 font-mono">
+                    📊 EXTRACTED METADATA
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 text-xs font-mono">
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Call ID</div>
+                      <div className="text-sky-400 font-bold mt-0.5">{simulationResult.dispatch_id}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Timestamp</div>
+                      <div className="text-slate-300 mt-0.5">{new Date(simulationResult.timestamp).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Call Type</div>
+                      <div className="text-slate-200 font-bold mt-0.5">{simulationResult.incident_type}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Alarm Level</div>
+                      <div className="text-slate-200 font-bold mt-0.5">{simulationResult.alarm_level} Alarm</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Responding Units</div>
+                      <div className="flex gap-1.5 flex-wrap mt-1">
+                        {simulationResult.responding_units && simulationResult.responding_units.length > 0 ? (
+                          simulationResult.responding_units.map((unit, idx) => (
+                            <span key={idx} className="bg-slate-800 border border-slate-700 text-sky-400 font-black px-2 py-0.5 rounded text-[10px]">
+                              {unit}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-500 italic">None Extracted</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Parsed Address</div>
+                      <div className="text-slate-200 font-bold mt-0.5 truncate" title={simulationResult.target?.address || simulationResult.address}>
+                        {simulationResult.target?.address || simulationResult.address || "N/A"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Cross Roads</div>
+                      <div className="text-slate-200 font-bold mt-0.5 truncate" title={simulationResult.intersection}>
+                        {simulationResult.intersection || "N/A"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Radio Channel</div>
+                      <div className="text-amber-400 font-bold mt-0.5">Talk Group {simulationResult.radio_channel || "N/A"}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Map Grid</div>
+                      <div className="text-amber-400 font-bold mt-0.5">Grid {simulationResult.map_grid || "N/A"}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Pipeline Confidence</div>
+                      <div className="mt-1 font-bold">
+                        <span className={`px-2 py-0.5 rounded text-[10px] border ${getConfidenceColor(simulationResult.confidence_score)}`}>
+                          {simulationResult.confidence_score.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Dual-Round Matching</div>
+                      <div className="text-slate-300 font-bold mt-0.5">
+                        Recorded: {simulationResult.second_round_recorded ? "Yes" : "No"} | Matched: {simulationResult.second_round_matched ? "Yes" : "No"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Transcription & Verification */}
+                <div className="flex flex-col gap-4 bg-slate-950/50 border border-slate-850 p-4 rounded-xl">
+                  <h4 className="text-[10px] text-sky-400 font-extrabold uppercase tracking-widest border-b border-slate-850 pb-1.5 font-mono">
+                    🎙️ PIPELINE TRANSCRIPTION & VERIFICATION
+                  </h4>
+
+                  <div className="flex flex-col gap-3.5">
+                    {/* Pipeline STT Output */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] text-slate-500 uppercase font-black font-mono">Sanitized Speech-To-Text Output</span>
+                      <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-xs font-mono text-slate-350 italic max-h-32 overflow-y-auto leading-relaxed select-text">
+                        "{simulationResult.raw_transcript || "No transcript output generated."}"
+                      </div>
+                    </div>
+
+                    {/* Ground-Truth Verification */}
+                    {simulationResult.verified_transcript && (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between items-center font-mono">
+                          <span className="text-[9px] text-slate-500 uppercase font-black">Ground-Truth Verification Transcript</span>
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                            Accuracy Match: {simulationResult.transcript_accuracy}%
+                          </span>
+                        </div>
+                        <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-xs font-mono text-slate-355 italic max-h-32 overflow-y-auto leading-relaxed select-text">
+                          "{simulationResult.verified_transcript}"
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Action Buttons */}
+              <div className="border-t border-slate-800 pt-4 mt-2 flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => onTriggered(simulationResult)}
+                  className="bg-sky-500 hover:bg-sky-400 text-black font-black py-3 px-6 rounded-xl flex-grow transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-sky-600 uppercase text-xs tracking-wider"
+                >
+                  🗺️ WAKE UP KIOSK HUD OVERRIDE
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSimulationResult(null);
+                    setAudioFile(null);
+                    setVerifiedTranscript('');
+                    setErrorMsg('');
+                  }}
+                  className="bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold py-3 px-6 rounded-xl transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                >
+                  🔄 TEST ANOTHER RECORDING
+                </button>
+              </div>
+
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

@@ -852,6 +852,224 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
         phase_1_trigger_lengths.pop(dispatch_id, None)
         phase_1_candidates.pop(dispatch_id, None)
 
+def get_audio_duration(file_path: str) -> float:
+    """Helper to retrieve audio duration in seconds using wavio or whisper loading."""
+    try:
+        if file_path.lower().endswith('.wav'):
+            import wavio
+            w = wavio.read(file_path)
+            return round(w.data.shape[0] / w.rate, 2)
+    except Exception:
+        pass
+    try:
+        # Fallback to loading via whisper to count samples
+        import whisper
+        arr = whisper.load_audio(file_path)
+        return round(len(arr) / 16000, 2)
+    except Exception:
+        return 30.0
+
+def poll_simulation_requests(validator, stt_model):
+    """Polls Supabase for pending simulation requests, transcribes and parses, then saves the result."""
+    import requests
+    import json
+    import os
+    import tempfile
+    
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+    if not supabase_url or not supabase_key:
+        return
+        
+    endpoint = f"{supabase_url.rstrip('/')}/rest/v1/simulation_requests?status=eq.pending"
+    headers = {
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.get(endpoint, headers=headers, timeout=10)
+        response.raise_for_status()
+        pending_requests = response.json()
+        
+        for req in pending_requests:
+            req_id = req.get("id")
+            audio_url = req.get("audio_url")
+            verified_transcript = req.get("verified_transcript")
+            
+            logging.info(f"Processing simulation request {req_id}...")
+            
+            # Update status to processing
+            patch_endpoint = f"{supabase_url.rstrip('/')}/rest/v1/simulation_requests?id=eq.{req_id}"
+            requests.patch(patch_endpoint, headers=headers, json={"status": "processing"}, timeout=10)
+            
+            try:
+                # Download audio file
+                logging.info(f"Downloading simulation audio from: {audio_url}")
+                audio_headers = {
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}"
+                }
+                audio_response = requests.get(audio_url, headers=audio_headers, timeout=20)
+                audio_response.raise_for_status()
+                audio_bytes = audio_response.content
+                
+                suffix = ".wav"
+                if ".mp3" in audio_url.lower():
+                    suffix = ".mp3"
+                    
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                    temp_file.write(audio_bytes)
+                    temp_path = temp_file.name
+                    
+                try:
+                    # Get duration
+                    audio_duration = get_audio_duration(temp_path)
+                    
+                    # Run speech to text
+                    raw_transcript = None
+                    if STT_ENGINE == "google":
+                        raw_transcript = transcribe_audio_bytes(audio_bytes)
+                    elif STT_ENGINE == "whisper":
+                        import numpy as np
+                        try:
+                            import whisper
+                            audio_float = whisper.load_audio(temp_path)
+                            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+                        except Exception as w_err:
+                            logging.error(f"Whisper load failed: {w_err}. Trying direct filepath...")
+                            raw_transcript = transcribe_audio_local(temp_path, model=stt_model)
+                            
+                    if not raw_transcript:
+                        raise ValueError("Speech-to-Text did not produce any transcript text.")
+                        
+                    transcript = sanitize_transcript(raw_transcript)
+                    logging.info(f"Simulation transcribed: '{transcript}'")
+                    
+                    # Parse incident rounds (split by coquitlam keyword)
+                    announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+                    all_candidates = []
+                    for text in announcements:
+                        if len(text.split()) > 2:
+                            all_candidates.extend(parse_dispatch_announcement(text, UNITS_VOCABULARY))
+                            
+                    # Check for double rounds
+                    second_round_recorded = False
+                    second_round_matched = False
+                    
+                    if len(all_candidates) >= 2:
+                        second_round_recorded = True
+                        p1 = all_candidates[0]
+                        p2 = all_candidates[1]
+                        p1_addr = (p1.address or p1.intersection or "").lower()
+                        p2_addr = (p2.address or p2.intersection or "").lower()
+                        if p1_addr == p2_addr and p1_addr != "":
+                            second_round_matched = True
+                            
+                    # Geocode and run pipeline to post to live_calls
+                    dispatch_id = f"SIM-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
+                    
+                    db_payload, responding_units = process_and_post_payload(
+                        dispatch_id=dispatch_id,
+                        transcript=transcript,
+                        all_candidates=all_candidates,
+                        validator=validator,
+                        units_vocabulary=UNITS_VOCABULARY,
+                        verify_location_override=False,
+                        audio_url=audio_url,
+                        audio_duration=audio_duration
+                    )
+                    
+                    if not db_payload:
+                        raise ValueError("No valid address or intersection details could be geocoded from the transcript.")
+                        
+                    # Calculate transcript similarity score if verified transcript is provided
+                    accuracy = 100.0
+                    if verified_transcript:
+                        from thefuzz import fuzz
+                        clean_stt = " ".join(transcript.lower().split())
+                        clean_verified = " ".join(verified_transcript.lower().split())
+                        accuracy = float(fuzz.ratio(clean_stt, clean_verified))
+                        
+                    # Gather coordinates and details
+                    target_obj = db_payload.get("target") or {
+                        "address": db_payload.get("address") or address,
+                        "lat": lat,
+                        "lng": lng,
+                        "rings": rings
+                    }
+                    
+                    result_payload = {
+                        "dispatch_id": dispatch_id,
+                        "timestamp": db_payload.get("timestamp"),
+                        "incident_type": db_payload.get("incident_type"),
+                        "alarm_level": db_payload.get("alarm_level", 1),
+                        "responding_units": db_payload.get("responding_units", []),
+                        "target": target_obj,
+                        "address": target_obj.get("address"),
+                        "raw_transcript": transcript,
+                        "confidence_score": db_payload.get("confidence_score", 0.0),
+                        "verify_location": False,
+                        "radio_channel": next((d.radio_channel for d in all_candidates if d.radio_channel), None),
+                        "map_grid": next((d.map_grid for d in all_candidates if d.map_grid), None),
+                        "second_round_recorded": second_round_recorded,
+                        "second_round_matched": second_round_matched,
+                        "verified_transcript": verified_transcript,
+                        "transcript_accuracy": accuracy,
+                        "audio_url": audio_url,
+                        "audio_duration": audio_duration
+                    }
+                    
+                    # Update status to completed
+                    requests.patch(
+                        patch_endpoint,
+                        headers=headers,
+                        json={
+                            "status": "completed",
+                            "result": result_payload
+                        },
+                        timeout=10
+                    )
+                    logging.info(f"Simulation {req_id} completed. Posted Dispatch ID: {dispatch_id}")
+                    
+                finally:
+                    if os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except Exception:
+                            pass
+                            
+            except Exception as e:
+                logging.error(f"Error processing simulation request: {e}", exc_info=True)
+                requests.patch(
+                    patch_endpoint,
+                    headers=headers,
+                    json={
+                        "status": "failed",
+                        "error_message": str(e)
+                    },
+                    timeout=10
+                )
+    except Exception as e:
+        logging.error(f"Failed to poll simulation requests: {e}")
+
+def start_simulation_poller(validator, stt_model):
+    """Starts the simulation requests polling loop in a daemon background thread."""
+    import threading
+    
+    def poll_thread():
+        logging.info("Starting simulation requests poller thread...")
+        while True:
+            try:
+                poll_simulation_requests(validator, stt_model)
+            except Exception as e:
+                logging.error(f"Error in simulation poller thread: {e}")
+            time.sleep(5.0)
+            
+    t = threading.Thread(target=poll_thread, name="SimulationPoller", daemon=True)
+    t.start()
+
 def background_worker_loop(task_queue: multiprocessing.Queue):
     """
     Background worker loop. Run in a separate Process.
@@ -889,6 +1107,9 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
                 logging.info("standard whisper model pre-loaded successfully.")
         except Exception as e:
             logging.error(f"Failed to pre-load Whisper model: {e}. Will load on demand.", exc_info=True)
+
+    # Start simulation requests poller thread
+    start_simulation_poller(validator, stt_model)
 
     triggered_phase_1_ids = set()
     phase_1_trigger_lengths = {}

@@ -74,11 +74,11 @@ const getClosureTypeName = (bit) => {
     case 512: return "Lane(s) Closed";
     case 2048: return "Alternating Traffic";
     case 8192: return "One Direction Closed";
-    case 16384: return "Local Traffic Only";
+    case 16384: return "Road Closed - Local Traffic Only";
     case 32768:
-    case 65536: return "Emergency Access Only";
+    case 65536: return "Road Closed - Emergency Access Only";
     case 131072: return "Intermittent Blockage";
-    case 262144: return "No Emergency Access";
+    case 262144: return "Road Closed - No Emergency Access";
     default: return "";
   }
 };
@@ -624,9 +624,26 @@ export default function MapBoard() {
 
             // Headline, street and description
             const locationName = geom.MarkerInfo?.LocationName || "";
-            const streetName = issue.TableViewInfo?.Location || locationName || desc.BaseLocationDescription || "Local Road";
+            const streetName = locationName || issue.TableViewInfo?.Location || desc.BaseLocationDescription || "Local Road";
             
+            let categoryName = "Traffic Alert";
+            const iconClass = geom.MarkerInfo?.IconClass || issue.TableViewInfo?.IconClass || "";
+            if (iconClass.toLowerCase().includes("construction")) {
+              categoryName = "Construction";
+            } else if (iconClass.toLowerCase().includes("event")) {
+              categoryName = "Special Event";
+            } else if (iconClass.toLowerCase().includes("debris")) {
+              categoryName = "Caution";
+            } else if (iconClass.toLowerCase().includes("slippery")) {
+              categoryName = "Weather Alert";
+            }
+
             const closureTypeName = getClosureTypeName(highestBit);
+            let headlineText = desc.Headline || "";
+            if (!headlineText) {
+              headlineText = closureTypeName ? `${categoryName}: ${closureTypeName}` : categoryName;
+            }
+
             let descriptionText = desc.BaseDescription ? desc.BaseDescription.trim() : "";
             if (!descriptionText) {
               descriptionText = closureTypeName ? `Local activity/road work. Status: ${closureTypeName}.` : "Local construction or road activity.";
@@ -634,7 +651,7 @@ export default function MapBoard() {
 
             const item = {
               id: `${issue.IssueId}_${geomIdx}`,
-              headline: desc.Headline || closureTypeName || "ROAD WORK / CONSTRUCTION",
+              headline: headlineText,
               street: streetName,
               severity: severity,
               emergencyAccess: emergencyAccess,

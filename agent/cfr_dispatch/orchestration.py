@@ -906,12 +906,16 @@ def poll_simulation_requests(validator, stt_model):
             
             try:
                 # Download audio file
-                logging.info(f"Downloading simulation audio from: {audio_url}")
+                download_url = audio_url
+                if "/object/public/" in audio_url:
+                    download_url = audio_url.replace("/object/public/", "/object/authenticated/")
+                    
+                logging.info(f"Downloading simulation audio from: {download_url}")
                 audio_headers = {
                     "apikey": supabase_key,
                     "Authorization": f"Bearer {supabase_key}"
                 }
-                audio_response = requests.get(audio_url, headers=audio_headers, timeout=20)
+                audio_response = requests.get(download_url, headers=audio_headers, timeout=20)
                 audio_response.raise_for_status()
                 audio_bytes = audio_response.content
                 

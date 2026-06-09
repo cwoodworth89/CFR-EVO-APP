@@ -560,6 +560,22 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [simulationResult, setSimulationResult] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval = null;
+    if (simulating) {
+      setElapsedSeconds(0);
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [simulating]);
 
   const handleTrigger = async (e) => {
     e.preventDefault();
@@ -768,7 +784,16 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
               {/* Status & Submit */}
               <div className="border-t border-slate-850 pt-4 mt-2 flex flex-col gap-3">
                 {statusMsg && (
-                  <div className="flex flex-col items-center justify-center py-4 text-amber-400 gap-2">
+                  <div className="flex flex-col items-center justify-center py-4 text-amber-400 gap-2 w-full">
+                    <style>{`
+                      @keyframes shimmer {
+                        0% { transform: translateX(-100%); }
+                        100% { transform: translateX(100%); }
+                      }
+                      .animate-shimmer {
+                        animation: shimmer 1.5s infinite linear;
+                      }
+                    `}</style>
                     <span className="flex h-3 w-3 relative">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
@@ -776,6 +801,28 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     <span className="text-[10px] font-bold font-mono tracking-widest uppercase mt-1 animate-pulse">
                       ⚙️ {statusMsg}
                     </span>
+                    
+                    {/* Time Elapsed & Progress Bar */}
+                    <div className="text-[9px] text-slate-500 font-mono mt-1">
+                      ⏱️ ELAPSED TIME: <span className="text-amber-400 font-bold">{elapsedSeconds}s</span>
+                    </div>
+                    
+                    <div className="w-full max-w-md bg-slate-950 border border-slate-800/80 rounded-full h-3 overflow-hidden p-0.5 relative mt-1.5 shadow-inner">
+                      <div 
+                        className="h-full bg-gradient-to-r from-amber-500 via-sky-500 to-indigo-500 rounded-full transition-all duration-300 relative overflow-hidden"
+                        style={{
+                          width: `${Math.min(100, (elapsedSeconds / 30) * 100)}%`
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ width: '200%' }} />
+                      </div>
+                    </div>
+                    
+                    {elapsedSeconds > 15 && statusMsg.includes("Waiting") && (
+                      <p className="text-[9px] text-rose-450 font-bold font-mono mt-2 animate-pulse text-center max-w-sm leading-relaxed bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg">
+                        ⚠️ AGENT DELAY: Make sure the Python agent is running ('python main.py' in agent folder) to process the request.
+                      </p>
+                    )}
                   </div>
                 )}
                 

@@ -44,6 +44,13 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [dbStatus, setDbStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
   const [dbError, setDbError] = useState(null);
 
+  // Supabase Auth session states
+  const [session, setSession] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
+
   // Form states for ground truth corrections
   const [verifiedTranscript, setVerifiedTranscript] = useState('');
   const [verifiedAddress, setVerifiedAddress] = useState('');
@@ -77,6 +84,30 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   };
 
   useEffect(() => {
+    // 1. Get initial session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Fetch calls & subscribe to realtime updates reactively based on session
+  useEffect(() => {
+    if (!session) {
+      setCalls([]);
+      setSelectedCall(null);
+      setLoading(false);
+      return;
+    }
+
     fetchCalls();
 
     // Subscribe to realtime updates
@@ -109,7 +140,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [session]);
 
   const [audioSignedUrl, setAudioSignedUrl] = useState(null);
 
@@ -224,10 +255,102 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
   };
 
-  const getAudioUrl = (url) => {
-    if (!url) return null;
-    return url;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      });
+      if (error) throw error;
+      setSession(data.session);
+    } catch (err) {
+      console.error('Login error:', err);
+      setLoginError(err.message || String(err));
+    } finally {
+      setLoginLoading(false);
+    }
   };
+
+  if (!session) {
+    return (
+      <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex items-center justify-center p-6 text-slate-100 font-sans animate-in fade-in duration-200">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-left border-sky-500/20">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-black text-sky-455 uppercase tracking-wider flex items-center gap-1.5">
+              🛡️ ADMIN DASHBOARD LOGIN
+            </h3>
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="text-slate-400 hover:text-white text-xs font-bold font-mono cursor-pointer transition-colors"
+            >
+              ✕ CANCEL
+            </button>
+          </div>
+          
+          <p className="text-[11px] text-slate-400 leading-relaxed font-mono">
+            This dashboard displays sensitive live dispatch data. Please enter your administrator credentials to access.
+          </p>
+
+          {loginError && (
+            <div className="bg-rose-500/15 text-rose-400 border border-rose-500/20 rounded-xl p-3 text-xs font-mono font-bold animate-in shake duration-150">
+              Error: {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="flex flex-col gap-4 mt-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-slate-405 font-extrabold uppercase font-mono tracking-wider">
+                Admin Email Address
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loginLoading}
+                className="w-full bg-slate-955 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-650"
+                placeholder="admin@cfr-dispatch.com"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-slate-405 font-extrabold uppercase font-mono tracking-wider">
+                Security Password
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loginLoading}
+                className="w-full bg-slate-955 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-650"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="mt-2 bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-3 px-6 rounded-xl w-full shadow-lg transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {loginLoading ? (
+                <>
+                  <span className="animate-spin border-2 border-black border-t-transparent h-4 w-4 rounded-full"></span>
+                  LOGGING IN...
+                </>
+              ) : (
+                'LOG IN'
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200">
@@ -266,6 +389,15 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             className="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer shadow-md flex items-center gap-1 border border-amber-600"
           >
             ⚡ SIMULATE DISPATCH
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+            }}
+            className="bg-rose-950/45 border border-rose-900/40 hover:border-rose-500 hover:text-white text-rose-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
+          >
+            🚪 LOG OUT
           </button>
           <button
             type="button"

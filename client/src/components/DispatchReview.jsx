@@ -239,6 +239,27 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     }
   };
 
+  const handleDeleteCall = async (id, dispatchId) => {
+    if (!window.confirm(`Are you sure you want to permanently delete dispatch ${dispatchId}?`)) {
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('live_calls')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setCalls((prev) => prev.filter((c) => c.id !== id));
+      if (selectedCall?.id === id) {
+        setSelectedCall(null);
+      }
+    } catch (err) {
+      console.error('Error deleting dispatch:', err);
+      alert('Failed to delete dispatch.');
+    }
+  };
+
   // Filtered calls list based on search query
   const filteredCalls = calls.filter((c) => {
     const query = searchQuery.toLowerCase();
@@ -279,7 +300,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex items-center justify-center p-6 text-slate-100 font-sans animate-in fade-in duration-200">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-left border-sky-500/20">
           <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-black text-sky-455 uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-sm font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
               🛡️ ADMIN DASHBOARD LOGIN
             </h3>
             <button 
@@ -303,7 +324,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
 
           <form onSubmit={handleLogin} className="flex flex-col gap-4 mt-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] text-slate-405 font-extrabold uppercase font-mono tracking-wider">
+              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
                 Admin Email Address
               </label>
               <input
@@ -312,13 +333,13 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loginLoading}
-                className="w-full bg-slate-955 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-650"
+                className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-500"
                 placeholder="admin@cfr-dispatch.com"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] text-slate-405 font-extrabold uppercase font-mono tracking-wider">
+              <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
                 Security Password
               </label>
               <input
@@ -327,7 +348,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loginLoading}
-                className="w-full bg-slate-955 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-650"
+                className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-500"
                 placeholder="••••••••"
               />
             </div>
@@ -367,13 +388,13 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             )}
             {dbStatus === 'checking' && (
               <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-450 animate-ping"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping"></span>
                 Checking DB...
               </span>
             )}
             {dbStatus === 'disconnected' && (
               <span className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300" title={dbError || ''}>
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-550"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
                 DB Error
               </span>
             )}
@@ -465,13 +486,12 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono bg-slate-950/40 sticky top-0 backdrop-blur-sm">
-                      <th className="py-2.5 px-3">Dispatch ID</th>
-                      <th className="py-2.5 px-3">Recorded</th>
-                      <th className="py-2.5 px-3">Audio</th>
-                      <th className="py-2.5 px-3">System Prefills</th>
-                      <th className="py-2.5 px-3">Raw Transcript</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
+                      <th className="py-2.5 px-3 w-[15%]">Dispatch ID</th>
+                      <th className="py-2.5 px-3 w-[10%]">Recorded</th>
+                      <th className="py-2.5 px-3 w-[12%]">Audio</th>
+                      <th className="py-2.5 px-3 w-[35%]">System Prefills</th>
+                      <th className="py-2.5 px-3 w-[15%]">Status</th>
+                      <th className="py-2.5 px-3 text-right w-[13%]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -485,10 +505,10 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                             isSelected ? 'bg-slate-800/70 border-sky-500/40 shadow-sm' : ''
                           }`}
                         >
-                          <td className="py-3 px-3 font-mono font-bold">
-                            <div className="text-sky-400">{call.dispatch_id}</div>
-                            <div className="text-[9px] text-slate-500 font-normal mt-0.5">
-                              {formatTimestampPT(call.timestamp)}
+                          <td className="py-3 px-3 font-mono">
+                            <div className="text-slate-200 font-bold">{formatTimestampPT(call.timestamp)}</div>
+                            <div className="text-[9.5px] text-sky-400 font-medium mt-0.5">
+                              ID: {call.dispatch_id}
                             </div>
                           </td>
                           <td className="py-3 px-3 font-mono font-bold text-slate-300">
@@ -503,7 +523,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               <span className="text-[10px] text-slate-500 italic">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-3 max-w-[15rem] truncate text-slate-350">
+                          <td className="py-3 px-3 max-w-[15rem] truncate text-slate-300">
                             <div className="font-extrabold text-white text-[11px] truncate">
                               {call.incident_type}
                             </div>
@@ -514,33 +534,53 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                                Units: {call.responding_units?.join(', ') || 'None'}
                              </div>
                           </td>
-                          <td className="py-3 px-3 max-w-[12rem] truncate text-slate-400 italic" title={call.raw_transcript}>
-                            "{call.raw_transcript || 'No transcript text'}"
-                          </td>
                           <td className="py-3 px-3">
-                            {call.feedback_submitted ? (
-                              <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 tracking-wider">
-                                ✓ REVIEWED
-                              </span>
-                            ) : call.verify_location ? (
-                              <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/20 tracking-wider animate-pulse">
-                                ⚠️ VERIFY
-                              </span>
-                            ) : (
-                              <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-750 tracking-wider">
-                                PENDING
-                              </span>
-                            )}
+                            <div className="flex flex-col gap-1 items-start">
+                              {call.feedback_submitted ? (
+                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 tracking-wider">
+                                  ✓ VERIFIED
+                                </span>
+                              ) : (
+                                <>
+                                  {(call.raw_transcript === "[Transcription Failed]" || !call.raw_transcript) ? (
+                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/20 tracking-wider animate-pulse">
+                                      ❌ STT FAIL
+                                    </span>
+                                  ) : call.verify_location ? (
+                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/20 tracking-wider">
+                                      ⚠️ MAP FAIL
+                                    </span>
+                                  ) : (
+                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-750 tracking-wider">
+                                      PENDING
+                                    </span>
+                                  )}
+                                  {call.verified_transcript && (
+                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/20 tracking-wider">
+                                      ✓ TRUTH UPLOADED
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                              {call.confidence_score !== undefined && call.confidence_score !== null && (
+                                <span className={`text-[9.5px] font-mono font-bold mt-0.5 ${
+                                  call.confidence_score >= 80 ? 'text-emerald-400' :
+                                  call.confidence_score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                                }`} title="STT & geocoding match confidence score">
+                                  Score: {Math.round(call.confidence_score)}%
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1.5 justify-end">
+                            <div className="flex gap-1.5 justify-end items-center">
                               {call.target?.lat && call.target?.lng && (
                                 <button
                                   onClick={() => {
                                     onLocateAddress(call);
                                     onClose();
                                   }}
-                                  className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-500/50 transition-all flex items-center gap-0.5 cursor-pointer shadow"
+                                  className="bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-600/30 transition-all flex items-center gap-0.5 cursor-pointer shadow"
                                   title="Display Route & Hydrants on Map"
                                 >
                                   🗺️ MAP
@@ -548,9 +588,16 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               )}
                               <button
                                 onClick={() => handleSelectCall(call)}
-                                className="bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold px-2 py-1 rounded text-[10px] border border-slate-700 transition-all cursor-pointer"
+                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded text-[10px] border border-slate-700 transition-all cursor-pointer"
                               >
                                 EDIT
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCall(call.id, call.dispatch_id)}
+                                className="bg-rose-950/30 hover:bg-rose-900/20 text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded text-[10px] border border-rose-900/20 transition-all cursor-pointer flex items-center justify-center"
+                                title="Delete dispatch entry"
+                              >
+                                🗑️
                               </button>
                             </div>
                           </td>
@@ -581,9 +628,15 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   <h3 className="font-black text-white text-sm uppercase tracking-wide">
                     Review: {selectedCall.dispatch_id}
                   </h3>
-                  <p className="text-[10px] text-slate-450 font-mono mt-0.5">
-                    Original Score: {selectedCall.confidence_score}%
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] text-slate-400 font-mono">Confidence:</span>
+                    <span className={`text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                      selectedCall.confidence_score >= 80 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                      selectedCall.confidence_score >= 40 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                    }`}>
+                      {selectedCall.confidence_score !== undefined && selectedCall.confidence_score !== null ? `${Math.round(selectedCall.confidence_score)}%` : 'N/A'}
+                    </span>
+                  </div>
                 </div>
                 {selectedCall.target?.lat && selectedCall.target?.lng && (
                   <button

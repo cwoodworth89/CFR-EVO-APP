@@ -92,6 +92,7 @@ def sanitize_transcript(text: str) -> str:
         r'\bpresidents?\b': 'crescent',
         r'\bpresents?\b': 'crescent',
         r'\bpresence?\b': 'crescent',
+        r'\btreat\b': 'street',
         
         # Specific major streets / locations
         r'\bsharp\s+treat\b': 'sharpe street',

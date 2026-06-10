@@ -293,7 +293,7 @@ def google_geocode_fallback(address: str, api_key: str) -> tuple[dict | None, st
         return None, None
 
 
-def process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None):
+def process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None, verified_transcript=None):
     """Common logic for geocoding, preparing DB payload, and posting to Supabase/NTFY."""
     try:
         unique_addresses = []
@@ -320,8 +320,9 @@ def process_and_post_payload(dispatch_id, transcript, all_candidates, validator,
                 logging.warning("No address or intersection parsed, but dispatch details found. Using 'Unknown Location' fallback.")
                 unique_addresses = ["Unknown Location"]
             else:
-                logging.error("Could not parse any address or intersection from transcript, and no dispatch details found. Aborting.")
-                return None, []
+                logging.warning("Could not parse any address or intersection from transcript, and no dispatch details found. Storing as fallback to allow manual review.")
+                unique_addresses = ["Unknown Location"]
+                verify_location_override = True
             
         # 5. Geocode Local-First (100% Offline)
         local_geocode_result = None
@@ -445,6 +446,8 @@ def process_and_post_payload(dispatch_id, transcript, all_candidates, validator,
             db_payload["audio_url"] = audio_url
         if audio_duration is not None:
             db_payload["audio_duration"] = audio_duration
+        if verified_transcript is not None:
+            db_payload["verified_transcript"] = verified_transcript
         
         if INTEGRATION_PAYLOAD_OPTION == 1:
             db_payload["address"] = best_address
@@ -564,8 +567,8 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
             raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
             
         if not raw_transcript:
-            logging.error("Transcription failed.")
-            return
+            logging.warning("Transcription failed. Storing empty placeholder to allow manual review.")
+            raw_transcript = "[Transcription Failed]"
             
         transcript = sanitize_transcript(raw_transcript)
         
@@ -748,8 +751,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
             
         if not raw_transcript:
-            logging.warning("Phase 2 transcription failed.")
-            raw_transcript = ""
+            logging.warning("Phase 2 transcription failed. Storing empty placeholder to allow manual review.")
+            raw_transcript = "[Transcription Failed]"
             
         transcript = sanitize_transcript(raw_transcript)
         logging.info(f"Phase 2 Sanitized Transcript: '{transcript}'")
@@ -1018,7 +1021,8 @@ def poll_simulation_requests(validator, stt_model):
                         units_vocabulary=UNITS_VOCABULARY,
                         verify_location_override=False,
                         audio_url=audio_url,
-                        audio_duration=audio_duration
+                        audio_duration=audio_duration,
+                        verified_transcript=verified_transcript
                     )
                     
                     if not db_payload:

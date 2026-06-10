@@ -190,5 +190,12 @@ temp_dispatch_full.wav
 agent/*.json
 agent/test_calls/
 *.json.key
-agent/audio_files/recordings/
+agent/audio_files/
 agent/client/public/recordings/
+
+# Block all audio files from Git globally
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.m4a

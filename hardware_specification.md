@@ -38,6 +38,14 @@ This phase focuses on capturing dispatch audio via a microphone or line-in feed 
 | **Phase 1 Microphone (Trial)** | Discrete, plug-and-play USB microphone. Avoids analog noise/ground loop hum on the Pi's GPIO pins. | Kinobo USB Mini Microphone or PoP Voice USB Lavalier | $10 - $15 |
 | **Line-In Interface (Permanent)** | High-quality, low-noise USB sound card with dedicated RCA Line-In (prevents clipping from line-level signals). | Behringer U-Control UCA202 or UCA222 | $30 |
 
+> [!IMPORTANT]
+> **Audio Privacy & Passive Monitoring**:
+> The microphone or line-in feed operates on a local, passive listening loop and **does not capture or record ambient room conversations**. Much like wake-word activation on Alexa, Siri, or Gemini, the audio agent runs entirely offline in memory, listening only for the specific dispatch sequential alert tones.
+> * No audio is recorded or transmitted during normal standby.
+> * Recording and transcription trigger only after a valid alert tone sequence is matched.
+> * Only structured call details (incident type, address, dispatched units, channels) are parsed and recorded.
+> For more details, see [docs/privacy.md](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/docs/privacy.md).
+
 ### Phase 2: Touchscreen Kiosk Display (Estimated Cost: +~$120 - $150 USD)
 This phase adds a medium-sized wall-mountable touch screen and runs both the React web client and Python agent on the same Pi.
 

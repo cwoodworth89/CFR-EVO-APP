@@ -1354,7 +1354,7 @@ export default function MapBoard() {
 
           {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
           <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
-            CFR EVO APP | BUILD: {buildTime}
+            CFR EVO APP | BUILD: {buildTime} | LICENSE: POLYFORM NONCOMMERCIAL 1.0.0
           </div>
         </div>
 

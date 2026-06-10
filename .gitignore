@@ -181,7 +181,8 @@ cython_debug/
 .cursorindexingignore
 
 # Custom CFR Dispatch Mapping Ignores
-data/
+agent/data/Property_Information/
+agent/data/Emergency_Response_Zones/
 scratch/
 temp_dispatch_*.wav
 temp_dispatch_full.wav

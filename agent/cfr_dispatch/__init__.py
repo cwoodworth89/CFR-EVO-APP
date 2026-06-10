@@ -36,3 +36,6 @@ def _load_env():
                     os.environ[key] = value
 
 _load_env()
+
+# Suppress Hugging Face cache symlink warnings on Windows
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"

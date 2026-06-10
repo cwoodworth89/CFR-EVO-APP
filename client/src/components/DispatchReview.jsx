@@ -12,7 +12,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedAddress, setVerifiedAddress] = useState('');
   const [verifiedIncident, setVerifiedIncident] = useState('');
   const [verifiedUnits, setVerifiedUnits] = useState('');
-  const [verifiedAlarm, setVerifiedAlarm] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showSimulator, setShowSimulator] = useState(false);
@@ -82,7 +81,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       const units = selectedCall.verified_units || selectedCall.responding_units || [];
       setVerifiedUnits(units.join(', '));
       
-      setVerifiedAlarm(selectedCall.verified_alarm || selectedCall.alarm_level || 1);
       setSuccessMsg('');
       
       // Securely fetch signed URL for private audio bucket
@@ -151,7 +149,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
           verified_address: verifiedAddress,
           verified_incident: verifiedIncident,
           verified_units: unitsArray,
-          verified_alarm: parseInt(verifiedAlarm),
+          verified_alarm: 1,
           feedback_submitted: true,
           // Clear verify location warning upon verification
           verify_location: false
@@ -300,9 +298,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                             <div className="text-[10px] truncate mt-0.5">
                               📍 {call.target?.address || call.address || 'Unknown Address'}
                             </div>
-                            <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-                              Alarm: {call.alarm_level} | Units: {call.responding_units?.join(', ') || 'None'}
-                            </div>
+                             <div className="text-[9px] text-slate-500 font-mono mt-0.5">
+                               Units: {call.responding_units?.join(', ') || 'None'}
+                             </div>
                           </td>
                           <td className="py-3 px-3 max-w-[12rem] truncate text-slate-400 italic" title={call.raw_transcript}>
                             "{call.raw_transcript || 'No transcript text'}"
@@ -477,45 +475,23 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   />
                 </div>
 
-                {/* Alarm Level & Responding Units */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                        Verified Alarm
-                      </label>
-                      <span className="text-[8px] text-slate-500 font-bold">
-                        Sys: {selectedCall.alarm_level || 1}
-                      </span>
-                    </div>
-                    <select
-                      value={verifiedAlarm}
-                      onChange={(e) => setVerifiedAlarm(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
-                    >
-                      <option value={1}>1st Alarm</option>
-                      <option value={2}>2nd Alarm</option>
-                      <option value={3}>3rd Alarm</option>
-                    </select>
+                {/* Responding Units */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                      Verified Units
+                    </label>
+                    <span className="text-[8px] text-slate-500 font-bold truncate max-w-[150px]" title={selectedCall.responding_units?.join(', ')}>
+                      Sys: {selectedCall.responding_units?.join(', ') || 'None'}
+                    </span>
                   </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                        Verified Units
-                      </label>
-                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[80px]" title={selectedCall.responding_units?.join(', ')}>
-                        Sys: {selectedCall.responding_units?.join(', ') || 'None'}
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      value={verifiedUnits}
-                      onChange={(e) => setVerifiedUnits(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                      placeholder="e.g. E1, L1"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={verifiedUnits}
+                    onChange={(e) => setVerifiedUnits(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
+                    placeholder="e.g. E1, L1"
+                  />
                 </div>
               </div>
 
@@ -562,6 +538,9 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
   const [simulationResult, setSimulationResult] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  const pollIntervalRef = React.useRef(null);
+  const channelRef = React.useRef(null);
+
   useEffect(() => {
     let interval = null;
     if (simulating) {
@@ -577,12 +556,47 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
     };
   }, [simulating]);
 
+  // Clean up refs on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, []);
+
+  const handleCancel = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    setSimulating(false);
+    setStatusMsg("");
+    setErrorMsg("Simulation cancelled by user.");
+  };
+
+  const handleClose = () => {
+    handleCancel();
+    onClose();
+  };
+
   const handleTrigger = async (e) => {
     e.preventDefault();
     if (!audioFile) {
       alert("Please upload a .wav or .mp3 audio file to run the simulation.");
       return;
     }
+
+    // Clear previous refs if any exist
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     setSimulating(true);
     setErrorMsg('');
@@ -645,16 +659,27 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
               setSimulationResult(updated.result);
               setSimulating(false);
               setStatusMsg("");
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
               supabase.removeChannel(channel);
+              channelRef.current = null;
             } else if (updated.status === 'failed') {
               setErrorMsg(updated.error_message || "Simulation failed in the backend pipeline.");
               setSimulating(false);
               setStatusMsg("");
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
               supabase.removeChannel(channel);
+              channelRef.current = null;
             }
           }
         )
         .subscribe();
+      channelRef.current = channel;
 
       // Fallback polling in case realtime websocket fails or has delay
       const pollInterval = setInterval(async () => {
@@ -668,16 +693,24 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
           if (!pollError && pollData) {
             if (pollData.status === 'completed') {
               clearInterval(pollInterval);
+              pollIntervalRef.current = null;
               setSimulationResult(pollData.result);
               setSimulating(false);
               setStatusMsg("");
-              supabase.removeChannel(channel);
+              if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
             } else if (pollData.status === 'failed') {
               clearInterval(pollInterval);
+              pollIntervalRef.current = null;
               setErrorMsg(pollData.error_message || "Simulation failed in the backend pipeline.");
               setSimulating(false);
               setStatusMsg("");
-              supabase.removeChannel(channel);
+              if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
             } else if (pollData.status === 'processing') {
               setStatusMsg("Speech-to-Text & geocoding in progress...");
             }
@@ -686,12 +719,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
           console.warn("Polling error:", err);
         }
       }, 3000);
-
-      // Clean up interval on component unmount
-      return () => {
-        clearInterval(pollInterval);
-        supabase.removeChannel(channel);
-      };
+      pollIntervalRef.current = pollInterval;
 
     } catch (err) {
       console.error("Simulation request failed:", err);
@@ -718,9 +746,8 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
           </h3>
           <button 
             type="button"
-            onClick={onClose} 
-            disabled={simulating}
-            className="text-slate-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+            onClick={handleClose} 
+            className="text-slate-400 hover:text-white text-xs font-bold font-mono cursor-pointer transition-colors"
           >
             ✕ CLOSE
           </button>
@@ -823,6 +850,14 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                         ⚠️ AGENT DELAY: Make sure the Python agent is running ('python main.py' in agent folder) to process the request.
                       </p>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="mt-2.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-350 border border-rose-500/20 hover:border-rose-500/30 font-black py-2 px-5 rounded-xl text-[10px] transition-all cursor-pointer font-mono uppercase tracking-wider"
+                    >
+                      ✕ Cancel & Reset Simulation
+                    </button>
                   </div>
                 )}
                 
@@ -879,8 +914,10 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                       <div className="text-slate-200 font-bold mt-0.5">{simulationResult.incident_type}</div>
                     </div>
                     <div>
-                      <div className="text-[9px] text-slate-500 uppercase font-black">Alarm Level</div>
-                      <div className="text-slate-200 font-bold mt-0.5">{simulationResult.alarm_level} Alarm</div>
+                      <div className="text-[9px] text-slate-500 uppercase font-black">Uploaded File</div>
+                      <div className="text-slate-200 font-bold mt-0.5 truncate max-w-[180px]" title={audioFile?.name || 'N/A'}>
+                        {audioFile?.name || 'N/A'}
+                      </div>
                     </div>
                     <div className="col-span-2">
                       <div className="text-[9px] text-slate-500 uppercase font-black">Responding Units</div>

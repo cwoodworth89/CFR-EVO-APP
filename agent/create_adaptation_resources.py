@@ -16,15 +16,14 @@ GCP_PROJECT_ID = 'cfr-dispatch-mapping'
 # NOTE: The main script assumes your street files are in a 'data' subdirectory.
 RESOURCES = [
     # Core Location & Dispatch Vocabularies
-    {"id": "coquitlam-street-names-1", "file": "data/coquitlam_streets_1.txt"},
-    {"id": "coquitlam-street-names-2", "file": "data/coquitlam_streets_2.txt"},
-    {"id": "map-grid-numbers", "file": "data/map_grid_numbers.txt"},
+    {"id": "coquitlam-street-names-1", "file": "data/vocabulary/coquitlam_streets.txt"},
+    {"id": "map-grid-numbers", "file": "data/vocabulary/map_grid_numbers.txt"},
     
     # Custom Vocabularies
-    {"id": "cfr-units", "file": "units_vocabulary.txt"},
-    {"id": "cfr-call-types", "file": "call_types.txt"},
-    {"id": "cfr-radio-channels", "file": "radio_channels.txt"},
-    {"id": "cfr-keywords", "file": "keywords.txt"},
+    {"id": "cfr-units", "file": "data/vocabulary/units_vocabulary.txt"},
+    {"id": "cfr-call-types", "file": "data/vocabulary/call_types.txt"},
+    {"id": "cfr-radio-channels", "file": "data/vocabulary/radio_channels.txt"},
+    {"id": "cfr-keywords", "file": "data/vocabulary/keywords.txt"},
 ]
 
 def create_resources():

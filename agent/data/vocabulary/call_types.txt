@@ -1,0 +1,61 @@
+# --- Alarms ---
+Alarm Activated - High Risk
+Alarm Activated
+Alarms Activated - High Risk
+Alarms Activated
+
+# --- Fire ---
+Structure Fire - High Risk
+Structure Fire
+Vehicle Fire - Large Vehicle
+Vehicle Fire
+Wildland Fire - Smouldering
+Wildland Fire - Small Area
+Wildland Fire
+Rubbish Fire
+
+# --- Gas / Hydro ---
+Gas Leak
+Wires Down
+
+# --- Hazmat ---
+Hazmat 1
+Hazmat 2
+Hazmat 3
+
+# --- Medical ---
+Medical Aid - Cardiac Arrest
+Medical Aid - Cardiac Problems
+Medical Aid - Chest Pain
+Medical Aid - Collapse
+Medical Aid - Difficulty Breathing
+Medical Aid - Fall
+Medical Aid - Maternity
+Medical Aid - Overdose
+Medical Aid - Traumatic Injuries
+Medical Aid - Assist
+Medical Aid
+
+# --- Motor Vehicle Incidents ---
+Motor Vehicle Incident - Large Vehicle
+Motor Vehicle Incident - Rollover
+Motor Vehicle Incident - Skytrain
+Motor Vehicle Incident - High Velocity Impact
+Motor Vehicle Incident - Pedestrian Struck
+Motor Vehicle Incident - Cyclist Struck
+Motor Vehicle Incident
+Vehicle Rollover
+
+# --- Public Service ---
+Public Assist
+Lift Assist
+
+# --- Rescue ---
+Confined Space Rescue
+Rope Rescue
+Swift Water Rescue
+Technical Rescue
+
+# --- Smoke Reports ---
+Report of Smoke - Indoors
+Report of Smoke

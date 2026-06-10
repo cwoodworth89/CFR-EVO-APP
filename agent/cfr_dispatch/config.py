@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 # -- Integration Settings --
-STT_ENGINE = os.environ.get("STT_ENGINE", "whisper")  # Options: "google", "whisper"
-WHISPER_MODEL = "base"                # Options: "tiny", "base", "small"
+STT_ENGINE = os.environ.get("STT_ENGINE", "google")  # Options: "google", "whisper"
+WHISPER_MODEL = "medium"                # Options: "tiny", "base", "small", "medium"
 INTEGRATION_PAYLOAD_OPTION = 2        # 1: Lightweight address, 2: Fully geocoded parcel rings
 ENABLE_GOOGLE_MAPS_FALLBACK = False   # Keep offline-first by disabling fallback
 ENABLE_NTFY_PUSH = True               # Free Tasker push notifications
@@ -48,19 +48,37 @@ ADDRESS_STREET_TYPE_COLUMN = 'STREETTYPE'
 ZONES_MAP_NAME_COLUMN = 'MAP_NAME'
 STREET_NAME_CONFIDENCE_THRESHOLD = 80
 
-# -- Vocabularies & Parsing --
-UNITS_VOCABULARY = [
-    "Car",
-    "Engine",
-    "Hazmat",
-    "Hazmat Tender",
-    "Ladder",
-    "Light Attack Vehicle",
-    "Medic",
-    "Quint",
-    "Rescue",
-    "Squad",
-    "Tender"
+import re
+
+# Helper function to load vocabulary files relative to this package
+def load_vocabulary_file(filename: str) -> list[str]:
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    agent_dir = os.path.dirname(package_dir)
+    filepath = os.path.join(agent_dir, "data", "vocabulary", filename)
+    items = []
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    items.append(line)
+    return items
+
+# Dynamic Vocabulary Loading
+UNITS_VOCAB_RAW = load_vocabulary_file("units_vocabulary.txt")
+RESPONSE_TYPES = load_vocabulary_file("response_types.txt")
+RADIO_CHANNELS = load_vocabulary_file("radio_channels.txt")
+MAP_GRIDS = load_vocabulary_file("map_grid_numbers.txt")
+CALL_TYPES = sorted(load_vocabulary_file("call_types.txt"), key=len, reverse=True)
+
+# Extract base unit types dynamically from units_vocabulary.txt (e.g. "Engine 1" -> "Engine")
+_types_set = set()
+for _unit in UNITS_VOCAB_RAW:
+    _match = re.match(r'^([a-zA-Z\s]+?)\s*\d*$', _unit)
+    if _match:
+        _types_set.add(_match.group(1).strip())
+UNITS_VOCABULARY = sorted(list(_types_set)) if _types_set else [
+    "Car", "Engine", "Hazmat", "Hazmat Tender", "Ladder", "Light Attack Vehicle", "Medic", "Quint", "Rescue", "Squad", "Tender"
 ]
 
 UNIT_PARSING_IGNORE_LIST = UNITS_VOCABULARY + [

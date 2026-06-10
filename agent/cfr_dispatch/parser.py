@@ -11,7 +11,13 @@ from thefuzz import fuzz
 from cfr_dispatch.config import (
     DispatchData,
     UNIT_PARSING_IGNORE_LIST,
-    INVALID_NEXT_WORDS
+    INVALID_NEXT_WORDS,
+    CALL_TYPES,
+    RESPONSE_TYPES,
+    RADIO_CHANNELS,
+    MAP_GRIDS,
+    UNITS_VOCAB_RAW,
+    UNITS_VOCABULARY
 )
 
 def sanitize_transcript(text: str) -> str:
@@ -36,18 +42,23 @@ def sanitize_transcript(text: str) -> str:
         r'\bkirk\s+whitman\b': 'coquitlam',
         r'\bquickly\b': 'coquitlam',
         r'\bcopeland\b': 'coquitlam',
+        r'\bpoit\s*loma\b': 'coquitlam',
+        r'\bpoint\s+loma\b': 'coquitlam',
+        r'\bhope\s+that\s+1\b': 'coquitlam',
+        r'\bhope\s+that\s+one\b': 'coquitlam',
+        r'\bpopoetal\b': 'coquitlam',
         r'\bhoquiam\b': 'coquitlam',
         r'\bcrazy\s+an\b': 'coquitlam',
         r'\bcoquit\s*loom\b': 'coquitlam',
-        r'\bpoit\s*loma\b': 'coquitlam',
-        r'\bpoint\s+loma\b': 'coquitlam',
         
         # Respond & Priority
         r'\brespawns?\b': 'respond',
         r'\bresponses?\b': 'respond',
         r'\bresign\b': 'respond',
+        r'\breson\b': 'respond',
         r'\bwe\s+found\b': 'respond',
         r'\bregency\b': 'emergency',
+        r'\bmedley\b': 'medical aid',
         r'\bvan\s+ruitens?\b': 'routine',
         
         # Cross streets and roads
@@ -60,6 +71,7 @@ def sanitize_transcript(text: str) -> str:
         # Talk Group (channel)
         r'\buse\s+tax\b': 'use talk group',
         r'\buse\s+tack\b': 'use talk group',
+        r'\buse\s+tag\b': 'use talk group',
         r'\bnews\s+tack\b': 'use talk group',
         r'\bmens\s+table\b': 'use talk group',
         r'\btalk\s*groups?\b': 'talk group',
@@ -76,6 +88,9 @@ def sanitize_transcript(text: str) -> str:
         r'\bpresence?\b': 'crescent',
         
         # Specific major streets / locations
+        r'\bsharp\s+treat\b': 'sharpe street',
+        r'\bwig\s+on\s+throught\b': 'wigham drive',
+        r'\bburden\s+cart\b': 'burton court',
         r'\bbroke\s+mirror\b': 'brookmere',
         r'\bdo\s+we\s+need\s+from\s+growing\b': 'dewdney trunk road',
         r'\bdo\s+we\s+need\s+from\s+bro\b': 'dewdney trunk road',
@@ -107,18 +122,31 @@ def sanitize_transcript(text: str) -> str:
 
 def load_call_types(filepath="call_types.txt") -> List[str]:
     """Loads and returns sorted call types list from a text file, longest first."""
+    if filepath == "call_types.txt":
+        try:
+            from cfr_dispatch.config import CALL_TYPES as cfg_call_types
+            if cfg_call_types:
+                return cfg_call_types
+        except ImportError:
+            pass
+
     call_types = []
     
     # Resolve default filepath relative to the parent directory of this module (agent/)
     if filepath == "call_types.txt":
         package_dir = os.path.dirname(os.path.abspath(__file__))
-        resolved_path = os.path.join(os.path.dirname(package_dir), "call_types.txt")
+        agent_dir = os.path.dirname(package_dir)
+        resolved_path = os.path.join(agent_dir, "data", "vocabulary", "call_types.txt")
         if os.path.exists(resolved_path):
             filepath = resolved_path
+        else:
+            resolved_path = os.path.join(agent_dir, "call_types.txt")
+            if os.path.exists(resolved_path):
+                filepath = resolved_path
 
     if os.path.exists(filepath):
         try:
-            with open(filepath, 'r') as f:
+            with open(filepath, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith('#'):
@@ -135,9 +163,13 @@ CALL_TYPES = load_call_types()
 
 def match_incident_type(transcript: str, call_types: List[str]) -> str:
     """Matches transcript text to incident/call types using exact substring or fuzzy matching."""
-    # 1. Look for exact substring matches
+    # Normalize transcript by removing hyphens and double spaces for clean matching
+    norm_transcript = re.sub(r'\s*-\s*', ' ', transcript.lower())
+    
+    # 1. Look for exact substring matches (normalizing the call type too)
     for ct in call_types:
-        if ct.lower() in transcript:
+        norm_ct = re.sub(r'\s*-\s*', ' ', ct.lower())
+        if norm_ct in norm_transcript:
             return ct
             
     # 2. Look for best fuzzy match
@@ -163,27 +195,62 @@ def parse_alarm_level(transcript: str) -> int:
             pass
     return 1
 
+def get_unit_abbreviation(unit_type: str) -> str:
+    """Returns the abbreviation code for a given unit type (e.g., engine -> E)."""
+    mapping = {
+        "engine": "E",
+        "ladder": "L",
+        "rescue": "R",
+        "car": "C",
+        "squad": "S",
+        "medic": "M",
+        "quint": "Q",
+        "tender": "T",
+        "hazmat": "H",
+        "hazmat tender": "HT",
+        "light attack vehicle": "LAV"
+    }
+    ut_lower = unit_type.lower().strip()
+    if ut_lower in mapping:
+        return mapping[ut_lower]
+        
+    # Fallback/dynamic abbreviation:
+    # If it is multi-word (e.g., "Hazmat Tender"), take first letter of each word
+    words = ut_lower.split()
+    if len(words) > 1:
+        return "".join(w[0].upper() for w in words)
+    else:
+        return ut_lower[:3].upper()
+
 def abbreviate_units(units_str: str) -> List[str]:
-    """Formats raw unit names into apparatus abbreviation codes (e.g. Engine 1 -> E1)."""
+    """
+    Formats raw unit names into apparatus abbreviation codes (e.g. Engine 1 -> E1).
+    Validates unit types and numbers against ground-truth UNITS_VOCAB_RAW.
+    """
     if not units_str:
         return []
         
-    mapping = {
-        "engine": "E", "ladder": "L", "rescue": "R", "car": "C",
-        "squad": "S", "medic": "M", "quint": "Q", "tender": "T",
-        "hazmat": "H", "light attack vehicle": "LAV"
-    }
+    # Sort units vocabulary descending by length to match multi-word unit types first
+    sorted_vocab = sorted(UNITS_VOCABULARY, key=len, reverse=True)
+    vocab_pattern = '|'.join(re.escape(ut.lower()) for ut in sorted_vocab)
     
     found_units = []
     # Search for unit types followed by a number
     matches = re.findall(
-        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat|light attack vehicle)\s+([\w\d-]+)\b',
+        r'\b(' + vocab_pattern + r')\s+([\w\d-]+)\b',
         units_str.lower()
     )
+    
+    valid_units_set = {u.strip().lower() for u in UNITS_VOCAB_RAW}
+    
     for unit_type, unit_num in matches:
-        abbr = mapping.get(unit_type, unit_type.capitalize())
-        found_units.append(f"{abbr}{unit_num.upper()}")
-        
+        raw_unit_name = f"{unit_type.strip()} {unit_num.strip()}".lower()
+        if raw_unit_name in valid_units_set:
+            abbr = get_unit_abbreviation(unit_type)
+            found_units.append(f"{abbr}{unit_num.upper()}")
+        else:
+            logging.warning(f"Parsed unit '{raw_unit_name}' is not in ground-truth UNITS_VOCAB_RAW. Rejecting.")
+            
     return found_units
 
 def normalize_street_suffix(text: str) -> str:
@@ -276,6 +343,59 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
 
     return text
 
+def match_radio_channel(talk_group_raw: str, radio_channels: List[str]) -> Optional[str]:
+    """Matches raw transcript text against ground-truth radio channels using substring or fuzzy logic."""
+    if not talk_group_raw:
+        return None
+    raw_clean = talk_group_raw.strip().lower()
+    if not raw_clean:
+        return None
+        
+    # 1. Look for exact substring match first
+    for channel in radio_channels:
+        chan_clean = channel.strip().lower()
+        if raw_clean in chan_clean:
+            if raw_clean.isdigit():
+                # For digit channels, ensure word boundary to prevent matching e.g. "5" with "15"
+                if re.search(r'\b' + re.escape(raw_clean) + r'\b', chan_clean):
+                    return channel
+            else:
+                return channel
+                
+    # 2. Look for digits inside raw text and see if it matches channel digit
+    raw_digits = re.findall(r'\d+', raw_clean)
+    if raw_digits:
+        for digit in raw_digits:
+            for channel in radio_channels:
+                chan_clean = channel.strip().lower()
+                # If channel has this digit as a word, e.g. "Talk Group 5" contains "\b5\b"
+                if re.search(r'\b' + re.escape(digit) + r'\b', chan_clean):
+                    return channel
+
+    # 3. Fallback to fuzzy matching
+    best_match = None
+    best_score = 0
+    for channel in radio_channels:
+        chan_clean = channel.strip().lower()
+        score = fuzz.token_set_ratio(raw_clean, chan_clean)
+        if score > best_score:
+            best_score = score
+            best_match = channel
+            
+    if best_score >= 75:
+        return best_match
+        
+    return None
+
+def clean_channel_name_for_output(channel_name: str) -> str:
+    """Removes redundant words like 'Coquitlam' and 'Talk Group' for clean storage/UI display."""
+    # Remove "coquitlam" (case insensitive)
+    cleaned = re.sub(r'(?i)\bcoquitlam\b', '', channel_name).strip()
+    # Remove "talk group" (case insensitive) from start
+    cleaned = re.sub(r'(?i)^\btalk\s*group\b', '', cleaned).strip()
+    cleaned = cleaned.strip()
+    return cleaned if cleaned else channel_name
+
 def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) -> List[DispatchData]:
     """
     Parses sanitized text for dispatch fields, including addresses, intersections, units,
@@ -291,7 +411,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
     
     # --- 1. Try Template-Aligned Anchor Segmentation ---
     # Template: [Units] respond [priority] [incident_type] [address] near/cross roads [cross_roads] use talk group [channel] map grid [grid]
-    respond_match = re.search(r'\brespond\s+(routine|emergency)\b', text, re.IGNORECASE)
+    response_pattern_str = '|'.join(re.escape(rt.strip().lower()) for rt in RESPONSE_TYPES)
+    respond_match = re.search(r'\brespond\s+(' + response_pattern_str + r')\b', text, re.IGNORECASE)
     if respond_match:
         try:
             respond_idx = respond_match.start()
@@ -367,9 +488,9 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 if map_grid_match:
                     talk_group_end = min(talk_group_end, map_grid_match.start())
                 talk_group_raw = remainder[talk_group_start:talk_group_end].strip()
-                tg_digits = re.search(r'\d+', talk_group_raw)
-                if tg_digits:
-                    talk_group_str = tg_digits.group(0)
+                matched_chan = match_radio_channel(talk_group_raw, RADIO_CHANNELS)
+                if matched_chan:
+                    talk_group_str = clean_channel_name_for_output(matched_chan)
                     
             # Extract Map Grid
             map_grid_str = None
@@ -378,7 +499,11 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 map_grid_raw = remainder[map_grid_start:].strip()
                 grid_digits = re.search(r'\d+', map_grid_raw)
                 if grid_digits:
-                    map_grid_str = grid_digits.group(0)
+                    grid_val = grid_digits.group(0)
+                    if grid_val in MAP_GRIDS:
+                        map_grid_str = grid_val
+                    else:
+                        logging.warning(f"Parsed map grid '{grid_val}' is not in ground-truth MAP_GRIDS. Rejecting.")
                     
             dispatch = DispatchData(
                 raw_text=text,
@@ -454,8 +579,10 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
     if not found_dispatches:
         return []
 
-    units_pattern = re.compile(r'^(?P<units>(?:(?:' + '|'.join(units_vocab) + r')\s+[\w\d-]+[,\s]*)+)', re.IGNORECASE)
-    response_pattern = re.compile(r'\brespond\s*(?P<type>routine|emergency)\b', re.IGNORECASE)
+    # Sort units_vocab descending by length to support multi-word units correctly in the regex
+    sorted_vocab = sorted(units_vocab, key=len, reverse=True)
+    units_pattern = re.compile(r'^(?P<units>(?:(?:' + '|'.join(re.escape(u) for u in sorted_vocab) + r')\s+[\w\d-]+[,\s]*)+)', re.IGNORECASE)
+    response_pattern = re.compile(r'\brespond\s*(?P<type>' + response_pattern_str + r')\b', re.IGNORECASE)
     map_grid_pattern = re.compile(r'\b(?:map grid|math grade|math grid)\s*(\d{1,3})\b', re.IGNORECASE)
     final_grid_pattern = re.compile(r'coquitlam\s*(\d{1,3})\b', re.IGNORECASE)
     
@@ -466,9 +593,22 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
     final_grid_matches = final_grid_pattern.findall(text)
     if final_grid_matches:
         parsed_grids.extend(final_grid_matches)
-    grid_str = parsed_grids[0] if parsed_grids else None
+    valid_grids = [g for g in parsed_grids if g in MAP_GRIDS]
+    grid_str = valid_grids[0] if valid_grids else None
     
+    # Look for talk group match in fallback text
+    talk_group_pattern = re.compile(r'\b(?:use talk group|talk group)\s+(.+?)(?:\s+map grid|\s+math grade|\s+math grid|$)', re.IGNORECASE)
+    tg_match = talk_group_pattern.search(text)
+    fallback_tg_str = None
+    if tg_match:
+        matched_chan = match_radio_channel(tg_match.group(1), RADIO_CHANNELS)
+        if matched_chan:
+            fallback_tg_str = clean_channel_name_for_output(matched_chan)
+            
     for dispatch in found_dispatches:
-        dispatch.units, dispatch.response_type, dispatch.map_grid = units_str, response_str, grid_str
+        dispatch.units = units_str
+        dispatch.response_type = response_str
+        dispatch.map_grid = grid_str
+        dispatch.radio_channel = fallback_tg_str
         
     return found_dispatches

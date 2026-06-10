@@ -87,6 +87,11 @@ def setup_logging():
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
+    # Silence verbose third-party loggers
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+
 def transcribe_audio_bytes(content: bytes) -> str | None:
     """Transcribes raw WAV audio bytes using Google Cloud Speech-to-Text v2 with custom phrase adaptation."""
     try:
@@ -100,6 +105,28 @@ def transcribe_audio_bytes(content: bytes) -> str | None:
             
             full_resource_name = f"projects/{GCP_PROJECT_ID}/locations/global/customClasses/{resource_id}"
             phrases_to_boost.append({"value": f"${full_resource_name}", "boost": boost_value})
+
+        # Inject system-wide structural biases and vocabulary into the recognizer
+        system_phrases = [
+            "Coquitlam",
+            "respond emergency",
+            "respond routine",
+            "medical aid",
+            "use talk group",
+            "talk group",
+            "map grid",
+            "Combined Response Coquitlam"
+        ]
+        
+        # Add units and unit patterns (e.g., "Engine 1" to "Engine 19")
+        for unit in UNITS_VOCABULARY:
+            system_phrases.append(unit)
+            for num in range(1, 20):
+                system_phrases.append(f"{unit} {num}")
+                
+        # Boost structural dispatch phrases at high priority
+        for phrase in system_phrases:
+            phrases_to_boost.append({"value": phrase, "boost": 20.0})
 
         inline_set = speech_v2.types.PhraseSet(phrases=phrases_to_boost)
         adaptation_phrase_set_dict = {"inline_phrase_set": inline_set}
@@ -167,7 +194,7 @@ def transcribe_audio_local(audio_data, model=None) -> str | None:
         
         if is_faster_whisper:
             logging.info("Transcribing using cached faster-whisper model...")
-            segments, info = model.transcribe(audio_data, beam_size=2)
+            segments, info = model.transcribe(audio_data, beam_size=2, language="en")
             text = " ".join([segment.text for segment in segments])
             return text.strip() or None
         else:
@@ -272,9 +299,9 @@ def process_and_post_payload(dispatch_id, transcript, all_candidates, validator,
             if d.intersection and d.intersection not in unique_addresses:
                 unique_addresses.append(d.intersection)
                 
-        # Parse Incident Type and Alarm Level
+        # Parse Incident Type
         incident_type = match_incident_type(transcript, CALL_TYPES)
-        alarm_level = parse_alarm_level(transcript)
+        alarm_level = 1
         units_str = next((d.units for d in all_candidates if d.units), None)
         responding_units = abbreviate_units(units_str)
 
@@ -803,7 +830,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                 corr_payload = {
                                     "dispatch_id": dispatch_id,
                                     "incident_type": match_incident_type(transcript, CALL_TYPES),
-                                    "alarm_level": parse_alarm_level(transcript),
+                                    "alarm_level": 1,
                                     "responding_units": abbreviate_units(p2_candidate.units),
                                     "lat": res["lat"],
                                     "lng": res["lng"],
@@ -853,7 +880,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
         phase_1_candidates.pop(dispatch_id, None)
 
 def get_audio_duration(file_path: str) -> float:
-    """Helper to retrieve audio duration in seconds using wavio or whisper loading."""
+    """Helper to retrieve audio duration in seconds using wavio, PyAV, or fallbacks."""
     try:
         if file_path.lower().endswith('.wav'):
             import wavio
@@ -862,12 +889,13 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         pass
     try:
-        # Fallback to loading via whisper to count samples
-        import whisper
-        arr = whisper.load_audio(file_path)
-        return round(len(arr) / 16000, 2)
+        import av
+        with av.open(file_path) as container:
+            duration = float(container.duration) / av.time_base
+            return round(duration, 2)
     except Exception:
-        return 30.0
+        pass
+    return 30.0
 
 def poll_simulation_requests(validator, stt_model):
     """Polls Supabase for pending simulation requests, transcribes and parses, then saves the result."""
@@ -936,14 +964,17 @@ def poll_simulation_requests(validator, stt_model):
                     if STT_ENGINE == "google":
                         raw_transcript = transcribe_audio_bytes(audio_bytes)
                     elif STT_ENGINE == "whisper":
-                        import numpy as np
-                        try:
-                            import whisper
-                            audio_float = whisper.load_audio(temp_path)
-                            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
-                        except Exception as w_err:
-                            logging.error(f"Whisper load failed: {w_err}. Trying direct filepath...")
+                        is_faster_whisper = stt_model and hasattr(stt_model, 'transcribe') and not hasattr(stt_model, 'load_model')
+                        if is_faster_whisper:
                             raw_transcript = transcribe_audio_local(temp_path, model=stt_model)
+                        else:
+                            try:
+                                import whisper
+                                audio_float = whisper.load_audio(temp_path)
+                                raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+                            except Exception as w_err:
+                                logging.warning(f"Standard Whisper load failed (likely ffmpeg missing): {w_err}. Trying direct path...")
+                                raw_transcript = transcribe_audio_local(temp_path, model=stt_model)
                             
                     if not raw_transcript:
                         raise ValueError("Speech-to-Text did not produce any transcript text.")
@@ -1008,7 +1039,6 @@ def poll_simulation_requests(validator, stt_model):
                         "dispatch_id": dispatch_id,
                         "timestamp": db_payload.get("timestamp"),
                         "incident_type": db_payload.get("incident_type"),
-                        "alarm_level": db_payload.get("alarm_level", 1),
                         "responding_units": db_payload.get("responding_units", []),
                         "target": target_obj,
                         "address": target_obj.get("address"),
@@ -1079,6 +1109,7 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
     Background worker loop. Run in a separate Process.
     Initializes GIS validator and loads/caches the speech-to-text models once at startup.
     """
+    setup_logging()
     logging.info("Background Dispatch Worker process starting...")
     try:
         validator = CoquitlamDataValidator(ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH)
@@ -1158,8 +1189,7 @@ def run_dispatch_system():
         return
         
     if ENABLE_NTFY_PUSH and not os.environ.get("NTFY_TOPIC"):
-        logging.critical("FATAL ERROR: ENABLE_NTFY_PUSH is True but NTFY_TOPIC is not set.")
-        return
+        logging.warning("ENABLE_NTFY_PUSH is True but NTFY_TOPIC is not set. Push notifications will be skipped.")
         
 
     

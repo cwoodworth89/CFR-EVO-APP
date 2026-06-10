@@ -6,3 +6,11 @@ wavio
 numpy
 word2number
 shapely
+requests
+regex
+thefuzz
+openai-whisper
+faster-whisper
+geopandas
+pyogrio
+scipy

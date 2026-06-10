@@ -68,13 +68,13 @@ def update_supabase_record(dispatch_id: str, payload: dict, url: str, key: str) 
 
 def post_to_ntfy(payload: dict, topic: str, token: str = None) -> bool:
     """Posts dispatch data to a private Ntfy channel to wake up Android devices."""
-    if not topic:
-        logging.warning("Ntfy topic not set. Skipping push.")
+    if not topic or topic.strip() == "" or "your-private-ntfy-topic" in topic:
+        logging.info("Ntfy topic not configured or using default placeholder. Skipping push.")
         return False
         
     endpoint = f"https://ntfy.sh/{topic}"
     headers = {}
-    if token:
+    if token and token.strip() != "" and "your-optional-ntfy-token" not in token:
         headers["Authorization"] = f"Bearer {token}"
         
     try:
@@ -99,7 +99,7 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None) -> bool:
         logging.info("Successfully posted to Ntfy.")
         return True
     except Exception as e:
-        logging.error(f"Failed to post to Ntfy: {e}", exc_info=True)
+        logging.warning(f"Failed to post to Ntfy: {e} (Please verify your NTFY_TOPIC and NTFY_TOKEN credentials.)")
         return False
 
 def upload_to_supabase_storage(file_bytes: bytes, file_name: str, url: str, key: str) -> str | None:

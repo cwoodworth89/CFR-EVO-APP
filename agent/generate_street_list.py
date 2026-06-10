@@ -12,12 +12,12 @@ try:
     unique_streets = gdf[ADDRESS_STREET_NAME_COLUMN].dropna().str.upper().unique()
 
     # Save the list to a text file
-    with open('coquitlam_streets.txt', 'w') as f:
+    with open('data/vocabulary/coquitlam_streets.txt', 'w') as f:
         for street in sorted(unique_streets):
             f.write(f"{street}\n")
 
     print(f"\nSUCCESS! Found {len(unique_streets)} unique street names.")
-    print("They have been saved to 'coquitlam_streets.txt'.")
+    print("They have been saved to 'data/vocabulary/coquitlam_streets.txt'.")
 
 except Exception as e:
     print(f"An error occurred: {e}")

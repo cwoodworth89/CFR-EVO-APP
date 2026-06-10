@@ -18,31 +18,11 @@ export function Header({
   alertsCount
 }) {
   const [showLayersMenu, setShowLayersMenu] = React.useState(false);
-  const [showPasswordModal, setShowPasswordModal] = React.useState(false);
-  const [passwordInput, setPasswordInput] = React.useState("");
-  const [errorMsg, setErrorMsg] = React.useState("");
   const isExplore = appMode === "EXPLORE";
 
   const handleModeChange = (e) => {
     const selectedValue = e.target.value;
-    if (selectedValue === "ADMIN_DISPATCHES") {
-      setShowPasswordModal(true);
-      setPasswordInput("");
-      setErrorMsg("");
-    } else {
-      setAppMode(selectedValue);
-    }
-  };
-
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD || "cfradmin";
-    if (passwordInput === correctPassword) {
-      setShowPasswordModal(false);
-      setAppMode("ADMIN_DISPATCHES");
-    } else {
-      setErrorMsg("Incorrect admin password. Access denied.");
-    }
+    setAppMode(selectedValue);
   };
 
   return (
@@ -90,54 +70,6 @@ export function Header({
             </select>
           </div>
         </div>
-
-        {/* Password Modal Overlay */}
-        {showPasswordModal && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl w-full max-w-sm text-left animate-in zoom-in-95 duration-155">
-              <h3 className="text-sm font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-3 mb-4">
-                🛡️ ADMIN SECURITY ACCESS
-              </h3>
-              
-              <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono">
-                    Enter Credentials
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="Admin password..."
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    autoFocus
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-white rounded-lg px-3 py-2 text-xs focus:outline-none placeholder-slate-600 font-mono"
-                  />
-                  {errorMsg && (
-                    <span className="text-[9px] text-rose-500 font-mono font-bold mt-1">
-                      ⚠️ {errorMsg}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswordModal(false)}
-                    className="bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-850 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                  >
-                    CANCEL
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-indigo-650 hover:bg-indigo-600 text-white border border-indigo-500 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
-                  >
-                    VERIFY
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* Right Side: Options & Alerts Panel Trigger */}
         <div className="flex gap-3 items-center">

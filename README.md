@@ -80,3 +80,17 @@ This application operates strictly using completely open, public, and non-sensit
 2. **Open Geodata**: All parcel layers, boundaries, street grids, and fire hydrant locations are retrieved from public municipal datasets (e.g., Coquitlam Open Data).
 3. **Open Road Closure Feeds**: Closed-road information and construction alerts are pulled from public traffic APIs (e.g., DriveBC Open511, Municipal 511).
 4. **FOI/Public Record Metadata**: Supporting metadata such as call classification terms, apparatus lists, and station locations are gathered from public records and Freedom of Information (FOI) disclosures.
+For detailed privacy design, see [docs/privacy.md](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/docs/privacy.md).
+
+---
+
+## 🤖 Pair-Programming & AI-Assisted Development Disclosure
+
+This project was built using a structured engineering partnership between the lead developer and **Antigravity**, Google DeepMind's agentic AI coding assistant within the **Antigravity IDE**. 
+
+Rather than relying on rapid prototyping or unverified code generation, all features follow a strict, production-grade development process:
+1. **Research & Architectural Analysis**: Conducting targeted analysis of external endpoints (e.g. ArcGIS spatial indexing anomalies, CORS proxies, and ALSA audio captures).
+2. **Detailed Implementation Planning**: Drafting formal design blueprints and validation workflows in the [docs/](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/docs/) directory prior to modifying any source code.
+3. **Automated & Manual Verification**: Executing offline python test suites, local geocoding verification, and compilation checks (`npm run build`).
+4. **Offline Resilience Focus**: Transitioning unstable external datasets (such as addresses, emergency zones, and water hydrants) into local cached structures to ensure full hall-kiosk operation even during network outages.
+

@@ -94,3 +94,14 @@ Rather than relying on rapid prototyping or unverified code generation, all feat
 3. **Automated & Manual Verification**: Executing offline python test suites, local geocoding verification, and compilation checks (`npm run build`).
 4. **Offline Resilience Focus**: Transitioning unstable external datasets (such as addresses, emergency zones, and water hydrants) into local cached structures to ensure full hall-kiosk operation even during network outages.
 
+---
+
+## ⚖️ Personal Time & Ownership Disclosure
+
+This project is a personal, independent hobby project developed entirely by Curtis Woodworth on personal time, using personal equipment, and personal funding.
+
+*   **No Employer Affiliation**: This software is not commissioned, sponsored, endorsed, or owned by the City of Coquitlam, Coquitlam Fire Rescue, or any associated municipal or government body.
+*   **No Employer Resources Used**: No employer-owned computers, software licenses, network infrastructure, or databases were used during the design, development, compilation, or hosting of this project.
+*   **Independent Work Product**: All intellectual property, assets, and code in this repository represent the independent work product of the author, developed strictly outside of official duty hours.
+
+

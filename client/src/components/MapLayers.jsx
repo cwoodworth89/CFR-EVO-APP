@@ -145,30 +145,33 @@ export function HydrantsLayer({ visible }) {
       };
     }, [map, visible]);
 
-    // 1. Render static Esri dynamic map overlay at zoom levels >= 17 for official hydrant icons
+    const [allHydrants, setAllHydrants] = React.useState([]);
+
+    // Load local cached hydrant database once when visible
     React.useEffect(() => {
-      if (!visible || zoom < 17) return;
-      
-      const layer = dynamicMapLayer({
-          url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer",
-          layers: [2], // 2 = Water Hydrants
-          opacity: 0.9,
-          f: 'image'
-      }).addTo(map);
+      if (!visible) return;
 
-      return () => { 
-          map.removeLayer(layer);
-      };
-    }, [map, visible, zoom]);
+      fetch('/data/hydrants.json')
+        .then(r => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(data => {
+          setAllHydrants(data);
+        })
+        .catch(err => {
+          console.warn("Failed to load local cached hydrants:", err);
+        });
+    }, [visible]);
 
-    // 2. Zoom >= 17: Fetch dynamic bounding-box vector hydrants with debouncing & spatial thresholding
+    // Zoom >= 17: Filter local hydrants in-memory based on current bounding box with spatial thresholding
     const lastCenterRef = React.useRef(null);
     const lastZoomRef = React.useRef(null);
     const debounceTimerRef = React.useRef(null);
     const bbox = visible && zoom >= 17 ? map.getBounds().toBBoxString() : "";
 
     React.useEffect(() => {
-      if (!visible || zoom < 17 || !bbox) {
+      if (!visible || zoom < 17 || allHydrants.length === 0 || !bbox) {
         setHydrants([]);
         return;
       }
@@ -178,19 +181,19 @@ export function HydrantsLayer({ visible }) {
       const lastCenter = lastCenterRef.current;
       const lastZoom = lastZoomRef.current;
 
-      let shouldFetch = false;
+      let shouldFilter = false;
       if (!lastCenter || lastZoom !== currentZoom) {
-        shouldFetch = true;
+        shouldFilter = true;
       } else {
         const from = turf.point([lastCenter.lng, lastCenter.lat]);
         const to = turf.point([currentCenter.lng, currentCenter.lat]);
         const distMeters = turf.distance(from, to, { units: 'kilometers' }) * 1000;
         if (distMeters >= 75) {
-          shouldFetch = true;
+          shouldFilter = true;
         }
       }
 
-      if (!shouldFetch) return;
+      if (!shouldFilter) return;
 
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -206,49 +209,105 @@ export function HydrantsLayer({ visible }) {
         const maxLng = bounds.getNorthEast().lng;
         const maxLat = bounds.getNorthEast().lat;
 
-        const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${minLng},${minLat},${maxLng},${maxLat}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
+        // Filter hydrants in current viewport bounds
+        const filtered = allHydrants.filter(h => 
+          h.lng >= minLng && h.lng <= maxLng &&
+          h.lat >= minLat && h.lat <= maxLat
+        );
 
-        fetch(url)
-          .then(r => {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            return r.json();
-          })
-          .then(data => {
-            if (data && data.features) {
-              setHydrants(data.features);
-            }
-          })
-          .catch(err => {
-            console.warn("Failed to fetch viewport hydrants:", err);
-          });
-      }, 250); // 250ms debounce threshold
+        // Map back to format expected by rendering code: { geometry: {x,y}, attributes: {OBJECTID,gis_id,status,flow_class} }
+        const formatted = filtered.map(h => ({
+          geometry: { x: h.lng, y: h.lat },
+          attributes: {
+            OBJECTID: h.id,
+            gis_id: h.gisId,
+            status: h.status,
+            flow_class: h.flowClass
+          }
+        }));
+
+        setHydrants(formatted);
+      }, 100); // Fast 100ms debounce since local array filtering is instant
 
       return () => {
         if (debounceTimerRef.current) {
           clearTimeout(debounceTimerRef.current);
         }
       };
-    }, [visible, zoom, map, bbox]);
+    }, [visible, zoom, map, bbox, allHydrants]);
 
-    // Custom Icon styling to highlight and overlay details on top of official city symbols
+    // Custom Icon styling to highlight details and flow ratings in a premium dot-and-ring aesthetic
     const getHydrantIcon = (status, flowClass) => {
-      let bgColor = 'transparent'; 
-      let borderColor = 'transparent';
-      let emoji = '';
+      let bgColor = 'rgba(15, 23, 42, 0.6)'; // dark fill inside the ring
+      let borderColor = '#facc15'; // default yellow
+      let borderStyle = '2px solid';
       let opacity = '1.0';
-      let borderStyle = 'none';
+      
+      let isSpecial = false;
+      let emoji = '';
 
       if (status === 'PRIVATE') {
-        bgColor = 'rgba(245, 158, 11, 0.15)'; // Transparent amber highlight fill
-        borderColor = '#f59e0b'; // Amber highlighting ring
-        borderStyle = '2px solid';
+        borderColor = '#f59e0b'; // Amber
+        isSpecial = true;
+        emoji = '🔒';
       } else if (status === 'ABANDONED' || status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
-        bgColor = 'rgba(55, 65, 81, 0.6)'; // Dark semi-transparent caution mask
-        borderColor = '#ef4444'; // Red caution border
+        borderColor = '#ef4444'; // Red
+        isSpecial = true;
         emoji = '⚠️';
         opacity = '0.9';
-        borderStyle = '2px solid';
+      } else {
+        // NFPA 291 Color code by flow class rating
+        const fc = (flowClass || "").toUpperCase();
+        if (fc === 'AA') {
+          borderColor = '#38bdf8'; // Sky Blue
+        } else if (fc === 'A') {
+          borderColor = '#4ade80'; // Green
+        } else if (fc === 'B') {
+          borderColor = '#fb923c'; // Orange
+        } else if (fc === 'C') {
+          borderColor = '#f87171'; // Red
+        } else {
+          borderColor = '#facc15'; // Yellow
+        }
       }
+
+      const iconHtml = isSpecial ? `
+        <div style="
+          background-color: ${status === 'PRIVATE' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(55, 65, 81, 0.6)'};
+          border: ${borderStyle} ${borderColor};
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+          font-size: 10px;
+          box-sizing: border-box;
+          opacity: ${opacity};
+        ">${emoji}</div>
+      ` : `
+        <div style="
+          width: 20px;
+          height: 20px;
+          border: 2px solid ${borderColor};
+          border-radius: 50%;
+          background-color: ${bgColor};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+          box-sizing: border-box;
+          opacity: ${opacity};
+        ">
+          <div style="
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: ${borderColor};
+          "></div>
+        </div>
+      `;
 
       // High-contrast rating label (e.g. AA) in white
       const ratingHtml = flowClass ? `
@@ -286,27 +345,14 @@ export function HydrantsLayer({ visible }) {
             align-items: center;
             justify-content: center;
           ">
-            <div style="
-              background-color: ${bgColor};
-              border: ${borderStyle} ${borderColor};
-              border-radius: 50%;
-              width: 24px;
-              height: 24px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              box-shadow: ${status === 'PRIVATE' || emoji ? '0 2px 4px rgba(0,0,0,0.4)' : 'none'};
-              font-size: 11px;
-              box-sizing: border-box;
-              opacity: ${opacity};
-            ">${emoji}</div>
+            ${iconHtml}
             ${labelHtml}
           </div>
         `,
-        // Covers vertical height of circle (24px) + margin/text (~20px) = 44px
-        iconSize: [32, 48],
-        iconAnchor: [16, 12], // Centered horizontally (16) and vertically in the circle (12)
-        popupAnchor: [0, -12]
+        // Covers vertical height of circle (20px) + margin/text (~20px) = 40px
+        iconSize: [24, 40],
+        iconAnchor: [12, 10], // Centered horizontally (12) and vertically in the circle (10)
+        popupAnchor: [0, -10]
       });
     };
 

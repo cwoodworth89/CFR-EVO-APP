@@ -265,6 +265,19 @@ export default function MapBoard() {
   const [targetPolygon, setTargetPolygon] = useState(null);
   const [allNearbyHydrants, setAllNearbyHydrants] = useState([]);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [allHydrantsData, setAllHydrantsData] = useState([]);
+
+  // Load all hydrants data once on mount
+  useEffect(() => {
+    fetch('/data/hydrants.json')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        setAllHydrantsData(data);
+      })
+      .catch(err => {
+        console.error("Failed to load local cached hydrants database:", err);
+      });
+  }, []);
 
   const updateTargetAddress = useCallback((addr) => {
     setTargetAddress(addr);
@@ -342,37 +355,41 @@ export default function MapBoard() {
     };
   }, [map, updateTargetAddress]);
 
-  // Query Nearby Hydrants on targetAddress change (storing raw features only)
+  // Query Nearby Hydrants on targetAddress change (using local in-memory dataset)
   useEffect(() => {
-    if (!targetAddress) return;
+    if (!targetAddress || allHydrantsData.length === 0) {
+      setAllNearbyHydrants([]);
+      return;
+    }
 
     const lat = targetAddress.lat;
     const lng = targetAddress.lng;
+    const centerPoint = turf.point([lng, lat]);
 
-    // Fetch Nearby Hydrants from Layer 2 (within 300m / ~1000ft to capture hydrants further along route)
-    const hydUrl = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&distance=300&units=esriSRUnit_Meter&outFields=OBJECTID,gis_id,status,flow_class&returnGeometry=true&outSR=4326&f=json`;
+    try {
+      // Filter hydrants within 300m (0.3 km)
+      const nearby = allHydrantsData
+        .map(h => {
+          const hydPoint = turf.point([h.lng, h.lat]);
+          const distKm = turf.distance(centerPoint, hydPoint, { units: 'kilometers' });
+          const distM = Math.round(distKm * 1000);
+          return { ...h, distM };
+        })
+        .filter(h => h.distM <= 300)
+        .map(h => ({
+          gisId: h.gisId,
+          lat: h.lat,
+          lng: h.lng,
+          flowClass: h.flowClass,
+          status: h.status
+        }));
 
-    fetch(hydUrl)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data && data.features && data.features.length > 0) {
-          const rawHydrants = data.features.map(f => ({
-            gisId: f.attributes.gis_id || "Unknown",
-            lat: f.geometry.y,
-            lng: f.geometry.x,
-            flowClass: f.attributes.flow_class || "",
-            status: f.attributes.status || ""
-          }));
-          setAllNearbyHydrants(rawHydrants);
-        } else {
-          setAllNearbyHydrants([]);
-        }
-      })
-      .catch(err => {
-        console.warn("Failed to fetch nearby hydrants:", err);
-        setAllNearbyHydrants([]);
-      });
-  }, [targetAddress]);
+      setAllNearbyHydrants(nearby);
+    } catch (e) {
+      console.warn("Failed to filter nearby hydrants locally:", e);
+      setAllNearbyHydrants([]);
+    }
+  }, [targetAddress, allHydrantsData]);
 
   // Filter and sort nearby hydrants dynamically with Alpha-segment logic
   const nearestHydrants = useMemo(() => {

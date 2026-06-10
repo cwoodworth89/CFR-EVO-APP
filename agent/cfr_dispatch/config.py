@@ -16,7 +16,8 @@ USE_INTELLIGENT_PARSER = True
 AUDIO_SAMPLE_RATE = 16000
 # Default audio hardware device ID (checks environment or defaults to system default None)
 DEVICE_ID = int(os.environ.get("AUDIO_DEVICE_ID")) if os.environ.get("AUDIO_DEVICE_ID") is not None else None
-NOISE_AMPLITUDE_THRESHOLD = 1500
+NOISE_AMPLITUDE_THRESHOLD = 3000
+NOISE_AMPLITUDE_THRESHOLD_MIN = 1500  # Keep a record of the original minimum threshold
 SUSTAINED_LOUDNESS_WINDOW = 5
 SUSTAINED_LOUDNESS_CHUNKS_REQUIRED = 5
 TONE_ANALYSIS_DURATION_SECONDS = 3.5
@@ -28,13 +29,13 @@ PHASE_1_CHECK_INTERVAL_S = 3.0
 MIN_PHASE_1_DURATION_S = 10.0
 
 # -- Tone Fingerprints & Matching --
-MATCH_THRESHOLD_PERCENT = 0.65
+MATCH_THRESHOLD_PERCENT = 0.85
 FREQUENCY_TOLERANCE_HZ = 10
 NUM_PEAKS_TO_FIND = 20
 GOLDEN_FINGERPRINTS = {
-    "Chief Tone":  [429.69, 437.50, 445.31, 656.25, 664.06],
-    "Engine Tone": [593.75, 601.56, 1343.75, 1351.56],
-    "Rescue Tone": [718.75, 726.56, 734.38]
+    "Chief Tone":  [437.50, 656.25],
+    "Engine Tone": [601.56, 1351.56],
+    "Rescue Tone": [726.56, 890.62, 2179.69]
 }
 
 # -- Geodata & Validation --

@@ -50,6 +50,10 @@ def sanitize_transcript(text: str) -> str:
         r'\bhoquiam\b': 'coquitlam',
         r'\bcrazy\s+an\b': 'coquitlam',
         r'\bcoquit\s*loom\b': 'coquitlam',
+        r'\bcoquina\b': 'coquitlam',
+        
+        # Unit corrections
+        r'\bqueens\s+(\d+)\b': r'quint \1',
         
         # Respond & Priority
         r'\brespawns?\b': 'respond',
@@ -57,6 +61,8 @@ def sanitize_transcript(text: str) -> str:
         r'\bresign\b': 'respond',
         r'\breson\b': 'respond',
         r'\bwe\s+found\b': 'respond',
+        r'\brespondents\b': 'respond',
+        r'\bresponder\b': 'respond',
         r'\bregency\b': 'emergency',
         r'\bmedley\b': 'medical aid',
         r'\bvan\s+ruitens?\b': 'routine',

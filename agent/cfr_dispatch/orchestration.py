@@ -70,6 +70,10 @@ dispatch_queue = multiprocessing.Queue()
 
 def setup_logging():
     """Configures global debug logs and console streams."""
+    import time
+    # Configure logging formatters globally to use local time (Pacific Time)
+    logging.Formatter.converter = time.localtime
+
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     if logger.hasHandlers():
@@ -416,7 +420,8 @@ def process_and_post_payload(dispatch_id, transcript, all_candidates, validator,
                 logging.info(f"[Post-Check] Grid Check skipped for grids {parsed_grids} because location coordinates are null.")
                 
         # 8. Construct Payloads
-        timestamp = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+        # Use local time with timezone offset to align with local logs
+        timestamp = datetime.datetime.now().astimezone().isoformat()
         
         target_payload = {
             "address": best_address,

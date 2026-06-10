@@ -150,7 +150,8 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
     print(f"   Abbreviated Units: {responding_units}")
     
     # 5. Build integration payload (Option 2)
-    timestamp = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+    # Use local time with timezone offset to match orchestration payload format
+    timestamp = datetime.datetime.now().astimezone().isoformat()
     dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
     
     db_payload = {

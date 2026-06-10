@@ -30,9 +30,9 @@ NUM_PEAKS_TO_FIND = 20
 # === GOLDEN FINGERPRINTS (Paste your longer, source-generated fingerprints here)
 # ==============================================================================
 GOLDEN_FINGERPRINTS = {
-    "Chief Tone":  [429.69, 437.50, 445.31, 656.25, 664.06],
-    "Engine Tone": [593.75, 601.56, 609.38, 1343.75, 1351.56],
-    "Rescue Tone": [718.75, 726.56, 734.38, 890.62, 898.44]
+    "Chief Tone":  [437.50, 656.25],
+    "Engine Tone": [601.56, 1351.56],
+    "Rescue Tone": [726.56, 890.62, 2179.69]
 }
 
 # --- Global State Variables ---

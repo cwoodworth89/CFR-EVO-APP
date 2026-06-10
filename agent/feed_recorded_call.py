@@ -50,9 +50,18 @@ def main():
     # Convert to mono if stereo
     if wav.data.ndim > 1:
         print("Converting stereo to mono...")
-        audio_data = wav.data.mean(axis=1).astype(np.int16)
+        audio_data = wav.data.mean(axis=1)
     else:
-        audio_data = wav.data.squeeze().astype(np.int16)
+        audio_data = wav.data.squeeze()
+        
+    rate = wav.rate
+    if rate != 16000:
+        from scipy import signal
+        print(f"Resampling from {rate} Hz to 16000 Hz...")
+        num_samples = int(len(audio_data) * 16000 / rate)
+        audio_data = signal.resample(audio_data, num_samples)
+        
+    audio_data = audio_data.astype(np.int16)
         
     print("Initializing Coquitlam Data Validator...")
     validator = CoquitlamDataValidator(ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH)

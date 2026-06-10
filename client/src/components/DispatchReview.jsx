@@ -1,11 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
+// Helper to format timestamps to Pacific Time matching database and local logs
+const formatTimestampPT = (ts) => {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    // Format to YYYY-MM-DD HH:MM:SS in Pacific Time (America/Los_Angeles)
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+    const parts = formatter.formatToParts(d);
+    const partMap = {};
+    parts.forEach(p => { partMap[p.type] = p.value; });
+    
+    return `${partMap.year}-${partMap.month}-${partMap.day} ${partMap.hour}:${partMap.minute}:${partMap.second}`;
+  } catch (e) {
+    try {
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+    } catch (err) {
+      return ts;
+    }
+  }
+};
+
 export default function DispatchReview({ onClose, onLocateAddress }) {
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCall, setSelectedCall] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Database connection status state
+  const [dbStatus, setDbStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
+  const [dbError, setDbError] = useState(null);
 
   // Form states for ground truth corrections
   const [verifiedTranscript, setVerifiedTranscript] = useState('');
@@ -17,24 +54,29 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [showSimulator, setShowSimulator] = useState(false);
 
   // Load calls from Supabase
+  const fetchCalls = async () => {
+    setLoading(true);
+    setDbStatus('checking');
+    setDbError(null);
+    try {
+      const { data, error } = await supabase
+        .from('live_calls')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (error) throw error;
+      setCalls(data || []);
+      setDbStatus('connected');
+    } catch (err) {
+      console.error('Error fetching dispatches:', err);
+      setDbStatus('disconnected');
+      setDbError(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCalls = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('live_calls')
-          .select('*')
-          .order('timestamp', { ascending: false });
-
-        if (error) throw error;
-        setCalls(data || []);
-      } catch (err) {
-        console.error('Error fetching dispatches:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchCalls();
 
     // Subscribe to realtime updates
@@ -192,8 +234,26 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-5 flex-shrink-0">
         <div>
-          <h1 className="text-xl font-black text-sky-400 tracking-wider flex items-center gap-2">
-            🛡️ ADMIN DISPATCH REVIEW DASHBOARD
+          <h1 className="text-xl font-black text-sky-400 tracking-wider flex items-center gap-3 select-none">
+            <span>🛡️ ADMIN DISPATCH REVIEW DASHBOARD</span>
+            {dbStatus === 'connected' && (
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                DB Connected
+              </span>
+            )}
+            {dbStatus === 'checking' && (
+              <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-450 animate-ping"></span>
+                Checking DB...
+              </span>
+            )}
+            {dbStatus === 'disconnected' && (
+              <span className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300" title={dbError || ''}>
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-550"></span>
+                DB Error
+              </span>
+            )}
           </h1>
           <p className="text-xs text-slate-400 mt-1 font-mono">
             Provide ground-truth feedback, edit location anomalies, check audio quality, and review STT performance.
@@ -244,6 +304,26 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                 </span>
                 <span className="text-[10px] font-bold font-mono tracking-widest uppercase mt-2">Fetching dispatch logs...</span>
               </div>
+            ) : dbStatus === 'disconnected' ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 bg-rose-950/20 border border-rose-900/30 rounded-2xl text-center">
+                <span className="text-3xl mb-2">⚠️</span>
+                <h3 className="font-extrabold text-rose-455 uppercase text-xs tracking-wider">Database Connection Failed</h3>
+                <p className="text-xs text-slate-400 mt-2 max-w-md font-mono leading-relaxed">
+                  Could not load dispatches from Supabase. Ensure your client environment variables are correctly set in `client/.env.local` and your Supabase database has matching schema.
+                </p>
+                {dbError && (
+                  <div className="mt-4 p-3 bg-slate-950/80 border border-slate-850 text-[10px] text-rose-400 font-mono rounded-lg max-w-lg overflow-x-auto text-left select-text">
+                    Error Details: {dbError}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={fetchCalls}
+                  className="mt-5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/35 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
+                >
+                  Retry Connection
+                </button>
+              </div>
             ) : filteredCalls.length === 0 ? (
               <div className="text-center py-20 text-slate-500 text-xs italic">
                 No dispatches found in the database.
@@ -276,7 +356,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                           <td className="py-3 px-3 font-mono font-bold">
                             <div className="text-sky-400">{call.dispatch_id}</div>
                             <div className="text-[9px] text-slate-500 font-normal mt-0.5">
-                              {new Date(call.timestamp).toLocaleString()}
+                              {formatTimestampPT(call.timestamp)}
                             </div>
                           </td>
                           <td className="py-3 px-3 font-mono font-bold text-slate-300">
@@ -907,7 +987,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Timestamp</div>
-                      <div className="text-slate-300 mt-0.5">{new Date(simulationResult.timestamp).toLocaleString()}</div>
+                      <div className="text-slate-300 mt-0.5">{formatTimestampPT(simulationResult.timestamp)}</div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Call Type</div>

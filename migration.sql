@@ -22,30 +22,31 @@ ALTER publication supabase_realtime ADD TABLE public.simulation_requests;
 -- 4. Enable Row-Level Security (RLS) on simulation_requests
 ALTER TABLE public.simulation_requests ENABLE ROW LEVEL SECURITY;
 
--- 5. Create RLS Policies for simulation_requests (Allow public anon/authenticated access since client has no auth flow)
-DROP POLICY IF EXISTS "Allow authenticated select on simulation_requests" ON public.simulation_requests;
+-- 5. Create RLS Policies for simulation_requests (Restricting access to authenticated users to prevent public leaks)
 DROP POLICY IF EXISTS "Allow public select on simulation_requests" ON public.simulation_requests;
-CREATE POLICY "Allow public select on simulation_requests" 
-ON public.simulation_requests FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow authenticated select on simulation_requests" ON public.simulation_requests;
+CREATE POLICY "Allow authenticated select on simulation_requests" 
+ON public.simulation_requests FOR SELECT TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Allow authenticated insert on simulation_requests" ON public.simulation_requests;
 DROP POLICY IF EXISTS "Allow public insert on simulation_requests" ON public.simulation_requests;
-CREATE POLICY "Allow public insert on simulation_requests" 
-ON public.simulation_requests FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow authenticated insert on simulation_requests" ON public.simulation_requests;
+CREATE POLICY "Allow authenticated insert on simulation_requests" 
+ON public.simulation_requests FOR INSERT TO authenticated WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Allow authenticated update on simulation_requests" ON public.simulation_requests;
 DROP POLICY IF EXISTS "Allow public update on simulation_requests" ON public.simulation_requests;
-CREATE POLICY "Allow public update on simulation_requests" 
-ON public.simulation_requests FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow authenticated update on simulation_requests" ON public.simulation_requests;
+CREATE POLICY "Allow authenticated update on simulation_requests" 
+ON public.simulation_requests FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
--- 6. Update RLS Policies for live_calls to allow public/anon read and update
-DROP POLICY IF EXISTS "Allow authenticated users to read dispatches" ON public.live_calls;
+-- 6. Update RLS Policies for live_calls to allow authenticated read and update only
 DROP POLICY IF EXISTS "Allow public read dispatches" ON public.live_calls;
-CREATE POLICY "Allow public read dispatches" 
-ON public.live_calls FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow authenticated users to read dispatches" ON public.live_calls;
+CREATE POLICY "Allow authenticated users to read dispatches" 
+ON public.live_calls FOR SELECT TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Allow authenticated users to submit corrections" ON public.live_calls;
 DROP POLICY IF EXISTS "Allow public submit corrections" ON public.live_calls;
-CREATE POLICY "Allow public submit corrections" 
-ON public.live_calls FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow authenticated users to submit corrections" ON public.live_calls;
+CREATE POLICY "Allow authenticated users to submit corrections" 
+ON public.live_calls FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
 

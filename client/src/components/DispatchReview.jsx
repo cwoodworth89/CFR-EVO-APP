@@ -147,11 +147,11 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   // Update form fields & fetch secure signed audio URL when selectedCall changes
   useEffect(() => {
     if (selectedCall) {
-      setVerifiedTranscript(selectedCall.verified_transcript || selectedCall.raw_transcript || '');
-      setVerifiedAddress(selectedCall.verified_address || selectedCall.target?.address || selectedCall.address || '');
-      setVerifiedIncident(selectedCall.verified_incident || selectedCall.incident_type || '');
+      setVerifiedTranscript(selectedCall.verified_transcript || '');
+      setVerifiedAddress(selectedCall.verified_address || '');
+      setVerifiedIncident(selectedCall.verified_incident || '');
       
-      const units = selectedCall.verified_units || selectedCall.responding_units || [];
+      const units = selectedCall.verified_units || [];
       setVerifiedUnits(units.join(', '));
       
       setSuccessMsg('');

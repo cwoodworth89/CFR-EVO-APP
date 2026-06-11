@@ -91,7 +91,7 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None) -> bool:
             lng = target.get("lng")
             
         if lat and lng:
-            headers["Click"] = f"google.navigation:q={lat},{lng}"
+            headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
             
         logging.info(f"Posting dispatch payload to ntfy.sh topic '{topic}'...")
         response = requests.post(endpoint, headers=headers, data=json.dumps(payload), timeout=10)

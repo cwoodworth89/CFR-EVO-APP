@@ -844,12 +844,11 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                     "lng": res["lng"],
                                     "target": target_payload
                                 }
-                                # Customize title for correction
                                 headers = {
                                     "Title": f"CORRECTION: Dispatch {dispatch_id}",
                                     "Priority": "5",
                                     "Tags": "warning,rotating_light",
-                                    "Click": f"google.navigation:q={res['lat']},{res['lng']}"
+                                    "Click": f"https://www.google.com/maps/search/?api=1&query={res['lat']},{res['lng']}"
                                 }
                                 if ntfy_token:
                                     headers["Authorization"] = f"Bearer {ntfy_token}"

@@ -1,0 +1,5 @@
+transcript: Coquitlam Engine two Engine three Rescue two Respond Emergency Alarm Activated High Risk Eleven eightyfour Eastwood Street Near Primrose Lane and Guildford Way Use Talk Group 6 Coquitlam Map Grid 84
+address: 1184 Eastwood St
+units: E2,E3,R2
+priority: emergency
+grid: 84

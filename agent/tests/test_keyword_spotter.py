@@ -1,7 +1,15 @@
 import sounddevice as sd
 import pvporcupine
 import os
+import sys
 import time
+
+# Ensure working directory is the agent folder so relative paths resolve correctly
+script_dir = os.path.dirname(os.path.abspath(__file__))
+agent_dir = os.path.dirname(script_dir)
+os.chdir(agent_dir)
+if agent_dir not in sys.path:
+    sys.path.append(agent_dir)
 
 # ==============================================================================
 # --- CONFIGURATION ---

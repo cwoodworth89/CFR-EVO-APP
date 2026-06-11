@@ -10,12 +10,17 @@
 
 import sys
 import os
+
+# Ensure working directory is the agent folder so relative data paths and imports resolve correctly
+script_dir = os.path.dirname(os.path.abspath(__file__))
+agent_dir = os.path.dirname(script_dir)
+os.chdir(agent_dir)
+if agent_dir not in sys.path:
+    sys.path.append(agent_dir)
+
 import wavio
 import numpy as np
 import logging
-
-# Ensure main directory is in path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from cfr_dispatch.gis import CoquitlamDataValidator
 from cfr_dispatch.orchestration import process_full_dispatch, setup_logging

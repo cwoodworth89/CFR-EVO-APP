@@ -109,8 +109,8 @@ def run_diagnostics():
     print(f"Found {len(wav_files)} test audio samples. Initializing GIS shapefiles...")
     try:
         validator = CoquitlamDataValidator(
-            os.path.join(current_dir, ADDRESS_SHAPEFILE_PATH),
-            os.path.join(current_dir, ZONES_SHAPEFILE_PATH)
+            os.path.join(parent_dir, ADDRESS_SHAPEFILE_PATH),
+            os.path.join(parent_dir, ZONES_SHAPEFILE_PATH)
         )
         print("GIS Database initialized successfully.")
     except Exception as e:
@@ -240,34 +240,34 @@ def run_diagnostics():
         
         # Address Details printing
         if expected["address"] or parsed_address:
-            status = f"{COLOR_GREEN}✓ Match{COLOR_RESET}" if address_matched else f"{COLOR_RED}✗ Mismatch (Expected: '{expected['address']}', Got: '{parsed_address}'){COLOR_RESET}"
+            status = f"{COLOR_GREEN}[OK] Match{COLOR_RESET}" if address_matched else f"{COLOR_RED}[FAIL] Mismatch (Expected: '{expected['address']}', Got: '{parsed_address}'){COLOR_RESET}"
             print(f"    - Address:      {parsed_address} ({status})")
             
         # Geocode printing
         if parsed_address:
-            geo_status = f"{COLOR_GREEN}✓ Coordinates Found {coords}{COLOR_RESET}" if geocode_success else f"{COLOR_RED}✗ GIS Shapefile Not Found (Coordinates: None){COLOR_RESET}"
+            geo_status = f"{COLOR_GREEN}[OK] Coordinates Found {coords}{COLOR_RESET}" if geocode_success else f"{COLOR_RED}[FAIL] GIS Shapefile Not Found (Coordinates: None){COLOR_RESET}"
             print(f"    - Geocoding:    {geo_status}")
             
         # Units Details printing
         if expected["units"] or parsed_units_abbr:
-            status = f"{COLOR_GREEN}✓ Match{COLOR_RESET}" if units_matched else f"{COLOR_RED}✗ Mismatch (Expected: {expected['units']}, Got: {parsed_units_abbr}){COLOR_RESET}"
+            status = f"{COLOR_GREEN}[OK] Match{COLOR_RESET}" if units_matched else f"{COLOR_RED}[FAIL] Mismatch (Expected: {expected['units']}, Got: {parsed_units_abbr}){COLOR_RESET}"
             print(f"    - Responding:   {parsed_units_abbr} ({status})")
             
         # Priority details
         if expected["priority"] or parsed_priority:
-            status = f"{COLOR_GREEN}✓ Match{COLOR_RESET}" if priority_matched else f"{COLOR_RED}✗ Mismatch (Expected: {expected['priority']}, Got: {parsed_priority}){COLOR_RESET}"
+            status = f"{COLOR_GREEN}[OK] Match{COLOR_RESET}" if priority_matched else f"{COLOR_RED}[FAIL] Mismatch (Expected: {expected['priority']}, Got: {parsed_priority}){COLOR_RESET}"
             print(f"    - Priority:     {parsed_priority} ({status})")
             
         # Grid Details
         if expected["grid"] or parsed_grid:
-            status = f"{COLOR_GREEN}✓ Match{COLOR_RESET}" if grid_matched else f"{COLOR_RED}✗ Mismatch (Expected: {expected['grid']}, Got: {parsed_grid}){COLOR_RESET}"
+            status = f"{COLOR_GREEN}[OK] Match{COLOR_RESET}" if grid_matched else f"{COLOR_RED}[FAIL] Mismatch (Expected: {expected['grid']}, Got: {parsed_grid}){COLOR_RESET}"
             print(f"    - Map Grid:     {parsed_grid} ({status})")
             
         if issues:
             issue_pills = " ".join([f"{COLOR_YELLOW}[{i}]{COLOR_RESET}" for i in issues])
             print(f"  {COLOR_BOLD}Diagnosed Issues:{COLOR_RESET} {issue_pills}")
         else:
-            print(f"  {COLOR_GREEN}{COLOR_BOLD}✓ Clean Parse (No issues detected){COLOR_RESET}")
+            print(f"  {COLOR_GREEN}{COLOR_BOLD}[OK] Clean Parse (No issues detected){COLOR_RESET}")
             
         print("-" * 40 + "\n")
         
@@ -320,10 +320,10 @@ def run_diagnostics():
             elif issue_type == "GRID_BOUNDS_MISMATCH":
                 desc = "Resolved coordinates do not match the expected response grid envelope."
                 
-            print(f"  {COLOR_RED}• {issue_type:<23} ({count} occurrence(s)){COLOR_RESET}")
+            print(f"  {COLOR_RED}* {issue_type:<23} ({count} occurrence(s)){COLOR_RESET}")
             print(f"    Description: {desc}")
     else:
-        print(f"\n{COLOR_GREEN}{COLOR_BOLD}🎉 PERFECT RUN! All test cases parsed and geocoded flawlessly.{COLOR_RESET}")
+        print(f"\n{COLOR_GREEN}{COLOR_BOLD}[SUCCESS] PERFECT RUN! All test cases parsed and geocoded flawlessly.{COLOR_RESET}")
         
     print(f"\n{COLOR_CYAN}{COLOR_BOLD}=================================================={COLOR_RESET}\n")
 

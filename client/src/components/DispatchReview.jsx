@@ -58,7 +58,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  const [showSimulator, setShowSimulator] = useState(false);
+  const [showUploader, setShowUploader] = useState(false);
 
   // Load calls from Supabase
   const fetchCalls = async () => {
@@ -406,10 +406,10 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
         <div className="flex gap-3 items-center">
           <button
             type="button"
-            onClick={() => setShowSimulator(true)}
+            onClick={() => setShowUploader(true)}
             className="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer shadow-md flex items-center gap-1 border border-amber-600"
           >
-            ⚡ SIMULATE DISPATCH
+            📤 UPLOAD DISPATCH
           </button>
           <button
             type="button"
@@ -870,12 +870,12 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
           )}
         </div>
       </div>
-      {showSimulator && (
-        <LiveDispatchSimulator 
-          onClose={() => setShowSimulator(false)}
-          onTriggered={(simCall) => {
-            setShowSimulator(false);
-            onLocateAddress(simCall);
+      {showUploader && (
+        <DispatchAudioUploader 
+          onClose={() => setShowUploader(false)}
+          onTriggered={(uploadedCall) => {
+            setShowUploader(false);
+            onLocateAddress(uploadedCall);
           }}
         />
       )}
@@ -883,13 +883,13 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   );
 }
 
-function LiveDispatchSimulator({ onClose, onTriggered }) {
+function DispatchAudioUploader({ onClose, onTriggered }) {
   const [audioFile, setAudioFile] = useState(null);
   const [verifiedTranscript, setVerifiedTranscript] = useState('');
-  const [simulating, setSimulating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [simulationResult, setSimulationResult] = useState(null);
+  const [uploadResult, setUploadResult] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollIntervalRef = React.useRef(null);
@@ -897,7 +897,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
 
   useEffect(() => {
     let interval = null;
-    if (simulating) {
+    if (uploading) {
       setElapsedSeconds(0);
       interval = setInterval(() => {
         setElapsedSeconds((prev) => prev + 1);
@@ -908,7 +908,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [simulating]);
+  }, [uploading]);
 
   // Clean up refs on unmount
   useEffect(() => {
@@ -931,9 +931,9 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    setSimulating(false);
+    setUploading(false);
     setStatusMsg("");
-    setErrorMsg("Simulation cancelled by user.");
+    setErrorMsg("Upload cancelled by user.");
   };
 
   const handleClose = () => {
@@ -944,7 +944,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
   const handleTrigger = async (e) => {
     e.preventDefault();
     if (!audioFile) {
-      alert("Please upload a .wav or .mp3 audio file to run the simulation.");
+      alert("Please select a .wav or .mp3 audio file to upload.");
       return;
     }
 
@@ -952,15 +952,15 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
-    setSimulating(true);
+    setUploading(true);
     setErrorMsg('');
-    setSimulationResult(null);
+    setUploadResult(null);
     setStatusMsg("Uploading audio recording to Supabase storage...");
 
     try {
       // 1. Upload audio to 'dispatch-audio' bucket
       const fileExt = audioFile.name.split('.').pop();
-      const fileName = `sim-${Date.now()}.${fileExt}`;
+      const fileName = `upload-${Date.now()}.${fileExt}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('dispatch-audio')
@@ -975,10 +975,10 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
         
       const audioUrl = publicUrlData.publicUrl;
 
-      // 2. Insert simulation request into 'simulation_requests'
-      setStatusMsg("Queueing request for Python pipeline...");
+      // 2. Insert request into 'dispatch_uploads'
+      setStatusMsg("Queueing dispatch for offline processing...");
       const { data: insertData, error: insertError } = await supabase
-        .from('simulation_requests')
+        .from('dispatch_uploads')
         .insert([{
           audio_url: audioUrl,
           verified_transcript: verifiedTranscript.trim() || null,
@@ -988,30 +988,30 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
 
       if (insertError) throw insertError;
       if (!insertData || insertData.length === 0) {
-        throw new Error("Failed to create simulation request in database.");
+        throw new Error("Failed to create upload entry in database.");
       }
 
       const requestId = insertData[0].id;
-      setStatusMsg("Waiting for Python agent to pickup request...");
+      setStatusMsg("Waiting for dispatch processor to start...");
 
       // 3. Subscribe to real-time updates for this specific request
       const channel = supabase
-        .channel(`sim-${requestId}`)
+        .channel(`upload-${requestId}`)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
-            table: 'simulation_requests',
+            table: 'dispatch_uploads',
             filter: `id=eq.${requestId}`
           },
           (payload) => {
             const updated = payload.new;
             if (updated.status === 'processing') {
-              setStatusMsg("Speech-to-Text & geocoding in progress...");
+              setStatusMsg("Transcribing & geocoding in progress...");
             } else if (updated.status === 'completed') {
-              setSimulationResult(updated.result);
-              setSimulating(false);
+              setUploadResult(updated.result);
+              setUploading(false);
               setStatusMsg("");
               if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
@@ -1020,8 +1020,8 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
               supabase.removeChannel(channel);
               channelRef.current = null;
             } else if (updated.status === 'failed') {
-              setErrorMsg(updated.error_message || "Simulation failed in the backend pipeline.");
-              setSimulating(false);
+              setErrorMsg(updated.error_message || "Processing failed in the backend pipeline.");
+              setUploading(false);
               setStatusMsg("");
               if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
@@ -1039,7 +1039,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
       const pollInterval = setInterval(async () => {
         try {
           const { data: pollData, error: pollError } = await supabase
-            .from('simulation_requests')
+            .from('dispatch_uploads')
             .select('*')
             .eq('id', requestId)
             .single();
@@ -1048,8 +1048,8 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
             if (pollData.status === 'completed') {
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
-              setSimulationResult(pollData.result);
-              setSimulating(false);
+              setUploadResult(pollData.result);
+              setUploading(false);
               setStatusMsg("");
               if (channelRef.current) {
                 supabase.removeChannel(channelRef.current);
@@ -1058,15 +1058,15 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
             } else if (pollData.status === 'failed') {
               clearInterval(pollInterval);
               pollIntervalRef.current = null;
-              setErrorMsg(pollData.error_message || "Simulation failed in the backend pipeline.");
-              setSimulating(false);
+              setErrorMsg(pollData.error_message || "Processing failed in the backend pipeline.");
+              setUploading(false);
               setStatusMsg("");
               if (channelRef.current) {
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
               }
             } else if (pollData.status === 'processing') {
-              setStatusMsg("Speech-to-Text & geocoding in progress...");
+              setStatusMsg("Transcribing & geocoding in progress...");
             }
           }
         } catch (err) {
@@ -1076,9 +1076,9 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
       pollIntervalRef.current = pollInterval;
 
     } catch (err) {
-      console.error("Simulation request failed:", err);
-      setErrorMsg(err.message || "Failed to trigger simulation.");
-      setSimulating(false);
+      console.error("Upload request failed:", err);
+      setErrorMsg(err.message || "Failed to initiate upload processing.");
+      setUploading(false);
       setStatusMsg("");
     }
   };
@@ -1095,8 +1095,8 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
         
         {/* Header */}
         <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4 flex-shrink-0">
-          <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            ⚡ LIVE PIPELINE DISPATCH SIMULATION
+          <h3 className="text-sm font-black text-sky-450 uppercase tracking-wider flex items-center gap-1.5">
+            📤 UPLOAD DISPATCH AUDIO FOR PROCESSING
           </h3>
           <button 
             type="button"
@@ -1109,7 +1109,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
 
         {/* Content Area */}
         <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-5">
-          {!simulationResult ? (
+          {!uploadResult ? (
             <form onSubmit={handleTrigger} className="flex flex-col gap-4">
               <p className="text-xs text-slate-400 leading-relaxed font-mono">
                 Upload a raw audio recording file (.wav or .mp3) of a dispatch announcement to process it through the actual Speech-to-Text, parsing, geocoding, and dual-round alert matching backend.
@@ -1132,7 +1132,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     type="file"
                     accept="audio/wav, audio/mpeg, audio/mp3"
                     onChange={(e) => setAudioFile(e.target.files[0])}
-                    disabled={simulating}
+                    disabled={uploading}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
                   <span className="text-2xl mb-1">🎙️</span>
@@ -1156,16 +1156,16 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                   rows={4}
                   value={verifiedTranscript}
                   onChange={(e) => setVerifiedTranscript(e.target.value)}
-                  disabled={simulating}
+                  disabled={uploading}
                   placeholder="Paste the expected ground truth text here. The pipeline will compare the Speech-to-Text output against this to verify accuracy..."
-                  className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-xl p-2.5 focus:outline-none focus:border-amber-500 font-mono resize-none leading-relaxed"
+                  className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-xl p-2.5 focus:outline-none focus:border-sky-500 font-mono resize-none leading-relaxed"
                 />
               </div>
 
               {/* Status & Submit */}
               <div className="border-t border-slate-850 pt-4 mt-2 flex flex-col gap-3">
                 {statusMsg && (
-                  <div className="flex flex-col items-center justify-center py-4 text-amber-400 gap-2 w-full">
+                  <div className="flex flex-col items-center justify-center py-4 text-sky-450 gap-2 w-full">
                     <style>{`
                       @keyframes shimmer {
                         0% { transform: translateX(-100%); }
@@ -1176,8 +1176,8 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                       }
                     `}</style>
                     <span className="flex h-3 w-3 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
                     </span>
                     <span className="text-[10px] font-bold font-mono tracking-widest uppercase mt-1 animate-pulse">
                       ⚙️ {statusMsg}
@@ -1185,12 +1185,12 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     
                     {/* Time Elapsed & Progress Bar */}
                     <div className="text-[9px] text-slate-500 font-mono mt-1">
-                      ⏱️ ELAPSED TIME: <span className="text-amber-400 font-bold">{elapsedSeconds}s</span>
+                      ⏱️ ELAPSED TIME: <span className="text-sky-400 font-bold">{elapsedSeconds}s</span>
                     </div>
                     
                     <div className="w-full max-w-md bg-slate-950 border border-slate-800/80 rounded-full h-3 overflow-hidden p-0.5 relative mt-1.5 shadow-inner">
                       <div 
-                        className="h-full bg-gradient-to-r from-amber-500 via-sky-500 to-indigo-500 rounded-full transition-all duration-300 relative overflow-hidden"
+                        className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-300 relative overflow-hidden"
                         style={{
                           width: `${Math.min(100, (elapsedSeconds / 30) * 100)}%`
                         }}
@@ -1201,7 +1201,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     
                     {elapsedSeconds > 15 && statusMsg.includes("Waiting") && (
                       <p className="text-[9px] text-rose-450 font-bold font-mono mt-2 animate-pulse text-center max-w-sm leading-relaxed bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg">
-                        ⚠️ AGENT DELAY: Make sure the Python agent is running ('python main.py' in agent folder) to process the request.
+                        ⚠️ PROCESSOR DELAY: Make sure the Python backend is running ('python main.py' in the agent directory) to process the uploaded call.
                       </p>
                     )}
 
@@ -1210,39 +1210,39 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                       onClick={handleCancel}
                       className="mt-2.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-350 border border-rose-500/20 hover:border-rose-500/30 font-black py-2 px-5 rounded-xl text-[10px] transition-all cursor-pointer font-mono uppercase tracking-wider"
                     >
-                      ✕ Cancel & Reset Simulation
+                      ✕ Cancel & Reset Upload
                     </button>
                   </div>
                 )}
                 
                 <button
                   type="submit"
-                  disabled={simulating || !audioFile}
-                  className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black py-3 px-6 rounded-xl w-full transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-amber-600 uppercase text-xs tracking-wider"
+                  disabled={uploading || !audioFile}
+                  className="bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-black font-black py-3 px-6 rounded-xl w-full transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-sky-600 uppercase text-xs tracking-wider"
                 >
-                  {simulating ? (
+                  {uploading ? (
                     <>
                       <span className="animate-spin border-2 border-black border-t-transparent h-4 w-4 rounded-full"></span>
-                      RUNNING SIMULATION PIPELINE...
+                      PROCESSING DISPATCH AUDIO...
                     </>
                   ) : (
-                    "🚀 RUN PIPELINE SIMULATION"
+                    "🚀 PROCESS DISPATCH AUDIO"
                   )}
                 </button>
               </div>
             </form>
           ) : (
-            // Simulation Report Screen
+            // Upload report
             <div className="flex flex-col gap-5 animate-in fade-in duration-200">
               
               {/* Alert Header */}
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex justify-between items-center">
                 <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  SIMULATION PROCESSING PIPELINE COMPLETED SUCCESSFULLY
+                  DISPATCH AUDIO PROCESSED SUCCESSFULLY
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">
-                  ID: {simulationResult.dispatch_id}
+                  ID: {uploadResult.dispatch_id}
                 </span>
               </div>
 
@@ -1257,15 +1257,15 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 text-xs font-mono">
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Call ID</div>
-                      <div className="text-sky-400 font-bold mt-0.5">{simulationResult.dispatch_id}</div>
+                      <div className="text-sky-400 font-bold mt-0.5">{uploadResult.dispatch_id}</div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Timestamp</div>
-                      <div className="text-slate-300 mt-0.5">{formatTimestampPT(simulationResult.timestamp)}</div>
+                      <div className="text-slate-300 mt-0.5">{formatTimestampPT(uploadResult.timestamp)}</div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Call Type</div>
-                      <div className="text-slate-200 font-bold mt-0.5">{simulationResult.incident_type}</div>
+                      <div className="text-slate-200 font-bold mt-0.5">{uploadResult.incident_type}</div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Uploaded File</div>
@@ -1276,8 +1276,8 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     <div className="col-span-2">
                       <div className="text-[9px] text-slate-500 uppercase font-black">Responding Units</div>
                       <div className="flex gap-1.5 flex-wrap mt-1">
-                        {simulationResult.responding_units && simulationResult.responding_units.length > 0 ? (
-                          simulationResult.responding_units.map((unit, idx) => (
+                        {uploadResult.responding_units && uploadResult.responding_units.length > 0 ? (
+                          uploadResult.responding_units.map((unit, idx) => (
                             <span key={idx} className="bg-slate-800 border border-slate-700 text-sky-400 font-black px-2 py-0.5 rounded text-[10px]">
                               {unit}
                             </span>
@@ -1289,36 +1289,36 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Parsed Address</div>
-                      <div className="text-slate-200 font-bold mt-0.5 truncate" title={simulationResult.target?.address || simulationResult.address}>
-                        {simulationResult.target?.address || simulationResult.address || "N/A"}
+                      <div className="text-slate-200 font-bold mt-0.5 truncate" title={uploadResult.target?.address || uploadResult.address}>
+                        {uploadResult.target?.address || uploadResult.address || "N/A"}
                       </div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Cross Roads</div>
-                      <div className="text-slate-200 font-bold mt-0.5 truncate" title={simulationResult.intersection}>
-                        {simulationResult.intersection || "N/A"}
+                      <div className="text-slate-200 font-bold mt-0.5 truncate" title={uploadResult.intersection}>
+                        {uploadResult.intersection || "N/A"}
                       </div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Radio Channel</div>
-                      <div className="text-amber-400 font-bold mt-0.5">Talk Group {simulationResult.radio_channel || "N/A"}</div>
+                      <div className="text-sky-400 font-bold mt-0.5 font-bold">Talk Group {uploadResult.radio_channel || "N/A"}</div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Map Grid</div>
-                      <div className="text-amber-400 font-bold mt-0.5">Grid {simulationResult.map_grid || "N/A"}</div>
+                      <div className="text-sky-400 font-bold mt-0.5 font-bold">Grid {uploadResult.map_grid || "N/A"}</div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Pipeline Confidence</div>
                       <div className="mt-1 font-bold">
-                        <span className={`px-2 py-0.5 rounded text-[10px] border ${getConfidenceColor(simulationResult.confidence_score)}`}>
-                          {simulationResult.confidence_score.toFixed(1)}%
+                        <span className={`px-2 py-0.5 rounded text-[10px] border ${getConfidenceColor(uploadResult.confidence_score)}`}>
+                          {uploadResult.confidence_score.toFixed(1)}%
                         </span>
                       </div>
                     </div>
                     <div>
                       <div className="text-[9px] text-slate-500 uppercase font-black">Dual-Round Matching</div>
                       <div className="text-slate-300 font-bold mt-0.5">
-                        Recorded: {simulationResult.second_round_recorded ? "Yes" : "No"} | Matched: {simulationResult.second_round_matched ? "Yes" : "No"}
+                        Recorded: {uploadResult.second_round_recorded ? "Yes" : "No"} | Matched: {uploadResult.second_round_matched ? "Yes" : "No"}
                       </div>
                     </div>
                   </div>
@@ -1335,21 +1335,21 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                     <div className="flex flex-col gap-1">
                       <span className="text-[9px] text-slate-500 uppercase font-black font-mono">Sanitized Speech-To-Text Output</span>
                       <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-xs font-mono text-slate-350 italic max-h-32 overflow-y-auto leading-relaxed select-text">
-                        "{simulationResult.raw_transcript || "No transcript output generated."}"
+                        "{uploadResult.raw_transcript || "No transcript output generated."}"
                       </div>
                     </div>
 
                     {/* Ground-Truth Verification */}
-                    {simulationResult.verified_transcript && (
+                    {uploadResult.verified_transcript && (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex justify-between items-center font-mono">
                           <span className="text-[9px] text-slate-500 uppercase font-black">Ground-Truth Verification Transcript</span>
                           <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                            Accuracy Match: {simulationResult.transcript_accuracy}%
+                            Accuracy Match: {uploadResult.transcript_accuracy}%
                           </span>
                         </div>
                         <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-xs font-mono text-slate-355 italic max-h-32 overflow-y-auto leading-relaxed select-text">
-                          "{simulationResult.verified_transcript}"
+                          "{uploadResult.verified_transcript}"
                         </div>
                       </div>
                     )}
@@ -1362,7 +1362,7 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
               <div className="border-t border-slate-800 pt-4 mt-2 flex gap-4">
                 <button
                   type="button"
-                  onClick={() => onTriggered(simulationResult)}
+                  onClick={() => onTriggered(uploadResult)}
                   className="bg-sky-500 hover:bg-sky-400 text-black font-black py-3 px-6 rounded-xl flex-grow transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-sky-600 uppercase text-xs tracking-wider"
                 >
                   🗺️ WAKE UP KIOSK HUD OVERRIDE
@@ -1370,14 +1370,14 @@ function LiveDispatchSimulator({ onClose, onTriggered }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setSimulationResult(null);
+                    setUploadResult(null);
                     setAudioFile(null);
                     setVerifiedTranscript('');
                     setErrorMsg('');
                   }}
                   className="bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold py-3 px-6 rounded-xl transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs"
                 >
-                  🔄 TEST ANOTHER RECORDING
+                  🔄 UPLOAD ANOTHER RECORDING
                 </button>
               </div>
 

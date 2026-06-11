@@ -11,7 +11,7 @@ if %errorlevel% neq 0 (
 )
 
 :: Get current directory with backslashes
-set SCRIPT_PATH=%~dp0update_gis_data.py
+set SCRIPT_PATH=%~dp0scripts\update_gis_data.py
 
 echo Registering monthly GIS update task in Task Scheduler...
 schtasks /create /tn "CFR_GIS_Maintenance" /tr "python \"%SCRIPT_PATH%\"" /sc monthly /mo 1 /d 1 /st 03:00 /f

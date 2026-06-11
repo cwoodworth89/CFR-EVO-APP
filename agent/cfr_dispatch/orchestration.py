@@ -922,8 +922,8 @@ def get_audio_duration(file_path: str) -> float:
         pass
     return 30.0
 
-def poll_simulation_requests(validator, stt_model):
-    """Polls Supabase for pending simulation requests, transcribes and parses, then saves the result."""
+def poll_dispatch_uploads(validator, stt_model):
+    """Polls Supabase for pending dispatch uploads, transcribes and parses, then saves the result."""
     import requests
     import json
     import os
@@ -934,7 +934,7 @@ def poll_simulation_requests(validator, stt_model):
     if not supabase_url or not supabase_key:
         return
         
-    endpoint = f"{supabase_url.rstrip('/')}/rest/v1/simulation_requests?status=eq.pending"
+    endpoint = f"{supabase_url.rstrip('/')}/rest/v1/dispatch_uploads?status=eq.pending"
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}",
@@ -951,10 +951,10 @@ def poll_simulation_requests(validator, stt_model):
             audio_url = req.get("audio_url")
             verified_transcript = req.get("verified_transcript")
             
-            logging.info(f"Processing simulation request {req_id}...")
+            logging.info(f"Processing dispatch upload {req_id}...")
             
             # Update status to processing
-            patch_endpoint = f"{supabase_url.rstrip('/')}/rest/v1/simulation_requests?id=eq.{req_id}"
+            patch_endpoint = f"{supabase_url.rstrip('/')}/rest/v1/dispatch_uploads?id=eq.{req_id}"
             requests.patch(patch_endpoint, headers=headers, json={"status": "processing"}, timeout=10)
             
             try:
@@ -963,7 +963,7 @@ def poll_simulation_requests(validator, stt_model):
                 if "/object/public/" in audio_url:
                     download_url = audio_url.replace("/object/public/", "/object/authenticated/")
                     
-                logging.info(f"Downloading simulation audio from: {download_url}")
+                logging.info(f"Downloading upload audio from: {download_url}")
                 audio_headers = {
                     "apikey": supabase_key,
                     "Authorization": f"Bearer {supabase_key}"
@@ -1005,7 +1005,7 @@ def poll_simulation_requests(validator, stt_model):
                         raise ValueError("Speech-to-Text did not produce any transcript text.")
                         
                     transcript = sanitize_transcript(raw_transcript)
-                    logging.info(f"Simulation transcribed: '{transcript}'")
+                    logging.info(f"Upload transcribed: '{transcript}'")
                     
                     # Parse incident rounds (split by map grid/unit repetitions)
                     announcements = split_rounds(transcript, UNITS_VOCABULARY)
@@ -1028,7 +1028,7 @@ def poll_simulation_requests(validator, stt_model):
                             second_round_matched = True
                             
                     # Geocode and run pipeline to post to live_calls
-                    dispatch_id = f"SIM-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
+                    dispatch_id = f"UPL-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
                     
                     db_payload, responding_units = process_and_post_payload(
                         dispatch_id=dispatch_id,
@@ -1093,7 +1093,7 @@ def poll_simulation_requests(validator, stt_model):
                         },
                         timeout=10
                     )
-                    logging.info(f"Simulation {req_id} completed. Posted Dispatch ID: {dispatch_id}")
+                    logging.info(f"Upload {req_id} completed. Posted Dispatch ID: {dispatch_id}")
                     
                 finally:
                     if os.path.exists(temp_path):
@@ -1103,7 +1103,7 @@ def poll_simulation_requests(validator, stt_model):
                             pass
                             
             except Exception as e:
-                logging.error(f"Error processing simulation request: {e}", exc_info=True)
+                logging.error(f"Error processing dispatch upload: {e}", exc_info=True)
                 requests.patch(
                     patch_endpoint,
                     headers=headers,
@@ -1114,22 +1114,22 @@ def poll_simulation_requests(validator, stt_model):
                     timeout=10
                 )
     except Exception as e:
-        logging.error(f"Failed to poll simulation requests: {e}")
+        logging.error(f"Failed to poll dispatch uploads: {e}")
 
-def start_simulation_poller(validator, stt_model):
-    """Starts the simulation requests polling loop in a daemon background thread."""
+def start_dispatch_upload_poller(validator, stt_model):
+    """Starts the dispatch uploads polling loop in a daemon background thread."""
     import threading
     
     def poll_thread():
-        logging.info("Starting simulation requests poller thread...")
+        logging.info("Starting dispatch uploads poller thread...")
         while True:
             try:
-                poll_simulation_requests(validator, stt_model)
+                poll_dispatch_uploads(validator, stt_model)
             except Exception as e:
-                logging.error(f"Error in simulation poller thread: {e}")
+                logging.error(f"Error in dispatch uploads poller thread: {e}")
             time.sleep(5.0)
             
-    t = threading.Thread(target=poll_thread, name="SimulationPoller", daemon=True)
+    t = threading.Thread(target=poll_thread, name="DispatchUploadPoller", daemon=True)
     t.start()
 
 def background_worker_loop(task_queue: multiprocessing.Queue):
@@ -1171,8 +1171,8 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
         except Exception as e:
             logging.error(f"Failed to pre-load Whisper model: {e}. Will load on demand.", exc_info=True)
 
-    # Start simulation requests poller thread
-    start_simulation_poller(validator, stt_model)
+    # Start dispatch uploads poller thread
+    start_dispatch_upload_poller(validator, stt_model)
 
     triggered_phase_1_ids = set()
     phase_1_trigger_lengths = {}

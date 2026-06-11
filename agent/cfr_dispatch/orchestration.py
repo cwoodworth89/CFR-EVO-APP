@@ -55,6 +55,7 @@ from cfr_dispatch.parser import (
     parse_alarm_level,
     abbreviate_units,
     parse_dispatch_announcement,
+    split_rounds,
     CALL_TYPES
 )
 from cfr_dispatch.gis import CoquitlamDataValidator
@@ -293,7 +294,7 @@ def google_geocode_fallback(address: str, api_key: str) -> tuple[dict | None, st
         return None, None
 
 
-def process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None, verified_transcript=None):
+def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None, verified_transcript=None):
     """Common logic for geocoding, preparing DB payload, and posting to Supabase/NTFY."""
     try:
         unique_addresses = []
@@ -304,13 +305,13 @@ def process_and_post_payload(dispatch_id, transcript, all_candidates, validator,
                 unique_addresses.append(d.intersection)
                 
         # Parse Incident Type
-        incident_type = match_incident_type(transcript, CALL_TYPES)
+        incident_type = match_incident_type(sanitized_transcript, CALL_TYPES)
         alarm_level = 1
         units_str = next((d.units for d in all_candidates if d.units), None)
         responding_units = abbreviate_units(units_str)
 
         # Check for specific placeholder phrase
-        is_specific_placeholder = "contact dispatch" in transcript or "location information" in transcript
+        is_specific_placeholder = "contact dispatch" in sanitized_transcript.lower() or "location information" in sanitized_transcript.lower()
         
         if is_specific_placeholder:
             unique_addresses = ["Contact dispatch for location information"]
@@ -437,7 +438,8 @@ def process_and_post_payload(dispatch_id, transcript, all_candidates, validator,
             "alarm_level": alarm_level,
             "responding_units": responding_units,
             "timestamp": timestamp,
-            "raw_transcript": transcript,
+            "raw_transcript": raw_transcript,
+            "sanitized_transcript": sanitized_transcript,
             "confidence_score": confidence_score,
             "verify_location": verify_location
         }
@@ -573,7 +575,7 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
         transcript = sanitize_transcript(raw_transcript)
         
         # 3. Parse announcements
-        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+        announcements = split_rounds(transcript, units_vocabulary)
         all_candidates = []
         for text in announcements:
             if len(text.split()) > 2:
@@ -583,7 +585,7 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
         audio_url, audio_duration = save_and_upload_audio(dispatch_id, buffer, tone_name)
         
         # 5. Geocode and Post
-        process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocabulary,
+        process_and_post_payload(dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocabulary,
                                  audio_url=audio_url, audio_duration=audio_duration)
     except Exception as e:
         logging.error(f"Error processing dispatch ID {dispatch_id}: {e}", exc_info=True)
@@ -678,7 +680,7 @@ def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_mod
         transcript = sanitize_transcript(raw_transcript)
         
         # 3. Parse announcements
-        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+        announcements = split_rounds(transcript, units_vocab)
         all_candidates = []
         for text in announcements:
             if len(text.split()) > 2:
@@ -690,7 +692,7 @@ def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_mod
             
             # Post Phase 1 payload to Supabase
             db_payload, responding_units = process_and_post_payload(
-                dispatch_id, transcript, all_candidates, validator, units_vocab, verify_location_override=False
+                dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab, verify_location_override=False
             )
             
             if db_payload:
@@ -698,6 +700,7 @@ def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_mod
                 triggered_phase_1_ids.add(dispatch_id)
                 phase_1_trigger_lengths[dispatch_id] = len(buffer)
                 phase_1_candidates[dispatch_id] = {
+                    "raw_transcript": raw_transcript,
                     "transcript": transcript,
                     "candidates": all_candidates,
                     "units": responding_units,
@@ -758,7 +761,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
         logging.info(f"Phase 2 Sanitized Transcript: '{transcript}'")
         
         # 3. Parse announcements
-        announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+        announcements = split_rounds(transcript, units_vocab)
         all_candidates = []
         for text in announcements:
             if len(text.split()) > 2:
@@ -768,7 +771,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
         if not p1_data:
             # Fallback: Phase 1 never triggered, so we just treat this as a standard single-phase run
             logging.info("Phase 1 fallback: Inserting new record in single-phase mode.")
-            process_and_post_payload(dispatch_id, transcript, all_candidates, validator, units_vocab,
+            process_and_post_payload(dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab,
                                      audio_url=audio_url, audio_duration=audio_duration)
         else:
             # Phase 1 did trigger! We compare Phase 2 with Phase 1 to verify or correct
@@ -777,6 +780,13 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             
             p1_addr = (p1_candidate.address or p1_candidate.intersection or "").lower() if p1_candidate else ""
             p2_addr = (p2_candidate.address or p2_candidate.intersection or "").lower() if p2_candidate else ""
+            
+            # Combine Phase 1 and Phase 2 transcripts
+            p1_raw = p1_data.get("raw_transcript") or p1_data.get("transcript") or ""
+            p1_sanitized = p1_data.get("transcript") or ""
+            
+            full_raw = f"{p1_raw} {raw_transcript}".strip() if p1_raw else raw_transcript
+            full_sanitized = f"{p1_sanitized} {transcript}".strip() if p1_sanitized else transcript
             
             # Compare addresses
             addresses_match = p1_addr == p2_addr and p1_addr != ""
@@ -792,7 +802,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         "verify_location": False,
                         "confidence_score": 100.0,  # Boost confidence to 100% since both rounds verified it
                         "audio_url": audio_url,
-                        "audio_duration": audio_duration
+                        "audio_duration": audio_duration,
+                        "raw_transcript": full_raw,
+                        "sanitized_transcript": full_sanitized
                     }
                     update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
             else:
@@ -819,7 +831,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             "verify_location": False,
                             "confidence_score": float(res["confidence"]),
                             "audio_url": audio_url,
-                            "audio_duration": audio_duration
+                            "audio_duration": audio_duration,
+                            "raw_transcript": full_raw,
+                            "sanitized_transcript": full_sanitized
                         }
                         if INTEGRATION_PAYLOAD_OPTION == 1:
                             update_payload["address"] = res["address"]
@@ -863,7 +877,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             update_payload = {
                                 "verify_location": True,
                                 "audio_url": audio_url,
-                                "audio_duration": audio_duration
+                                "audio_duration": audio_duration,
+                                "raw_transcript": full_raw,
+                                "sanitized_transcript": full_sanitized
                             }
                             update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
                 else:
@@ -874,7 +890,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         update_payload = {
                             "verify_location": False,
                             "audio_url": audio_url,
-                            "audio_duration": audio_duration
+                            "audio_duration": audio_duration,
+                            "raw_transcript": full_raw,
+                            "sanitized_transcript": full_sanitized
                         }
                         update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
                         
@@ -989,8 +1007,8 @@ def poll_simulation_requests(validator, stt_model):
                     transcript = sanitize_transcript(raw_transcript)
                     logging.info(f"Simulation transcribed: '{transcript}'")
                     
-                    # Parse incident rounds (split by coquitlam keyword)
-                    announcements = re.split(r'\bcoquitlam\b', transcript, flags=re.IGNORECASE)
+                    # Parse incident rounds (split by map grid/unit repetitions)
+                    announcements = split_rounds(transcript, UNITS_VOCABULARY)
                     all_candidates = []
                     for text in announcements:
                         if len(text.split()) > 2:
@@ -1014,7 +1032,8 @@ def poll_simulation_requests(validator, stt_model):
                     
                     db_payload, responding_units = process_and_post_payload(
                         dispatch_id=dispatch_id,
-                        transcript=transcript,
+                        raw_transcript=raw_transcript,
+                        sanitized_transcript=transcript,
                         all_candidates=all_candidates,
                         validator=validator,
                         units_vocabulary=UNITS_VOCABULARY,
@@ -1050,7 +1069,8 @@ def poll_simulation_requests(validator, stt_model):
                         "responding_units": db_payload.get("responding_units", []),
                         "target": target_obj,
                         "address": target_obj.get("address"),
-                        "raw_transcript": transcript,
+                        "raw_transcript": raw_transcript,
+                        "sanitized_transcript": transcript,
                         "confidence_score": db_payload.get("confidence_score", 0.0),
                         "verify_location": False,
                         "radio_channel": next((d.radio_channel for d in all_candidates if d.radio_channel), None),

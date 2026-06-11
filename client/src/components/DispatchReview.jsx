@@ -679,13 +679,102 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   </div>
                 )}
 
-                {/* Transcript side-by-side */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-450 font-extrabold uppercase font-mono">
-                    Raw Transcript (STT Output)
+                {/* 3-Stage Pipeline Flow Timeline */}
+                <div className="flex flex-col gap-3 mt-2">
+                  <span className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                    Pipeline Execution Flow
                   </span>
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850 text-xs text-slate-400 font-mono italic max-h-24 overflow-y-auto leading-relaxed select-text">
-                    "{selectedCall.raw_transcript || 'No transcript text captured'}"
+
+                  <div className="relative border-l border-slate-800 pl-4 ml-2 flex flex-col gap-4">
+                    {/* Stage 1: Raw STT Output */}
+                    <div className="relative">
+                      {/* Timeline Dot */}
+                      <span className="absolute -left-[21px] top-1.5 flex h-2 w-2 rounded-full bg-slate-500 border border-slate-900 ring-4 ring-slate-950"></span>
+                      
+                      <div className="flex flex-col gap-1 bg-slate-950 border border-slate-850 rounded-xl p-3 shadow-inner">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide font-mono">
+                            Stage 1: Raw STT Output
+                          </span>
+                          {(selectedCall.raw_transcript === "[Transcription Failed]" || !selectedCall.raw_transcript) && (
+                            <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/20 tracking-wider">
+                              FAILED
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono italic mt-1 leading-relaxed select-text select-all">
+                          "{selectedCall.raw_transcript || 'No transcript text captured'}"
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stage 2: Parser Output */}
+                    <div className="relative">
+                      {/* Timeline Dot */}
+                      <span className="absolute -left-[21px] top-1.5 flex h-2 w-2 rounded-full bg-sky-500 border border-slate-900 ring-4 ring-slate-950"></span>
+                      
+                      <div className="flex flex-col gap-1 bg-sky-950/20 border border-sky-900/30 rounded-xl p-3 shadow-inner">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wide font-mono">
+                            Stage 2: Parser Output
+                          </span>
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 tracking-wider">
+                            HOMOPHONES RESOLVED
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-300 font-mono mt-1 leading-relaxed select-text select-all">
+                          "{selectedCall.sanitized_transcript || selectedCall.raw_transcript || 'No text'}"
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stage 3: Extracted Metadata */}
+                    <div className="relative">
+                      {/* Timeline Dot */}
+                      <span className="absolute -left-[21px] top-1.5 flex h-2 w-2 rounded-full bg-emerald-500 border border-slate-900 ring-4 ring-slate-950"></span>
+                      
+                      <div className="flex flex-col gap-2 bg-emerald-950/10 border border-emerald-900/20 rounded-xl p-3 shadow-inner">
+                        <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wide font-mono">
+                          Stage 3: Extracted Metadata
+                        </span>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          {/* Incident Type Badge */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Incident</span>
+                            <span className="text-[10px] font-bold text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                              {selectedCall.incident_type}
+                            </span>
+                          </div>
+
+                          {/* Address Badge */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Address</span>
+                            <span className="text-[10px] font-bold text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg flex items-center gap-1 max-w-[15rem] truncate" title={selectedCall.target?.address || selectedCall.address}>
+                              📍 {selectedCall.target?.address || selectedCall.address || 'Unknown'}
+                            </span>
+                          </div>
+
+                          {/* Units Badge */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Units</span>
+                            <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                              {selectedCall.responding_units?.join(', ') || 'None'}
+                            </span>
+                          </div>
+
+                          {/* Coordinates Badge */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Coordinates</span>
+                            <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                              {selectedCall.target?.lat && selectedCall.target?.lng 
+                                ? `${selectedCall.target.lat.toFixed(4)}, ${selectedCall.target.lng.toFixed(4)}`
+                                : 'Null'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

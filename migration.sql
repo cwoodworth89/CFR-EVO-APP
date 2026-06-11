@@ -4,6 +4,7 @@
 ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS audio_url TEXT;
 ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS audio_duration NUMERIC(6,2);
 ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS origins TEXT[] DEFAULT '{}';
+ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS sanitized_transcript TEXT;
 
 -- 2. Create the simulation_requests table
 CREATE TABLE IF NOT EXISTS public.simulation_requests (

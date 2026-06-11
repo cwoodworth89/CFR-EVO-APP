@@ -619,3 +619,31 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
         dispatch.radio_channel = fallback_tg_str
         
     return found_dispatches
+
+
+def split_rounds(text: str, units_vocab: List[str]) -> List[str]:
+    """
+    Splits a continuous transcript containing multiple announcement rounds into separate segments.
+    Aligns with Coquitlam dispatch structures where the wake-word is not repeated.
+    Splits by:
+      1. Right after the first "map grid [digits]" phrase.
+      2. Before the second occurrence of a responding unit followed by "respond".
+    """
+    # Normalize spaces
+    text = ' '.join(text.strip().split())
+    
+    # 1. Split right after the first "map grid [digits]" (standard end of Round 1)
+    # E.g. "map grid 12 Engine 1 respond..." -> splits after "map grid 12"
+    grid_split = re.split(r'(?<=\bmap\s+grid\s+\d{1,3}\b)', text, maxsplit=1, flags=re.IGNORECASE)
+    if len(grid_split) >= 2:
+        return [grid_split[0].strip(), grid_split[1].strip()]
+        
+    # 2. Fallback: Split before the second occurrence of a unit followed by "respond"
+    # E.g. "engine 1 respond... engine 1 respond..." -> splits before second "engine 1 respond"
+    unit_pattern = '|'.join(re.escape(u.lower()) for u in units_vocab)
+    matches = list(re.finditer(rf'\b({unit_pattern})\s+\d+\s+respond\b', text, flags=re.IGNORECASE))
+    if len(matches) >= 2:
+        split_idx = matches[1].start()
+        return [text[:split_idx].strip(), text[split_idx:].strip()]
+        
+    return [text]

@@ -34,7 +34,8 @@ from cfr_dispatch.parser import (
     match_incident_type,
     parse_alarm_level,
     abbreviate_units,
-    parse_dispatch_announcement
+    parse_dispatch_announcement,
+    split_rounds
 )
 from cfr_dispatch.config import UNITS_VOCABULARY
 
@@ -51,7 +52,7 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
     print(f"1. Sanitized: '{sanitized}'")
     
     # 2. Parse announcements
-    announcements = re.split(r'\bcoquitlam\b', sanitized, flags=re.IGNORECASE)
+    announcements = split_rounds(sanitized, UNITS_VOCABULARY)
     all_candidates = []
     for text in announcements:
         if len(text.split()) > 2:
@@ -160,7 +161,8 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
         "alarm_level": alarm_level,
         "responding_units": responding_units,
         "timestamp": timestamp,
-        "raw_transcript": sanitized,
+        "raw_transcript": transcript,
+        "sanitized_transcript": sanitized,
         "confidence_score": confidence_score,
         "verify_location": verify_location,
         "target": {
@@ -178,7 +180,8 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
     # Verify fields match specification
     assert db_payload["dispatch_id"].startswith("DISP-2026-")
     assert db_payload["alarm_level"] >= 1
-    assert db_payload["raw_transcript"] == sanitized
+    assert db_payload["raw_transcript"] == transcript
+    assert db_payload["sanitized_transcript"] == sanitized
     assert "confidence_score" in db_payload
     assert "verify_location" in db_payload
     

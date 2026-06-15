@@ -182,16 +182,22 @@ cython_debug/
 
 # Custom CFR Dispatch Mapping Ignores
 agent/data/Property_Information/
+backend/data/Property_Information/
 agent/data/Emergency_Response_Zones/
+backend/data/Emergency_Response_Zones/
 scratch/
 temp_dispatch_*.wav
 temp_dispatch_full.wav
 *.log
 agent/*.json
+backend/*.json
 agent/test_calls/
+backend/tests/test_calls/
 *.json.key
 agent/audio_files/
+backend/audio_files/
 agent/client/public/recordings/
+frontend/public/recordings/
 
 # Block all audio files from Git globally
 *.wav
@@ -199,3 +205,4 @@ agent/client/public/recordings/
 *.ogg
 *.flac
 *.m4a
+*.aup3

@@ -6,7 +6,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, CranesLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
@@ -252,6 +252,7 @@ export default function MapBoard() {
   const [showHydrants, setShowHydrants] = useState(true); 
   const [showZones, setShowZones] = useState(false); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
+  const [showCranes, setShowCranes] = useState(false); 
   
   // COLLAPSIBLE SIDEBAR STATES
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
@@ -1091,6 +1092,8 @@ export default function MapBoard() {
           setShowRoadClosures={setShowRoadClosures}
           showLabels={showLabels}
           setShowLabels={setShowLabels}
+          showCranes={showCranes}
+          setShowCranes={setShowCranes}
           addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
@@ -1129,6 +1132,9 @@ export default function MapBoard() {
             
             {/* Hydrants Visual GIS Overlay */}
             <HydrantsLayer visible={showHydrants} />
+            
+            {/* Tower Cranes Map Overlay */}
+            <CranesLayer visible={showCranes} />
             
             {/* 2. DEFINE CUSTOM PANES */}
             <Pane name="underlayPane" style={{ zIndex: 390 }} />

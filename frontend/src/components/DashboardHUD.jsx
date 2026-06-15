@@ -387,6 +387,8 @@ export function LeftSidebar({
   setShowRoadClosures,
   showLabels,
   setShowLabels,
+  showCranes,
+  setShowCranes,
   homeHall,
   setHomeHall,
   targetAddress,
@@ -417,6 +419,16 @@ export function LeftSidebar({
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const [suggestions, setSuggestions] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
+  const [cranesList, setCranesList] = React.useState([]);
+
+  React.useEffect(() => {
+    if (showCranes) {
+      fetch('/data/tower_cranes.json')
+        .then(r => r.json())
+        .then(setCranesList)
+        .catch(console.warn);
+    }
+  }, [showCranes]);
 
   // Reset activeIndex whenever query changes or suggestions show status shifts
   React.useEffect(() => {
@@ -733,6 +745,48 @@ export function LeftSidebar({
                              />
                              <span className="flex items-center gap-1.5">📐 Emergency Zones</span>
                           </label>
+                          
+                          {/* 🏗️ TOWER CRANES OVERLAY */}
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                             <input 
+                                type="checkbox" 
+                                checked={showCranes} 
+                                onChange={(e) => setShowCranes(e.target.checked)} 
+                                className="rounded border-slate-800 bg-slate-950 text-orange-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                             />
+                             <span className="flex items-center gap-1.5">🏗️ Tower Cranes</span>
+                          </label>
+                          {showCranes && cranesList.length > 0 && (
+                             <div className="flex flex-col gap-1 pl-6.5 mt-1 transition-all duration-300">
+                                <select
+                                   onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val && map) {
+                                         const selected = cranesList.find(c => c.id === val);
+                                         if (selected) {
+                                            map.setView([selected.lat, selected.lng], 17);
+                                            setTimeout(() => {
+                                               map.eachLayer(layer => {
+                                                  if (layer instanceof L.Marker) {
+                                                     const latlng = layer.getLatLng();
+                                                     if (Math.abs(latlng.lat - selected.lat) < 0.0001 && Math.abs(latlng.lng - selected.lng) < 0.0001) {
+                                                        layer.openPopup();
+                                                     }
+                                                  }
+                                               });
+                                            }, 300);
+                                         }
+                                      }
+                                   }}
+                                   className="rounded border-slate-800 bg-slate-950 text-slate-300 text-xs w-full py-1.5 px-2 focus:ring-orange-500 focus:border-orange-500 border cursor-pointer"
+                                >
+                                   <option value="">-- Zoom to Crane --</option>
+                                   {cranesList.map(c => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                   ))}
+                                </select>
+                             </div>
+                          )}
                        </div>
                     </div>
 

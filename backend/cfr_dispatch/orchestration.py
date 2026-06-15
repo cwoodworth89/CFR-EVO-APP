@@ -41,13 +41,21 @@ from cfr_dispatch.config import (
     ADAPTATION_RESOURCE_IDS,
     BOOST_MAPPING,
     GCP_PROJECT_ID,
-    RECOGNIZER_RESOURCE_NAME
+    RECOGNIZER_RESOURCE_NAME,
+    ADDRESS_HOUSE_NUM_COLUMN,
+    ADDRESS_STREET_NAME_COLUMN,
+    ADDRESS_STREET_TYPE_COLUMN,
+    ADDRESS_FULL_ADDR_COLUMN,
+    STREET_NAME_CONFIDENCE_THRESHOLD,
+    ZONES_MAP_NAME_COLUMN,
+    VERBOSITY_LEVEL
 )
-from cfr_dispatch.dsp import (
+from audio_service import (
     get_rms,
     analyze_live_audio,
     get_best_match,
-    filter_known_tones
+    filter_known_tones,
+    capture_full_dispatch
 )
 from cfr_dispatch.parser import (
     sanitize_transcript,
@@ -58,8 +66,8 @@ from cfr_dispatch.parser import (
     split_rounds,
     CALL_TYPES
 )
-from cfr_dispatch.gis import CoquitlamDataValidator
-from cfr_dispatch.integration import (
+from gis_service import CoquitlamDataValidator
+from notification_service import (
     post_to_supabase,
     post_to_ntfy,
     update_supabase_record,
@@ -70,24 +78,44 @@ from cfr_dispatch.integration import (
 dispatch_queue = multiprocessing.Queue()
 
 def setup_logging():
-    """Configures global debug logs and console streams."""
+    """Configures global debug logs and console streams using daily 0800 shift rotation."""
     import time
+    import datetime
+    from logging.handlers import TimedRotatingFileHandler
+    
     # Configure logging formatters globally to use local time (Pacific Time)
     logging.Formatter.converter = time.localtime
 
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    
+    # Map verbosity levels: 0 (MUTED), 1 (STANDARD), 2 (VERBOSE), 3 (TRACE)
+    if VERBOSITY_LEVEL == 0:
+        log_level = logging.ERROR
+    elif VERBOSITY_LEVEL == 1:
+        log_level = logging.INFO
+    else:
+        log_level = logging.DEBUG
+        
+    logger.setLevel(log_level)
     if logger.hasHandlers():
         logger.handlers.clear()
         
-    file_handler = logging.FileHandler('dispatch.log', mode='a')
-    file_handler.setLevel(logging.DEBUG)
+    # Timed Rotating File Handler (rotates daily at 08:00, retains 10 backups)
+    log_file = 'dispatch.log'
+    file_handler = TimedRotatingFileHandler(
+        log_file,
+        when='D',
+        interval=1,
+        backupCount=10,
+        atTime=datetime.time(8, 0, 0)
+    )
+    file_handler.setLevel(logging.DEBUG if VERBOSITY_LEVEL >= 2 else logging.INFO)
     file_formatter = logging.Formatter('%(asctime)s - %(levelname)-8s - %(threadName)s - %(funcName)s - %(message)s')
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
     
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.INFO if VERBOSITY_LEVEL >= 1 else logging.WARNING)
     console_formatter = logging.Formatter('%(asctime)s - %(levelname)-8s - %(message)s')
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
@@ -174,7 +202,9 @@ def transcribe_audio_bytes(content: bytes) -> str | None:
         return None
 
 def transcribe_audio_file(file_path: str) -> str | None:
-    """Transcribes audio file using Google Cloud Speech-to-Text v2."""
+    """Transcribes audio file respecting STT_ENGINE configuration."""
+    if STT_ENGINE == "whisper":
+        return transcribe_audio_file_local(file_path)
     try:
         with open(file_path, "rb") as audio_file:
             content = audio_file.read()
@@ -496,7 +526,7 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str) -> tup
         logging.info(f"Recorded audio duration: {duration_seconds}s")
         
         # Filter tones to create clean listening wav (same as what gets transcribed)
-        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE, GOLDEN_FINGERPRINTS)
         
         # Convert to WAV bytes in memory
         wav_io = io.BytesIO()
@@ -553,7 +583,7 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
             
         # 1. Combine and Filter Audio
         full_dispatch_audio = np.concatenate(buffer)
-        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE, GOLDEN_FINGERPRINTS)
         
         # 2. Transcribe Audio (100% In-Memory)
         raw_transcript = None
@@ -659,7 +689,7 @@ def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_mod
     try:
         # 1. Combine and Filter Audio
         full_dispatch_audio = np.concatenate(buffer)
-        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE, GOLDEN_FINGERPRINTS)
         
         # 2. Transcribe Audio (100% In-Memory)
         raw_transcript = None
@@ -738,7 +768,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             
         # 1. Combine and Filter Audio
         full_dispatch_audio = np.concatenate(second_round_buffer)
-        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE)
+        filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE, GOLDEN_FINGERPRINTS)
         
         # 2. Transcribe Audio (100% In-Memory)
         raw_transcript = None
@@ -1140,7 +1170,16 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
     setup_logging()
     logging.info("Background Dispatch Worker process starting...")
     try:
-        validator = CoquitlamDataValidator(ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH)
+        validator = CoquitlamDataValidator(
+            ADDRESS_SHAPEFILE_PATH,
+            ZONES_SHAPEFILE_PATH,
+            house_num_col=ADDRESS_HOUSE_NUM_COLUMN,
+            street_name_col=ADDRESS_STREET_NAME_COLUMN,
+            street_type_col=ADDRESS_STREET_TYPE_COLUMN,
+            full_addr_col=ADDRESS_FULL_ADDR_COLUMN,
+            zone_map_name_col=ZONES_MAP_NAME_COLUMN,
+            street_confidence_threshold=STREET_NAME_CONFIDENCE_THRESHOLD
+        )
         logging.info("Background Dispatch Worker process initialized and ready.")
     except Exception as e:
         logging.critical(f"Failed to initialize validator in worker process: {e}", exc_info=True)
@@ -1256,8 +1295,8 @@ def run_dispatch_system():
                         if len(analysis_buffer) * blocksize >= TONE_ANALYSIS_DURATION_SECONDS * AUDIO_SAMPLE_RATE:
                             logging.info("Analyzing captured audio for a dispatch tone...")
                             full_sample_np = np.concatenate(analysis_buffer)
-                            live_frequencies = analyze_live_audio(full_sample_np.tobytes())
-                            matched_tone, score = get_best_match(live_frequencies)
+                            live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND)
+                            matched_tone, score = get_best_match(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
                             if matched_tone:
                                 logging.info(f"TONE CONFIRMED: '{matched_tone}' (Match: {score*100:.0f}%)")
                                 break
@@ -1284,7 +1323,7 @@ def run_dispatch_system():
                     current_threshold = max(NOISE_AMPLITUDE_THRESHOLD, current_baseline * 2.5)
 
                     current_time = time.time()
-                    if current_time - last_log_time >= 5.0:
+                    if VERBOSITY_LEVEL >= 3 and current_time - last_log_time >= 5.0:
                         logging.debug(f"Listening... RMS: {int(rms):<5} | Threshold: {int(current_threshold):<5} | Loud Chunks: {sum(loudness_history)}/{SUSTAINED_LOUDNESS_CHUNKS_REQUIRED}")
                         last_log_time = current_time
 
@@ -1299,7 +1338,21 @@ def run_dispatch_system():
 
                 # Dispatch Capture
                 dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
-                dispatch_buffer = capture_full_dispatch(stream, blocksize, dispatch_queue, dispatch_id, matched_tone, initial_buffer=analysis_buffer)
+                dispatch_buffer = capture_full_dispatch(
+                    stream,
+                    blocksize,
+                    dispatch_queue,
+                    dispatch_id,
+                    matched_tone,
+                    initial_buffer=analysis_buffer,
+                    sample_rate=AUDIO_SAMPLE_RATE,
+                    max_duration_s=MAX_DISPATCH_DURATION_S,
+                    min_phase_1_duration_s=MIN_PHASE_1_DURATION_S,
+                    phase_1_check_interval_s=PHASE_1_CHECK_INTERVAL_S,
+                    end_of_dispatch_rms_threshold=END_OF_DISPATCH_RMS_THRESHOLD,
+                    end_of_dispatch_silence_s=END_OF_DISPATCH_SILENCE_S,
+                    units_vocabulary=UNITS_VOCABULARY
+                )
                 if dispatch_buffer:
                     logging.info(f"Queueing finalized dispatch ID {dispatch_id} for background processor core...")
                     dispatch_queue.put({

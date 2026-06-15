@@ -1,70 +1,36 @@
-# cfr_dispatch/gis.py
-# GIS Shapefile parser, coordinates re-projector, and spatial grid validator
-
 import re
 import logging
 import geopandas as gpd
 from shapely.geometry import Point
 from thefuzz import fuzz
+from typing import List, Tuple
 
-from cfr_dispatch.config import (
-    ADDRESS_HOUSE_NUM_COLUMN,
-    ADDRESS_STREET_NAME_COLUMN,
-    ADDRESS_STREET_TYPE_COLUMN,
-    ADDRESS_FULL_ADDR_COLUMN,
-    STREET_NAME_CONFIDENCE_THRESHOLD,
-    ZONES_MAP_NAME_COLUMN
-)
+from gis_service.shapefile_loader import load_addresses, load_zones
 
 class CoquitlamDataValidator:
-    def __init__(self, address_shp_path: str, zones_shp_path: str):
-        self.addresses_gdf = None
-        self.zones_gdf = None
-        self.zones_crs = None
-        self.zones_sindex = None
-        self.house_number_index = {} # O(1) startup index
+    def __init__(self, 
+                 address_shp_path: str, 
+                 zones_shp_path: str,
+                 house_num_col: str = "HOUSE",
+                 street_name_col: str = "STREET",
+                 street_type_col: str = "STREETTYPE",
+                 full_addr_col: str = "ADDRESS",
+                 zone_map_name_col: str = "MAP_NAME",
+                 street_confidence_threshold: int = 80):
         
-        self._load_data(address_shp_path, zones_shp_path)
+        self.house_num_col = house_num_col
+        self.street_name_col = street_name_col
+        self.street_type_col = street_type_col
+        self.full_addr_col = full_addr_col
+        self.zone_map_name_col = zone_map_name_col
+        self.street_confidence_threshold = street_confidence_threshold
+        
+        self.addresses_gdf, self.house_number_index = load_addresses(
+            address_shp_path, house_num_col, street_name_col, street_type_col
+        )
+        self.zones_gdf, self.zones_crs, self.zones_sindex = load_zones(zones_shp_path)
 
-    def _load_data(self, address_shp_path: str, zones_shp_path: str):
-        # 1. Load Address Shapefiles
-        try:
-            logging.info(f"Loading Coquitlam address data from: {address_shp_path} (using pyogrio engine)")
-            self.addresses_gdf = gpd.read_file(address_shp_path, engine="pyogrio")
-            
-            # Normalize shapefile fields
-            self.addresses_gdf[ADDRESS_HOUSE_NUM_COLUMN] = self.addresses_gdf[ADDRESS_HOUSE_NUM_COLUMN].astype(str).str.strip()
-            self.addresses_gdf[ADDRESS_STREET_NAME_COLUMN] = self.addresses_gdf[ADDRESS_STREET_NAME_COLUMN].astype(str).str.strip()
-            self.addresses_gdf[ADDRESS_STREET_TYPE_COLUMN] = self.addresses_gdf[ADDRESS_STREET_TYPE_COLUMN].astype(str).str.strip()
-            
-            # Build fast in-memory lookups
-            logging.info("Indexing address points into fast lookup dictionary...")
-            self.house_number_index = {}
-            for _, row in self.addresses_gdf.iterrows():
-                house_num = row[ADDRESS_HOUSE_NUM_COLUMN]
-                if house_num not in self.house_number_index:
-                    self.house_number_index[house_num] = []
-                self.house_number_index[house_num].append(row)
-                
-            logging.info(f"Successfully loaded and indexed {len(self.addresses_gdf)} Coquitlam addresses.")
-        except Exception as e:
-            logging.error(f"FATAL: Could not load or process Coquitlam address Shapefile: {e}", exc_info=True)
-            self.addresses_gdf = None
-
-        # 2. Load Zone Shapefiles
-        try:
-            logging.info(f"Loading Coquitlam emergency response zones from: {zones_shp_path} (using pyogrio engine)")
-            self.zones_gdf = gpd.read_file(zones_shp_path, engine="pyogrio")
-            self.zones_crs = self.zones_gdf.crs
-            
-            logging.info("Building spatial index for emergency zones...")
-            self.zones_sindex = self.zones_gdf.sindex
-            logging.info(f"Successfully loaded {len(self.zones_gdf)} Coquitlam emergency zones.")
-        except Exception as e:
-            logging.error(f"FATAL: Could not load Coquitlam emergency zones Shapefile: {e}", exc_info=True)
-            self.zones_gdf = None
-
-    def validate_address_exists(self, parsed_address: str) -> tuple[int, str | None]:
+    def validate_address_exists(self, parsed_address: str) -> Tuple[int, str | None]:
         """Surgically checks if a parsed address exists in our local GIS database."""
         if self.addresses_gdf is None or not parsed_address:
             return 0, None
@@ -86,14 +52,14 @@ class CoquitlamDataValidator:
         best_score = 0
         best_match_full_address = None
         for row in possible_matches:
-            db_full_street = f"{row[ADDRESS_STREET_NAME_COLUMN]} {row[ADDRESS_STREET_TYPE_COLUMN]}".upper()
+            db_full_street = f"{row[self.street_name_col]} {row[self.street_type_col]}".upper()
             score = fuzz.token_set_ratio(parsed_street, db_full_street.strip())
             if score > best_score:
                 best_score = score
-                best_match_full_address = row[ADDRESS_FULL_ADDR_COLUMN]
+                best_match_full_address = row[self.full_addr_col]
                 
         logging.debug(f"GIS Lookup for '{parsed_address}': Best street match score = {best_score}%")
-        if best_score >= STREET_NAME_CONFIDENCE_THRESHOLD:
+        if best_score >= self.street_confidence_threshold:
             return best_score, best_match_full_address
         return best_score, None
 
@@ -137,13 +103,13 @@ class CoquitlamDataValidator:
         best_score = 0
         best_row = None
         for row in possible_matches:
-            db_full_street = f"{row[ADDRESS_STREET_NAME_COLUMN]} {row[ADDRESS_STREET_TYPE_COLUMN]}".upper().strip()
+            db_full_street = f"{row[self.street_name_col]} {row[self.street_type_col]}".upper().strip()
             score = fuzz.token_set_ratio(parsed_street, db_full_street)
             if score > best_score:
                 best_score = score
                 best_row = row
                 
-        if best_score >= STREET_NAME_CONFIDENCE_THRESHOLD and best_row is not None:
+        if best_score >= self.street_confidence_threshold and best_row is not None:
             try:
                 # Convert geometry to WGS84 (EPSG:4326)
                 geom_gdf = gpd.GeoDataFrame([best_row], crs=self.addresses_gdf.crs)
@@ -166,7 +132,7 @@ class CoquitlamDataValidator:
                     
                 rings = extract_rings(matched_geom)
                 return {
-                    "address": best_row[ADDRESS_FULL_ADDR_COLUMN],
+                    "address": best_row[self.full_addr_col],
                     "lat": centroid.y,
                     "lng": centroid.x,
                     "rings": rings,
@@ -187,7 +153,7 @@ class CoquitlamDataValidator:
             point_geom = point_gdf.geometry.iloc[0]
             possible_matches_idx = list(self.zones_sindex.intersection(point_geom.bounds))
             possible_matches = self.zones_gdf.iloc[possible_matches_idx]
-            target_zone = possible_matches[possible_matches[ZONES_MAP_NAME_COLUMN] == grid_id]
+            target_zone = possible_matches[possible_matches[self.zone_map_name_col] == grid_id]
             
             if target_zone.empty:
                 return False

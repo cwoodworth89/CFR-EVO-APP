@@ -17,13 +17,21 @@ if parent_dir not in sys.path:
 try:
     from agent.cfr_dispatch.orchestration import transcribe_audio_file
     from agent.cfr_dispatch.parser import sanitize_transcript, parse_dispatch_announcement, abbreviate_units
-    from agent.cfr_dispatch.config import UNITS_VOCABULARY, ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH
-    from agent.cfr_dispatch.gis import CoquitlamDataValidator
+    from agent.cfr_dispatch.config import (
+        UNITS_VOCABULARY, ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH,
+        ADDRESS_HOUSE_NUM_COLUMN, ADDRESS_STREET_NAME_COLUMN, ADDRESS_STREET_TYPE_COLUMN,
+        ADDRESS_FULL_ADDR_COLUMN, STREET_NAME_CONFIDENCE_THRESHOLD, ZONES_MAP_NAME_COLUMN
+    )
+    from gis_service import CoquitlamDataValidator
 except ImportError:
     from cfr_dispatch.orchestration import transcribe_audio_file
     from cfr_dispatch.parser import sanitize_transcript, parse_dispatch_announcement, abbreviate_units
-    from cfr_dispatch.config import UNITS_VOCABULARY, ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH
-    from cfr_dispatch.gis import CoquitlamDataValidator
+    from cfr_dispatch.config import (
+        UNITS_VOCABULARY, ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH,
+        ADDRESS_HOUSE_NUM_COLUMN, ADDRESS_STREET_NAME_COLUMN, ADDRESS_STREET_TYPE_COLUMN,
+        ADDRESS_FULL_ADDR_COLUMN, STREET_NAME_CONFIDENCE_THRESHOLD, ZONES_MAP_NAME_COLUMN
+    )
+    from gis_service import CoquitlamDataValidator
 
 # ANSI Color Codes for Windows terminal output
 COLOR_GREEN = "\033[92m"
@@ -110,7 +118,13 @@ def run_diagnostics():
     try:
         validator = CoquitlamDataValidator(
             os.path.join(parent_dir, ADDRESS_SHAPEFILE_PATH),
-            os.path.join(parent_dir, ZONES_SHAPEFILE_PATH)
+            os.path.join(parent_dir, ZONES_SHAPEFILE_PATH),
+            house_num_col=ADDRESS_HOUSE_NUM_COLUMN,
+            street_name_col=ADDRESS_STREET_NAME_COLUMN,
+            street_type_col=ADDRESS_STREET_TYPE_COLUMN,
+            full_addr_col=ADDRESS_FULL_ADDR_COLUMN,
+            zone_map_name_col=ZONES_MAP_NAME_COLUMN,
+            street_confidence_threshold=STREET_NAME_CONFIDENCE_THRESHOLD
         )
         print("GIS Database initialized successfully.")
     except Exception as e:
@@ -133,7 +147,7 @@ def run_diagnostics():
         # 1. Transcribe Audio
         actual_raw_transcript = transcribe_audio_file(wav_path)
         if not actual_raw_transcript:
-            print(f"  {COLOR_RED}❌ STT FAILURE: Transcription failed to return text.{COLOR_RESET}\n")
+            print(f"  {COLOR_RED}[FAIL] STT FAILURE: Transcription failed to return text.{COLOR_RESET}\n")
             results.append({
                 "file": wav_file,
                 "score": 0.0,

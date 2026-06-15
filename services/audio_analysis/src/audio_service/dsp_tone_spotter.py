@@ -1,15 +1,5 @@
-# cfr_dispatch/dsp.py
-# Digital Signal Processing and Tone Detection algorithms
-
 import numpy as np
 from scipy import signal
-from cfr_dispatch.config import (
-    AUDIO_SAMPLE_RATE,
-    NUM_PEAKS_TO_FIND,
-    GOLDEN_FINGERPRINTS,
-    FREQUENCY_TOLERANCE_HZ,
-    MATCH_THRESHOLD_PERCENT
-)
 
 def get_rms(data: np.ndarray) -> float:
     """Computes the root-mean-square value of a PCM audio array."""
@@ -17,7 +7,7 @@ def get_rms(data: np.ndarray) -> float:
         return 0.0
     return np.sqrt(np.mean(data.astype(np.float32)**2))
 
-def analyze_live_audio(data: bytes, num_peaks: int = NUM_PEAKS_TO_FIND) -> set:
+def analyze_live_audio(data: bytes, sample_rate: int, num_peaks: int) -> set:
     """
     Analyzes an audio byte buffer for frequency peaks.
     Applies a high-pass Butterworth filter, a Hamming window to prevent spectral leakage,
@@ -28,7 +18,7 @@ def analyze_live_audio(data: bytes, num_peaks: int = NUM_PEAKS_TO_FIND) -> set:
         return set()
         
     cutoff_hz = 300.0
-    nyquist_freq = 0.5 * AUDIO_SAMPLE_RATE
+    nyquist_freq = 0.5 * sample_rate
     normal_cutoff = cutoff_hz / nyquist_freq
     
     b, a = signal.butter(5, normal_cutoff, btype='high', analog=False)
@@ -39,11 +29,11 @@ def analyze_live_audio(data: bytes, num_peaks: int = NUM_PEAKS_TO_FIND) -> set:
     windowed_signal = filtered_signal * window
     
     fft_data = np.fft.rfft(windowed_signal)
-    fft_freqs = np.fft.rfftfreq(len(windowed_signal), 1.0 / AUDIO_SAMPLE_RATE)
+    fft_freqs = np.fft.rfftfreq(len(windowed_signal), 1.0 / sample_rate)
     fft_magnitude = np.abs(fft_data)
     
     # Enforce minimum peak separation distance of 15 Hz to avoid duplicate adjacent bin detections
-    bin_spacing = AUDIO_SAMPLE_RATE / len(filtered_signal)
+    bin_spacing = sample_rate / len(filtered_signal)
     min_distance_bins = max(1, int(15.0 / bin_spacing))
     
     try:
@@ -60,35 +50,35 @@ def analyze_live_audio(data: bytes, num_peaks: int = NUM_PEAKS_TO_FIND) -> set:
         except (ValueError, IndexError):
             return set()
 
-def get_best_match(live_frequencies: set) -> tuple[str, float] | tuple[None, None]:
+def get_best_match(live_frequencies: set, golden_fingerprints: dict, frequency_tolerance_hz: float, match_threshold_percent: float) -> tuple[str, float] | tuple[None, None]:
     """
-    Compares detected frequency peaks against GOLDEN_FINGERPRINTS.
-    Returns the matched tone name and match ratio if it exceeds the MATCH_THRESHOLD_PERCENT.
+    Compares detected frequency peaks against golden_fingerprints.
+    Returns the matched tone name and match ratio if it exceeds the match_threshold_percent.
     """
     best_match_tone = None
     best_match_score = -1.0
     
-    for tone_name, golden_freqs in GOLDEN_FINGERPRINTS.items():
-        matches_found = sum(1 for gf in golden_freqs if any(abs(lf - gf) <= FREQUENCY_TOLERANCE_HZ for lf in live_frequencies))
+    for tone_name, golden_freqs in golden_fingerprints.items():
+        matches_found = sum(1 for gf in golden_freqs if any(abs(lf - gf) <= frequency_tolerance_hz for lf in live_frequencies))
         score = matches_found / len(golden_freqs) if golden_freqs else 0.0
         
         if score > best_match_score:
             best_match_score = score
             best_match_tone = tone_name
             
-    if best_match_score >= MATCH_THRESHOLD_PERCENT:
+    if best_match_score >= match_threshold_percent:
         return best_match_tone, best_match_score
     return None, None
 
-def filter_known_tones(audio_data: np.ndarray, tone_name: str, sample_rate: int) -> np.ndarray:
+def filter_known_tones(audio_data: np.ndarray, tone_name: str, sample_rate: int, golden_fingerprints: dict) -> np.ndarray:
     """
     Applies causal forward IIR notch filters at the golden fingerprint frequencies
     associated with tone_name to clean up voice transcriptions.
     """
-    if not tone_name or tone_name not in GOLDEN_FINGERPRINTS:
+    if not tone_name or tone_name not in golden_fingerprints:
         return audio_data
         
-    tone_frequencies = GOLDEN_FINGERPRINTS[tone_name]
+    tone_frequencies = golden_fingerprints[tone_name]
     filtered_audio = audio_data.copy()
     
     for freq in tone_frequencies:

@@ -437,3 +437,95 @@ export function StationsLayer() {
         </>
     );
 }
+
+// 🏗️ NEW: TOWER CRANES LAYER
+const craneIcon = L.divIcon({
+  className: 'custom-crane-icon',
+  html: `<div style="
+    background-color: #fff;
+    border: 2px solid #ea580c;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    font-size: 15px;
+    box-sizing: content-box;
+  ">🏗️</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
+export function CranesLayer({ visible, onSelectCrane }) {
+  const [cranes, setCranes] = React.useState([]);
+
+  React.useEffect(() => {
+    if (!visible) return;
+
+    fetch('/data/tower_cranes.json')
+      .then(r => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(data => {
+        setCranes(data);
+      })
+      .catch(err => {
+        console.warn("Failed to load Coquitlam tower cranes:", err);
+      });
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <>
+      {cranes.map(c => (
+        <Marker 
+          key={c.id} 
+          position={[c.lat, c.lng]} 
+          icon={craneIcon}
+          eventHandlers={{
+            click: () => {
+              if (onSelectCrane) onSelectCrane(c);
+            }
+          }}
+        >
+          <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">TOWER CRANE</span>
+              <span className="text-white text-xs font-bold">{c.id}</span>
+            </div>
+          </Tooltip>
+          <Popup className="crane-popup">
+            <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '180px', maxWidth: '240px' }}>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-[9px] text-slate-400 font-mono font-medium">PRE-INCIDENT DATA</span>
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30">ACTIVE</span>
+              </div>
+              <h3 className="font-bold text-sm text-orange-400 mt-2 leading-tight">{c.name}</h3>
+              
+              <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-xs">
+                <span className="text-slate-400 font-sans">Location</span>
+                <span className="text-slate-300 text-right leading-tight ml-2">{c.address}</span>
+              </div>
+              
+              <div className="mt-3">
+                <a 
+                  href={c.pre_incident_plan_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/50 rounded text-center text-xs font-bold transition-all shadow-md cursor-pointer"
+                >
+                  🔗 View Pre-Incident Plan
+                </a>
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
+}

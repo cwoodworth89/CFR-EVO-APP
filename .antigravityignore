@@ -1,0 +1,12 @@
+.venv/
+node_modules/
+__pycache__/
+*.wav
+*.mp3
+.git/
+scratch/
+frontend/public/data/addresses.json
+frontend/public/data/blocks.json
+frontend/public/data/hydrants.json
+frontend/public/data/zones.json
+frontend/dist/

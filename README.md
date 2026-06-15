@@ -14,24 +14,95 @@ Furthermore, it doubles as a geographical training simulator, helping drivers me
 
 ---
 
-## ⚡ How It Works (At a Glance)
+## ⚡ System Architecture
 
-The entire system operates as a seamless loop, moving from station radio speakers to digital map screens in seconds:
+The entire system is designed around isolated domain packages that interact asynchronously to process audio and dispatch metadata.
 
 ```mermaid
-graph TD
-    A[📻 Station Radio Feed] -->| Tones & Voice Dispatch | B[🎤 Python Listening Agent]
-    B -->| Transcribes & Geocodes Location | C[☁️ Supabase Secure Cloud DB]
-    C -->| Real-Time Broadcasts | D[💻 CFR EVO Web Dashboard]
-    D -->| 🧭 Maps Route, Highlights Hydrants & Road Hazards | E[🚒 Responding Crews]
-    D -->| 🛡️ Admin Inputs Confirmed Ground-Truth Corrections | C
+flowchart TB
+    subgraph Frontend [React Application - /frontend]
+        A[Dashboard HUD] <-->|Real-time WebSockets| B[Leaflet Map Board]
+        B -->|Overlay Layers| C[ESRI Cadastral / Planning GIS]
+        B -->|Cached Assets| D[(Hydrants & Tower Cranes JSON)]
+    end
+
+    subgraph SiblingServices [Domain Services - /services]
+        subgraph GISDomain [GIS Service - /services/gis]
+            E[Shapefile Loader] --> F[Local Geocoder & Validator]
+        end
+        subgraph AudioDomain [Audio Analysis - /services/audio_analysis]
+            G[Sound Capture Listener] --> H[DSP Tone Spotter]
+        end
+        subgraph NotificationDomain [Notifications - /services/dispatch_notifications]
+            I[Supabase Sync Engine]
+            J[NTFY Push Broker]
+        end
+    end
+
+    subgraph Backend [Python Orchestrator - /backend]
+        K[Main Loop / Thread Runner]
+        L[Multiprocessing Queue]
+        M[GCP Speech / Whisper Local STT]
+        N[Text Parser & Sanitizer]
+    end
+
+    %% Flow connections
+    G -->|PCM audio stream| K
+    K -->|FFT peaks| H
+    H -->|Tone confirmed| L
+    L -->|Phase 1 Buffer| M
+    M -->|Transcription| N
+    N -->|Address Candidates| F
+    F -->|WGS84 Coordinates| I
+    I -->|REST Push| O[(Supabase Cloud DB)]
+    J -->|Push Alert| P[ntfy.sh Server]
+    O <-->|WebSocket| A
+    P -->|Alerts| A
 ```
 
-1. **The Radio Dispatch**: When an emergency call comes in, distinct tones play over the radio, followed by the automated voice dispatch announcing the address, incident type, responding units, and map grid.
-2. **The Listening Agent (Backend)**: Running quietly on station hardware (or your local computer), a Python script hears the loud tones, records the announcement, sanitizes the text, geocodes the address, and identifies the correct dispatch zone entirely offline.
-3. **The Secure Database (Supabase)**: The parsed call metadata is pushed to the cloud, where it is instantly saved and broadcasted.
-4. **The Web Dashboard (Frontend)**: Responders load the web page (hosted on GitHub Pages) on station screens, TVs, or mobile devices. The moment a call is uploaded, the web app updates in real-time—suggesting driving routes from the station, highlighting the 3 nearest fire hydrants, and warning of active road closures.
-5. **The Feedback Loop (Admin)**: An admin review tab allows station users to enter verified transcripts and address corrections. This creates a data set to compare speech-to-text outputs and continually improve the system's accuracy.
+---
+
+## 🧭 Two-Phase Dispatch Pipeline
+
+To minimize dispatch latency, the backend splits transcription and notifications into two distinct, sequential phases:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dispatcher as Station Radio Feed
+    participant SoundCapture as Audio Listener (SoundCapture)
+    participant DSP as DSP Tone Spotter
+    participant Queue as Worker Queue
+    participant STT as STT Engine (GCP/Whisper)
+    participant GIS as GIS Validator
+    participant DB as Supabase / NTFY
+
+    Dispatcher->>SoundCapture: Dispatch Tones Play
+    SoundCapture->>DSP: Analyze live audio frequency peaks
+    DSP-->>SoundCapture: Tone Confirmed
+    SoundCapture->>Queue: Start recording + Queue Phase 1 Check (Periodic)
+    
+    Note over SoundCapture,Queue: Phase 1: Quick Alert (First 15s)
+    Queue->>STT: Transcribe initial chunk
+    STT-->>Queue: Sanitized transcript (Round 1)
+    Queue->>GIS: Local Geocode
+    GIS-->>Queue: Match (Coordinates + Zone)
+    Queue->>DB: POST live_calls (verify_location = false, status = pending)
+    
+    Note over SoundCapture,Queue: Phase 2: Verification (Complete Call)
+    Dispatcher->>SoundCapture: Dispatch ends (silence threshold)
+    SoundCapture->>Queue: Queue Phase 2 Finalize
+    Queue->>STT: Transcribe full call
+    STT-->>Queue: Transcript (Round 2)
+    Queue->>GIS: Local Geocode Round 2 Address
+    alt Address matches Round 1
+        Queue->>DB: PATCH status to verified, upload full clean WAV
+    else Address mismatch (Correction needed)
+        Queue->>GIS: Geocode Round 2 Corrected Address
+        Queue->>DB: PATCH coordinates, set verify_location = true
+        Queue->>DB: Trigger correction notification via NTFY
+    end
+```
 
 ---
 
@@ -51,25 +122,21 @@ graph TD
 
 ## 📂 Repository Structure
 
-The project is split into two main subdirectories:
+The project has been split into isolated domain packages to ensure zero cyclical dependencies:
 
-* [**`/agent`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/agent) (Backend): The Python script that listens to the microphone audio stream, monitors decibels, and processes transcriptions using Speech-to-Text models.
-* [**`/client`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client) (Frontend): The React/Tailwind web app that renders the Leaflet map layers, handles routing, runs training games, and displays the admin review logs.
+* [**`/backend`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/backend): The central orchestrator running the background stream loop, parsing transcriptions, and coordinating API payloads.
+* [**`/frontend`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/frontend): The React/Vite client dashboard, mapping Leaflet layers, and running geographical training games.
+* [**`/services/gis`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/services/gis): Sibling GIS service, packaging Coquitlam parcel geocoders and emergency zone spatial indices.
+* [**`/services/audio_analysis`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/services/audio_analysis): Sibling DSP service, implementing Butterworth filters, Hamming window FFTs, and audio capture streams.
+* [**`/services/dispatch_notifications`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/services/dispatch_notifications): Sibling notification service, wrapping Supabase sync engine and mobile push notifications.
 
 ---
 
 ## 🛠️ Quick Installation (Developers)
 
 For detailed developer setup instructions, credential configuration, and dependencies, please refer to the README files inside the respective subfolders:
-- Read [**Agent Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/agent/README.md) for running the listener.
-- Read [**Client Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/README.md) for running or deploying the website.
-
----
-
-## 🗓️ Future Roadmap
-- **Two-Phase Dispatch Pipeline**: Implement a Quick-Alert (Phase 1) that slices the first 12 seconds of dispatch audio to geocode and push routing to personal devices within 15 seconds, followed by a Full-Verification (Phase 2) that transcribes the entire call to verify details and push corrections if necessary.
-- **Station Touchscreen Kiosk Display**: Display the live routing overlays, active construction hazards, and nearest fire hydrants locally on dedicated touch screen monitors mounted inside each fire hall.
-- **Apparatus Shift Subscription**: Implement a web interface allowing drivers to subscribe their personal phones to specific apparatuses (e.g., Engine 1, Ladder 1) for the duration of a shift, filtering alerts to only active responders.
+- Read [**Backend Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/backend/README.md) for running the listener.
+- Read [**Frontend Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/frontend/README.md) for running or deploying the website.
 
 ---
 
@@ -84,18 +151,6 @@ For detailed privacy design, see [docs/privacy.md](file:///C:/Users/curti/Docume
 
 ---
 
-## 🤖 Pair-Programming & AI-Assisted Development Disclosure
-
-This project was built using a structured engineering partnership between the lead developer and **Antigravity**, Google DeepMind's agentic AI coding assistant within the **Antigravity IDE**. 
-
-Rather than relying on rapid prototyping or unverified code generation, all features follow a strict, production-grade development process:
-1. **Research & Architectural Analysis**: Conducting targeted analysis of external endpoints (e.g. ArcGIS spatial indexing anomalies, CORS proxies, and ALSA audio captures).
-2. **Detailed Implementation Planning**: Drafting formal design blueprints and validation workflows in the [docs/](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/docs/) directory prior to modifying any source code.
-3. **Automated & Manual Verification**: Executing offline python test suites, local geocoding verification, and compilation checks (`npm run build`).
-4. **Offline Resilience Focus**: Transitioning unstable external datasets (such as addresses, emergency zones, and water hydrants) into local cached structures to ensure full hall-kiosk operation even during network outages.
-
----
-
 ## ⚖️ Personal Time & Ownership Disclosure
 
 This project is a personal, independent hobby project developed entirely by Curtis Woodworth on personal time, using personal equipment, and personal funding.
@@ -103,5 +158,3 @@ This project is a personal, independent hobby project developed entirely by Curt
 *   **No Employer Affiliation**: This software is not commissioned, sponsored, endorsed, or owned by the City of Coquitlam, Coquitlam Fire Rescue, or any associated municipal or government body.
 *   **No Employer Resources Used**: No employer-owned computers, software licenses, network infrastructure, or databases were used during the design, development, compilation, or hosting of this project.
 *   **Independent Work Product**: All intellectual property, assets, and code in this repository represent the independent work product of the author, developed strictly outside of official duty hours.
-
-

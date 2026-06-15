@@ -39,3 +39,14 @@ _load_env()
 
 # Suppress Hugging Face cache symlink warnings on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
+# Dynamically append sibling services to sys.path
+import sys
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+workspace_dir = os.path.dirname(root_dir)
+services_dir = os.path.join(workspace_dir, "services")
+for service_name in ["gis", "audio_analysis", "dispatch_notifications"]:
+    pkg_src = os.path.abspath(os.path.join(services_dir, service_name, "src"))
+    if os.path.exists(pkg_src) and pkg_src not in sys.path:
+        sys.path.append(pkg_src)
+

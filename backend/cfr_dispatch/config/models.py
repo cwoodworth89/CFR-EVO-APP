@@ -1,3 +1,6 @@
+# NOTE: For parsed data models, segmentation layout, and integration options, see:
+#   - docs/call_structure.md
+#   - docs/dispatch_integration_options.md
 from dataclasses import dataclass
 from typing import Optional
 

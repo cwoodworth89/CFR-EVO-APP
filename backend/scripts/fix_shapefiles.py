@@ -1,3 +1,4 @@
+# NOTE: For local shapefile storage paths and post-download winding order corrections, see docs/gis_endpoints.md
 import geopandas as gpd
 import os
 

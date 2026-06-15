@@ -20,6 +20,35 @@ import json
 import logging
 import shutil
 import geopandas as gpd
+import datetime
+
+# Timestamp tracking for weekly update throttling
+TIMESTAMP_FILE = os.path.join(agent_dir, "data", "last_gis_update.timestamp")
+
+def should_run_update() -> bool:
+    """Checks the timestamp file to prevent redundant updates within the same week."""
+    if os.path.exists(TIMESTAMP_FILE):
+        try:
+            with open(TIMESTAMP_FILE, 'r') as f:
+                last_update_str = f.read().strip()
+            last_update_time = datetime.datetime.fromisoformat(last_update_str)
+            # If updated in the last 6 days, don't run again
+            if (datetime.datetime.now() - last_update_time).days < 6:
+                return False
+        except Exception as e:
+            logging.warning(f"Could not read timestamp file: {e}")
+    return True
+
+def mark_update_success():
+    """Saves the current timestamp to mark a successful update run."""
+    try:
+        os.makedirs(os.path.dirname(TIMESTAMP_FILE), exist_ok=True)
+        with open(TIMESTAMP_FILE, 'w') as f:
+            f.write(datetime.datetime.now().isoformat())
+        logging.info("Saved success timestamp.")
+    except Exception as e:
+        logging.error(f"Failed to save success timestamp: {e}")
+
 
 # Setup logging
 logging.basicConfig(
@@ -141,7 +170,7 @@ def update_hydrant_data():
                 
             if "error" in data:
                 logging.error(f"ArcGIS server returned error: {data['error']}")
-                return
+                return False
                 
             features = data.get("features", [])
             if not features:
@@ -154,7 +183,7 @@ def update_hydrant_data():
             
     except Exception as e:
         logging.error(f"Failed to query new hydrant listings from server: {e}")
-        return
+        return False
         
     logging.info(f"Fetched {len(fresh_features)} fresh hydrants from MapServer.")
     
@@ -229,17 +258,25 @@ def update_hydrant_data():
         with open(output_path, "w") as out_f:
             json.dump(new_hydrants_list, out_f, indent=2)
         logging.info(f"Successfully updated cached hydrant database at: {output_path}")
+        return True
     except Exception as e:
         logging.error(f"Failed to write updated hydrants file: {e}")
+        return False
 
 def main():
-    logging.info("=== Starting Coquitlam GIS Database Monthly Update ===")
+    logging.info("=== Starting Coquitlam GIS Database Weekly Update ===")
     
+    # Throttle run to once per week
+    if not should_run_update():
+        logging.info("GIS data was already updated successfully within the last 6 days. Skipping update.")
+        sys.exit(0)
+        
     # Create temp directory
     os.makedirs(TEMP_DIR, exist_ok=True)
     address_zip = os.path.join(TEMP_DIR, "addresses.zip")
     zones_zip = os.path.join(TEMP_DIR, "zones.zip")
     
+    shapefiles_success = True
     # 1. Update shapefile layers (address and response zones)
     try:
         logging.info("Updating shapefile layers (address and response zones)...")
@@ -265,6 +302,7 @@ def main():
                 
     except Exception as e:
         logging.error(f"Shapefile update failed! Reverting to backups. Error: {e}", exc_info=True)
+        shapefiles_success = False
         # Revert folders from backups if error occurred
         for folder in [ADDRESS_DEST_DIR, ZONES_DEST_DIR]:
             backup = f"{folder}_backup"
@@ -275,9 +313,10 @@ def main():
                 shutil.rmtree(backup)
                 logging.info(f"Reverted {folder} from backup.")
                 
-    # 2. Update fire hydrants database (independent of shapefile status)
+    # 2. Update fire hydrants database
+    hydrants_success = False
     try:
-        update_hydrant_data()
+        hydrants_success = update_hydrant_data()
     except Exception as e:
         logging.error(f"Fire hydrant database update failed. Error: {e}", exc_info=True)
         
@@ -288,7 +327,15 @@ def main():
                 shutil.rmtree(TEMP_DIR)
             except Exception:
                 pass
-        logging.info("=== GIS Update Process Complete ===")
+        
+    # Check overall success to write success timestamp and set exit code
+    if shapefiles_success and hydrants_success:
+        logging.info("=== GIS Update Process Succeeded ===")
+        mark_update_success()
+        sys.exit(0)
+    else:
+        logging.error("=== GIS Update Process Failed ===")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

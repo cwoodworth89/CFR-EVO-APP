@@ -1,3 +1,6 @@
+# NOTE: For calibration of audio thresholds, device selection, and test procedures, see:
+#   - docs/hardware_specification.md
+#   - docs/test_procedures.md
 # DSP settings and thresholds
 NOISE_AMPLITUDE_THRESHOLD = 3000
 NOISE_AMPLITUDE_THRESHOLD_MIN = 1500

@@ -1,5 +1,6 @@
 # feed_recorded_call.py
 # Helper script to feed a saved WAV file into the dispatch mapping pipeline.
+# NOTE: For usage guides, expected test calls, and Procedure 4, see docs/test_procedures.md
 #
 # Usage:
 #   python feed_recorded_call.py <path_to_wav_file> [tone_name]

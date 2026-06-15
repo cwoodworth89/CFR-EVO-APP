@@ -1,5 +1,6 @@
 # cfr_dispatch/parser.py
 # Regex parsing, sanitization, and incident matching logic
+# NOTE: For dispatch template definitions and regex segmentation fields, see docs/call_structure.md
 
 import os
 import regex as re

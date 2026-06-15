@@ -1,6 +1,7 @@
 # ==============================================================================
 # create_adaptation_resources.py
 # DEFINITIVE SCRIPT V1.0
+# NOTE: For Google STT speech adaptation resources and vocabulary boost settings, see docs/hardware_specification.md
 # ==============================================================================
 import os
 from google.cloud import speech_v2

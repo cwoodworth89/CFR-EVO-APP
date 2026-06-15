@@ -1,3 +1,7 @@
+# NOTE: For integration options, payload fields, database setup, and GIS properties, see:
+#   - docs/dispatch_integration_options.md
+#   - docs/supabase_setup.md
+#   - docs/gis_endpoints.md
 import os
 from cfr_dispatch.config.paths import SHAPES_DIR
 

@@ -1,5 +1,6 @@
-# agent/run_test_suite.py
+# backend/tests/run_test_suite.py
 # Local Quality Assurance & Diagnostics test runner for CFR Dispatch
+# NOTE: For test procedures, QA metrics, and running diagnostic scripts, see docs/test_procedures.md
 
 import os
 import sys

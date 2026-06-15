@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# NOTE: For calibration instructions, alert tone profiles, and audio level setup, see:
+#   - docs/hardware_specification.md
+#   - docs/test_procedures.md
 
 import pyaudio
 import numpy as np

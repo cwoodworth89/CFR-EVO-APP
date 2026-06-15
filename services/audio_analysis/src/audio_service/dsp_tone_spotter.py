@@ -1,3 +1,4 @@
+# NOTE: For hardware specs, PortAudio device setup, and ambient noise floor thresholds, see hardware_specification.md
 import numpy as np
 from scipy import signal
 

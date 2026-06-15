@@ -60,7 +60,8 @@ These datasets are pre-processed and saved inside the frontend's static director
 
 GIS databases are updated automatically on a scheduled maintenance cycle via Windows Task Scheduler.
 * **Scheduled Task Name**: `CFR_GIS_Maintenance`
-* **Trigger**: Monthly (1st of every month at 3:00 AM)
+* **Trigger**: Weekly (Sundays at 3:00 AM)
+* **Retry Strategy**: Runs weekly with a 3-hour retry window (re-runs every 60 minutes up to 3 times on failure; throttled via a local success timestamp `backend/data/last_gis_update.timestamp` to prevent redundant network calls once succeeded).
 * **Script Location**: `backend/scripts/update_gis_data.py`
 * **Registration Script**: `backend/schedule_maintenance.bat` (Run as Administrator)
 

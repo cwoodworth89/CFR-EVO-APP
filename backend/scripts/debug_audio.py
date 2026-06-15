@@ -1,3 +1,6 @@
+# NOTE: For audio device index discovery and volume meter checks, see:
+#   - docs/hardware_specification.md
+#   - docs/test_procedures.md
 import sounddevice as sd
 import numpy as np
 import time

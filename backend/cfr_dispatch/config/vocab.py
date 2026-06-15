@@ -1,3 +1,6 @@
+# NOTE: For vocabulary lists, anchor keywords, and speech adaptation boosts, see:
+#   - docs/call_structure.md
+#   - docs/hardware_specification.md
 import os
 import re
 from cfr_dispatch.config.paths import VOCAB_DIR

@@ -1,3 +1,4 @@
+# NOTE: For database schemas, migrations, and schema configs, see docs/supabase_setup.md
 import logging
 import requests
 

@@ -1,3 +1,5 @@
+# NOTE: For hardware configs, PortAudio setup, and threshold parameters, see docs/hardware_specification.md
+# For station PA integration architectures, see docs/dispatch_integration_options.md
 import time
 import logging
 from audio_service.dsp_tone_spotter import get_rms

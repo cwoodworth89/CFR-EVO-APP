@@ -1,3 +1,4 @@
+# NOTE: For local shapefiles see docs/gis_endpoints.md, and for transcription/sanitization vocabulary see docs/call_structure.md
 import geopandas as gpd
 
 # Make sure these paths and column names are correct for your setup

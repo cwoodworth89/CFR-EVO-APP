@@ -1,6 +1,9 @@
 # ==============================================================================
 # test_supabase_integration.py
 # Offline Validation Harness for CFR Dispatch Integration
+# NOTE: For database setup instructions and Procedure 2 test details, see:
+#   - docs/supabase_setup.md
+#   - docs/test_procedures.md
 # ==============================================================================
 import os
 import sys

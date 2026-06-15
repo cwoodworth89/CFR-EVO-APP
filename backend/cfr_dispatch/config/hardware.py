@@ -1,3 +1,4 @@
+# NOTE: For hardware specs, Raspberry Pi setup, and audio capture interfaces, see docs/hardware_specification.md
 import os
 
 # Core hardware config

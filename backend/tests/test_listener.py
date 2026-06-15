@@ -1,3 +1,6 @@
+# NOTE: For audio listener thresholds, tone fingerprints, and microphone diagnostics, see:
+#   - docs/hardware_specification.md
+#   - docs/test_procedures.md
 import sounddevice as sd
 import numpy as np
 import librosa

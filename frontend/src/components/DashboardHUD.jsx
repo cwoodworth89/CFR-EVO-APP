@@ -1,3 +1,4 @@
+// NOTE: For the live Coquitlam GIS offline warning status badge details, see docs/gis_endpoints.md
 import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';

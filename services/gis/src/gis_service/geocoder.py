@@ -1,3 +1,4 @@
+# NOTE: For shapefile details, offline geocoding layouts, and zone boundaries details, see docs/gis_endpoints.md
 import re
 import logging
 import geopandas as gpd

@@ -1,4 +1,5 @@
 /* global __BUILD_DATE__ */
+// NOTE: For details on local GIS JSONs (hydrants.json, zones.json) and map layout config, see docs/gis_endpoints.md
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
 import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';

@@ -1,3 +1,4 @@
+// NOTE: For live MapServer endpoints (Parcels, Roads, Zones) and fallback logic, see docs/gis_endpoints.md
 import React, { useEffect, useRef } from 'react';
 import { Marker, Tooltip, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';

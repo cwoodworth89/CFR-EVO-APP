@@ -1,3 +1,4 @@
+# NOTE: For information about the source shapefile downloads, paths, and metadata, see docs/gis_endpoints.md
 import geopandas as gpd
 import logging
 

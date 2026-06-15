@@ -268,7 +268,7 @@ export default function MapBoard() {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
 
-  // Load all hydrants data once on mount
+  // Load all hydrants data and fire zones once on mount
   useEffect(() => {
     fetch('/data/hydrants.json')
       .then(r => r.ok ? r.json() : [])
@@ -277,6 +277,17 @@ export default function MapBoard() {
       })
       .catch(err => {
         console.error("Failed to load local cached hydrants database:", err);
+      });
+
+    // Fetch zones on startup for offline map overlay
+    const baseUrl = import.meta.env.BASE_URL;
+    fetch(`${baseUrl}data/zones.json?v=2`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        setZones(data);
+      })
+      .catch(err => {
+        console.error("Failed to load zones at startup:", err);
       });
   }, []);
 
@@ -359,7 +370,8 @@ export default function MapBoard() {
   // Query Nearby Hydrants on targetAddress change (using local in-memory dataset)
   useEffect(() => {
     if (!targetAddress || allHydrantsData.length === 0) {
-      setAllNearbyHydrants([]);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAllNearbyHydrants(prev => prev.length > 0 ? [] : prev);
       return;
     }
 
@@ -388,7 +400,7 @@ export default function MapBoard() {
       setAllNearbyHydrants(nearby);
     } catch (e) {
       console.warn("Failed to filter nearby hydrants locally:", e);
-      setAllNearbyHydrants([]);
+      setAllNearbyHydrants(prev => prev.length > 0 ? [] : prev);
     }
   }, [targetAddress, allHydrantsData]);
 
@@ -1046,7 +1058,23 @@ export default function MapBoard() {
         }
         return { color: "transparent", fillOpacity: 0, weight: 0 }; 
     }
-    return { color: "#475569", fillOpacity: 0.05, weight: 1 };
+    
+    // Color-code by fire hall for explore/live modes
+    const stationName = zone.station || "";
+    let color = "#475569"; // default slate gray
+    
+    if (stationName.includes("Hall 1") || zone.unit_id === "E1") color = "#f87171";      // Red for Hall 1
+    else if (stationName.includes("Hall 2") || zone.unit_id === "E2") color = "#60a5fa"; // Blue for Hall 2
+    else if (stationName.includes("Hall 3") || zone.unit_id === "E3" || zone.unit_id === "Q5") color = "#34d399"; // Green for Hall 3
+    else if (stationName.includes("Hall 4") || zone.unit_id === "E4") color = "#c084fc"; // Purple for Hall 4
+    
+    return {
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.08,
+      weight: 1.5,
+      dashArray: "3 3"
+    };
   };
  
   // Filter closures for map and alerts rendering (only show currently active ones on map)
@@ -1155,7 +1183,17 @@ export default function MapBoard() {
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
                   pathOptions={getZoneStyle(zone)} 
                   pane="underlayPane" 
-              />
+              >
+                {appMode === "EXPLORE" && (
+                  <Tooltip sticky direction="center" permanent={false}>
+                    <div className="font-mono text-[10px] font-bold text-slate-200">
+                      <span className="text-amber-400 font-extrabold">ZONE {zone.zone_id}</span>
+                      <span className="mx-1 text-slate-500">|</span>
+                      <span className="text-slate-300 font-semibold">{zone.unit_id}</span>
+                    </div>
+                  </Tooltip>
+                )}
+              </Polygon>
             ))}
 
             {/* HIDE STATIONS IN TRAINING MODE */}

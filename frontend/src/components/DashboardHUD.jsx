@@ -15,7 +15,8 @@ export function Header({
   setLeftSidebarOpen,
   rightSidebarOpen,
   setRightSidebarOpen,
-  alertsCount
+  alertsCount,
+  gisOffline
 }) {
   const [showLayersMenu, setShowLayersMenu] = React.useState(false);
   const isExplore = appMode === "EXPLORE";
@@ -41,10 +42,19 @@ export function Header({
             📋 CONTROL PANEL
           </button>
           
-          <h1 className="text-lg font-bold tracking-wider flex items-center gap-1.5 select-none">
-            CFR <span className="text-emerald-500 font-extrabold">EVO</span>
-            <span className="text-slate-500 font-normal text-[10px] uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2">APP</span>
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold tracking-wider flex items-center gap-1.5 select-none">
+              CFR <span className="text-emerald-500 font-extrabold">EVO</span>
+              <span className="text-slate-500 font-normal text-[10px] uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2">APP</span>
+            </h1>
+            
+            {gisOffline && (
+              <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-mono font-bold px-2 py-0.5 rounded flex items-center gap-1.5 select-none animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-455"></span>
+                COQUITLAM GIS OFFLINE
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Center: Mode Select Dropdown */}

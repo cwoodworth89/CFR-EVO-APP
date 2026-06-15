@@ -253,6 +253,7 @@ export default function MapBoard() {
   const [showZones, setShowZones] = useState(false); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
   const [showCranes, setShowCranes] = useState(false); 
+  const [cadastralError, setCadastralError] = useState(false); 
   
   // COLLAPSIBLE SIDEBAR STATES
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
@@ -1154,9 +1155,12 @@ export default function MapBoard() {
               className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
           >
             {/* 1. BASE MAP (z-index 200) */}
-            <BaseMap style={mapStyle} />
+            <BaseMap style={mapStyle} useLabelsFallback={cadastralError} />
             
-            <CoquitlamOverlays visible={showLabels} />
+            <CoquitlamOverlays 
+                visible={showLabels && !cadastralError} 
+                onLoadError={() => setCadastralError(true)} 
+            />
             
             {/* Hydrants Visual GIS Overlay */}
             <HydrantsLayer visible={showHydrants} />
@@ -1172,7 +1176,7 @@ export default function MapBoard() {
             
             {/* "Top Bun" - The Text Labels */}
             <FireZonesLayer 
-                visible={appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)} 
+                visible={(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && !cadastralError} 
                 pane="labelsPane" 
             />
             

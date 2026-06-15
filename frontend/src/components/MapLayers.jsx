@@ -29,7 +29,7 @@ const stationIcon = L.divIcon({
 });
 
 // 🗺️ BASEMAP COMPONENT
-export function BaseMap({ style }) {
+export function BaseMap({ style, useLabelsFallback }) {
     const map = useMap();
     const layerRef = useRef(null);
 
@@ -55,8 +55,13 @@ export function BaseMap({ style }) {
             return;
         }
 
+        let url = config.url;
+        if (useLabelsFallback && url.includes('_nolabels')) {
+            url = url.replace('_nolabels', '_all');
+        }
+
         if (config.type === 'tile') {
-            const tileLayer = L.tileLayer(config.url, {
+            const tileLayer = L.tileLayer(url, {
                 attribution: config.attribution,
                 subdomains: config.subdomains,
                 maxNativeZoom: config.maxNativeZoom ?? 19,
@@ -70,13 +75,13 @@ export function BaseMap({ style }) {
         }
 
         return cleanup;
-    }, [map, style]);
+    }, [map, style, useLabelsFallback]);
 
     return null;
 }
 
 // 🏗️ COQUITLAM ROADS/PARCELS
-export function CoquitlamOverlays({ visible }) {
+export function CoquitlamOverlays({ visible, onLoadError }) {
     const map = useMap();
     useEffect(() => {
       if (!visible) return;
@@ -86,12 +91,22 @@ export function CoquitlamOverlays({ visible }) {
           opacity: 0.9,
           layers: [0, 1, 16], // Roads, Addresses, Parcels
           f: 'image'
-      }).addTo(map);
+      });
+
+      if (onLoadError) {
+          overlayLayer.on('requesterror', (err) => {
+              console.warn("Coquitlam Cadastral map server is inaccessible. Triggering standard basemap labels fallback.", err);
+              onLoadError();
+          });
+      }
+
+      overlayLayer.addTo(map);
 
       return () => { 
+          overlayLayer.off('requesterror');
           map.removeLayer(overlayLayer);
       };
-    }, [map, visible]);
+    }, [map, visible, onLoadError]);
     
     return null;
 }

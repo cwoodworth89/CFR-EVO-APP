@@ -98,7 +98,7 @@ def update_hydrant_data():
     logging.info("=== Starting Coquitlam Fire Hydrants Database Update ===")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_dir = os.path.join(script_dir, "..", "client", "public", "data")
+    output_dir = os.path.join(script_dir, "..", "frontend", "public", "data")
     output_path = os.path.join(output_dir, "hydrants.json")
     
     # 1. Load existing hydrants if file exists

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "TC-1",
+    "name": "TC-1: Coquitlam Centre Development",
+    "address": "2929 Barnet Hwy, Coquitlam, BC",
+    "lat": 49.2878,
+    "lng": -122.7932,
+    "pre_incident_plan_url": "https://www.coquitlam.ca/DocumentCenter/View/6124"
+  },
+  {
+    "id": "TC-2",
+    "name": "TC-2: Burquitlam Area High-Rise",
+    "address": "551 Emerson St, Coquitlam, BC",
+    "lat": 49.2731,
+    "lng": -122.8943,
+    "pre_incident_plan_url": "https://www.coquitlam.ca/DocumentCenter/View/5801"
+  },
+  {
+    "id": "TC-3",
+    "name": "TC-3: Austin Heights Development",
+    "address": "1045 Austin Ave, Coquitlam, BC",
+    "lat": 49.2592,
+    "lng": -122.8831,
+    "pre_incident_plan_url": "https://www.coquitlam.ca/DocumentCenter/View/6431"
+  }
+]

@@ -86,7 +86,7 @@ We have included a fully automated installation script `setup_kiosk.sh` in the r
     ```
 4.  Follow the post-setup checklist outputted by the script:
     *   Initialize Tailscale: `sudo tailscale up --ssh`
-    *   Configure your environment variables: `nano agent/.env`
+    *   Configure your environment variables: `nano backend/.env`
     *   Restart the agent: `sudo systemctl restart cfr-agent`
 
 ---
@@ -103,17 +103,17 @@ cd ~/CFR-EVO-APP
 # Set up virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r agent/requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ### 1. Host the React Frontend via Nginx
 Compile the production build:
 ```bash
-cd client
+cd frontend
 npm install
 npm run build
 ```
-This generates static files in `client/dist`.
+This generates static files in `frontend/dist`.
 
 Install Nginx:
 ```bash
@@ -124,7 +124,7 @@ Configure Nginx to serve the build on port 80. Edit `/etc/nginx/sites-available/
 ```nginx
 server {
     listen 80 default_server;
-    root /home/YOUR_USERNAME/CFR-EVO-APP/client/dist;
+    root /home/YOUR_USERNAME/CFR-EVO-APP/frontend/dist;
     index index.html;
     server_name _;
 
@@ -150,7 +150,7 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=YOUR_USERNAME
-WorkingDirectory=/home/YOUR_USERNAME/CFR-EVO-APP/agent
+WorkingDirectory=/home/YOUR_USERNAME/CFR-EVO-APP/backend
 ExecStart=/home/YOUR_USERNAME/CFR-EVO-APP/.venv/bin/python main.py
 Restart=always
 RestartSec=5
@@ -207,7 +207,7 @@ if [ "$LOCAL" != "$REMOTE" ]; then
     git pull origin main
     
     # Rebuild frontend
-    cd client || exit 1
+    cd frontend || exit 1
     npm install
     npm run build
     
@@ -283,7 +283,7 @@ Tailscale allows you to SSH into the laptop or inspect the web dashboard remotel
     arecord -l
     ```
     Note the card index (e.g., `card 1`).
-4.  Open `~/CFR-EVO-APP/agent/.env` and update the audio configuration:
+4.  Open `~/CFR-EVO-APP/backend/.env` and update the audio configuration:
     ```env
     AUDIO_DEVICE_ID=1  # Change to match card index from arecord -l
     STT_ENGINE=whisper # Recommend local whisper since the laptop has the CPU power for it
@@ -291,5 +291,5 @@ Tailscale allows you to SSH into the laptop or inspect the web dashboard remotel
     ```
 5.  Calibrate and test the audio levels:
     ```bash
-    python agent/calibrate_audio_interactive.py
+    python backend/scripts/calibrate_audio_interactive.py
     ```

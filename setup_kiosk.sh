@@ -19,12 +19,12 @@ echo "Setting up Python virtual environment..."
 python3 -m venv "${PROJECT_DIR}/.venv"
 source "${PROJECT_DIR}/.venv/bin/activate"
 echo "Installing agent requirements..."
-pip install -r "${PROJECT_DIR}/agent/requirements.txt"
+pip install -r "${PROJECT_DIR}/backend/requirements.txt"
 deactivate
 
 # 3. Build the React frontend
 echo "Installing frontend node packages and building static files..."
-cd "${PROJECT_DIR}/client"
+cd "${PROJECT_DIR}/frontend"
 npm install
 npm run build
 cd "${PROJECT_DIR}"
@@ -36,7 +36,7 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
 
-    root ${PROJECT_DIR}/client/dist;
+    root ${PROJECT_DIR}/frontend/dist;
     index index.html;
 
     server_name _;
@@ -62,7 +62,7 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=${USER}
-WorkingDirectory=${PROJECT_DIR}/agent
+WorkingDirectory=${PROJECT_DIR}/backend
 ExecStart=${PROJECT_DIR}/.venv/bin/python main.py
 Restart=always
 RestartSec=5
@@ -119,7 +119,7 @@ if [ "\${LOCAL}" != "\${REMOTE}" ]; then
     git pull origin main
     
     # Rebuild frontend
-    cd client || exit 1
+    cd frontend || exit 1
     npm install
     npm run build
     
@@ -152,6 +152,6 @@ echo " CFR EVO AUTO-SETUP COMPLETE!"
 echo "======================================================================"
 echo "To complete setup:"
 echo "1. Run Tailscale authentication: 'sudo tailscale up --ssh'"
-echo "2. Edit your environment config: 'nano ${PROJECT_DIR}/agent/.env'"
+echo "2. Edit your environment config: 'nano ${PROJECT_DIR}/backend/.env'"
 echo "3. Restart the agent after editing .env: 'sudo systemctl restart cfr-agent'"
 echo "======================================================================"

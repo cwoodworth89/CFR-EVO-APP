@@ -171,7 +171,7 @@ STT_ENGINE=google  # Recommended for low CPU load on Pi
 ```
 Run the interactive calibration script to align your amplitude triggers with the background noise of the station:
 ```bash
-python agent/calibrate_audio_interactive.py
+python backend/scripts/calibrate_audio_interactive.py
 ```
 
 ---
@@ -185,11 +185,11 @@ Rather than running Vite's dev server (`npm run dev`) in the background—which 
 
 Compile the build:
 ```bash
-cd client
+cd frontend
 npm install
 npm run build
 ```
-This generates static files in `client/dist`.
+This generates static files in `frontend/dist`.
 
 Install and configure Nginx:
 ```bash
@@ -202,7 +202,7 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
 
-    root /home/pi/CFR-EVO-APP/client/dist;
+    root /home/pi/CFR-EVO-APP/frontend/dist;
     index index.html;
 
     server_name _;
@@ -230,7 +230,7 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/CFR-EVO-APP/agent
+WorkingDirectory=/home/pi/CFR-EVO-APP/backend
 ExecStart=/home/pi/CFR-EVO-APP/.venv/bin/python main.py
 Restart=always
 RestartSec=5
@@ -455,7 +455,7 @@ Leaflet typically requests map tiles from third-party CDNs (like CartoDB or Stad
 The current routing overlay queries external geodata APIs or OSRM instances.
 *   **Implementation**: Run an **OSRM (Open Source Routing Machine)** or **Valhalla** engine locally in a Docker container on each Pi.
 *   **Data Source**: Load the OSRM container with the British Columbia OpenStreetMap export (`.osm.pbf`) preprocessed for emergency vehicles (truck weight, turn restrictions).
-*   **Kiosk URL**: Update [MapBoard.jsx](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/src/components/MapBoard.jsx) to target the local route server:
+*   **Kiosk URL**: Update [MapBoard.jsx](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/frontend/src/components/MapBoard.jsx) to target the local route server:
     `Routing URL: "http://localhost:5000/route/v1/driving/{lng1},{lat1};{lng2},{lat2}"`
 
 #### 4. Local Geocoding & Hydrant Queries

@@ -57,6 +57,64 @@ This phase adds a medium-sized wall-mountable touch screen and runs both the Rea
 
 ---
 
+## 💻 Alternative: All-in-One x86 Laptop Kiosk (e.g., Lenovo Flex 5)
+
+If you have an unused touchscreen laptop (such as a Lenovo Flex 5), repurposing it as a dedicated station kiosk is a highly cost-effective and powerful alternative to the Raspberry Pi ecosystem.
+
+### Why Use a Touchscreen Laptop?
+*   **Zero Hardware Costs**: Eliminates the need to purchase a Pi, touchscreen, power supply, case, and SD card.
+*   **Built-in UPS (Battery Backup)**: The laptop's internal battery acts as an automatic uninterruptible power supply, keeping the listening agent and kiosk running during temporary station power fluctuations.
+*   **Vastly Superior Performance**: The x86 processor (Core i3/i5/i7) runs local Whisper speech-to-text models (such as `base` or `small`) in under 2 seconds. The React mapping dashboard renders without any GPU lag.
+*   **Integrated Large Display**: The 14-inch Full HD (1920x1080) screen offers significantly more canvas space for Leaflet maps and hydrant layouts than a 10.1-inch Pi screen.
+*   **Built-in Mic Array**: Ready for Phase 1 voice trial testing immediately without any extra microphone hardware.
+
+### Operating System & Ubuntu Setup
+We recommend installing **Ubuntu 24.04 LTS Desktop** (or a lighter flavor like **Lubuntu** if it is a lower-spec model). Ubuntu GNOME has excellent native support for touch digitizers, onscreen keyboards, and automatic screen rotation.
+
+> [!WARNING]
+> **Audio Rack Interfacing on Laptops**
+> When migrating to the Phase 2 line-in feed, **do not** plug the 1V line-level audio rack output directly into the laptop's built-in 3.5mm combo microphone jack. Laptop mic ports are highly amplified (mic-level) and will severely clip, distort, or damage the laptop's internal audio codec. You should still use the **Behringer UCA202 / UCA222 USB sound card** to capture line-level signals cleanly.
+
+### Ubuntu Kiosk Mode Configuration
+
+#### 1. Enable Automatic Login
+Open your system settings: **Settings** -> **Users** -> Unlock (Top Right) -> Toggle **Automatic Login** to **ON**.
+
+#### 2. Prevent Laptop Lid Suspend
+Since you will fold the Flex 5 into tablet mode or mount it, you must configure Ubuntu to ignore the lid-closed sensor so it does not go to sleep when folded:
+Edit the login daemon configuration file `/etc/systemd/logind.conf`:
+```ini
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+```
+Apply the changes:
+```bash
+sudo systemctl restart systemd-logind
+```
+
+#### 3. Disable Screen Sleep & Lock
+Prevent GNOME from turning off the display:
+```bash
+# Set screen blank timeout to "Never"
+gsettings set org.gnome.desktop.session idle-delay 0
+# Disable lock screen
+gsettings set org.gnome.desktop.screensaver lock-enabled false
+```
+
+#### 4. Configure Kiosk Browser Autostart
+To make Chromium boot directly into full-screen kiosk mode pointing to the local dashboard at startup, create a GNOME autostart entry:
+Create the file `~/.config/autostart/kiosk.desktop`:
+```ini
+[Desktop Entry]
+Type=Application
+Name=CFR EVO Kiosk
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --no-first-run http://localhost
+X-GNOME-Autostart-enabled=true
+```
+
+---
+
 ## 🎛️ Audio Integration & Rack Tapping
 
 To transition from the Phase 1 trial microphone to a permanent, static-free line-in feed, tap into the station's existing audio rack. The BMFH (Coquitlam Fire Hall) rack offers three clean tap points:

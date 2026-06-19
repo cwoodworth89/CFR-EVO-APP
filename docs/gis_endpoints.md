@@ -1,77 +1,145 @@
-# Coquitlam GIS Data Sources & API Endpoints
+# CFR EVO: GIS Endpoints & Offline Migration Notes
 
-This document serves as the authoritative map of all external GIS APIs, datasets, and local caching/fallback mechanisms used by the CFR-EVO-APP.
-
----
-
-## 1. Overview of the GIS Architecture
-
-To maintain high reliability during dispatch operations, the system is designed to **rely as little as possible on external network queries**:
-* **Backend Geocoding**: Done 100% offline using high-performance local Shapefiles indexed in memory at startup.
-* **Frontend Overlays**: Large visual layers (like hydrants and zone polygons) are served locally as static JSON files.
-* **Live GIS Overlays**: Dense overlays (like parcel property lines) are loaded dynamically via ESRI Leaflet image streams from the city's servers, with automatic fallback structures if they go offline.
+This document provides a guide to the local GIS datasets currently packaged with the app, their configuration, and the future roadmap for replacing the external municipal servers at `geodata.coquitlam.ca` with local hosting via the **Dynamic Viewport API (Option A)**.
 
 ---
 
-## 2. Live MapServer Endpoints (Frontend Leaflet UI)
+## 🗺️ Current Packaged GIS Datasets
 
-These live ArcGIS map services are consumed by Leaflet inside the React frontend:
+The frontend app runs in a local-first capacity by caching spatial databases under `frontend/public/data/`. These files are fetched relative to the application's base URL:
 
-| Component Name | Service Type | ArcGIS Server REST URL | Layers/Sublayers Used |
-| :--- | :--- | :--- | :--- |
-| `CoquitlamOverlays` | MapServer | `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer` | `0` (Roads), `1` (Addresses), `16` (Parcels) |
-| `FireZonesLayer` | MapServer | `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Planning/MapServer` | `6` (Emergency Response Zones boundary lines & labels) |
-
----
-
-## 3. Offline Shapefile Downloads (Backend Geocoder)
-
-These raw shapefiles are used by the backend geocoding and zone containment systems. They are downloaded, wind-order-corrected, and stored locally.
-
-### Address Points Dataset
-* **ArcGIS Hub ID**: `e38a2f7cdc9b47e38d87873ea6fee275_0`
-* **Direct Download (SHP ZIP)**: `https://opendata.arcgis.com/api/v3/datasets/e38a2f7cdc9b47e38d87873ea6fee275_0/downloads/data?format=shp&spatialRefId=4326`
-* **Local Path**: `backend/data/Property_Information/Addresses.*` (`.shp`, `.dbf`, `.prj`, `.shx`)
-
-### Emergency Response Zones Dataset
-* **ArcGIS Hub ID**: `f7e227f598e94696ac8e43538e80c35f_6`
-* **Direct Download (SHP ZIP)**: `https://opendata.arcgis.com/api/v3/datasets/f7e227f598e94696ac8e43538e80c35f_6/downloads/data?format=shp&spatialRefId=4326`
-* **Local Path**: `backend/data/Emergency_Response_Zones/Emergency_Response_Zones.*` (`.shp`, `.dbf`, `.prj`, `.shx`)
+*   **`data/hydrants.json`**: Cached municipal fire hydrants database containing flow rate classification (Class AA/A/B/C), status (Operating/Private/Out-of-Service), ID, and lat/lng coordinates.
+*   **`data/zones.json`**: Boundaries and geographic boundaries of response zones for the apparatus dispatch mappings.
+*   **`data/intersections.json`**: Street intersection coordinate mappings for driver training games.
+*   **`data/blocks.json`**: Street segment blocks and address ranges.
 
 ---
 
-## 4. Local Cached Datasets (Frontend Static JSONs)
+## 🚧 Future Migration: Offline Cadastral Map Overlays (Option A)
 
-These datasets are pre-processed and saved inside the frontend's static directory for client-side rendering performance.
+Currently, the map dashboard displays road and parcel boundaries dynamically by streaming pre-rendered map layer images from:
+`https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer`
 
-### Water Hydrants
-* **Live Query URL**: `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query`
-* **Local Path**: `frontend/public/data/hydrants.json`
-* **Fields Fetched**: `OBJECTID,gis_id,status,flow_class`
-* **Query Parameters**: `where=1=1&outSR=4326&f=json` (fetched sequentially in pages of 1000 using `resultOffset` pagination to bypass server query limitations).
+And address queries autocomplete by making API requests to:
+`https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query`
 
-### Emergency Response Zones (Geometry)
-* **Local Path**: `frontend/public/data/zones.json`
-* **Purpose**: Allows 100% offline rendering of Fire Zones boundaries and Hall/Unit details.
+To achieve 100% internet-independent operation, we will transition the app to **Option A: Dynamic Viewport API** hosted locally by the backend Python agent.
+
+### Option A: Architectural Workflow
+
+```mermaid
+sequenceDiagram
+    participant UI as React Frontend (Map)
+    participant API as Python Local API
+    participant GIS as Shapefiles (Addresses.shp)
+
+    rect rgb(30, 41, 59)
+        Note over UI, GIS: 1. Address Search Autocomplete
+        UI->>API: GET /api/autocomplete?q=428+Nelson
+        API->>GIS: Fuzzy match house number & street names
+        GIS-->>API: Centroid, full address, & parcel rings
+        API-->>UI: JSON Suggestions list
+    end
+
+    rect rgb(15, 23, 42)
+        Note over UI, GIS: 2. Viewport Cadastral Rendering
+        UI->>API: GET /api/parcels?bbox=min_lng,min_lat,max_lng,max_lat
+        API->>GIS: Query spatial index for intersecting property polygons
+        GIS-->>API: Matching coordinates & attributes
+        API-->>UI: Lightweight GeoJSON FeatureCollection
+        Note over UI: Render GeoJSON layer on Leaflet
+    end
+```
+
+### 1. Backend API Implementation Blueprint
+The backend agent will run a lightweight, non-blocking HTTP server (e.g., using `FastAPI` or standard library `http.server`) exposing the following endpoints:
+
+#### A. Address Autocomplete
+*   **Endpoint**: `GET /api/autocomplete?q=<search_query>`
+*   **Processing**:
+    1. Parse the search query into a house number and street name.
+    2. Query the pre-indexed `Addresses.shp` shapefile using `CoquitlamDataValidator.validate_address_exists()`.
+    3. Return matching records as a JSON list.
+*   **Response Format**:
+    ```json
+    [
+      {
+        "address": "428 Nelson St",
+        "lat": 49.27305,
+        "lng": -122.88452,
+        "rings": [[[ -122.8847, 49.2731 ], [ -122.8843, 49.2731 ], ...]]
+      }
+    ]
+    ```
+
+#### B. Dynamic Viewport Parcels (Bounding Box Query)
+*   **Endpoint**: `GET /api/parcels?bbox=<min_lng>,<min_lat>,<max_lng>,<max_lat>`
+*   **Processing**:
+    1. Parse the bounding box parameters.
+    2. Query the shapefile spatial index (`sindex.intersection()`) to extract parcel geometries intersecting the current viewport.
+    3. Convert geometries to WGS84 and export to a standard GeoJSON FeatureCollection.
+*   **Response Format**:
+    ```json
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[ -122.8847, 49.2731 ], ...]]
+          },
+          "properties": {
+            "address": "428 Nelson St",
+            "house": "428",
+            "street": "Nelson St"
+          }
+        }
+      ]
+    }
+    ```
 
 ---
 
-## 5. Maintenance & Cron Automation
+### 2. Frontend Map Integration Blueprint
 
-GIS databases are updated automatically on a scheduled maintenance cycle via Windows Task Scheduler.
-* **Scheduled Task Name**: `CFR_GIS_Maintenance`
-* **Trigger**: Weekly (Sundays at 3:00 AM)
-* **Retry Strategy**: Runs weekly with a 3-hour retry window (re-runs every 60 minutes up to 3 times on failure; throttled via a local success timestamp `backend/data/last_gis_update.timestamp` to prevent redundant network calls once succeeded).
-* **Script Location**: `backend/scripts/update_gis_data.py`
-* **Registration Script**: `backend/schedule_maintenance.bat` (Run as Administrator)
+*   **Autocomplete Toggle**: Update the `LeftSidebar` autocomplete handler inside `DashboardHUD.jsx` to query the local backend port:
+    ```javascript
+    const url = `http://localhost:8000/api/autocomplete?q=${encodeURIComponent(searchQuery)}`;
+    ```
+*   **Dynamic GeoJSON Layer**: In `MapLayers.jsx`, replace the ESRI `dynamicMapLayer` with a Leaflet `GeoJSON` layer that updates dynamically:
+    ```javascript
+    export function LocalCadastralLayer({ visible }) {
+        const map = useMap();
+        const [geoJsonData, setGeoJsonData] = useState(null);
 
----
+        useEffect(() => {
+            if (!visible) return;
 
-## 6. Offline Fallback Logic
+            const updateParcels = () => {
+                const bounds = map.getBounds();
+                const bbox = `${bounds.getSouthWest().lng},${bounds.getSouthWest().lat},${bounds.getNorthEast().lng},${bounds.getNorthEast().lat}`;
+                
+                fetch(`http://localhost:8000/api/parcels?bbox=${bbox}`)
+                    .then(r => r.json())
+                    .then(data => setGeoJsonData(data))
+                    .catch(e => console.warn("Failed to update local parcels:", e));
+            };
 
-If Coquitlam's ArcGIS servers go offline, the system self-heals in the following sequence:
-1. **Network Error Interception**: `CoquitlamOverlays` monitors the MapServer using a Leaflet `requesterror` event.
-2. **Blinking Indicator Status**: Once an error is detected, the frontend header displays a pulsing **`COQUITLAM GIS OFFLINE`** warning badge next to the application logo.
-3. **MapServer Muting**: All ongoing image-generation requests to `CoquitlamOverlays` and `FireZonesLayer` are disabled to avoid flooding the browser console with repeated network timeouts as the map is panned.
-4. **Basemap Labels Restoration**: The `BaseMap` component replaces the default no-labels basemap tile URL (CartoDB Light/Dark `nolabels` tiles) with the standard labeled version (`light_all` or `dark_all`) as an emergency labels backup.
-5. **Local GeoJSON Zone Render**: The map falls back to rendering fire zone boundaries and responding hall units using local coordinates from the cached `zones.json` with dynamic hover tooltips.
+            map.on('moveend zoomend', updateParcels);
+            updateParcels();
+
+            return () => {
+                map.off('moveend zoomend', updateParcels);
+            };
+        }, [map, visible]);
+
+        if (!visible || !geoJsonData) return null;
+        return <GeoJSON data={geoJsonData} style={{ color: '#475569', weight: 1, fillOpacity: 0.05 }} />;
+    }
+    ```
+
+### 3. Advantages of Option A
+*   **100% Offline-Capable**: Works completely without internet, pulling directly from local `.shp` files.
+*   **Lightweight Resource Footprint**: Does not require running resource-heavy tile-rendering containers (like TileServer-GL) on client kiosks.
+*   **Dynamic Data Querying**: The frontend can access raw attributes (address, house numbers) on hovered/clicked parcels directly from the GeoJSON properties.

@@ -272,7 +272,8 @@ export default function MapBoard() {
 
   // Load all hydrants data and fire zones once on mount
   useEffect(() => {
-    fetch('/data/hydrants.json')
+    const baseUrl = import.meta.env.BASE_URL;
+    fetch(`${baseUrl}data/hydrants.json`)
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         setAllHydrantsData(data);
@@ -282,7 +283,6 @@ export default function MapBoard() {
       });
 
     // Fetch zones on startup for offline map overlay
-    const baseUrl = import.meta.env.BASE_URL;
     fetch(`${baseUrl}data/zones.json?v=2`)
       .then(r => r.ok ? r.json() : [])
       .then(data => {

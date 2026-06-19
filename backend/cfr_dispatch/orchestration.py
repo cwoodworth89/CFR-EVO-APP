@@ -48,7 +48,11 @@ from cfr_dispatch.config import (
     ADDRESS_FULL_ADDR_COLUMN,
     STREET_NAME_CONFIDENCE_THRESHOLD,
     ZONES_MAP_NAME_COLUMN,
-    VERBOSITY_LEVEL
+    VERBOSITY_LEVEL,
+    NUM_PEAKS_TO_FIND,
+    GOLDEN_FINGERPRINTS,
+    FREQUENCY_TOLERANCE_HZ,
+    MATCH_THRESHOLD_PERCENT
 )
 from audio_service import (
     get_rms,
@@ -247,50 +251,6 @@ def transcribe_audio_local(audio_data, model=None) -> str | None:
 def transcribe_audio_file_local(file_path: str, model=None) -> str | None:
     """Transcribes local audio file path using Whisper (backwards compatibility)."""
     return transcribe_audio_local(file_path, model=model)
-
-def capture_full_dispatch(stream, blocksize, dispatch_queue, dispatch_id, matched_tone, initial_buffer=None):
-    """Captures continuous dispatch audio until END_OF_DISPATCH_SILENCE_S is reached, pushing Phase 1 checks periodically."""
-    logging.info(f"STATE: CAPTURING DISPATCH (ID: {dispatch_id})")
-    audio_buffer = initial_buffer if initial_buffer is not None else []
-    max_chunks = int((AUDIO_SAMPLE_RATE / blocksize) * MAX_DISPATCH_DURATION_S)
-    start_chunk = len(audio_buffer)
-    silence_start_time = None
-    last_check_time = time.time()
-    
-    for i in range(start_chunk, max_chunks):
-        try:
-            pcm, _ = stream.read(blocksize)
-            audio_buffer.append(pcm)
-            
-            # Periodic Phase 1 Check trigger
-            current_time = time.time()
-            duration_s = (len(audio_buffer) * blocksize) / AUDIO_SAMPLE_RATE
-            if duration_s >= MIN_PHASE_1_DURATION_S and (current_time - last_check_time >= PHASE_1_CHECK_INTERVAL_S):
-                last_check_time = current_time
-                logging.debug(f"Queueing intermediate audio buffer for Phase 1 check ({len(audio_buffer)} blocks, {duration_s:.1f}s)...")
-                dispatch_queue.put({
-                    "type": "phase_1_check",
-                    "dispatch_id": dispatch_id,
-                    "buffer": list(audio_buffer),
-                    "tone_name": matched_tone,
-                    "units_vocab": UNITS_VOCABULARY
-                })
-
-            volume = get_rms(pcm)
-            if volume < END_OF_DISPATCH_RMS_THRESHOLD:
-                if silence_start_time is None:
-                    silence_start_time = time.time()
-                elif time.time() - silence_start_time >= END_OF_DISPATCH_SILENCE_S:
-                    logging.info(f"END OF DISPATCH DETECTED by {END_OF_DISPATCH_SILENCE_S}s of silence.")
-                    return audio_buffer
-            else:
-                silence_start_time = None
-        except Exception as e:
-            logging.error(f"Audio stream read error: {e}", exc_info=True)
-            break
-            
-    logging.info(f"MAX DURATION ({MAX_DISPATCH_DURATION_S}s) REACHED.")
-    return audio_buffer
 
 
 def google_geocode_fallback(address: str, api_key: str) -> tuple[dict | None, str | None]:
@@ -888,16 +848,14 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                     "lng": res["lng"],
                                     "target": target_payload
                                 }
-                                headers = {
-                                    "Title": f"CORRECTION: Dispatch {dispatch_id}",
-                                    "Priority": "5",
-                                    "Tags": "warning,rotating_light",
-                                    "Click": f"https://www.google.com/maps/search/?api=1&query={res['lat']},{res['lng']}"
-                                }
-                                if ntfy_token:
-                                    headers["Authorization"] = f"Bearer {ntfy_token}"
                                 try:
-                                    requests.post(f"https://ntfy.sh/{ntfy_topic}", headers=headers, data=json.dumps(corr_payload), timeout=10)
+                                    post_to_ntfy(
+                                        corr_payload,
+                                        ntfy_topic,
+                                        ntfy_token,
+                                        title=f"CORRECTION: Dispatch {dispatch_id}",
+                                        tags="warning,rotating_light"
+                                    )
                                 except Exception as n_err:
                                     logging.error(f"Failed to post correction to Ntfy: {n_err}")
                     else:

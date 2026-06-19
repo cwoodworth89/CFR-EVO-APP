@@ -2,7 +2,7 @@ import json
 import logging
 import requests
 
-def post_to_ntfy(payload: dict, topic: str, token: str = None) -> bool:
+def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
     """Posts dispatch data to a private Ntfy channel to wake up Android devices."""
     if not topic or topic.strip() == "" or "your-private-ntfy-topic" in topic:
         logging.info("Ntfy topic not configured or using default placeholder. Skipping push.")
@@ -14,10 +14,20 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None) -> bool:
         headers["Authorization"] = f"Bearer {token}"
         
     try:
-        headers["Title"] = f"Dispatch: {payload.get('incident_type', 'Structure Fire')}"
-        headers["Priority"] = "5"
-        headers["Tags"] = "fire_engine,rotating_light"
+        # Determine Title
+        if title:
+            headers["Title"] = title
+        else:
+            headers["Title"] = f"Dispatch: {payload.get('incident_type', 'Structure Fire')}"
+            
+        headers["Priority"] = priority
         
+        # Determine Tags
+        if tags:
+            headers["Tags"] = tags
+        else:
+            headers["Tags"] = "fire_engine,rotating_light"
+            
         # Parse coordinates for direct tap-to-navigate action
         lat = payload.get("lat")
         lng = payload.get("lng")
@@ -29,8 +39,51 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None) -> bool:
         if lat and lng:
             headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
             
-        logging.info(f"Posting dispatch payload to ntfy.sh topic '{topic}'...")
-        response = requests.post(endpoint, headers=headers, data=json.dumps(payload), timeout=10)
+        # Format a clean, human-readable body message instead of raw JSON
+        address = payload.get("address")
+        if not address:
+            target = payload.get("target", {})
+            address = target.get("address")
+        if not address:
+            address = "Unknown Location"
+
+        units_list = payload.get("responding_units", [])
+        if isinstance(units_list, list):
+            units_str = ", ".join(units_list) if units_list else "None assigned"
+        else:
+            units_str = str(units_list)
+
+        alarm_level = payload.get("alarm_level", 1)
+
+        transcript = payload.get("raw_transcript") or payload.get("sanitized_transcript") or ""
+        
+        # Fallback if no transcript is present (e.g. for simple correction events)
+        if not transcript:
+            is_correction = title and "CORRECTION" in title
+            if is_correction:
+                transcript = "Location/units updated in Phase 2 processing."
+            else:
+                transcript = "No transcript available"
+
+        if transcript.startswith("[") and transcript.endswith("]"):
+            transcript_clean = transcript
+        else:
+            transcript_clean = transcript[:150] + "..." if len(transcript) > 150 else transcript
+
+        duration = payload.get("audio_duration")
+        duration_str = f" ({duration:.1f}s)" if duration else ""
+
+        lines = [
+            f"📍 Address: {address}",
+            f"🚒 Units: {units_str}",
+            f"🚨 Alarm: {alarm_level}",
+            f"📝 Transcript: {transcript_clean}{duration_str}"
+        ]
+        
+        message_body = "\n".join(lines)
+            
+        logging.info(f"Posting formatted dispatch payload to ntfy.sh topic '{topic}'...")
+        response = requests.post(endpoint, headers=headers, data=message_body.encode('utf-8'), timeout=10)
         response.raise_for_status()
         logging.info("Successfully posted to Ntfy.")
         return True

@@ -167,7 +167,8 @@ export function HydrantsLayer({ visible }) {
     React.useEffect(() => {
       if (!visible) return;
 
-      fetch('/data/hydrants.json')
+      const baseUrl = import.meta.env.BASE_URL;
+      fetch(`${baseUrl}data/hydrants.json`)
         .then(r => {
           if (!r.ok) throw new Error("HTTP " + r.status);
           return r.json();

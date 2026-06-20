@@ -100,6 +100,10 @@ Clone the repository and install the dependencies:
 git clone https://github.com/cwoodworth89/CFR-EVO-APP.git ~/CFR-EVO-APP
 cd ~/CFR-EVO-APP
 
+# Install system prerequisites
+sudo apt update
+sudo apt install -y python3-venv libportaudio2
+
 # Set up virtual environment
 python3 -m venv .venv
 source .venv/bin/activate

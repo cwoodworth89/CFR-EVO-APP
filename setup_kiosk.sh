@@ -12,7 +12,7 @@ echo "Starting kiosk auto-setup in directory: ${PROJECT_DIR}"
 # 1. Update package list and install system dependencies
 echo "Installing system dependencies..."
 sudo apt update
-sudo apt install -y python3-venv python3-pip nginx chromium-browser unattended-upgrades curl git nodejs npm
+sudo apt install -y python3-venv python3-pip nginx chromium-browser unattended-upgrades curl git nodejs npm libportaudio2
 
 # 2. Setup Python virtual environment & backend agent requirements
 echo "Setting up Python virtual environment..."

@@ -281,7 +281,39 @@ Tailscale allows you to SSH into the laptop or inspect the web dashboard remotel
 
 ---
 
-## 🎤 Step 6: Audio Setup (UCA202 Integration)
+## 📂 Step 6: Transferring Shapefiles & Credentials (SCP over Tailscale)
+
+Because shapefiles (geocoding boundaries) and credential files (like `.env` and Google Service Account key JSON files) contain sensitive information and large datasets, they are gitignored and not pushed to GitHub. 
+
+Now that both your development machine and the laptop are on the same Tailscale network, you can copy these files securely in seconds using `scp` (Secure Copy Protocol) directly from your development machine.
+
+### 1. Transfer the Shapefiles
+Open a terminal (PowerShell or Command Prompt) on your **development machine** and run the following:
+```powershell
+# Navigate to the local repository directory on Windows
+cd C:\Users\curti\Documents\GitHub\CFR-EVO-APP\backend
+
+# Copy the entire data/ folder to the laptop (replace <laptop-tailscale-ip> and YOUR_USERNAME)
+scp -r data YOUR_USERNAME@<laptop-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+```
+
+### 2. Transfer Credentials (Optional)
+You can also copy your locally configured `.env` file and Google JSON key directly:
+```powershell
+# Copy your local .env configuration file
+scp .env YOUR_USERNAME@<laptop-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+
+# Copy your Google Application Credentials key file
+scp gcp-service-account-key.json YOUR_USERNAME@<laptop-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+```
+
+> [!CAUTION]
+> **Git Discipline & Security**
+> Ensure that you **never** commit or push your `.env` or `.json` credential files to public/private Git repositories. Keep them gitignored on all development workspaces.
+
+---
+
+## 🎤 Step 7: Audio Setup (UCA202 Integration)
 
 1.  Plug the Behringer UCA202 into a USB port on the Lenovo Flex 5.
 2.  Connect your station graphic equalizer or amp utility feed to the UCA202 **INPUT L/R** RCA ports.

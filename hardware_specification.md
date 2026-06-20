@@ -174,6 +174,25 @@ Run the interactive calibration script to align your amplitude triggers with the
 python backend/scripts/calibrate_audio_interactive.py
 ```
 
+### 3. Transferring Shapefiles & Credentials (SCP over Tailscale)
+Because shapefiles (`backend/data/`) and configuration credentials (`.env`, Google key JSONs) are large or contain sensitive API credentials, they are excluded from Git source control. 
+
+To copy them securely from your development computer to the kiosk machine over your secure Tailscale network, open a terminal on your development PC and run:
+
+```powershell
+# Navigate to the backend folder
+cd C:\Users\curti\Documents\GitHub\CFR-EVO-APP\backend
+
+# Copy the geodata shapefiles folder
+scp -r data YOUR_USERNAME@<kiosk-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+
+# Copy your configuration credentials
+scp .env YOUR_USERNAME@<kiosk-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+```
+
+> [!WARNING]
+> **Credential Security**: Always verify that your `.env` and Google Service Account key files are included in your `.gitignore` rules before transferring them. Never check them into Git control.
+
 ---
 
 ## 🖥️ Phase 2: Kiosk Mode & Local Run Configuration

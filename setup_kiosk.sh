@@ -151,6 +151,12 @@ sudo systemctl start unattended-upgrades
 echo "Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
 
+# Copy .env.example if .env does not exist
+if [ ! -f "${PROJECT_DIR}/backend/.env" ]; then
+    echo "Creating default .env configuration file..."
+    cp "${PROJECT_DIR}/backend/.env.example" "${PROJECT_DIR}/backend/.env"
+fi
+
 echo "======================================================================"
 echo " CFR EVO AUTO-SETUP COMPLETE!"
 echo "======================================================================"

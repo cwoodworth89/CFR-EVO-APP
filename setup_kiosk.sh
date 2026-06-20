@@ -25,6 +25,11 @@ deactivate
 # 3. Build the React frontend
 echo "Installing frontend node packages and building static files..."
 cd "${PROJECT_DIR}/frontend"
+# Copy .env.example if .env does not exist
+if [ ! -f ".env" ]; then
+    echo "Creating default frontend .env file..."
+    cp .env.example .env
+fi
 npm install
 npm run build
 cd "${PROJECT_DIR}"

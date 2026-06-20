@@ -54,6 +54,9 @@ sudo systemctl restart nginx
 
 # 5. Create backend agent systemd service
 echo "Creating cfr-agent systemd service..."
+REAL_USER=${SUDO_USER:-$USER}
+USER_UID=$(id -u ${REAL_USER})
+
 cat <<EOF | sudo tee /etc/systemd/system/cfr-agent.service
 [Unit]
 Description=CFR EVO Dispatch Listening Agent
@@ -61,7 +64,8 @@ After=network.target sound.target
 
 [Service]
 Type=simple
-User=${USER}
+User=${REAL_USER}
+Environment=XDG_RUNTIME_DIR=/run/user/${USER_UID}
 WorkingDirectory=${PROJECT_DIR}/backend
 ExecStart=${PROJECT_DIR}/.venv/bin/python main.py
 Restart=always

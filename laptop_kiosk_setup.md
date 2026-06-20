@@ -154,6 +154,7 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=YOUR_USERNAME
+Environment=XDG_RUNTIME_DIR=/run/user/YOUR_USER_ID
 WorkingDirectory=/home/YOUR_USERNAME/CFR-EVO-APP/backend
 ExecStart=/home/YOUR_USERNAME/CFR-EVO-APP/.venv/bin/python main.py
 Restart=always
@@ -165,6 +166,8 @@ SyslogIdentifier=cfr-agent
 [Install]
 WantedBy=multi-user.target
 ```
+*(Replace `YOUR_USERNAME` with your actual username, and `YOUR_USER_ID` with your Linux user ID. You can find your user ID by running `id -u YOUR_USERNAME` in the terminal. The first user created on Ubuntu is almost always `1000`).*
+
 Enable and start the service:
 ```bash
 sudo systemctl daemon-reload

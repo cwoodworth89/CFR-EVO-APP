@@ -230,6 +230,7 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=pi
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 WorkingDirectory=/home/pi/CFR-EVO-APP/backend
 ExecStart=/home/pi/CFR-EVO-APP/.venv/bin/python main.py
 Restart=always

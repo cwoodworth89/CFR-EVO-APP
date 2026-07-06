@@ -8,11 +8,11 @@ def get_rms(data: np.ndarray) -> float:
         return 0.0
     return np.sqrt(np.mean(data.astype(np.float32)**2))
 
-def analyze_live_audio(data: bytes, sample_rate: int, num_peaks: int) -> set:
+def analyze_live_audio(data: bytes, sample_rate: int, num_peaks: int, zscore_threshold: float = 50.0) -> set:
     """
     Analyzes an audio byte buffer for frequency peaks.
     Applies a high-pass Butterworth filter, a Hamming window to prevent spectral leakage,
-    and uses Scipy's find_peaks to extract distinct frequency components.
+    and checks for spectral purity (Z-score) to filter out speech/noise false positives.
     """
     audio_array = np.frombuffer(data, dtype=np.int16)
     if len(audio_array) == 0:
@@ -33,23 +33,41 @@ def analyze_live_audio(data: bytes, sample_rate: int, num_peaks: int) -> set:
     fft_freqs = np.fft.rfftfreq(len(windowed_signal), 1.0 / sample_rate)
     fft_magnitude = np.abs(fft_data)
     
+    if len(fft_magnitude) == 0:
+        return set()
+        
+    # Check spectral purity (Z-score of the maximum peak) to reject non-tone voice/noise triggers
+    max_val = np.max(fft_magnitude)
+    mean_val = np.mean(fft_magnitude)
+    std_val = np.std(fft_magnitude)
+    z_score = (max_val - mean_val) / std_val if std_val > 0 else 0.0
+    
     # Enforce minimum peak separation distance of 15 Hz to avoid duplicate adjacent bin detections
     bin_spacing = sample_rate / len(filtered_signal)
     min_distance_bins = max(1, int(15.0 / bin_spacing))
     
+    detected_freqs = set()
     try:
         # Find local peaks that stand out (prominence filter)
-        peaks, _ = signal.find_peaks(fft_magnitude, distance=min_distance_bins, prominence=np.max(fft_magnitude) * 0.05)
+        peaks, _ = signal.find_peaks(fft_magnitude, distance=min_distance_bins, prominence=max_val * 0.05)
         # Sort found peaks by magnitude descending and take top num_peaks
         sorted_peaks = sorted(peaks, key=lambda p: fft_magnitude[p], reverse=True)[:num_peaks]
-        return set(int(fft_freqs[p]) for p in sorted_peaks)
+        detected_freqs = set(int(fft_freqs[p]) for p in sorted_peaks)
     except Exception:
         # Fallback to partition if find_peaks fails or is unavailable
         try:
             peak_indices = np.argpartition(fft_magnitude, -num_peaks)[-num_peaks:]
-            return set(int(f) for f in fft_freqs[peak_indices])
+            detected_freqs = set(int(fft_freqs[p]) for p in peak_indices)
         except (ValueError, IndexError):
-            return set()
+            pass
+
+    import logging
+    logging.info(f"[DSP Analysis] Z-score: {z_score:.2f} (threshold: {zscore_threshold:.2f}) | Peaks: {sorted(list(detected_freqs))}")
+    
+    if z_score < zscore_threshold:
+        return set() # Rejected as non-pure tone
+        
+    return detected_freqs
 
 def get_best_match(live_frequencies: set, golden_fingerprints: dict, frequency_tolerance_hz: float, match_threshold_percent: float) -> tuple[str, float] | tuple[None, None]:
     """

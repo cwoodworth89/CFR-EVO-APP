@@ -53,9 +53,7 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None
         else:
             units_str = str(units_list)
 
-        alarm_level = payload.get("alarm_level", 1)
-
-        transcript = payload.get("raw_transcript") or payload.get("sanitized_transcript") or ""
+        transcript = payload.get("verified_transcript") or payload.get("sanitized_transcript") or payload.get("raw_transcript") or ""
         
         # Fallback if no transcript is present (e.g. for simple correction events)
         if not transcript:
@@ -72,13 +70,20 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None
 
         duration = payload.get("audio_duration")
         duration_str = f" ({duration:.1f}s)" if duration else ""
+        
+        map_grid = payload.get("map_grid") or target.get("map_grid")
+        radio_channel = payload.get("radio_channel") or target.get("radio_channel")
 
         lines = [
             f"📍 Address: {address}",
-            f"🚒 Units: {units_str}",
-            f"🚨 Alarm: {alarm_level}",
-            f"📝 Transcript: {transcript_clean}{duration_str}"
+            f"🚒 Units: {units_str}"
         ]
+        if map_grid:
+            lines.append(f"🗺️ Map Grid: {map_grid}")
+        if radio_channel:
+            lines.append(f"📻 Channel: {radio_channel}")
+            
+        lines.append(f"📝 Transcript: {transcript_clean}{duration_str}")
         
         message_body = "\n".join(lines)
             

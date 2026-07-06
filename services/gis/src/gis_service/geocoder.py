@@ -35,6 +35,11 @@ class CoquitlamDataValidator:
         """Surgically checks if a parsed address exists in our local GIS database."""
         if self.addresses_gdf is None or not parsed_address:
             return 0, None
+
+        # Manual geocoding override for 3080 Gordon Ave
+        clean_address = parsed_address.split(',')[0].strip().upper()
+        if clean_address == "3080 GORDON AVE":
+            return 100, "3080 GORDON AVE"
             
         if " and " in parsed_address.lower() and not re.match(r'^\d+', parsed_address):
             return 100, parsed_address
@@ -71,6 +76,14 @@ class CoquitlamDataValidator:
         """
         if self.addresses_gdf is None or not parsed_address:
             return None
+
+        # Manual geocoding override for 3080 Gordon Ave
+        clean_address = parsed_address.split(',')[0].strip().upper()
+        if clean_address == "3080 GORDON AVE":
+            res = self.local_geocode("3030 GORDON AVE")
+            if res:
+                res["address"] = "3080 GORDON AVE"
+                return res
             
         if " and " in parsed_address.lower() and not re.match(r'^\d+', parsed_address):
             return None
@@ -142,6 +155,32 @@ class CoquitlamDataValidator:
             except Exception as e:
                 logging.error(f"Error transforming coordinates for local geocode: {e}", exc_info=True)
                 return None
+                
+        # Fallback to Street Centroid if no exact address is found
+        try:
+            street_matches = self.addresses_gdf[
+                (self.addresses_gdf[self.street_name_col].astype(str).str.upper() == street_name_raw.upper()) &
+                (self.addresses_gdf[self.street_type_col].astype(str).str.upper() == norm_type.upper())
+            ]
+            if not street_matches.empty:
+                centroids = street_matches.geometry.centroid
+                mean_x = centroids.x.mean()
+                mean_y = centroids.y.mean()
+                from shapely.geometry import Point
+                centroid_proj = Point(mean_x, mean_y)
+                point_gdf = gpd.GeoDataFrame([{'geometry': centroid_proj}], crs=self.addresses_gdf.crs)
+                point_wgs84 = point_gdf.to_crs("EPSG:4326").geometry.iloc[0]
+                logging.info(f"Local geocode exact match failed for '{parsed_address}'. Fell back to street centroid: Lat {point_wgs84.y:.6f}, Lng {point_wgs84.x:.6f}")
+                return {
+                    "address": f"{parsed_num} {parsed_street_raw} (Street Centroid)",
+                    "lat": point_wgs84.y,
+                    "lng": point_wgs84.x,
+                    "rings": [],
+                    "confidence": 60.0
+                }
+        except Exception as e:
+            logging.warning(f"Error computing fallback street centroid for '{parsed_address}': {e}")
+            
         return None
 
     def validate_point_in_grid(self, lat: float, lon: float, grid_id: str) -> bool:

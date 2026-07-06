@@ -21,10 +21,11 @@ MIN_PHASE_1_DURATION_S = 10.0
 # Pager Tones matching thresholds & fingerprints
 MATCH_THRESHOLD_PERCENT = 0.85
 FREQUENCY_TOLERANCE_HZ = 10
-NUM_PEAKS_TO_FIND = 20
+NUM_PEAKS_TO_FIND = 10
+TONE_ZSCORE_THRESHOLD = 40.0
 
 GOLDEN_FINGERPRINTS = {
     "Chief Tone":  [437.50, 656.25],
     "Engine Tone": [601.56, 1351.56],
-    "Rescue Tone": [726.56, 890.62, 2179.69]
+    "Rescue Tone": [726.56, 890.62]
 }

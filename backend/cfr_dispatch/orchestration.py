@@ -50,6 +50,7 @@ from cfr_dispatch.config import (
     ZONES_MAP_NAME_COLUMN,
     VERBOSITY_LEVEL,
     NUM_PEAKS_TO_FIND,
+    TONE_ZSCORE_THRESHOLD,
     GOLDEN_FINGERPRINTS,
     FREQUENCY_TOLERANCE_HZ,
     MATCH_THRESHOLD_PERCENT
@@ -64,7 +65,6 @@ from audio_service import (
 from cfr_dispatch.parser import (
     sanitize_transcript,
     match_incident_type,
-    parse_alarm_level,
     abbreviate_units,
     parse_dispatch_announcement,
     split_rounds,
@@ -231,9 +231,10 @@ def transcribe_audio_local(audio_data, model=None) -> str | None:
 
         is_faster_whisper = hasattr(model, 'transcribe') and not hasattr(model, 'load_model')
         
+        initial_prompt = "Coquitlam, Combined Response Coquitlam, Engine, Ladder, Rescue, Medic, Squad, respond emergency, respond routine, use talk group, map grid"
         if is_faster_whisper:
             logging.info("Transcribing using cached faster-whisper model...")
-            segments, info = model.transcribe(audio_data, beam_size=2, language="en")
+            segments, info = model.transcribe(audio_data, beam_size=2, language="en", initial_prompt=initial_prompt)
             text = " ".join([segment.text for segment in segments])
             return text.strip() or None
         else:
@@ -241,7 +242,7 @@ def transcribe_audio_local(audio_data, model=None) -> str | None:
             if isinstance(audio_data, str):
                 import whisper
                 audio_data = whisper.load_audio(audio_data)
-            result = model.transcribe(audio_data, language="en", beam_size=2)
+            result = model.transcribe(audio_data, language="en", beam_size=2, initial_prompt=initial_prompt)
             return result.get("text", "").strip() or None
             
     except Exception as e:
@@ -296,7 +297,6 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
                 
         # Parse Incident Type
         incident_type = match_incident_type(sanitized_transcript, CALL_TYPES)
-        alarm_level = 1
         units_str = next((d.units for d in all_candidates if d.units), None)
         responding_units = abbreviate_units(units_str)
 
@@ -415,17 +415,21 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
         # Use local time with timezone offset to align with local logs
         timestamp = datetime.datetime.now().astimezone().isoformat()
         
+        map_grid = next((d.map_grid for d in all_candidates if d.map_grid), None)
+        radio_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), None)
+        
         target_payload = {
             "address": best_address,
             "lat": lat,
             "lng": lng,
-            "rings": rings
+            "rings": rings,
+            "map_grid": map_grid,
+            "radio_channel": radio_channel
         }
         
         db_payload = {
             "dispatch_id": dispatch_id,
             "incident_type": incident_type,
-            "alarm_level": alarm_level,
             "responding_units": responding_units,
             "timestamp": timestamp,
             "raw_transcript": raw_transcript,
@@ -842,7 +846,6 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                 corr_payload = {
                                     "dispatch_id": dispatch_id,
                                     "incident_type": match_incident_type(transcript, CALL_TYPES),
-                                    "alarm_level": 1,
                                     "responding_units": abbreviate_units(p2_candidate.units),
                                     "lat": res["lat"],
                                     "lng": res["lng"],
@@ -1253,7 +1256,7 @@ def run_dispatch_system():
                         if len(analysis_buffer) * blocksize >= TONE_ANALYSIS_DURATION_SECONDS * AUDIO_SAMPLE_RATE:
                             logging.info("Analyzing captured audio for a dispatch tone...")
                             full_sample_np = np.concatenate(analysis_buffer)
-                            live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND)
+                            live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD)
                             matched_tone, score = get_best_match(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
                             if matched_tone:
                                 logging.info(f"TONE CONFIRMED: '{matched_tone}' (Match: {score*100:.0f}%)")

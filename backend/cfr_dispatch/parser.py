@@ -52,6 +52,10 @@ def sanitize_transcript(text: str) -> str:
         r'\bcrazy\s+an\b': 'coquitlam',
         r'\bcoquit\s*loom\b': 'coquitlam',
         r'\bcoquina\b': 'coquitlam',
+        r'\bpoke\s+with\s+them\b': 'coquitlam',
+        r'\bhope\s+with\s+them\b': 'coquitlam',
+        r'\bpoke\s+with\s+him\b': 'coquitlam',
+        r'\bhope\s+with\s+him\b': 'coquitlam',
         
         # Unit corrections
         r'\bqueens\s+(\d+)\b': r'quint \1',
@@ -192,16 +196,6 @@ def match_incident_type(transcript: str, call_types: List[str]) -> str:
     if best_score >= 80:
         return best_match
     return "Unknown Incident"
-
-def parse_alarm_level(transcript: str) -> int:
-    """Parses and returns alarm level (1, 2, or 3) from the transcript text."""
-    match = re.search(r'\balarm\s*(?:level)?\s*(\d)\b', transcript, re.IGNORECASE)
-    if match:
-        try:
-            return int(match.group(1))
-        except ValueError:
-            pass
-    return 1
 
 def get_unit_abbreviation(unit_type: str) -> str:
     """Returns the abbreviation code for a given unit type (e.g., engine -> E)."""

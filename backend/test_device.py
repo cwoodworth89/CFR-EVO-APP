@@ -2,6 +2,7 @@
 import sounddevice as sd
 import numpy as np
 import os
+import sys
 
 def get_rms(audio_array):
     return np.sqrt(np.mean(audio_array.astype(float)**2)) if len(audio_array) > 0 else 0
@@ -43,33 +44,35 @@ def main():
         except ValueError:
             print("Invalid input. Please enter a valid number.")
             
-    # 3. Test the chosen device
+    # 3. Test the chosen device in real-time
     selected_device = devices[choice_idx]
-    print(f"\nTesting Device {choice_idx}: {selected_device['name']}...")
-    print("Recording for 5 seconds. Speak, play a sound, or play a dispatch tone now...")
-    
     sample_rate = 16000
+    blocksize = 1024
+    
+    print(f"\nTesting Device {choice_idx}: {selected_device['name']}...")
+    print("Press Ctrl+C to stop the real-time RMS level meter.")
+    print("==================================================")
+    print("  RMS Level  |  Max Peak  |  Signal Level Bar")
+    print("--------------------------------------------------")
+    
+    max_rms_seen = 0.0
     try:
-        audio_data = sd.rec(int(5.0 * sample_rate), samplerate=sample_rate, channels=1, dtype='int16', device=choice_idx)
-        sd.wait()
-        
-        rms_val = get_rms(audio_data)
-        max_val = np.max(np.abs(audio_data))
-        
-        print("\n--- Test Complete ---")
-        print(f"RMS Level: {rms_val:.2f}")
-        print(f"Max Peak:  {max_val}")
-        
-        if rms_val < 50:
-            print("WARNING: RMS level is very low (~0). The line might be silent or muted.")
-        elif rms_val > 1000:
-            print("SUCCESS: Strong audio signal detected!")
-        else:
-            print("INFO: Moderate audio signal detected.")
-            
-    except Exception as e:
-        print(f"ERROR: Failed to open or record from device: {e}")
-        return
+        with sd.InputStream(samplerate=sample_rate, channels=1, blocksize=blocksize, dtype='int16', device=choice_idx) as stream:
+            while True:
+                pcm, overflowed = stream.read(blocksize)
+                rms_val = get_rms(pcm)
+                max_val = np.max(np.abs(pcm))
+                if rms_val > max_rms_seen:
+                    max_rms_seen = rms_val
+                
+                # Format level bar
+                bar = "#" * int(min(rms_val / 200, 30))
+                print(f"  {rms_val:<10.1f} |  {max_val:<8} |  [{bar:<30}]", end="\r")
+                sys.stdout.flush()
+                
+    except KeyboardInterrupt:
+        print("\n==================================================")
+        print("\nMeter stopped by user.")
         
     # 4. Prompt to save to .env
     save_choice = input(f"\nDo you want to save Device ID {choice_idx} to backend/.env? (y/n): ").strip().lower()

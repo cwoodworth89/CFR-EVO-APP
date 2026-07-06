@@ -222,7 +222,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
           verified_address: verifiedAddress,
           verified_incident: verifiedIncident,
           verified_units: unitsArray,
-          verified_alarm: 1,
           feedback_submitted: true,
           // Clear verify location warning upon verification
           verify_location: false

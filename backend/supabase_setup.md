@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS public.live_calls (
     
     -- Metadata Parsed by STT Agent
     incident_type TEXT NOT NULL DEFAULT 'Unknown Incident',
-    alarm_level INTEGER NOT NULL DEFAULT 1,
     responding_units TEXT[] NOT NULL DEFAULT '{}',          -- Array of unit codes, e.g. {"E1", "L1"}
     
     -- Geocoding & Target Info (Option 2 Format)
@@ -35,15 +34,20 @@ CREATE TABLE IF NOT EXISTS public.live_calls (
     
     -- Ground Truth, Performance & Quality Logging
     raw_transcript TEXT,                                     -- Original text from STT
+    sanitized_transcript TEXT,                               -- Sanitized text from agent
     confidence_score NUMERIC(5,2) DEFAULT 0.0,               -- Fuzzy GIS lookup / STT confidence
     verify_location BOOLEAN DEFAULT FALSE,                   -- Flag indicating location needs validation
+    origins TEXT[] DEFAULT '{}',                            -- Source audio file origins or markers
+    
+    -- Audio metadata
+    audio_url TEXT,
+    audio_duration NUMERIC(6,2),
     
     -- Corrections Entered via Admin Web Interface
     verified_transcript TEXT,                                -- Actual ground-truth transcript
     verified_address TEXT,                                   -- Ground-truth address
     verified_incident TEXT,                                  -- Ground-truth incident type
     verified_units TEXT[],                                   -- Ground-truth units
-    verified_alarm INTEGER,                                  -- Ground-truth alarm level
     feedback_submitted BOOLEAN DEFAULT FALSE                 -- Flag set once reviewed by admin
 );
 

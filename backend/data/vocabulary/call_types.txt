@@ -13,6 +13,7 @@ Wildland Fire - Smouldering
 Wildland Fire - Small Area
 Wildland Fire
 Rubbish Fire
+Tent Fire
 
 # --- Gas / Hydro ---
 Gas Leak
@@ -24,6 +25,7 @@ Hazmat 2
 Hazmat 3
 
 # --- Medical ---
+Medical Aid - Significant Event - Multiple Patients
 Medical Aid - Cardiac Arrest
 Medical Aid - Cardiac Problems
 Medical Aid - Chest Pain

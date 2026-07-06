@@ -39,12 +39,12 @@ ZONES_MAP_NAME_COLUMN = 'MAP_NAME'
 STREET_NAME_CONFIDENCE_THRESHOLD = 80
 
 # Import parser functions from cfr_dispatch
-from cfr_dispatch.gis import CoquitlamDataValidator
+import cfr_dispatch
+from gis_service import CoquitlamDataValidator
 from cfr_dispatch.parser import (
     sanitize_transcript,
     load_call_types,
     match_incident_type,
-    parse_alarm_level,
     abbreviate_units,
     parse_dispatch_announcement,
     split_rounds
@@ -79,7 +79,6 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
             
     # Parse metadata early
     incident_type = match_incident_type(sanitized, call_types)
-    alarm_level = parse_alarm_level(sanitized)
     units_str = next((d.units for d in all_candidates if d.units), None)
     responding_units = abbreviate_units(units_str)
 
@@ -158,7 +157,6 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
     # 4. Extract incident metadata
     print(f"4. Incident Metadata:")
     print(f"   Incident Type: {incident_type}")
-    print(f"   Alarm Level: {alarm_level}")
     print(f"   Raw Units: {units_str}")
     print(f"   Abbreviated Units: {responding_units}")
     
@@ -170,7 +168,6 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
     db_payload = {
         "dispatch_id": dispatch_id,
         "incident_type": incident_type,
-        "alarm_level": alarm_level,
         "responding_units": responding_units,
         "timestamp": timestamp,
         "raw_transcript": transcript,
@@ -191,7 +188,6 @@ def run_pipeline_test(transcript: str, validator: CoquitlamDataValidator, call_t
     
     # Verify fields match specification
     assert db_payload["dispatch_id"].startswith("DISP-2026-")
-    assert db_payload["alarm_level"] >= 1
     assert db_payload["raw_transcript"] == transcript
     assert db_payload["sanitized_transcript"] == sanitized
     assert "confidence_score" in db_payload

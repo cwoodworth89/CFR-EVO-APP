@@ -371,3 +371,147 @@ Since we want to capture the audio feed passively, we can tap the signal at thre
     *   ⚠️ **HIGH VOLTAGE WARNING**: Directly connecting a 70V speaker line to a Raspberry Pi sound card will instantly fry the card, the Pi, and poses a safety risk. You **must** use a step-down transformer/attenuator.
     *   If you tap a zoned speaker line (e.g., Dorm A), you will only capture alerts that trigger that specific zone. To capture all alerts, you must tap a "Common/All-Call" speaker line.
 
+---
+
+## 🛠️ Site Integration Blueprint: Training Room Speaker Tap
+
+Tapping into the wall speaker in the **old training room** before the switch is a highly practical, low-risk solution. Since the speaker wiring is already accessible and taped at the switch, this point provides a clean feed without risking service interruptions at the main audio rack.
+
+### 1. Wiring Schematic
+
+By tapping the wires **before** they enter the wall switch, we ensure the Raspberry Pi/Laptop captures all dispatches, even if the training room speaker switch is set to "Off".
+
+```
+                          [70V Speaker Line Feed (Incoming)]
+                                         │
+               ┌─────────────────────────┴─────────────────────────┐
+               ▼                                                   ▼
+  [Training Room Switch]                             [Bogen WMT1AS Converter]
+         │                                            (Input Screw Terminals)
+  (ON/OFF wall switch)                                             │
+         │                                            (Passive Step-down &
+         ▼                                             10kΩ Magnetic Isolation)
+  [Training Room Speaker]                                          │
+                                                                   ▼
+                                                       [RCA Output (Line-Level)]
+                                                                   │
+                                                          (RCA to RCA Cable)
+                                                                   │
+                                                                   ▼
+                                                   [Behringer UCA202 USB Sound Card]
+                                                                   │
+                                                              (USB Port)
+                                                                   │
+                                                                   ▼
+                                                     [Raspberry Pi / Lenovo Laptop]
+```
+
+### 2. Bill of Materials (BOM) & Budget-Friendly Alternatives
+
+To implement this tap, you must step down the high-voltage (70V/25V) speaker signal and isolate the ground. While commercial units like the **Bogen WMT1AS** or **RDL TX-70A** are the gold standards, they can be heavily marked up in Canadian markets ($100 - $130 CAD).
+
+Here are three much cheaper, electrically isolated alternatives that you can easily source in Canada:
+
+#### Alternative A: Generic 70V Speaker Transformer (~$10–$15 CAD) — *Cheapest Isolated DIY*
+*   **Products**: *Speco T7010*, *Speco T7020*, or *Atlas LT70* (available at local electronics/industrial suppliers or online).
+*   **How it works**: These are standard matching transformers used on the back of typical 70V ceiling speakers. When wired in reverse, they step the voltage down safely and provide 100% galvanic (magnetic) isolation to protect your laptop/Pi.
+*   **Wiring**:
+    *   Connect the incoming 70V speaker feed to the primary tap leads: `COM` and the `0.5W` or `1W` tap.
+    *   Connect your sound card input (via a spliced RCA or 3.5mm cable) to the secondary speaker leads: `COM` and the `8-ohm` tap.
+    *   *Result*: At full amplifier volume, the 0.5W tap steps the signal down to roughly ~2V RMS, a perfect line-level match that won't overload your USB audio interface.
+
+#### Alternative B: Passive Direct Input (DI) Box (~$25–$35 CAD) — *Easiest Plug-and-Play*
+*   **Products**: *Behringer Ultra-DI DI400P*, *Pyle PDC21*, or *Neewer Passive DI Box* (widely available on Amazon.ca or local music stores like Long & McQuade).
+*   **How it works**: DI boxes are designed to convert high-level speaker/instrument lines to low-impedance inputs while isolating grounds.
+*   **Wiring**:
+    *   Solder or screw-terminal the incoming 70V speaker lines to a standard **1/4" TS Mono Jack**.
+    *   Plug the 1/4" jack into the DI box's `INPUT`.
+    *   **CRITICAL**: Engage the **`-40dB` pad switch** on the DI box to attenuate the 70V signal.
+    *   Connect the `XLR Output` on the DI box to the Behringer sound card using an XLR-to-RCA (or XLR-to-3.5mm) cable.
+    *   Engage the `Ground Lift` switch if you hear any hum.
+
+#### Alternative C: Car Audio Line Output Converter (LOC) (~$15–$25 CAD) — *Widely Available Locally*
+*   **Products**: *Scosche LOC2SL*, *PAC LP7-2*, or generic high-to-low converters (available at Canadian Tire, Amazon.ca, or local car audio shops).
+*   **How it works**: These step down speaker-level outputs to RCA outputs.
+*   **Wiring**:
+    *   To prevent the small transformer inside the car LOC from saturating (which causes distortion) on a 70V line, solder a **22k-ohm resistor (1/4 Watt)** in series with the positive (`+`) input speaker lead.
+    *   Connect the output RCAs directly to the Behringer UCA202.
+
+---
+
+### 3. Step-by-Step Installation Steps
+
+1.  **Safety First**: Ensure no announcements are playing when handling the bare wires. Although 70V audio is current-limited, it can deliver a noticeable tickle/shock if a dispatch occurs while you are holding the bare conductor.
+2.  **Expose the Splice**: Remove the electrical tape from the twisted speaker wires at the wall switch.
+3.  **Identify the Incoming Feed**: There should be two pairs of wires:
+    *   **Pair A (Incoming Feed)**: Carries the audio signal from the main amplifier.
+    *   **Pair B (Outgoing to Switch/Speaker)**: Runs to the switch and speaker.
+4.  **Install Wago Connectors**:
+    *   Take the positive (`+`) wire from the incoming feed, one leg of the outgoing switch feed, and a new short jumper wire, and insert all three into a **Wago 221 Lever-Nut**.
+    *   Do the same for the negative (`-`) wires using a second Wago connector.
+5.  **Connect the Transformer**: Run the two jumper wires from your Wago connectors to the screw terminals on the **Bogen WMT1AS** (typically labeled `70V` and `GND/COM`).
+6.  **Connect to the Pi/Laptop**:
+    *   Plug the RCA cable into the Bogen transformer's output jack.
+    *   Plug the other end of the RCA cable into the **Input** ports of the Behringer UCA202.
+    *   Plug the Behringer's USB cable into your Raspberry Pi or Lenovo laptop.
+
+---
+
+### 4. Laptop-Specific Considerations (Lenovo Flex 5)
+
+If you use the Lenovo Flex 5 laptop instead of a Raspberry Pi:
+*   **Avoid the Combo Jack**: The Lenovo Flex 5 has a single 3.5mm combo headset jack (headphone + mic). Avoid using a 3.5mm adapter to plug the speaker tap into this jack. Laptop microphone inputs are highly sensitive, mono-only, and easily distorted by line-level inputs.
+*   **Use the USB Sound Card**: Plugin the **Behringer UCA202** to the laptop's USB port. The operating system (Windows or Linux) will recognize it as a standard USB audio input device. This bypasses the laptop's internal sound card and guarantees a clean, unclipped stereo signal.
+*   **Recording Settings**:
+    *   In Audacity or your Python agent configuration, set the recording input to: `USB Audio CODEC`.
+    *   Set the input level in your OS settings to around **50% to 70%** to prevent digital clipping when loud dispatch alerts are broadcast.
+
+---
+
+## 🔍 How to Verify Speaker Line Voltage (70V vs. 25V vs. 8-Ohm)
+
+Before buying or hooking up hardware, you should verify what voltage is actually running on your speaker line. Paging lines in commercial installations are almost always 70V, but they can occasionally be 25V or low-impedance (8-ohm).
+
+### Method 1: Visual Inspection (Easiest)
+Open the wall speaker housing or look at the back of the training room speaker. 
+*   **If it's 70V or 25V**: You will see a small matching transformer (a block of metal laminations wound with copper wire) mounted directly to the speaker's metal frame. The wires from the wall will connect to leads labeled with wattages (e.g., `5W`, `2.5W`, `1.25W`, `0.62W`) or showing input ratings like `70V` or `25V`.
+*   **If it's 8-Ohm / Low-Impedance**: The wires from the wall will connect directly to the positive and negative terminals of the speaker cone without any transformer in between.
+
+### Method 2: Multimeter Testing
+1.  Set your digital multimeter (DMM) to **AC Voltage (V~)**.
+2.  Connect the probes to the positive and negative speaker terminals (or the bare wires at the switch).
+3.  Trigger or wait for an audio page/announcement:
+    *   **If it is a standard 8-ohm line**: The multimeter will read very low, usually peaking between **0.5V and 3V AC** even during loud speech.
+    *   **If it is a 25V line**: The meter will peak between **5V and 15V AC** during speech.
+    *   **If it is a 70V line**: The meter will peak between **15V and 50V AC** during speech (70.7V is the theoretical maximum at 100% amplifier output).
+
+---
+
+## 🇨🇳 AliExpress Budget Testing & Interfacing Kit
+
+If you are buying from AliExpress, you can assemble a complete testing and conversion kit for under **$25 CAD** total. Here are the exact keywords to search for:
+
+1.  **For Measuring the Voltage (Digital Multimeter)**
+    *   *Search*: `ANENG mini digital multimeter AC DC`
+    *   *Cost*: ~$5 - $10 CAD
+    *   *Use*: Confirm if the speaker line is 70V, 25V, or 8-ohm.
+2.  **For 70V/100V Conversion & Isolation (Choose ONE)**
+    *   **Option A: Passive DI Box**
+        *   *Search*: `passive DI box audio stage` or `passive direct box`
+        *   *Cost*: ~$12 - $18 CAD
+        *   *Use*: Steps down the 70V signal and isolates the grounds. Remember to toggle the `-40dB` pad switch on the unit!
+    *   **Option B: Car High-to-Low Converter**
+        *   *Search*: `car high to low audio converter RCA`
+        *   *Cost*: ~$2 - $4 CAD
+        *   *Use*: Convert speaker wires to RCA. (Solder a `22k ohm resistor` in series on the input line to prevent saturation/distortion on 70V).
+    *   **Option C: Generic 100V PA Transformer**
+        *   *Search*: `100V audio transformer PA speaker`
+        *   *Cost*: ~$3 - $5 CAD
+        *   *Use*: The raw matching transformer. Wire `100V` / `COM` to the line, and `8 ohm` / `COM` to the sound card.
+3.  **For Eliminating Hum (Ground Loop Isolator)**
+    *   *Search*: `3.5mm ground loop isolator hum noise filter`
+    *   *Cost*: ~$3 - $5 CAD
+    *   *Use*: Put this inline on the audio cable going to your Pi/laptop to prevent buzzes. (Not needed if using the DI Box or a speaker transformer, as they have isolation built in).
+
+
+

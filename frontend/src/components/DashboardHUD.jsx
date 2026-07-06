@@ -208,7 +208,6 @@ function ActiveDispatchPanel({ activeDispatch, setActiveDispatch, nearestHydrant
   const address = target.address || activeDispatch.address || "Unknown Address";
   const incidentType = activeDispatch.incident_type || "Emergency Call";
   const units = activeDispatch.responding_units || [];
-  const alarmLevel = activeDispatch.alarm_level || 1;
 
   const handleDismiss = () => {
     setActiveDispatch(null);
@@ -238,11 +237,6 @@ function ActiveDispatchPanel({ activeDispatch, setActiveDispatch, nearestHydrant
           <div className="border-t border-slate-900 mt-2.5 pt-2 flex flex-col gap-0.5 text-left">
             <span className="text-[8px] text-slate-500 font-extrabold uppercase font-mono">CALL TYPE</span>
             <div className="text-sm text-amber-500 font-black tracking-wide uppercase">{incidentType}</div>
-            {alarmLevel > 1 && (
-              <span className="inline-flex self-start px-2 py-0.5 rounded text-[9px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/20 mt-1 font-mono uppercase tracking-wider">
-                {alarmLevel}nd Alarm
-              </span>
-            )}
           </div>
         </div>
 

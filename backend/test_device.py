@@ -52,27 +52,33 @@ def main():
     print(f"\nTesting Device {choice_idx}: {selected_device['name']}...")
     print("Press Ctrl+C to stop the real-time RMS level meter.")
     print("==================================================")
-    print("  RMS Level  |  Max Peak  |  Signal Level Bar")
+    print("  Current RMS |  Max RMS Seen |  Max Peak  |  Signal Bar")
     print("--------------------------------------------------")
     
     max_rms_seen = 0.0
+    max_peak_seen = 0
     try:
         with sd.InputStream(samplerate=sample_rate, channels=1, blocksize=blocksize, dtype='int16', device=choice_idx) as stream:
             while True:
                 pcm, overflowed = stream.read(blocksize)
                 rms_val = get_rms(pcm)
-                max_val = np.max(np.abs(pcm))
+                max_val = int(np.max(np.abs(pcm)))
                 if rms_val > max_rms_seen:
                     max_rms_seen = rms_val
+                if max_val > max_peak_seen:
+                    max_peak_seen = max_val
                 
                 # Format level bar
-                bar = "#" * int(min(rms_val / 200, 30))
-                print(f"  {rms_val:<10.1f} |  {max_val:<8} |  [{bar:<30}]", end="\r")
+                bar = "#" * int(min(rms_val / 200, 20))
+                print(f"  {rms_val:<11.1f} |  {max_rms_seen:<12.1f} |  {max_val:<10} |  [{bar:<20}]", end="\r")
                 sys.stdout.flush()
                 
     except KeyboardInterrupt:
         print("\n==================================================")
-        print("\nMeter stopped by user.")
+        print("Meter stopped by user.")
+        print(f"Session Summary:")
+        print(f"  - Maximum RMS Level:  {max_rms_seen:.1f}")
+        print(f"  - Maximum Peak Value: {max_peak_seen}")
         
     # 4. Prompt to save to .env
     save_choice = input(f"\nDo you want to save Device ID {choice_idx} to backend/.env? (y/n): ").strip().lower()

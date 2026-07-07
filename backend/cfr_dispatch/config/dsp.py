@@ -2,9 +2,9 @@
 #   - docs/hardware_specification.md
 #   - docs/test_procedures.md
 # DSP settings and thresholds
-# Lowered for ultra-clean line-in feed (baseline is ~22 RMS)
-NOISE_AMPLITUDE_THRESHOLD = 800
-NOISE_AMPLITUDE_THRESHOLD_MIN = 400
+# Lowered significantly for high-sensitivity testing (baseline is ~22 RMS)
+NOISE_AMPLITUDE_THRESHOLD = 150
+NOISE_AMPLITUDE_THRESHOLD_MIN = 100
 SUSTAINED_LOUDNESS_WINDOW = 5
 SUSTAINED_LOUDNESS_CHUNKS_REQUIRED = 5
 TONE_ANALYSIS_DURATION_SECONDS = 3.5
@@ -12,7 +12,7 @@ TONE_ANALYSIS_DURATION_SECONDS = 3.5
 # Dispatch capture timing thresholds
 MAX_DISPATCH_DURATION_S = 59
 END_OF_DISPATCH_SILENCE_S = 3.0
-END_OF_DISPATCH_RMS_THRESHOLD = 200
+END_OF_DISPATCH_RMS_THRESHOLD = 80
 POST_EVENT_RESET_SILENCE_S = 3.0
 
 # Two-Phase Capture checkpoints

@@ -19,13 +19,14 @@ Coquitlam [Units]. Respond [Priority], [Incident Type], [Address]. Near [Cross S
 
 ## 🛠️ Segmented Parser Filters (Template-Aligned Segmentation)
 
-The parser in [parser.py](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/agent/cfr_dispatch/parser.py) maps this template directly to separate data fields using anchor keywords:
+The parser in [parser.py](../backend/cfr_dispatch/parser.py) maps this template directly to separate data fields using anchor keywords:
 
 | Segment Name | Sample Value | Anchor Keyword / Split logic |
 | :--- | :--- | :--- |
 | **Units** | `Engine 2, Engine 3, Rescue 2` | Precedes the `respond` keyword |
 | **Priority** | `Emergency` | Follows `respond` (e.g. `respond emergency` / `respond routine`) |
-| **Incident Type** | `Alarm Activated - High Risk` | Extracted via lookup matching against [call_types.txt](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/agent/data/vocabulary/call_types.txt) |
+| **Incident Type** | `Alarm Activated - High Risk` | Extracted via lookup matching against [call_types.txt](../backend/data/vocabulary/call_types.txt) |
+
 | **Address** | `1189 Eastwood Street` | Extracted from the text following the Incident Type, up to the `near` keyword |
 | **Cross Streets** | `Primrose Lane and Guildford Way` | Captured between the `near` / `cross roads` and `use talk group` anchors |
 | **Radio Channel** | `Talk Group 6 Coquitlam` | Extracted after the `use talk group` anchor |

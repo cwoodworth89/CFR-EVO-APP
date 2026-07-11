@@ -38,18 +38,18 @@ This document outlines the key milestones achieved during the development of CFR
     *   *Parcel Addresses*: Click the exact lot boundaries corresponding to addresses.
 *   **Score Tracking**: Added high-score, timer, and visual feedback states to gamify study reviews.
 
+### ⏱️ Milestone 6: Two-Phase Dispatch Slicing
+*   **Objective**: Minimize time-to-alert down to <15 seconds.
+*   **Implementation**: Refactored the listening loop to process incoming dispatch announcements in two stages: Phase 1 sends a rapid preliminary geocoded location to the UI/Map within 15 seconds, and Phase 2 uploads the finalized call recording, full transcript, and executes correction verifications after the broadcast finishes.
+
 ---
 
 ## 🗓️ Future Milestones
 
-### ⏱️ Milestone 6: Two-Phase Dispatch Slicing
-*   *Objective*: Minimize time-to-alert down to <15 seconds.
-*   *Implementation*: Slice the first 12 seconds of incoming audio (containing the address and call type) to trigger geocoding and send immediate routing overlays to crew devices, while the transcription of the remaining text continues in the background.
-
 ### 📺 Milestone 7: Hall Kiosk Touchscreen Mounts
-*   *Objective*: Deploy permanent station monitors.
-*   *Implementation*: Package the React client into a localized Electron kiosk container running on wall-mounted touchscreen displays inside hall bays, powered by dedicated Raspberry Pi 5 boards.
+*   **Objective**: Deploy permanent station monitors.
+*   **Implementation**: Package the React client into a localized Electron kiosk container running on wall-mounted touchscreen displays inside hall bays, powered by dedicated Raspberry Pi 5 boards.
 
 ### 📲 Milestone 8: Shift-Based Apparatus Subscriptions
-*   *Objective*: Filter push notifications dynamically.
-*   *Implementation*: Build a mobile-friendly onboarding interface where firefighters can subscribe their devices to a specific apparatus (e.g., E1, L1, or R1) on shift startup, receiving alerts only when their assigned vehicle is dispatched.
+*   **Objective**: Filter push notifications dynamically.
+*   **Implementation**: Build a mobile-friendly onboarding interface where firefighters can subscribe their devices to a specific apparatus (e.g., E1, L1, or R1) on shift startup, receiving alerts only when their assigned vehicle is dispatched.

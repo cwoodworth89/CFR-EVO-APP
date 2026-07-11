@@ -472,7 +472,7 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
 def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str) -> tuple[str | None, float]:
     """
     Concatenates recorded audio buffer chunks, saves a .wav file locally
-    (to client/public/recordings/ and agent/audio_files/recordings/),
+    (to frontend/public/recordings/ and backend/audio_files/recordings/),
     uploads it to Supabase Storage, and returns the public audio URL (or local path)
     and audio duration in seconds.
     """
@@ -497,28 +497,28 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str) -> tup
         wavio.write(wav_io, filtered_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
         audio_bytes = wav_io.getvalue()
         
-        # 1. Save locally to client/public/recordings/ for local playback fallback
+        # 1. Save locally to frontend/public/recordings/ for local playback fallback
         local_url_path = f"/recordings/{dispatch_id}.wav"
         try:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            local_dir = os.path.join(base_dir, "client", "public", "recordings")
+            local_dir = os.path.join(base_dir, "frontend", "public", "recordings")
             os.makedirs(local_dir, exist_ok=True)
             local_file_path = os.path.join(local_dir, f"{dispatch_id}.wav")
             logging.info(f"Saving audio locally to {local_file_path}...")
             with open(local_file_path, "wb") as f:
                 f.write(audio_bytes)
         except Exception as e:
-            logging.warning(f"Could not save audio locally to client/public/recordings: {e}")
+            logging.warning(f"Could not save audio locally to frontend/public/recordings: {e}")
             
-        # Also save to agent/audio_files/recordings/ for agent records/debugging
+        # Also save to backend/audio_files/recordings/ for records/debugging
         try:
-            agent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio_files", "recordings")
-            os.makedirs(agent_dir, exist_ok=True)
-            agent_file_path = os.path.join(agent_dir, f"{dispatch_id}.wav")
-            with open(agent_file_path, "wb") as f:
+            backend_rec_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio_files", "recordings")
+            os.makedirs(backend_rec_dir, exist_ok=True)
+            backend_file_path = os.path.join(backend_rec_dir, f"{dispatch_id}.wav")
+            with open(backend_file_path, "wb") as f:
                 f.write(audio_bytes)
         except Exception as e:
-            logging.warning(f"Could not save audio locally to agent/audio_files/recordings: {e}")
+            logging.warning(f"Could not save audio locally to backend/audio_files/recordings: {e}")
             
         # 2. Upload to Supabase Storage
         supabase_url = os.environ.get("SUPABASE_URL")

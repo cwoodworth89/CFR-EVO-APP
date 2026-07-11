@@ -291,7 +291,7 @@ Now that both your development machine and the laptop are on the same Tailscale 
 Open a terminal (PowerShell or Command Prompt) on your **development machine** and run the following:
 ```powershell
 # Navigate to the local repository directory on Windows
-cd C:\Users\curti\Documents\GitHub\CFR-EVO-APP\backend
+cd \path\to\CFR-EVO-APP\backend
 
 # Copy the entire data/ folder to the laptop (replace <laptop-tailscale-ip> and YOUR_USERNAME)
 scp -r data YOUR_USERNAME@<laptop-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/

@@ -13,13 +13,13 @@ During diagnostics, we discovered that:
 ---
 
 ## 2. Local Hydrant Cache Database
-*   Created a paginated script [download_hydrants.py](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/scratch/download_hydrants.py) that successfully queries the server via `where=1=1` non-spatial queries.
-*   Downloaded all 3,381 Coquitlam fire hydrants and saved them to a compact, local database file: [hydrants.json](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/public/data/hydrants.json) (544.75 KB).
+*   Created a paginated script [download_hydrants.py](../../scratch/download_hydrants.py) that successfully queries the server via `where=1=1` non-spatial queries.
+*   Downloaded all 3,381 Coquitlam fire hydrants and saved them to a compact, local database file: [hydrants.json](../../frontend/public/data/hydrants.json) (544.75 KB).
 
 ---
 
 ## 3. Client-Side Rendering & NFPA 291 Styles
-*   Refactored the `HydrantsLayer` component in [MapLayers.jsx](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/src/components/MapLayers.jsx):
+*   Refactored the `HydrantsLayer` component in [MapLayers.jsx](../../frontend/src/components/MapLayers.jsx):
     *   Removed the broken `dynamicMapLayer` raster overlay.
     *   Loads `/data/hydrants.json` on component mount if visible.
     *   Filters the 3,381 points in memory against the map viewport bounds when the map moves (taking less than 1ms).
@@ -34,7 +34,7 @@ During diagnostics, we discovered that:
 ---
 
 ## 4. Nearest-Hydrant Routing
-*   Refactored the target address query in [MapBoard.jsx](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/src/components/MapBoard.jsx):
+*   Refactored the target address query in [MapBoard.jsx](../../frontend/src/components/MapBoard.jsx):
     *   Loads `/data/hydrants.json` once on component mount.
     *   When the incident target address changes, it calculates the distance to all local hydrants using Turf.js and filters those within a 300-meter radius in-memory.
     *   This instantly restores the closest hydrant listing in the HUD and routing overlays without making network requests.
@@ -42,7 +42,7 @@ During diagnostics, we discovered that:
 ---
 
 ## 5. Maintenance & Change Tracking
-*   Updated the monthly maintenance script [update_gis_data.py](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/agent/update_gis_data.py):
+*   Updated the monthly maintenance script [update_gis_data.py](../../backend/scripts/update_gis_data.py):
     *   Added `update_hydrant_data()` which paginates through the MapServer and checks for differences against the local cached JSON file.
     *   Detects **Added** hydrants, **Deleted** hydrants, and **Modified** attributes (such as status updates or flow class corrections) and logs a detailed summary:
         ```text
@@ -57,5 +57,5 @@ During diagnostics, we discovered that:
 ---
 
 ## 6. Verification Results
-1.  **Manual Script Run**: Executed `update_gis_data.py` inside the virtual environment. It successfully isolated the address download failure, fetched all 3,381 hydrants, confirmed 0 differences, and safely updated `client/public/data/hydrants.json`.
-2.  **Production Build**: Ran `npm run build` in the `client/` directory. Vite completed the production build successfully in 4.39s with no errors.
+1.  **Manual Script Run**: Executed `update_gis_data.py` inside the virtual environment. It successfully isolated the address download failure, fetched all 3,381 hydrants, confirmed 0 differences, and safely updated `frontend/public/data/hydrants.json`.
+2.  **Production Build**: Ran `npm run build` in the `frontend/` directory. Vite completed the production build successfully in 4.39s with no errors.

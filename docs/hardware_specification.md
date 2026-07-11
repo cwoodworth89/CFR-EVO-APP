@@ -44,7 +44,7 @@ This phase focuses on capturing dispatch audio via a microphone or line-in feed 
 > * No audio is recorded or transmitted during normal standby.
 > * Recording and transcription trigger only after a valid alert tone sequence is matched.
 > * Only structured call details (incident type, address, dispatched units, channels) are parsed and recorded.
-> For more details, see [docs/privacy.md](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/docs/privacy.md).
+> For more details, see [docs/privacy.md](./privacy.md).
 
 ### Phase 2: Touchscreen Kiosk Display (Estimated Cost: +~$120 - $150 USD)
 This phase adds a medium-sized wall-mountable touch screen and runs both the React web client and Python agent on the same Pi.
@@ -54,6 +54,64 @@ This phase adds a medium-sized wall-mountable touch screen and runs both the Rea
 | **Touchscreen Display** | 10.1-inch Capacitive Touch Screen (1280x800 resolution). Provides the ideal canvas for Leaflet maps, routing overlays, and hydrant displays. | Waveshare 10.1" Capacitive Touch Display (HDMI + USB) | $100 |
 | **Display Cables** | Standard HDMI to Micro-HDMI cable (for Pi 5 video) and USB-A to Micro-USB cable (for capacitive touch data). | Waveshare bundled cables | Included |
 | **Enclosure / Mount** | Wall-mountable VESA case for Raspberry Pi 5 and the 10.1-inch screen to mount inside the fire hall or appliance bay. | SmartiPi Touch Pro or Waveshare 10.1" metal case | $25 - $40 |
+
+---
+
+## 💻 Alternative: All-in-One x86 Laptop Kiosk (e.g., Lenovo Flex 5)
+
+If you have an unused touchscreen laptop (such as a Lenovo Flex 5), repurposing it as a dedicated station kiosk is a highly cost-effective and powerful alternative to the Raspberry Pi ecosystem.
+
+### Why Use a Touchscreen Laptop?
+*   **Zero Hardware Costs**: Eliminates the need to purchase a Pi, touchscreen, power supply, case, and SD card.
+*   **Built-in UPS (Battery Backup)**: The laptop's internal battery acts as an automatic uninterruptible power supply, keeping the listening agent and kiosk running during temporary station power fluctuations.
+*   **Vastly Superior Performance**: The x86 processor (Core i3/i5/i7) runs local Whisper speech-to-text models (such as `base` or `small`) in under 2 seconds. The React mapping dashboard renders without any GPU lag.
+*   **Integrated Large Display**: The 14-inch Full HD (1920x1080) screen offers significantly more canvas space for Leaflet maps and hydrant layouts than a 10.1-inch Pi screen.
+*   **Built-in Mic Array**: Ready for Phase 1 voice trial testing immediately without any extra microphone hardware.
+
+### Operating System & Ubuntu Setup
+We recommend installing **Ubuntu 24.04 LTS Desktop** (or a lighter flavor like **Lubuntu** if it is a lower-spec model). Ubuntu GNOME has excellent native support for touch digitizers, onscreen keyboards, and automatic screen rotation.
+
+> [!WARNING]
+> **Audio Rack Interfacing on Laptops**
+> When migrating to the Phase 2 line-in feed, **do not** plug the 1V line-level audio rack output directly into the laptop's built-in 3.5mm combo microphone jack. Laptop mic ports are highly amplified (mic-level) and will severely clip, distort, or damage the laptop's internal audio codec. You should still use the **Behringer UCA202 / UCA222 USB sound card** to capture line-level signals cleanly.
+
+### Ubuntu Kiosk Mode Configuration
+
+#### 1. Enable Automatic Login
+Open your system settings: **Settings** -> **Users** -> Unlock (Top Right) -> Toggle **Automatic Login** to **ON**.
+
+#### 2. Prevent Laptop Lid Suspend
+Since you will fold the Flex 5 into tablet mode or mount it, you must configure Ubuntu to ignore the lid-closed sensor so it does not go to sleep when folded:
+Edit the login daemon configuration file `/etc/systemd/logind.conf`:
+```ini
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+```
+Apply the changes:
+```bash
+sudo systemctl restart systemd-logind
+```
+
+#### 3. Disable Screen Sleep & Lock
+Prevent GNOME from turning off the display:
+```bash
+# Set screen blank timeout to "Never"
+gsettings set org.gnome.desktop.session idle-delay 0
+# Disable lock screen
+gsettings set org.gnome.desktop.screensaver lock-enabled false
+```
+
+#### 4. Configure Kiosk Browser Autostart
+To make Chromium boot directly into full-screen kiosk mode pointing to the local dashboard at startup, create a GNOME autostart entry:
+Create the file `~/.config/autostart/kiosk.desktop`:
+```ini
+[Desktop Entry]
+Type=Application
+Name=CFR EVO Kiosk
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --no-first-run http://localhost
+X-GNOME-Autostart-enabled=true
+```
 
 ---
 
@@ -113,8 +171,27 @@ STT_ENGINE=google  # Recommended for low CPU load on Pi
 ```
 Run the interactive calibration script to align your amplitude triggers with the background noise of the station:
 ```bash
-python agent/calibrate_audio_interactive.py
+python backend/scripts/calibrate_audio_interactive.py
 ```
+
+### 3. Transferring Shapefiles & Credentials (SCP over Tailscale)
+Because shapefiles (`backend/data/`) and configuration credentials (`.env`, Google key JSONs) are large or contain sensitive API credentials, they are excluded from Git source control. 
+
+To copy them securely from your development computer to the kiosk machine over your secure Tailscale network, open a terminal on your development PC and run:
+
+```powershell
+# Navigate to the backend folder
+cd \path\to\CFR-EVO-APP\backend
+
+# Copy the geodata shapefiles folder
+scp -r data YOUR_USERNAME@<kiosk-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+
+# Copy your configuration credentials
+scp .env YOUR_USERNAME@<kiosk-tailscale-ip>:/home/YOUR_USERNAME/CFR-EVO-APP/backend/
+```
+
+> [!WARNING]
+> **Credential Security**: Always verify that your `.env` and Google Service Account key files are included in your `.gitignore` rules before transferring them. Never check them into Git control.
 
 ---
 
@@ -127,11 +204,11 @@ Rather than running Vite's dev server (`npm run dev`) in the background—which 
 
 Compile the build:
 ```bash
-cd client
+cd frontend
 npm install
 npm run build
 ```
-This generates static files in `client/dist`.
+This generates static files in `frontend/dist`.
 
 Install and configure Nginx:
 ```bash
@@ -144,7 +221,7 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
 
-    root /home/pi/CFR-EVO-APP/client/dist;
+    root /home/pi/CFR-EVO-APP/frontend/dist;
     index index.html;
 
     server_name _;
@@ -172,7 +249,8 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/CFR-EVO-APP/agent
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+WorkingDirectory=/home/pi/CFR-EVO-APP/backend
 ExecStart=/home/pi/CFR-EVO-APP/.venv/bin/python main.py
 Restart=always
 RestartSec=5
@@ -397,7 +475,7 @@ Leaflet typically requests map tiles from third-party CDNs (like CartoDB or Stad
 The current routing overlay queries external geodata APIs or OSRM instances.
 *   **Implementation**: Run an **OSRM (Open Source Routing Machine)** or **Valhalla** engine locally in a Docker container on each Pi.
 *   **Data Source**: Load the OSRM container with the British Columbia OpenStreetMap export (`.osm.pbf`) preprocessed for emergency vehicles (truck weight, turn restrictions).
-*   **Kiosk URL**: Update [MapBoard.jsx](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/client/src/components/MapBoard.jsx) to target the local route server:
+*   **Kiosk URL**: Update [MapBoard.jsx](../frontend/src/components/MapBoard.jsx) to target the local route server:
     `Routing URL: "http://localhost:5000/route/v1/driving/{lng1},{lat1};{lng2},{lat2}"`
 
 #### 4. Local Geocoding & Hydrant Queries

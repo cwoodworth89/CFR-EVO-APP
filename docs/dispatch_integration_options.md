@@ -71,7 +71,7 @@ The touchscreen monitor mounted to the Locution Enclosure displays a popup windo
 This method captures the audio voice announcement broadcast over the station speaker system.
 
 #### How it Works:
-1.  **Analog Audio Tap**: Connect the unused 1/4" output or the 1V utility output from the station's graphic equalizer/amplifier (as detailed in the [hardware_specification.md](file:///c:/Users/curti/Documents/GitHub/CFR-EVO-APP/hardware_specification.md)) to a Behringer UCA202 USB sound card on the Pi.
+1.  **Analog Audio Tap**: Connect the unused 1/4" output or the 1V utility output from the station's graphic equalizer/amplifier (as detailed in the [hardware_specification.md](./hardware_specification.md)) to a Behringer UCA202 USB sound card on the Pi.
 2.  **Tone & Level Detection**: The Python agent listens for the initial alert tones. When detected, it opens a recording buffer.
 3.  **Speech-to-Text (STT)**: The recorded audio file is processed using local **Whisper.cpp** (running on the Pi 5) or sent to the **Google STT API**.
 4.  **Template Parsing**: The resulting text is normalized and parsed against our vocabulary dictionaries.

@@ -12,12 +12,13 @@
 import sys
 import os
 
-# Ensure working directory is the agent folder so relative data paths and imports resolve correctly
+# Ensure working directory is the backend folder so relative data paths and imports resolve correctly
 script_dir = os.path.dirname(os.path.abspath(__file__))
-agent_dir = os.path.dirname(script_dir)
-os.chdir(agent_dir)
-if agent_dir not in sys.path:
-    sys.path.append(agent_dir)
+backend_dir = os.path.dirname(script_dir)
+os.chdir(backend_dir)
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
 
 import wavio
 import numpy as np

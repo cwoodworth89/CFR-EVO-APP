@@ -6,12 +6,12 @@
 import os
 import sys
 
-# Ensure working directory is the agent folder so relative data paths and imports resolve correctly
+# Ensure working directory is the backend folder so relative data paths and imports resolve correctly
 script_dir = os.path.dirname(os.path.abspath(__file__))
-agent_dir = os.path.dirname(script_dir)
-os.chdir(agent_dir)
-if agent_dir not in sys.path:
-    sys.path.append(agent_dir)
+backend_dir = os.path.dirname(script_dir)
+os.chdir(backend_dir)
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
 
 import zipfile
 import urllib.request
@@ -23,7 +23,8 @@ import geopandas as gpd
 import datetime
 
 # Timestamp tracking for weekly update throttling
-TIMESTAMP_FILE = os.path.join(agent_dir, "data", "last_gis_update.timestamp")
+TIMESTAMP_FILE = os.path.join(backend_dir, "data", "last_gis_update.timestamp")
+
 
 def should_run_update() -> bool:
     """Checks the timestamp file to prevent redundant updates within the same week."""

@@ -124,19 +124,19 @@ sequenceDiagram
 
 The project has been split into isolated domain packages to ensure zero cyclical dependencies:
 
-* [**`/backend`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/backend): The central orchestrator running the background stream loop, parsing transcriptions, and coordinating API payloads.
-* [**`/frontend`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/frontend): The React/Vite client dashboard, mapping Leaflet layers, and running geographical training games.
-* [**`/services/gis`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/services/gis): Sibling GIS service, packaging Coquitlam parcel geocoders and emergency zone spatial indices.
-* [**`/services/audio_analysis`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/services/audio_analysis): Sibling DSP service, implementing Butterworth filters, Hamming window FFTs, and audio capture streams.
-* [**`/services/dispatch_notifications`**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/services/dispatch_notifications): Sibling notification service, wrapping Supabase sync engine and mobile push notifications.
+* [**`/backend`**](./backend): The central orchestrator running the background stream loop, parsing transcriptions, and coordinating API payloads.
+* [**`/frontend`**](./frontend): The React/Vite client dashboard, mapping Leaflet layers, and running geographical training games.
+* [**`/services/gis`**](./services/gis): Sibling GIS service, packaging Coquitlam parcel geocoders and emergency zone spatial indices.
+* [**`/services/audio_analysis`**](./services/audio_analysis): Sibling DSP service, implementing Butterworth filters, Hamming window FFTs, and audio capture streams.
+* [**`/services/dispatch_notifications`**](./services/dispatch_notifications): Sibling notification service, wrapping Supabase sync engine and mobile push notifications.
 
 ---
 
 ## 🛠️ Quick Installation (Developers)
 
 For detailed developer setup instructions, credential configuration, and dependencies, please refer to the README files inside the respective subfolders:
-- Read [**Backend Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/backend/README.md) for running the listener.
-- Read [**Frontend Setup Guide**](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/frontend/README.md) for running or deploying the website.
+- Read [**Backend Setup Guide**](./backend/README.md) for running the listener.
+- Read [**Frontend Setup Guide**](./frontend/README.md) for running or deploying the website.
 
 ---
 
@@ -147,7 +147,7 @@ This application operates strictly using completely open, public, and non-sensit
 2. **Open Geodata**: All parcel layers, boundaries, street grids, and fire hydrant locations are retrieved from public municipal datasets (e.g., Coquitlam Open Data).
 3. **Open Road Closure Feeds**: Closed-road information and construction alerts are pulled from public traffic APIs (e.g., DriveBC Open511, Municipal 511).
 4. **FOI/Public Record Metadata**: Supporting metadata such as call classification terms, apparatus lists, and station locations are gathered from public records and Freedom of Information (FOI) disclosures.
-For detailed privacy design, see [docs/privacy.md](file:///C:/Users/curti/Documents/GitHub/CFR-EVO-APP/docs/privacy.md).
+For detailed privacy design, see [docs/privacy.md](./docs/privacy.md).
 
 ---
 
@@ -158,3 +158,4 @@ This project is a personal, independent hobby project developed entirely by Curt
 *   **No Employer Affiliation**: This software is not commissioned, sponsored, endorsed, or owned by the City of Coquitlam, Coquitlam Fire Rescue, or any associated municipal or government body.
 *   **No Employer Resources Used**: No employer-owned computers, software licenses, network infrastructure, or databases were used during the design, development, compilation, or hosting of this project.
 *   **Independent Work Product**: All intellectual property, assets, and code in this repository represent the independent work product of the author, developed strictly outside of official duty hours.
+

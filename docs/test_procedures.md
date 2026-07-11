@@ -135,7 +135,7 @@ python feed_recorded_call.py custom_call.wav "Engine Tone"
 ```
 
 ### 📋 Verification Checkpoints:
-1. **Local Filesystem**: A clean copy of the filtered audio should be saved to `client/public/recordings/[DISP-ID].wav` and `agent/audio_files/recordings/`.
+1. **Local Filesystem**: A clean copy of the filtered audio should be saved to `frontend/public/recordings/[DISP-ID].wav` and `backend/audio_files/recordings/`.
 2. **Supabase Storage**: The WAV file should upload to the `dispatch-audio` storage bucket.
 3. **Database Insertion**: A new row should appear in the `live_calls` table with a public URL to the audio file.
 4. **WebSocket Push**: The web client dashboard (either local `http://localhost:5173/CFR-EVO-APP/` or your live GitHub Pages URL) should instantly center the map on the geocoded address, draw a route line from the station, and highlight the three closest fire hydrants.
@@ -171,5 +171,6 @@ The python agent runs a background poller thread that checks for simulation requ
 | **RMS stays near `0.00`** | Windows Microphone Muted / Blocked | Open Windows Settings -> Privacy -> Microphone. Ensure "Allow apps to access your microphone" is turned ON. Verify device volume is not 0% in Sound Control Panel. |
 | **`PaErrorCode -9997`** | Invalid Sample Rate | The input device does not support the default `16000Hz` sample rate. Ensure you are targeting a device that supports 16kHz capture, or use a WASAPI loopback driver. |
 | **Geocoding returns `None` coordinates** | Address shapefile mapping issue | Verify that the address suffix matches the Coquitlam database. For example, the parser translates "Sandstone Crescent" to `Sandstone Cres` to match the local GIS shapefiles. Check the spelling in `data/vocabulary/street_names.txt`. |
-| **`GOOGLE_APPLICATION_CREDENTIALS` error** | GCP JSON file missing/expired | Ensure your Google Cloud service account key is saved at `agent/cfr-dispatch-mapping-b30ef9734c12.json` and that the file path is correctly specified in your `.env`. |
-| **Real-time updates not showing in web app** | Supabase Anon Key invalid | Ensure the publishable key starting with `sb_` or public JWT is updated in `client/.env.local` as `VITE_SUPABASE_ANON_KEY`. Check browser developer console (F12) for websocket connection errors. |
+| **`GOOGLE_APPLICATION_CREDENTIALS` error** | GCP JSON file missing/expired | Ensure your Google Cloud service account key is saved at `backend/cfr-dispatch-mapping-b30ef9734c12.json` and that the file path is correctly specified in your `.env`. |
+| **Real-time updates not showing in web app** | Supabase Anon Key invalid | Ensure the publishable key starting with `sb_` or public JWT is updated in `frontend/.env.local` as `VITE_SUPABASE_ANON_KEY`. Check browser developer console (F12) for websocket connection errors. |
+

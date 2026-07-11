@@ -18,6 +18,7 @@ import multiprocessing
 
 # Local package imports
 from cfr_dispatch.config import (
+    DispatchData,
     STT_ENGINE,
     WHISPER_MODEL,
     INTEGRATION_PAYLOAD_OPTION,
@@ -1047,10 +1048,10 @@ def poll_dispatch_uploads(validator, stt_model):
                         
                     # Gather coordinates and details
                     target_obj = db_payload.get("target") or {
-                        "address": db_payload.get("address") or address,
-                        "lat": lat,
-                        "lng": lng,
-                        "rings": rings
+                        "address": db_payload.get("address") or "Unknown Location",
+                        "lat": None,
+                        "lng": None,
+                        "rings": []
                     }
                     
                     result_payload = {

@@ -56,6 +56,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedAddress, setVerifiedAddress] = useState('');
   const [verifiedIncident, setVerifiedIncident] = useState('');
   const [verifiedUnits, setVerifiedUnits] = useState('');
+  const [qualityRating, setQualityRating] = useState('PENDING');
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showUploader, setShowUploader] = useState(false);
@@ -150,6 +151,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       setVerifiedTranscript(selectedCall.verified_transcript || '');
       setVerifiedAddress(selectedCall.verified_address || '');
       setVerifiedIncident(selectedCall.verified_incident || '');
+      setQualityRating(selectedCall.quality_rating || 'PENDING');
       
       const units = selectedCall.verified_units || [];
       setVerifiedUnits(units.join(', '));
@@ -201,6 +203,17 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     onClose(); // Close the review overlay to show map
   };
 
+  const handleQuickRate = (rating) => {
+    setQualityRating(rating);
+    if (!selectedCall) return;
+    if (rating === 'PERFECT' || rating === 'OPERATIONAL') {
+      setVerifiedTranscript(prev => prev || selectedCall.raw_transcript || '');
+      setVerifiedAddress(prev => prev || selectedCall.target?.address || selectedCall.address || '');
+      setVerifiedIncident(prev => prev || selectedCall.incident_type || '');
+      setVerifiedUnits(prev => prev || (selectedCall.responding_units || []).join(', '));
+    }
+  };
+
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!selectedCall) return;
@@ -223,8 +236,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
           verified_incident: verifiedIncident,
           verified_units: unitsArray,
           feedback_submitted: true,
-          // Clear verify location warning upon verification
-          verify_location: false
+          verify_location: false,
+          quality_rating: qualityRating,
+          model_updated: false
         })
         .eq('id', selectedCall.id);
 
@@ -485,11 +499,11 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono bg-slate-950/40 sticky top-0 backdrop-blur-sm">
-                      <th className="py-2.5 px-3 w-[15%]">Dispatch ID</th>
-                      <th className="py-2.5 px-3 w-[10%]">Recorded</th>
-                      <th className="py-2.5 px-3 w-[12%]">Audio</th>
-                      <th className="py-2.5 px-3 w-[35%]">System Prefills</th>
-                      <th className="py-2.5 px-3 w-[15%]">Status</th>
+                      <th className="py-2.5 px-3 w-[18%]">Date / Dispatch ID</th>
+                      <th className="py-2.5 px-3 w-[12%] text-center">Conf >90%</th>
+                      <th className="py-2.5 px-3 w-[12%] text-center">HITL Reviewed</th>
+                      <th className="py-2.5 px-3 w-[12%] text-center">STT Synced</th>
+                      <th className="py-2.5 px-3 w-[33%]">System Prefills</th>
                       <th className="py-2.5 px-3 text-right w-[13%]">Actions</th>
                     </tr>
                   </thead>
@@ -510,16 +524,37 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               ID: {call.dispatch_id}
                             </div>
                           </td>
-                          <td className="py-3 px-3 font-mono font-bold text-slate-300">
-                            {call.audio_duration ? `${call.audio_duration}s` : 'N/A'}
-                          </td>
-                          <td className="py-3 px-3">
-                            {call.audio_url ? (
-                              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                                🎙️ Available
+                          <td className="py-3 px-3 text-center">
+                            {call.confidence_score !== undefined && call.confidence_score !== null ? (
+                              <span className={`text-[11px] font-mono font-bold ${call.confidence_score >= 90 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {call.confidence_score >= 90 ? '🟢 Yes' : '🔴 No'} ({Math.round(call.confidence_score)}%)
                               </span>
                             ) : (
-                              <span className="text-[10px] text-slate-500 italic">—</span>
+                              <span className="text-slate-500 font-mono text-[10px]">N/A</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            {call.feedback_submitted ? (
+                              <span className="text-[11px] text-emerald-400 font-extrabold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+                                🟢 YES
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-500 font-extrabold uppercase tracking-wider bg-slate-800/50 border border-slate-750 px-1.5 py-0.5 rounded font-mono">
+                                🔴 NO
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            {!call.feedback_submitted ? (
+                              <span className="text-slate-500 font-mono text-[10.5px]">—</span>
+                            ) : call.model_updated ? (
+                              <span className="text-[11px] text-emerald-400 font-extrabold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+                                🟢 YES
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse font-mono" title="Queued for next model retuning run">
+                                🟡 QUEUED
+                              </span>
                             )}
                           </td>
                           <td className="py-3 px-3 max-w-[15rem] truncate text-slate-300">
@@ -529,46 +564,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                             <div className="text-[10px] truncate mt-0.5">
                               📍 {call.target?.address || call.address || 'Unknown Address'}
                             </div>
-                             <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-                               Units: {call.responding_units?.join(', ') || 'None'}
-                             </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex flex-col gap-1 items-start">
-                              {call.feedback_submitted ? (
-                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 tracking-wider">
-                                  ✓ VERIFIED
-                                </span>
-                              ) : (
-                                <>
-                                  {(call.raw_transcript === "[Transcription Failed]" || !call.raw_transcript) ? (
-                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/20 tracking-wider animate-pulse">
-                                      ❌ STT FAIL
-                                    </span>
-                                  ) : call.verify_location ? (
-                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/20 tracking-wider">
-                                      ⚠️ MAP FAIL
-                                    </span>
-                                  ) : (
-                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-750 tracking-wider">
-                                      PENDING
-                                    </span>
-                                  )}
-                                  {call.verified_transcript && (
-                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/20 tracking-wider">
-                                      ✓ TRUTH UPLOADED
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                              {call.confidence_score !== undefined && call.confidence_score !== null && (
-                                <span className={`text-[9.5px] font-mono font-bold mt-0.5 ${
-                                  call.confidence_score >= 80 ? 'text-emerald-400' :
-                                  call.confidence_score >= 40 ? 'text-amber-400' : 'text-rose-400'
-                                }`} title="STT & geocoding match confidence score">
-                                  Score: {Math.round(call.confidence_score)}%
-                                </span>
-                              )}
+                            <div className="text-[9px] text-slate-500 font-mono mt-0.5">
+                              Units: {call.responding_units?.join(', ') || 'None'}
                             </div>
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -774,6 +771,48 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* HITL Quality Rating Selector */}
+                <div className="flex flex-col gap-1.5 bg-slate-950 p-3 border border-slate-850 rounded-xl flex-shrink-0">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                    HITL Quality Rating
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRate('PERFECT')}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                        qualityRating === 'PERFECT'
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm font-mono'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
+                      }`}
+                    >
+                      🟢 Perfect
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRate('OPERATIONAL')}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                        qualityRating === 'OPERATIONAL'
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm font-mono'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
+                      }`}
+                    >
+                      🟡 Operational
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRate('FAILED')}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                        qualityRating === 'FAILED'
+                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-sm font-mono'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
+                      }`}
+                    >
+                      🔴 Failed
+                    </button>
                   </div>
                 </div>
 

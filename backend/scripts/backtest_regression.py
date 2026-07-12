@@ -7,6 +7,7 @@ import time
 import logging
 import datetime
 import numpy as np
+import requests
 
 # Set up paths so we can import cfr_dispatch package
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -260,6 +261,38 @@ def main():
         logging.info(f"Evaluation metrics logged to: {history_json_path}")
     except Exception as e:
         logging.warning(f"Failed to log evaluation history: {e}")
+
+    # 6. Post history to Supabase evaluation_history
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+    if supabase_url and supabase_key:
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        db_payload = {
+            "model_version": f"{STT_ENGINE}-boost-classes",
+            "total_samples": int(total),
+            "wer": float(round(new_avg_wer * 100, 2)),
+            "cer": float(round(new_avg_cer * 100, 2)),
+            "perfect_percent": float(round(perfect_p, 2)),
+            "operational_percent": float(round(operational_p, 2)),
+            "failed_percent": float(round(failed_p, 2))
+        }
+        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/evaluation_history"
+        logging.info(f"Posting evaluation metrics to Supabase: {endpoint}")
+        try:
+            db_response = requests.post(endpoint, headers=headers, json=db_payload, timeout=10)
+            db_response.raise_for_status()
+            logging.info("Successfully posted metrics to Supabase evaluation_history.")
+        except Exception as e:
+            logging.warning(f"Failed to post evaluation metrics to Supabase: {e}")
+    else:
+        logging.warning("Missing SUPABASE_URL or SUPABASE_KEY. Skipping Supabase metrics upload.")
+
+
 
 if __name__ == "__main__":
     main()

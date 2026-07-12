@@ -15,7 +15,8 @@ if backend_dir not in sys.path:
 
 import cfr_dispatch
 from cfr_dispatch.orchestration import transcribe_audio_file
-from cfr_dispatch.config import STT_ENGINE
+from cfr_dispatch.config import STT_ENGINE, UNITS_VOCABULARY
+from cfr_dispatch.parser import sanitize_transcript, split_rounds
 
 def levenshtein_distance(s1, s2):
     """Calculates Levenshtein distance between two lists or strings."""
@@ -126,11 +127,20 @@ def main():
             logging.error(f"Transcription failed for {file_name}: {e}")
             new_hyp = ""
             
-        # Calculate statistics
-        old_wer = calculate_wer(ref_text, old_hyp)
-        new_wer = calculate_wer(ref_text, new_hyp)
-        old_cer = calculate_cer(ref_text, old_hyp)
-        new_cer = calculate_cer(ref_text, new_hyp)
+        # Split rounds to keep only the first round (which corresponds to reference transcript)
+        new_hyp_rounds = split_rounds(new_hyp, UNITS_VOCABULARY)
+        new_hyp_first = new_hyp_rounds[0] if new_hyp_rounds else new_hyp
+        
+        # Sanitize for structured evaluation (mapping words to digits, normalizing names)
+        sanitized_ref = sanitize_transcript(ref_text)
+        sanitized_old = sanitize_transcript(old_hyp)
+        sanitized_new = sanitize_transcript(new_hyp_first)
+            
+        # Calculate statistics based on sanitized outputs (what the parser actually sees)
+        old_wer = calculate_wer(sanitized_ref, sanitized_old)
+        new_wer = calculate_wer(sanitized_ref, sanitized_new)
+        old_cer = calculate_cer(sanitized_ref, sanitized_old)
+        new_cer = calculate_cer(sanitized_ref, sanitized_new)
         
         old_wers.append(old_wer)
         new_wers.append(new_wer)
@@ -151,8 +161,11 @@ def main():
         comparisons.append({
             "id": file_name.replace(".wav", ""),
             "reference": ref_text,
+            "sanitized_reference": sanitized_ref,
             "old_hypothesis": old_hyp,
-            "new_hypothesis": new_hyp,
+            "sanitized_old": sanitized_old,
+            "new_hypothesis": new_hyp_first,
+            "sanitized_new": sanitized_new,
             "old_wer": old_wer,
             "new_wer": new_wer,
             "status": status
@@ -174,9 +187,11 @@ def main():
             color = "🔴"
             
         print(f"{color} Call {c['id']}: {c['status']}")
-        print(f"  - Human Ref:  \"{c['reference']}\"")
-        print(f"  - Old Hypoth: \"{c['old_hypothesis']}\" (WER: {c['old_wer']:.1%})")
-        print(f"  - New Hypoth: \"{c['new_hypothesis']}\" (WER: {c['new_wer']:.1%})")
+        print(f"  - Human Ref (Raw):  \"{c['reference']}\"")
+        print(f"  - Sanitized Ref:    \"{c['sanitized_reference']}\"")
+        print(f"  - Old Hypoth (San): \"{c['sanitized_old']}\" (WER: {c['old_wer']:.1%})")
+        print(f"  - New Hypoth (San): \"{c['sanitized_new']}\" (WER: {c['new_wer']:.1%})")
+        print(f"  - New Hypoth (Raw): \"{c['new_hypothesis']}\"")
         print()
         
     # Calculate global metrics

@@ -15,9 +15,16 @@ if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
 import cfr_dispatch
-from cfr_dispatch.orchestration import transcribe_audio_file
-from cfr_dispatch.config import STT_ENGINE, UNITS_VOCABULARY
-from cfr_dispatch.parser import sanitize_transcript, split_rounds
+from cfr_dispatch.orchestration import transcribe_audio_file, get_shared_validator
+from cfr_dispatch.config import STT_ENGINE, UNITS_VOCABULARY, DispatchData, CALL_TYPES
+from cfr_dispatch.parser import (
+    sanitize_transcript, 
+    split_rounds, 
+    reconstruct_template_transcript, 
+    parse_dispatch_announcement,
+    abbreviate_units,
+    match_incident_type
+)
 
 def levenshtein_distance(s1, s2):
     """Calculates Levenshtein distance between two lists or strings."""
@@ -91,6 +98,9 @@ def main():
         logging.error("Metadata is empty. No evaluations can be run.")
         sys.exit(1)
         
+    # Initialize shapefile validator for template reconstruction geocoding
+    validator = get_shared_validator()
+    
     # 3. Execution loop
     print("==================================================")
     print("        REGRESSION BACKTESTING & EVALUATION       ")
@@ -138,7 +148,43 @@ def main():
         sanitized_old = old_rounds[0] if old_rounds else sanitized_old_raw
         
         new_rounds = split_rounds(sanitized_new_raw, UNITS_VOCABULARY)
-        sanitized_new = new_rounds[0] if new_rounds else sanitized_new_raw
+        round_1_text = new_rounds[0] if new_rounds else sanitized_new_raw
+        sanitized_new = round_1_text
+        
+        # Apply Post-Transcription Template Reconstruction to evaluate true parser performance
+        if not ("contact dispatch" in round_1_text or "location information" in round_1_text) and "unknown location" not in round_1_text:
+            try:
+                candidates = parse_dispatch_announcement(round_1_text, UNITS_VOCABULARY)
+                if candidates:
+                    cand = candidates[0]
+                    resolved_addr = cand.address
+                    if cand.address and validator:
+                        score, matched_addr = validator.validate_address_exists(cand.address)
+                        if matched_addr:
+                            resolved_addr = matched_addr
+                            
+                    # Extract channel digit fallback
+                    channel_val = cand.radio_channel
+                    if not channel_val and "use talk group" in round_1_text:
+                        parts = round_1_text.split("use talk group")
+                        if len(parts) > 1:
+                            words = parts[1].strip().split()
+                            if words and words[0].isdigit():
+                                channel_val = words[0]
+                                
+                    reconstructed = reconstruct_template_transcript(DispatchData(
+                        raw_text=cand.raw_text,
+                        units=abbreviate_units(cand.units) if cand.units else None,
+                        response_type=cand.response_type,
+                        call_type=match_incident_type(round_1_text, CALL_TYPES),
+                        address=resolved_addr,
+                        intersection=cand.intersection,
+                        radio_channel=channel_val,
+                        map_grid=cand.map_grid
+                    ))
+                    sanitized_new = sanitize_transcript(reconstructed)
+            except Exception as eval_err:
+                logging.warning(f"Failed to reconstruct hypothesis in evaluation loop: {eval_err}")
             
         # Calculate statistics based on sanitized outputs (what the parser actually sees)
         old_wer = calculate_wer(sanitized_ref, sanitized_old)

@@ -69,6 +69,7 @@ from cfr_dispatch.parser import (
     abbreviate_units,
     parse_dispatch_announcement,
     split_rounds,
+    reconstruct_template_transcript,
     CALL_TYPES
 )
 from gis_service import CoquitlamDataValidator
@@ -554,13 +555,32 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
             "radio_channel": radio_channel
         }
         
+        # Post-Transcription Template Reconstruction
+        reconstructed_transcript = sanitized_transcript
+        if all_candidates and not is_specific_placeholder and best_address != "Unknown Location":
+            try:
+                candidate_copy = DispatchData(
+                    raw_text=all_candidates[0].raw_text,
+                    units=units_str,
+                    response_type=all_candidates[0].response_type or "routine",
+                    call_type=incident_type,
+                    address=best_address,
+                    intersection=all_candidates[0].intersection,
+                    radio_channel=radio_channel,
+                    map_grid=map_grid
+                )
+                reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
+                logging.info(f"Reconstructed template transcript: '{reconstructed_transcript}'")
+            except Exception as r_err:
+                logging.warning(f"Failed to reconstruct template transcript: {r_err}")
+
         db_payload = {
             "dispatch_id": dispatch_id,
             "incident_type": incident_type,
             "responding_units": responding_units,
             "timestamp": timestamp,
             "raw_transcript": raw_transcript,
-            "sanitized_transcript": sanitized_transcript,
+            "sanitized_transcript": reconstructed_transcript,
             "confidence_score": confidence_score,
             "verify_location": verify_location
         }

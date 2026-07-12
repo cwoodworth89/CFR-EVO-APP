@@ -643,3 +643,63 @@ def split_rounds(text: str, units_vocab: List[str]) -> List[str]:
         return [text[:split_idx].strip(), text[split_idx:].strip()]
         
     return [text]
+
+
+def reconstruct_template_transcript(dispatch: DispatchData) -> str:
+    """
+    Reconstructs a clean, standard, template-compliant transcript from parsed entities.
+    Resolves spelling typos and normalizes spacing/formatting.
+    """
+    parts = ["Coquitlam"]
+    
+    # 1. Units
+    if dispatch.units:
+        parts.append(dispatch.units.title())
+    else:
+        parts.append("units")
+        
+    # 2. Priority
+    resp = (dispatch.response_type or "routine").lower()
+    parts.append(f"respond {resp}")
+    
+    # 3. Call Type
+    if dispatch.call_type:
+        parts.append(dispatch.call_type.lower())
+    else:
+        parts.append("incident")
+        
+    # 4. Address
+    if dispatch.address:
+        parts.append(dispatch.address.lower())
+    else:
+        parts.append("address")
+        
+    # 5. Intersection / Cross Streets
+    if dispatch.intersection:
+        parts.append(f"near {dispatch.intersection.lower()}")
+        
+    # 6. Radio Channel
+    chan = dispatch.radio_channel or "combined response coquitlam"
+    if chan.isdigit():
+        parts.append(f"use talk group {chan}")
+    else:
+        # Match "combined response coquitlam" or similar text channels
+        if "talk group" in chan.lower():
+            parts.append(chan.lower())
+        else:
+            parts.append(f"use talk group {chan.lower()}")
+            
+    # 7. Map Grid
+    if dispatch.map_grid:
+        parts.append(f"map grid {dispatch.map_grid}")
+    else:
+        parts.append("map grid")
+        
+    # Build string: "Coquitlam [Units], respond [Priority], [Incident], [Address], [near Intersection], [Talk Group], [Map Grid]"
+    reconstructed = f"Coquitlam {parts[1]}, {parts[2]}, {parts[3]}, {parts[4]}"
+    if dispatch.intersection:
+        reconstructed += f", {parts[5]}"
+    reconstructed += f", {parts[6]}, {parts[7]}"
+    
+    return reconstructed
+

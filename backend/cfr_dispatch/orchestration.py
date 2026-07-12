@@ -218,10 +218,65 @@ def transcribe_audio_file(file_path: str) -> str | None:
         logging.error(f"Failed to read audio file: {e}", exc_info=True)
         return None
 
-def transcribe_audio_local(audio_data, model=None) -> str | None:
+_cached_validator = None
+
+def get_shared_validator():
+    global _cached_validator
+    if _cached_validator is None:
+        try:
+            from gis_service import CoquitlamDataValidator
+            from cfr_dispatch.config import (
+                ADDRESS_SHAPEFILE_PATH,
+                ZONES_SHAPEFILE_PATH,
+                ADDRESS_HOUSE_NUM_COLUMN,
+                ADDRESS_STREET_NAME_COLUMN,
+                ADDRESS_STREET_TYPE_COLUMN,
+                ADDRESS_FULL_ADDR_COLUMN,
+                ZONES_MAP_NAME_COLUMN,
+                STREET_NAME_CONFIDENCE_THRESHOLD
+            )
+            logging.info("Initializing shared CoquitlamDataValidator for STT hotwords...")
+            _cached_validator = CoquitlamDataValidator(
+                ADDRESS_SHAPEFILE_PATH,
+                ZONES_SHAPEFILE_PATH,
+                house_num_col=ADDRESS_HOUSE_NUM_COLUMN,
+                street_name_col=ADDRESS_STREET_NAME_COLUMN,
+                street_type_col=ADDRESS_STREET_TYPE_COLUMN,
+                full_addr_col=ADDRESS_FULL_ADDR_COLUMN,
+                zone_map_name_col=ZONES_MAP_NAME_COLUMN,
+                street_confidence_threshold=STREET_NAME_CONFIDENCE_THRESHOLD
+            )
+        except Exception as e:
+            logging.warning(f"Failed to load shared validator for STT hotwords: {e}")
+    return _cached_validator
+
+def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
+    base_words = [
+        "Coquitlam", "respond", "routine", "emergency", "Combined Response Coquitlam",
+        "use talk group", "map grid", "medical aid", "overdose", "lift assist", 
+        "structure fire", "alarm activated"
+    ]
+    units = [str(u) for u in units_vocabulary] if units_vocabulary else []
+    
+    streets = []
+    if validator:
+        try:
+            if hasattr(validator, 'addresses_gdf') and validator.addresses_gdf is not None:
+                col = validator.street_name_col
+                unique_streets = validator.addresses_gdf[col].dropna().unique()
+                streets = [str(s).title() for s in unique_streets if len(str(s).strip()) > 1]
+        except Exception as e:
+            logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
+            
+    all_terms = list(dict.fromkeys(base_words + units + streets))
+    hotwords_str = ", ".join(all_terms)
+    initial_prompt_str = ", ".join(all_terms[:80])
+    return initial_prompt_str, hotwords_str
+
+def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None:
     """
     Transcribes audio (NumPy array or file path) locally using a pre-loaded/cached
-    faster-whisper or openai-whisper model.
+    faster-whisper or openai-whisper model with street/unit phrase biasing.
     """
     try:
         if model is None:
@@ -232,10 +287,19 @@ def transcribe_audio_local(audio_data, model=None) -> str | None:
 
         is_faster_whisper = hasattr(model, 'transcribe') and not hasattr(model, 'load_model')
         
-        initial_prompt = "Coquitlam, Combined Response Coquitlam, Engine, Ladder, Rescue, Medic, Squad, respond emergency, respond routine, use talk group, map grid"
+        # Resolve validator dynamically if not supplied
+        if validator is None:
+            validator = get_shared_validator()
+            
+        initial_prompt, hotwords_str = build_stt_bias_words(validator, UNITS_VOCABULARY)
+        
         if is_faster_whisper:
-            logging.info("Transcribing using cached faster-whisper model...")
-            segments, info = model.transcribe(audio_data, beam_size=2, language="en", initial_prompt=initial_prompt)
+            logging.info("Transcribing using cached faster-whisper model with vocabulary boosting...")
+            try:
+                segments, info = model.transcribe(audio_data, beam_size=2, language="en", initial_prompt=initial_prompt, hotwords=hotwords_str)
+            except TypeError:
+                # Fallback if hotwords parameter is not supported by ctranslate2 version
+                segments, info = model.transcribe(audio_data, beam_size=2, language="en", initial_prompt=initial_prompt)
             text = " ".join([segment.text for segment in segments])
             return text.strip() or None
         else:
@@ -581,7 +645,7 @@ def process_full_dispatch(buffer, validator: CoquitlamDataValidator, tone_name: 
             audio_float = filtered_audio.astype(np.float32) / 32768.0
             if len(audio_float.shape) > 1:
                 audio_float = audio_float.squeeze()
-            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+            raw_transcript = transcribe_audio_local(audio_float, model=stt_model, validator=validator)
             
         if not raw_transcript:
             logging.warning("Transcription failed. Storing empty placeholder to allow manual review.")
@@ -687,7 +751,7 @@ def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_mod
             audio_float = filtered_audio.astype(np.float32) / 32768.0
             if len(audio_float.shape) > 1:
                 audio_float = audio_float.squeeze()
-            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+            raw_transcript = transcribe_audio_local(audio_float, model=stt_model, validator=validator)
             
         if not raw_transcript:
             return
@@ -766,7 +830,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             audio_float = filtered_audio.astype(np.float32) / 32768.0
             if len(audio_float.shape) > 1:
                 audio_float = audio_float.squeeze()
-            raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+            raw_transcript = transcribe_audio_local(audio_float, model=stt_model, validator=validator)
             
         if not raw_transcript:
             logging.warning("Phase 2 transcription failed. Storing empty placeholder to allow manual review.")
@@ -1003,15 +1067,15 @@ def poll_dispatch_uploads(validator, stt_model):
                     elif STT_ENGINE == "whisper":
                         is_faster_whisper = stt_model and hasattr(stt_model, 'transcribe') and not hasattr(stt_model, 'load_model')
                         if is_faster_whisper:
-                            raw_transcript = transcribe_audio_local(temp_path, model=stt_model)
+                            raw_transcript = transcribe_audio_local(temp_path, model=stt_model, validator=validator)
                         else:
                             try:
                                 import whisper
                                 audio_float = whisper.load_audio(temp_path)
-                                raw_transcript = transcribe_audio_local(audio_float, model=stt_model)
+                                raw_transcript = transcribe_audio_local(audio_float, model=stt_model, validator=validator)
                             except Exception as w_err:
                                 logging.warning(f"Standard Whisper load failed (likely ffmpeg missing): {w_err}. Trying direct path...")
-                                raw_transcript = transcribe_audio_local(temp_path, model=stt_model)
+                                raw_transcript = transcribe_audio_local(temp_path, model=stt_model, validator=validator)
                             
                     if not raw_transcript:
                         raise ValueError("Speech-to-Text did not produce any transcript text.")

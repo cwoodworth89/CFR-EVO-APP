@@ -647,15 +647,26 @@ def split_rounds(text: str, units_vocab: List[str]) -> List[str]:
 
 def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     """
-    Reconstructs a clean, standard, template-compliant transcript from parsed entities.
-    Resolves spelling typos and normalizes spacing/formatting.
+    Reconstructs a clean, standard, template-compliant transcript from parsed entities,
+    expanding abbreviations to align verbally with the dispatcher's voice.
     """
-    # 1. Units
+    # 1. Expand Unit Names (e.g. E1 -> Engine 1, R2 -> Rescue 2)
+    def expand_unit(u: str) -> str:
+        u_clean = str(u).strip().upper()
+        match = re.match(r'^([A-Z]+)(\d+)$', u_clean)
+        if match:
+            abbr, num = match.groups()
+            name_map = {
+                'E': 'Engine', 'R': 'Rescue', 'L': 'Ladder',
+                'Q': 'Quint', 'M': 'Medic', 'S': 'Squad', 'B': 'Battalion'
+            }
+            full_name = name_map.get(abbr, abbr)
+            return f"{full_name} {num}"
+        return str(u).title()
+
     if dispatch.units:
-        if isinstance(dispatch.units, list):
-            units_part = ", ".join(dispatch.units).title()
-        else:
-            units_part = str(dispatch.units).title()
+        unit_list = dispatch.units if isinstance(dispatch.units, list) else [dispatch.units]
+        units_part = ", ".join(expand_unit(u) for u in unit_list)
     else:
         units_part = "units"
         
@@ -666,18 +677,38 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     # 3. Call Type
     call_type_part = (dispatch.call_type or "incident").lower()
         
-    # 4. Address
-    address_part = (dispatch.address or "address").lower()
+    # 4. Address (Expand suffix abbreviations: e.g. pl -> place, cres -> crescent)
+    def expand_address_suffix(addr: str) -> str:
+        if not addr:
+            return "address"
+        suffix_map = {
+            r'\bpl\b': 'place',
+            r'\bcres\b': 'crescent',
+            r'\bave\b': 'avenue',
+            r'\bst\b': 'street',
+            r'\brd\b': 'road',
+            r'\bdr\b': 'drive',
+            r'\bln\b': 'lane',
+            r'\bct\b': 'court',
+            r'\bblvd\b': 'boulevard',
+            r'\bhwy\b': 'highway',
+            r'\bwy\b': 'way'
+        }
+        addr_lower = addr.lower()
+        for pattern, replacement in suffix_map.items():
+            addr_lower = re.sub(pattern, replacement, addr_lower)
+        return addr_lower
+
+    address_part = expand_address_suffix(dispatch.address)
         
     # 5. Intersection / Cross Streets
-    intersection_part = f", near {dispatch.intersection.lower()}" if dispatch.intersection else ""
+    intersection_part = f", near {expand_address_suffix(dispatch.intersection)}" if dispatch.intersection else ""
         
-    # 6. Radio Channel
+    # 6. Radio Channel (Map digital channels back to the full verbal name)
     chan = dispatch.radio_channel or "combined response coquitlam"
-    if chan.isdigit():
-        channel_part = f"use talk group {chan}"
+    if chan.strip() == "10" or "combined" in chan.lower():
+        channel_part = "us talk group combined response coquitlam"
     else:
-        # Match "combined response coquitlam" or similar text channels
         if "talk group" in chan.lower():
             channel_part = chan.lower()
         else:

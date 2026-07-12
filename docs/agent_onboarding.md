@@ -68,3 +68,40 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Privacy Compliance** | [docs/privacy.md](./privacy.md) | Voice monitoring rules, local RAM buffering specs, and FOI compliant data policies. |
 | **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Structural refactoring details of decoupling the monolith into microservices. |
 | **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant overlay integration and NFPA 291 vector markers mapping. |
+
+---
+
+## 📡 Remote Kiosk Access & Agent Commands
+
+The remote station kiosk machine is connected to this development host via **Tailscale SSH**. This allows developers and AI agents to securely query status, read logs, restart services, and transfer files directly from this machine's terminal.
+
+### 🔑 Connection Credentials
+* **Remote Hostname**: `cfr-mapping-tcfh`
+* **Tailscale IP**: `100.95.146.94`
+* **Username**: `tcfire`
+
+### 💻 Command Reference for AI Agents
+
+As an AI agent, you can propose and execute remote commands over SSH. Since the session runs in a non-interactive shell, verify that all commands are structured non-interactively (e.g., executing a quick check rather than spawning a prompt):
+
+* **System Status & Uptime**:
+  ```powershell
+  ssh tcfire@100.95.146.94 "uname -a; uptime"
+  ```
+* **Verify Audio DSP / System Logs**:
+  ```powershell
+  ssh tcfire@100.95.146.94 "tail -n 50 /home/tcfire/CFR-EVO-APP/backend/dispatch.log"
+  ```
+* **Restart the Orchestration Daemon**:
+  ```powershell
+  ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
+  ```
+* **Copy/Deploy files (e.g., Shapefiles)**:
+  ```powershell
+  scp -r ./backend/data/ tcfire@100.95.146.94:/home/tcfire/CFR-EVO-APP/backend/
+  ```
+
+> [!NOTE]
+> **Authentication Approval**: 
+> If Tailscale SSH requires fresh authentication, the command output will print a browser approval URL. Prompt the user to open and approve the link in their browser. Once they click **Approve**, the command will resume and complete automatically.
+

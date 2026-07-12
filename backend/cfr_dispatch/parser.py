@@ -101,6 +101,10 @@ def sanitize_transcript(text: str) -> str:
         r'\btreat\b': 'street',
         
         # Specific major streets / locations
+        r'\blow\s+heat\s+high\s*ways?\b': 'lougheed highway',
+        r'\blow\s+heed\s+high\s*ways?\b': 'lougheed highway',
+        r'\blove\s+heat\s+high\s*ways?\b': 'lougheed highway',
+        r'\blough\s+head\s+high\s*ways?\b': 'lougheed highway',
         r'\bsharp\s+treat\b': 'sharpe street',
         r'\bwig\s+on\s+throught\b': 'wigham drive',
         r'\bburden\s+cart\b': 'burton court',

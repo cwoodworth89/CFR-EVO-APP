@@ -263,14 +263,19 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
         try:
             if hasattr(validator, 'addresses_gdf') and validator.addresses_gdf is not None:
                 col = validator.street_name_col
-                unique_streets = validator.addresses_gdf[col].dropna().unique()
-                streets = [str(s).title() for s in unique_streets if len(str(s).strip()) > 1]
+                # Extract the top 80 most frequent street names to maximize geocoding relevance
+                street_counts = validator.addresses_gdf[col].dropna().value_counts()
+                top_streets = street_counts.head(80).index.tolist()
+                streets = [str(s).title() for s in top_streets if len(str(s).strip()) > 1]
         except Exception as e:
             logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
             
+    # Combine terms, keeping duplicates out and capping to 120 terms to prevent exceeding Whisper's 448 token limit
     all_terms = list(dict.fromkeys(base_words + units + streets))
+    all_terms = all_terms[:120]
+    
     hotwords_str = ", ".join(all_terms)
-    initial_prompt_str = ", ".join(all_terms[:80])
+    initial_prompt_str = ", ".join(all_terms)
     return initial_prompt_str, hotwords_str
 
 def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None:

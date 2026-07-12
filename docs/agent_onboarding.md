@@ -127,3 +127,32 @@ As an AI agent, you can propose and execute remote commands over SSH. Since the 
 > **Authentication Approval**: 
 > If Tailscale SSH requires fresh authentication, the command output will print a browser approval URL. Prompt the user to open and approve the link in their browser. Once they click **Approve**, the command will resume and complete automatically.
 
+## 📈 Speech-to-Text Training & MLOps Feedback Pipeline
+
+To optimize transcription quality and test new grammar sets or model parameters without breaking historic dispatches, the project includes an automated evaluation and feedback pipeline.
+
+### 1. Extract Training Ground-Truth Data
+Pull verified user corrections (ground truth reference transcripts) and their raw `.wav` recordings from Supabase to your local cache:
+```bash
+ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/extract_training_data.py"
+```
+* **Output**: Audio files cached at `backend/data/training/audio/` and metadata mappings saved to `backend/data/training/metadata.csv`.
+
+### 2. Run Backtest & Regression Evaluation
+Evaluate the current model's accuracy (Word Error Rate & Character Error Rate) against the historical ground-truth dataset to verify improvements and prevent regressions:
+```bash
+ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/backtest_regression.py"
+```
+* **Output**: Renders a side-by-side comparison (Human Reference, Old Hypothesis, New Hypothesis), logs results locally, and inserts a run summary into the Supabase `evaluation_history` table to feed the dashboard chart.
+
+### 3. Toggling Speech-to-Text Engines
+To switch between Google Cloud STT V2 and Local Offline Whisper:
+* Edit `backend/.env` on the kiosk:
+  * For Google: `STT_ENGINE=google`
+  * For Whisper: `STT_ENGINE=whisper`
+* After changing the engine configuration, restart the daemon:
+  ```bash
+  ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
+  ```
+
+

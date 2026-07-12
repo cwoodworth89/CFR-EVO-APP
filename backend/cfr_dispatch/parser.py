@@ -654,7 +654,10 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     
     # 1. Units
     if dispatch.units:
-        parts.append(dispatch.units.title())
+        if isinstance(dispatch.units, list):
+            parts.append(", ".join(dispatch.units).title())
+        else:
+            parts.append(str(dispatch.units).title())
     else:
         parts.append("units")
         

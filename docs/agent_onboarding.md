@@ -80,6 +80,17 @@ The remote station kiosk machine is connected to this development host via **Tai
 * **Tailscale IP**: `100.95.146.94`
 * **Username**: `tcfire`
 
+### 🔄 Git & Remote Programming Workflow (CRITICAL)
+To maintain code sanity and avoid divergence between development and production, follow this workflow:
+1. **Local Edits**: Make all permanent code, configuration, or documentation changes in the local git repository workspace first. **Do not modify production code files directly on the remote kiosk.**
+2. **Interactive Testing via SCP**: For fast iteration during debugging or testing, copy local scripts/changes to the kiosk using `scp`, and run them over SSH.
+3. **Commit & Deploy**: Once changes are verified, commit and push them to the central Git repository from your local development machine. On the remote kiosk, run a `git pull` or execute the update script to pull down the changes cleanly.
+
+### ⚠️ Audio System Remoting: XDG_RUNTIME_DIR Heuristic
+When invoking python scripts or commands that interact with the audio subsystem (`sounddevice` / PortAudio / ALSA / PulseAudio) remotely over an SSH session, you **must** prepend the user's runtime directory environment variable:
+* **Prefix**: `XDG_RUNTIME_DIR=/run/user/1000` (assuming user `tcfire` is UID 1000).
+* If omitted, PortAudio will fail with: `sounddevice.PortAudioError: Error initializing PortAudio: Unanticipated host error [PaErrorCode -9999]: 'PulseAudio_Initialize: Can't connect to server'`.
+
 ### 💻 Command Reference for AI Agents
 
 As an AI agent, you can propose and execute remote commands over SSH. Since the session runs in a non-interactive shell, verify that all commands are structured non-interactively (e.g., executing a quick check rather than spawning a prompt):
@@ -87,6 +98,17 @@ As an AI agent, you can propose and execute remote commands over SSH. Since the 
 * **System Status & Uptime**:
   ```powershell
   ssh tcfire@100.95.146.94 "uname -a; uptime"
+  ```
+* **Query Audio Devices (Using sounddevice)**:
+  ```powershell
+  ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python -c 'import sounddevice as sd; print(sd.query_devices())'"
+  ```
+* **Run 15-Second Audio Diagnostic**:
+  ```powershell
+  # Copy local diagnostic script first
+  scp ./backend/scripts/record_test.py tcfire@100.95.146.94:/home/tcfire/CFR-EVO-APP/backend/scripts/record_test.py
+  # Execute with device environment prefix
+  ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/record_test.py 13"
   ```
 * **Verify Audio DSP / System Logs**:
   ```powershell

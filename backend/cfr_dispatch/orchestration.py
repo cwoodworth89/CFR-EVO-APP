@@ -250,6 +250,38 @@ def get_shared_validator():
             logging.warning(f"Failed to load shared validator for STT hotwords: {e}")
     return _cached_validator
 
+def get_hitl_verified_streets() -> list[str]:
+    try:
+        supabase_url = os.environ.get("SUPABASE_URL")
+        supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+        if not supabase_url or not supabase_key:
+            return []
+            
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}"
+        }
+        # Query unique verified address fields where feedback_submitted is true
+        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address&feedback_submitted=eq.true"
+        response = requests.get(endpoint, headers=headers, timeout=5)
+        response.raise_for_status()
+        records = response.json()
+        
+        verified_streets = []
+        for r in records:
+            addr = r.get("verified_address")
+            if addr:
+                # Extract street name (remove leading house numbers and trailing city/province info)
+                match = re.search(r'^\d+\s+(?P<street>.*)', addr.split(',')[0].strip())
+                if match:
+                    street = match.group('street').strip().title()
+                    if street:
+                        verified_streets.append(street)
+        return list(set(verified_streets))
+    except Exception as e:
+        logging.warning(f"Failed to fetch HITL verified streets for STT hotwords: {e}")
+        return []
+
 def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
     base_words = [
         "Coquitlam", "respond", "routine", "emergency", "Combined Response Coquitlam",
@@ -258,6 +290,9 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
     ]
     # Core units (abbreviated list to optimize prompt length)
     units = ["Engine", "Rescue", "Ladder", "Medic", "Squad", "Battalion", "Quint"]
+    
+    # Fetch HITL verified streets to bias Whisper dynamically toward corrected addresses
+    hitl_streets = get_hitl_verified_streets()
     
     streets = []
     if validator:
@@ -271,9 +306,9 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
         except Exception as e:
             logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
             
-    # Combine terms, removing duplicates and capping to a strict limit of 35 terms
+    # Combine terms, removing duplicates and capping to a strict limit of 35 terms (HITL streets prioritized)
     # This prevents the Whisper decoder from throwing a positional embedding RuntimeError (token count > 448)
-    all_terms = list(dict.fromkeys(base_words + units + streets))
+    all_terms = list(dict.fromkeys(base_words + units + hitl_streets + streets))
     all_terms = all_terms[:35]
     
     hotwords_str = ", ".join(all_terms)

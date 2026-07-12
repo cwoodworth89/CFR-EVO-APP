@@ -92,6 +92,7 @@ def sanitize_transcript(text: str) -> str:
         r'\bmath\s+grids?\b': 'map grid',
         r'\bmath\s+grades?\b': 'map grid',
         r'\bmap\s+grades?\b': 'map grid',
+        r'\bmath\s+griff\b': 'map grid',
         
         # Street suffixes
         r'\bpresidents?\b': 'crescent',
@@ -627,9 +628,9 @@ def split_rounds(text: str, units_vocab: List[str]) -> List[str]:
     # Normalize spaces
     text = ' '.join(text.strip().split())
     
-    # 1. Split right after the first "map grid [digits]" (standard end of Round 1)
+    # 1. Split right after the first "map grid [digits/words]" (standard end of Round 1)
     # E.g. "map grid 12 Engine 1 respond..." -> splits after "map grid 12"
-    grid_split = re.split(r'(?<=\bmap\s+grid\s+\d{1,3}\b)', text, maxsplit=1, flags=re.IGNORECASE)
+    grid_split = re.split(r'(?<=\bmap\s+grid\s+\w+\b)', text, maxsplit=1, flags=re.IGNORECASE)
     if len(grid_split) >= 2:
         return [grid_split[0].strip(), grid_split[1].strip()]
         

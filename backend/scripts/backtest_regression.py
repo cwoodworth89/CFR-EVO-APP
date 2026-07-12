@@ -127,14 +127,17 @@ def main():
             logging.error(f"Transcription failed for {file_name}: {e}")
             new_hyp = ""
             
-        # Split rounds to keep only the first round (which corresponds to reference transcript)
-        new_hyp_rounds = split_rounds(new_hyp, UNITS_VOCABULARY)
-        new_hyp_first = new_hyp_rounds[0] if new_hyp_rounds else new_hyp
-        
         # Sanitize for structured evaluation (mapping words to digits, normalizing names)
         sanitized_ref = sanitize_transcript(ref_text)
-        sanitized_old = sanitize_transcript(old_hyp)
-        sanitized_new = sanitize_transcript(new_hyp_first)
+        sanitized_old_raw = sanitize_transcript(old_hyp)
+        sanitized_new_raw = sanitize_transcript(new_hyp)
+        
+        # Split rounds on the sanitized text to keep only the first round
+        old_rounds = split_rounds(sanitized_old_raw, UNITS_VOCABULARY)
+        sanitized_old = old_rounds[0] if old_rounds else sanitized_old_raw
+        
+        new_rounds = split_rounds(sanitized_new_raw, UNITS_VOCABULARY)
+        sanitized_new = new_rounds[0] if new_rounds else sanitized_new_raw
             
         # Calculate statistics based on sanitized outputs (what the parser actually sees)
         old_wer = calculate_wer(sanitized_ref, sanitized_old)
@@ -164,7 +167,7 @@ def main():
             "sanitized_reference": sanitized_ref,
             "old_hypothesis": old_hyp,
             "sanitized_old": sanitized_old,
-            "new_hypothesis": new_hyp_first,
+            "new_hypothesis": new_hyp,
             "sanitized_new": sanitized_new,
             "old_wer": old_wer,
             "new_wer": new_wer,

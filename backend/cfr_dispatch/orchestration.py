@@ -390,9 +390,6 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
                 }
                 confidence_score = 0.0
                 verify_location = True
-            
-        if verify_location_override is not None:
-            verify_location = verify_location_override
 
         # 7. Extract incident details and build metadata
         best_address = local_geocode_result["address"]
@@ -419,6 +416,29 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
         map_grid = next((d.map_grid for d in all_candidates if d.map_grid), None)
         radio_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), None)
         
+        # Structured Confidence Index Calculation
+        if best_address == "Contact dispatch for location information":
+            confidence_score = 100.0
+            verify_location = False
+        else:
+            base_confidence = confidence_score if confidence_score is not None else 0.0
+            penalties = 0.0
+            if lat is None or lng is None:
+                penalties += 30.0
+            if not responding_units or len(responding_units) == 0 or (len(responding_units) == 1 and responding_units[0] == "Unknown Unit"):
+                penalties += 20.0
+            if not map_grid or str(map_grid).strip() == "" or str(map_grid).lower() == "none":
+                penalties += 15.0
+            if not radio_channel or str(radio_channel).strip() == "" or str(radio_channel).lower() == "none":
+                penalties += 15.0
+            
+            confidence_score = max(0.0, base_confidence - penalties)
+            if confidence_score < 90.0:
+                verify_location = True
+                
+        if verify_location_override is not None:
+            verify_location = verify_location_override
+            
         target_payload = {
             "address": best_address,
             "lat": lat,

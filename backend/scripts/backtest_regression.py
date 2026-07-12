@@ -1,0 +1,247 @@
+# backend/scripts/backtest_regression.py
+import os
+import sys
+import csv
+import json
+import time
+import logging
+import datetime
+import numpy as np
+
+# Set up paths so we can import cfr_dispatch package
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
+import cfr_dispatch
+from cfr_dispatch.orchestration import transcribe_audio_file
+from cfr_dispatch.config import STT_ENGINE
+
+def levenshtein_distance(s1, s2):
+    """Calculates Levenshtein distance between two lists or strings."""
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
+    distances = range(len(s1) + 1)
+    for i2, c2 in enumerate(s2):
+        distances_ = [i2+1]
+        for i1, c1 in enumerate(s1):
+            if c1 == c2:
+                distances_.append(distances[i1])
+            else:
+                distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+        distances = distances_
+    return distances[-1]
+
+def calculate_wer(reference: str, hypothesis: str) -> float:
+    """Calculates Word Error Rate (WER)."""
+    ref_words = reference.lower().split()
+    hyp_words = hypothesis.lower().split()
+    if not ref_words:
+        return 0.0 if not hyp_words else 1.0
+    dist = levenshtein_distance(ref_words, hyp_words)
+    return float(dist) / len(ref_words)
+
+def calculate_cer(reference: str, hypothesis: str) -> float:
+    """Calculates Character Error Rate (CER)."""
+    ref_chars = list(reference.lower().strip())
+    hyp_chars = list(hypothesis.lower().strip())
+    if not ref_chars:
+        return 0.0 if not hyp_chars else 1.0
+    dist = levenshtein_distance(ref_chars, hyp_chars)
+    return float(dist) / len(ref_chars)
+
+def get_quality_rating(wer: float) -> str:
+    if wer == 0.0:
+        return "100% Perfect"
+    elif wer < 0.20:
+        return "Operational"
+    else:
+        return "Failed"
+
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    
+    # 1. Paths setup
+    training_dir = os.path.join(backend_dir, "data", "training")
+    audio_dir = os.path.join(training_dir, "audio")
+    metadata_csv_path = os.path.join(training_dir, "metadata.csv")
+    history_json_path = os.path.join(training_dir, "evaluation_history.json")
+    
+    if not os.path.exists(metadata_csv_path):
+        logging.error(f"Metadata file not found: {metadata_csv_path}")
+        logging.error("Please run scripts/extract_training_data.py first to sync verified dataset.")
+        sys.exit(1)
+        
+    # 2. Load dataset
+    records = []
+    try:
+        with open(metadata_csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                records.append(row)
+    except Exception as e:
+        logging.error(f"Failed to read metadata.csv: {e}")
+        sys.exit(1)
+        
+    logging.info(f"Loaded {len(records)} test samples from metadata.csv.")
+    
+    if not records:
+        logging.error("Metadata is empty. No evaluations can be run.")
+        sys.exit(1)
+        
+    # 3. Execution loop
+    print("==================================================")
+    print("        REGRESSION BACKTESTING & EVALUATION       ")
+    print("==================================================")
+    print(f"STT Engine: {STT_ENGINE.upper()}")
+    print("Transcribing and evaluating test cases...")
+    print("--------------------------------------------------")
+    
+    comparisons = []
+    old_wers, new_wers = [], []
+    old_cers, new_cers = [], []
+    quality_counts = {"100% Perfect": 0, "Operational": 0, "Failed": 0}
+    regressions_found = 0
+    improvements_found = 0
+    
+    for idx, r in enumerate(records):
+        file_name = r.get("file_name")
+        ref_text = r.get("verified_transcript", "").strip()
+        old_hyp = r.get("raw_transcript", "").strip()
+        
+        local_path = os.path.join(audio_dir, file_name)
+        if not os.path.exists(local_path):
+            logging.warning(f"Audio file missing, skipping: {local_path}")
+            continue
+            
+        print(f"Processing ({idx+1}/{len(records)}): {file_name}...")
+        
+        # Run active STT model
+        try:
+            new_hyp = transcribe_audio_file(local_path)
+            if new_hyp is None:
+                new_hyp = ""
+            new_hyp = new_hyp.strip()
+        except Exception as e:
+            logging.error(f"Transcription failed for {file_name}: {e}")
+            new_hyp = ""
+            
+        # Calculate statistics
+        old_wer = calculate_wer(ref_text, old_hyp)
+        new_wer = calculate_wer(ref_text, new_hyp)
+        old_cer = calculate_cer(ref_text, old_hyp)
+        new_cer = calculate_cer(ref_text, new_hyp)
+        
+        old_wers.append(old_wer)
+        new_wers.append(new_wer)
+        old_cers.append(old_cer)
+        new_cers.append(new_cer)
+        
+        rating = get_quality_rating(new_wer)
+        quality_counts[rating] += 1
+        
+        status = "Unchanged"
+        if new_wer < old_wer:
+            status = "Improved"
+            improvements_found += 1
+        elif new_wer > old_wer:
+            status = "Regression"
+            regressions_found += 1
+            
+        comparisons.append({
+            "id": file_name.replace(".wav", ""),
+            "reference": ref_text,
+            "old_hypothesis": old_hyp,
+            "new_hypothesis": new_hyp,
+            "old_wer": old_wer,
+            "new_wer": new_wer,
+            "status": status
+        })
+        
+    if not new_wers:
+        logging.error("No samples successfully evaluated.")
+        sys.exit(1)
+        
+    # 4. Display Results Table
+    print("\n--------------------------------------------------")
+    print("Evaluation Results Summary:")
+    print("--------------------------------------------------")
+    for c in comparisons:
+        color = "⚪"
+        if c["status"] == "Improved":
+            color = "🟢"
+        elif c["status"] == "Regression":
+            color = "🔴"
+            
+        print(f"{color} Call {c['id']}: {c['status']}")
+        print(f"  - Human Ref:  \"{c['reference']}\"")
+        print(f"  - Old Hypoth: \"{c['old_hypothesis']}\" (WER: {c['old_wer']:.1%})")
+        print(f"  - New Hypoth: \"{c['new_hypothesis']}\" (WER: {c['new_wer']:.1%})")
+        print()
+        
+    # Calculate global metrics
+    old_avg_wer = np.mean(old_wers)
+    new_avg_wer = np.mean(new_wers)
+    old_avg_cer = np.mean(old_cers)
+    new_avg_cer = np.mean(new_cers)
+    
+    total = len(new_wers)
+    perfect_p = (quality_counts["100% Perfect"] / total) * 100
+    operational_p = (quality_counts["Operational"] / total) * 100
+    failed_p = (quality_counts["Failed"] / total) * 100
+    
+    print("==================================================")
+    print("               FINAL MODEL SUMMARY                ")
+    print("==================================================")
+    print(f"  - Total Test Samples:    {total}")
+    print(f"  - Baseline (Old) WER:    {old_avg_wer:.1%}")
+    print(f"  - New Evaluation WER:    {new_avg_wer:.1%}")
+    print(f"  - Baseline (Old) CER:    {old_avg_cer:.1%}")
+    print(f"  - New Evaluation CER:    {new_avg_cer:.1%}")
+    print("--------------------------------------------------")
+    print(f"  - Improvements Found:    {improvements_found}")
+    print(f"  - Regressions Found:     {regressions_found}")
+    print("--------------------------------------------------")
+    print("Quality Rating Distribution:")
+    print(f"  - 100% Perfect:          {perfect_p:.1f}% ({quality_counts['100% Perfect']})")
+    print(f"  - Operational:           {operational_p:.1f}% ({quality_counts['Operational']})")
+    print(f"  - Failed:                {failed_p:.1f}% ({quality_counts['Failed']})")
+    print("==================================================")
+    
+    # 5. Log history
+    evaluation_run = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "model_version": f"{STT_ENGINE}-boost-classes",
+        "total_evaluation_samples": total,
+        "old_average_wer": float(old_avg_wer),
+        "new_average_wer": float(new_avg_wer),
+        "old_average_cer": float(old_avg_cer),
+        "new_average_cer": float(new_avg_cer),
+        "quality_metrics": {
+            "perfect_percent": float(perfect_p),
+            "operational_percent": float(operational_p),
+            "failed_percent": float(failed_p)
+        }
+    }
+    
+    history_list = []
+    if os.path.exists(history_json_path):
+        try:
+            with open(history_json_path, "r", encoding="utf-8") as f:
+                history_list = json.load(f)
+                if not isinstance(history_list, list):
+                    history_list = []
+        except Exception:
+            history_list = []
+            
+    history_list.append(evaluation_run)
+    
+    try:
+        with open(history_json_path, "w", encoding="utf-8") as f:
+            json.dump(history_list, f, indent=2)
+        logging.info(f"Evaluation metrics logged to: {history_json_path}")
+    except Exception as e:
+        logging.warning(f"Failed to log evaluation history: {e}")
+
+if __name__ == "__main__":
+    main()

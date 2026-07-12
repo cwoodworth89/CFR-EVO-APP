@@ -1,0 +1,14 @@
+{
+  "python.analysis.extraPaths": [
+    "./services/gis/src",
+    "./services/audio_analysis/src",
+    "./services/dispatch_notifications/src"
+  ],
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "args": ["-ExecutionPolicy", "Bypass"]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
+}

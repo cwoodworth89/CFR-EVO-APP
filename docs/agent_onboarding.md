@@ -85,6 +85,10 @@ To maintain code sanity and avoid divergence between development and production,
 1. **Local Edits**: Make all permanent code, configuration, or documentation changes in the local git repository workspace first. **Do not modify production code files directly on the remote kiosk.**
 2. **Interactive Testing via SCP**: For fast iteration during debugging or testing, copy local scripts/changes to the kiosk using `scp`, and run them over SSH.
 3. **Commit & Deploy**: Once changes are verified, commit and push them to the central Git repository from your local development machine. On the remote kiosk, run a `git pull` or execute the update script to pull down the changes cleanly.
+4. **Rebuild Frontend Assets**: Since the compiled production folder (`frontend/dist`) is in `.gitignore`, you must manually re-compile the frontend assets on the remote kiosk after pulling code changes for Nginx to serve them:
+   ```bash
+   ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/frontend && npm install && npm run build"
+   ```
 
 ### ⚠️ Audio System Remoting: XDG_RUNTIME_DIR Heuristic
 When invoking python scripts or commands that interact with the audio subsystem (`sounddevice` / PortAudio / ALSA / PulseAudio) remotely over an SSH session, you **must** prepend the user's runtime directory environment variable:
@@ -121,6 +125,10 @@ As an AI agent, you can propose and execute remote commands over SSH. Since the 
 * **Copy/Deploy files (e.g., Shapefiles)**:
   ```powershell
   scp -r ./backend/data/ tcfire@100.95.146.94:/home/tcfire/CFR-EVO-APP/backend/
+  ```
+* **Build Frontend Production Assets on Kiosk**:
+  ```powershell
+  ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/frontend && npm install && npm run build"
   ```
 
 > [!NOTE]

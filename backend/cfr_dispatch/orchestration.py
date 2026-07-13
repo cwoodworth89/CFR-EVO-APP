@@ -262,8 +262,8 @@ def get_hitl_verified_streets() -> list[str]:
             "apikey": supabase_key,
             "Authorization": f"Bearer {supabase_key}"
         }
-        # Query unique verified address fields where feedback_submitted is true
-        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address&feedback_submitted=eq.true"
+        # Query unique verified address fields where feedback_submitted is true, sorted descending by timestamp
+        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address&feedback_submitted=eq.true&order=timestamp.desc"
         response = requests.get(endpoint, headers=headers, timeout=5)
         response.raise_for_status()
         records = response.json()
@@ -278,7 +278,15 @@ def get_hitl_verified_streets() -> list[str]:
                     street = match.group('street').strip().title()
                     if street:
                         verified_streets.append(street)
-        return list(set(verified_streets))
+                        
+        # Deduplicate while preserving order of most recently verified first
+        seen = set()
+        deduped_streets = []
+        for s in verified_streets:
+            if s not in seen:
+                seen.add(s)
+                deduped_streets.append(s)
+        return deduped_streets
     except Exception as e:
         logging.warning(f"Failed to fetch HITL verified streets for STT hotwords: {e}")
         return []

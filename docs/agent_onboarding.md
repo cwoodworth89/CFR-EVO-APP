@@ -137,6 +137,7 @@ Pull verified user corrections (ground truth reference transcripts) and their ra
 ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/extract_training_data.py"
 ```
 * **Output**: Audio files cached at `backend/data/training/audio/` and metadata mappings saved to `backend/data/training/metadata.csv`.
+* **Database Action**: Automatically patches the database, setting `model_updated = true` for the cached records, shifting their status in the React Dashboard column from `🟡 QUEUED` to `🟢 YES` to verify the sync.
 
 ### 2. Run Backtest & Regression Evaluation
 Evaluate the current model's accuracy (Word Error Rate & Character Error Rate) against the historical ground-truth dataset to verify improvements and prevent regressions:

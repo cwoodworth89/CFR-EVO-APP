@@ -500,7 +500,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   <thead>
                     <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono bg-slate-950/40 sticky top-0 backdrop-blur-sm">
                       <th className="py-2.5 px-3 w-[18%]">Date / Dispatch ID</th>
-                      <th className="py-2.5 px-3 w-[12%] text-center">Conf >90%</th>
+                      <th className="py-2.5 px-3 w-[12%] text-center">Conf &gt;90%</th>
                       <th className="py-2.5 px-3 w-[12%] text-center">HITL Reviewed</th>
                       <th className="py-2.5 px-3 w-[12%] text-center">STT Synced</th>
                       <th className="py-2.5 px-3 w-[33%]">System Prefills</th>

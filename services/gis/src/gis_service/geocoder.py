@@ -62,7 +62,9 @@ class CoquitlamDataValidator:
             score = fuzz.token_set_ratio(parsed_street, db_full_street.strip())
             if score > best_score:
                 best_score = score
-                best_match_full_address = row[self.full_addr_col]
+                # Construct a clean address string without database suite/unit numbers
+                st_type = row[self.street_type_col] or ""
+                best_match_full_address = f"{parsed_num} {row[self.street_name_col]} {st_type}".strip().title()
                 
         logging.debug(f"GIS Lookup for '{parsed_address}': Best street match score = {best_score}%")
         if best_score >= self.street_confidence_threshold:

@@ -722,10 +722,15 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
             addr_lower = re.sub(pattern, replacement, addr_lower)
         return addr_lower
 
-    address_part = expand_address_suffix(dispatch.address)
-        
-    # 5. Intersection / Cross Streets
-    intersection_part = f", near {expand_address_suffix(dispatch.intersection)}" if dispatch.intersection else ""
+    if dispatch.address:
+        address_part = expand_address_suffix(dispatch.address)
+        intersection_part = f", near {expand_address_suffix(dispatch.intersection)}" if dispatch.intersection else ""
+    elif dispatch.intersection:
+        address_part = expand_address_suffix(dispatch.intersection)
+        intersection_part = ""
+    else:
+        address_part = "address"
+        intersection_part = ""
         
     # 6. Radio Channel (Map digital channels back to the full verbal name)
     chan = dispatch.radio_channel or "combined response coquitlam"

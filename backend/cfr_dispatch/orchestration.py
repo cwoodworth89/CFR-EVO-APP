@@ -252,6 +252,12 @@ def get_shared_validator():
     return _cached_validator
 
 def get_hitl_verified_streets() -> list[str]:
+    """
+    Fetches the most frequently misheard street names that required HITL correction.
+    Prioritizes streets by the number of times they were corrected (tally),
+    falling back to the most recent timestamp for ties. Only streets where the 
+    user-verified address differed from the system-geocoded address are indexed.
+    """
     try:
         supabase_url = os.environ.get("SUPABASE_URL")
         supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
@@ -262,31 +268,59 @@ def get_hitl_verified_streets() -> list[str]:
             "apikey": supabase_key,
             "Authorization": f"Bearer {supabase_key}"
         }
-        # Query unique verified address fields where feedback_submitted is true, sorted descending by timestamp
-        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address&feedback_submitted=eq.true&order=timestamp.desc"
+        # Query verified address, original address, target geocoded details, and timestamp
+        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address,address,target,timestamp&feedback_submitted=eq.true&verified_address=not.is.null"
         response = requests.get(endpoint, headers=headers, timeout=5)
         response.raise_for_status()
         records = response.json()
         
-        verified_streets = []
+        from collections import defaultdict
+        tally = defaultdict(int)
+        latest_ts = {}
+        
         for r in records:
-            addr = r.get("verified_address")
-            if addr:
-                # Extract street name (remove leading house numbers and trailing city/province info)
-                match = re.search(r'^\d+\s+(?P<street>.*)', addr.split(',')[0].strip())
+            verified_addr = r.get("verified_address")
+            system_addr = r.get("address")
+            if not system_addr and r.get("target"):
+                system_addr = r.get("target", {}).get("address")
+                
+            if not verified_addr:
+                continue
+                
+            # Helper to extract normalized street name
+            def clean_street(addr_str):
+                if not addr_str:
+                    return ""
+                # Strip leading house numbers
+                match = re.search(r'^\d+\s+(?P<street>.*)', addr_str.split(',')[0].strip())
                 if match:
-                    street = match.group('street').strip().title()
-                    if street:
-                        verified_streets.append(street)
-                        
-        # Deduplicate while preserving order of most recently verified first
-        seen = set()
-        deduped_streets = []
-        for s in verified_streets:
-            if s not in seen:
-                seen.add(s)
-                deduped_streets.append(s)
-        return deduped_streets
+                    return match.group('street').strip().title()
+                return addr_str.strip().title()
+                
+            v_street = clean_street(verified_addr)
+            sys_street = clean_street(system_addr)
+            
+            if v_street:
+                ts_str = r.get("timestamp", "")
+                ts_val = 0
+                if ts_str:
+                    try:
+                        ts_val = datetime.datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
+                    except Exception:
+                        pass
+                
+                # Check if it was a MISHEARD street (user corrected the system's address)
+                if sys_street and v_street != sys_street:
+                    tally[v_street] += 1
+                    latest_ts[v_street] = max(latest_ts.get(v_street, 0), ts_val)
+                    
+        # Sort streets descending by tally count (frequency of corrections), then by timestamp recency
+        sorted_streets = sorted(
+            tally.keys(),
+            key=lambda s: (tally[s], latest_ts.get(s, 0)),
+            reverse=True
+        )
+        return sorted_streets
     except Exception as e:
         logging.warning(f"Failed to fetch HITL verified streets for STT hotwords: {e}")
         return []

@@ -93,6 +93,8 @@ class CoquitlamDataValidator:
             return None
             
         parsed_num, parsed_street_raw = match.group('number'), match.group('street').strip()
+        # Clean unit/suite numbers (e.g. "number 105", "unit B") to ensure parcel match
+        parsed_street_raw = re.sub(r'\b(number|num|unit|suite|apt|apartment|#)\s+\w+\b.*', '', parsed_street_raw, flags=re.IGNORECASE).strip()
         
         # Normalize suffix to map indices
         words = parsed_street_raw.split()

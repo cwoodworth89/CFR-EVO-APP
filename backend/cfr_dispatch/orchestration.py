@@ -331,13 +331,6 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
         "use talk group", "map grid", "medical aid", "overdose", "lift assist", 
         "structure fire", "alarm activated"
     ]
-    # Specific high-probability Coquitlam unit phrases (incorporating actual numbers and replacing generic terms)
-    units = [
-        "Engine 1", "Engine 2", "Engine 3", "Engine 4", "Engine 5",
-        "Ladder 1", "Ladder 2", "Medic 1", "Rescue 1", "Rescue 2",
-        "Car 1", "Car 2", "Car 3", "Car 4", "Car 5",
-        "Quint 5", "Squad 1", "Squad 3", "Tender 4"
-    ]
     
     # Fetch HITL verified streets to bias Whisper dynamically toward corrected addresses
     hitl_streets = get_hitl_verified_streets()
@@ -347,16 +340,16 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
         try:
             if hasattr(validator, 'addresses_gdf') and validator.addresses_gdf is not None:
                 col = validator.street_name_col
-                # Extract the top 20 most frequent street names to prevent prompt token limit crashes
+                # Extract the top 30 most frequent street names (increased capacity since units are removed)
                 street_counts = validator.addresses_gdf[col].dropna().value_counts()
-                top_streets = street_counts.head(20).index.tolist()
+                top_streets = street_counts.head(30).index.tolist()
                 streets = [str(s).title() for s in top_streets if len(str(s).strip()) > 1]
         except Exception as e:
             logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
             
     # Combine terms, removing duplicates and capping to a safe limit of 45 terms (HITL streets prioritized)
     # This prevents the Whisper decoder from throwing a positional embedding RuntimeError (token count > 448)
-    all_terms = list(dict.fromkeys(base_words + units + hitl_streets + streets))
+    all_terms = list(dict.fromkeys(base_words + hitl_streets + streets))
     all_terms = all_terms[:45]
     
     hotwords_str = ", ".join(all_terms)

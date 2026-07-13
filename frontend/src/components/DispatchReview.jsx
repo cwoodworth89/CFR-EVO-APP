@@ -559,13 +559,31 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                           </td>
                           <td className="py-3 px-3 max-w-[15rem] truncate text-slate-300">
                             <div className="font-extrabold text-white text-[11px] truncate">
-                              {call.incident_type}
+                              {call.feedback_submitted && call.verified_incident ? (
+                                <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
+                                  {call.verified_incident}
+                                </span>
+                              ) : (
+                                call.incident_type
+                              )}
                             </div>
                             <div className="text-[10px] truncate mt-0.5">
-                              📍 {call.target?.address || call.address || 'Unknown Address'}
+                              📍 {call.feedback_submitted && call.verified_address ? (
+                                <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
+                                  {call.verified_address}
+                                </span>
+                              ) : (
+                                call.target?.address || call.address || 'Unknown Address'
+                              )}
                             </div>
                             <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-                              Units: {call.responding_units?.join(', ') || 'None'}
+                              Units: {call.feedback_submitted && call.verified_units && call.verified_units.length > 0 ? (
+                                <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
+                                  {call.verified_units.join(', ')}
+                                </span>
+                              ) : (
+                                call.responding_units?.join(', ') || 'None'
+                              )}
                             </div>
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>

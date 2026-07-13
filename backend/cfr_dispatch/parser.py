@@ -81,7 +81,8 @@ def sanitize_transcript(text: str) -> str:
         
         # Respond & Priority
         r'\brespawn(ed)?s?\b': 'respond',
-        r'\bresponses?\b': 'respond',
+        r'\bresponses?\s+(emergency|routine)\b': r'respond \1',
+        r'\bresponse\s+(emergency|routine)\b': r'respond \1',
         r'\bresign\b': 'respond',
         r'\breson\b': 'respond',
         r'\bwe\s+found\b': 'respond',

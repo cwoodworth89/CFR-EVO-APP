@@ -29,10 +29,24 @@ def sanitize_transcript(text: str) -> str:
     """
     text = text.lower()
 
-    # Compress commas and spaces between numbers (e.g. 296, 8 -> 2968, 1 1 2 5 -> 1125)
-    text = re.sub(r'(\d+)\s*,\s*(\d+)', r'\1\2', text)
-    for _ in range(5):
-        text = re.sub(r'\b(\d+)\s+(\d+)\b', r'\1\2', text)
+    # Compress commas, hyphens, and spaces between consecutive digits (e.g., 296, 8 -> 2968, 3-1-0-5 -> 3105, 110 0 -> 1100)
+    while True:
+        new_text = re.sub(r'(\d+)\s*,\s*(\d+)', r'\1\2', text)
+        if new_text == text:
+            break
+        text = new_text
+
+    while True:
+        new_text = re.sub(r'(\d+)\s*-\s*(\d+)', r'\1\2', text)
+        if new_text == text:
+            break
+        text = new_text
+
+    while True:
+        new_text = re.sub(r'\b(\d+)\s+(\d+)\b', r'\1\2', text)
+        if new_text == text:
+            break
+        text = new_text
 
     # Apply phonetic corrections for common mishearings in dispatch templates and names
     phonetic_corrections = {

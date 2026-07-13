@@ -61,7 +61,7 @@ def sanitize_transcript(text: str) -> str:
         r'\bqueens\s+(\d+)\b': r'quint \1',
         
         # Respond & Priority
-        r'\brespawns?\b': 'respond',
+        r'\brespawn(ed)?s?\b': 'respond',
         r'\bresponses?\b': 'respond',
         r'\bresign\b': 'respond',
         r'\breson\b': 'respond',
@@ -588,7 +588,7 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
 
     # Sort units_vocab descending by length to support multi-word units correctly in the regex
     sorted_vocab = sorted(units_vocab, key=len, reverse=True)
-    units_pattern = re.compile(r'^(?P<units>(?:(?:' + '|'.join(re.escape(u) for u in sorted_vocab) + r')\s+[\w\d-]+[,\s]*)+)', re.IGNORECASE)
+    units_pattern = re.compile(r'^(?:coquitlam\s+)?(?P<units>(?:(?:' + '|'.join(re.escape(u) for u in sorted_vocab) + r')\s+[\w\d-]+[,\s]*)+)', re.IGNORECASE)
     response_pattern = re.compile(r'\brespond\s*(?P<type>' + response_pattern_str + r')\b', re.IGNORECASE)
     map_grid_pattern = re.compile(r'\b(?:map grid|math grade|math grid)\s*(\d{1,3})\b', re.IGNORECASE)
     final_grid_pattern = re.compile(r'coquitlam\s*(\d{1,3})\b', re.IGNORECASE)

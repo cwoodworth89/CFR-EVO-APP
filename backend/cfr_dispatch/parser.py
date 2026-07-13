@@ -367,6 +367,13 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
             changed = True
             continue
 
+    # Strip trailing numbers, suite numbers, or building details after street type (unless followed by "and" / "near")
+    # e.g., "Burlington Drive 105" -> "Burlington Drive", "Lougheed Highway Superstore" -> "Lougheed Highway"
+    street_types = r"street|avenue|drive|way|road|crescent|boulevard|place|court|highway|lane|st|ave|rd|dr|ln|ct|blvd|hwy|wy"
+    match = re.search(r'\b(' + street_types + r')\b(?!\s+(?:and|near|cross\s+roads|cross\s+street|cross\s+of))\s+(.*)', text, re.IGNORECASE)
+    if match:
+        text = text[:match.end(1)].strip()
+
     return text
 
 def match_radio_channel(talk_group_raw: str, radio_channels: List[str]) -> Optional[str]:

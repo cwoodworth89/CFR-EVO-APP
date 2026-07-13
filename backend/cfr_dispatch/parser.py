@@ -29,6 +29,11 @@ def sanitize_transcript(text: str) -> str:
     """
     text = text.lower()
 
+    # Compress commas and spaces between numbers (e.g. 296, 8 -> 2968, 1 1 2 5 -> 1125)
+    text = re.sub(r'(\d+)\s*,\s*(\d+)', r'\1\2', text)
+    for _ in range(5):
+        text = re.sub(r'\b(\d+)\s+(\d+)\b', r'\1\2', text)
+
     # Apply phonetic corrections for common mishearings in dispatch templates and names
     phonetic_corrections = {
         # Unit number homophones

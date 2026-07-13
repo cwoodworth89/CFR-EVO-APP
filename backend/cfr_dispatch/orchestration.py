@@ -268,8 +268,8 @@ def get_hitl_verified_streets() -> list[str]:
             "apikey": supabase_key,
             "Authorization": f"Bearer {supabase_key}"
         }
-        # Query verified address, original address, target geocoded details, and timestamp
-        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address,address,target,timestamp&feedback_submitted=eq.true&verified_address=not.is.null"
+        # Query verified address, target geocoded details, and timestamp (address column does not exist separately)
+        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address,target,timestamp&feedback_submitted=eq.true&verified_address=not.is.null"
         response = requests.get(endpoint, headers=headers, timeout=5)
         response.raise_for_status()
         records = response.json()

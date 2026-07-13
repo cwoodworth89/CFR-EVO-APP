@@ -111,6 +111,22 @@ def main():
         logging.error(f"Failed to write metadata.csv: {e}")
         sys.exit(1)
         
+    # 6. Update database model_updated flag for successfully synced dispatches
+    synced_ids = [r.get("dispatch_id") for r in records if r.get("dispatch_id")]
+    if synced_ids:
+        logging.info(f"Updating model_updated status for {len(synced_ids)} calls in database...")
+        chunk_size = 50
+        for i in range(0, len(synced_ids), chunk_size):
+            chunk = synced_ids[i:i+chunk_size]
+            id_filter = ",".join(f"{id_val}" for id_val in chunk)
+            patch_url = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?dispatch_id=in.({id_filter})"
+            try:
+                patch_response = requests.patch(patch_url, headers=headers, json={"model_updated": True})
+                patch_response.raise_for_status()
+                logging.info(f"  Successfully marked chunk of {len(chunk)} dispatches as synced.")
+            except Exception as e:
+                logging.warning(f"  Failed to update model_updated flag for chunk: {e}")
+
     logging.info(f"SUCCESS: Dataset sync complete. {len(csv_rows)} rows cached. {downloaded_count} new WAV files downloaded.")
 
 if __name__ == "__main__":

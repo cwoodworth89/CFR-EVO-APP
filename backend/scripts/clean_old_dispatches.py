@@ -10,9 +10,7 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
-# Load env variables from .env file
-from dotenv import load_dotenv
-load_dotenv(os.path.join(backend_dir, ".env"))
+import cfr_dispatch
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")

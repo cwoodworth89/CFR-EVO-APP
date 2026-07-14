@@ -36,6 +36,7 @@ const formatTimestampPT = (ts) => {
 
 export default function DispatchReview({ onClose, onLocateAddress }) {
   const [calls, setCalls] = useState([]);
+  const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCall, setSelectedCall] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +78,15 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
 
       if (error) throw error;
       setCalls(data || []);
+      
+      const { data: evalData, error: evalError } = await supabase
+        .from('evaluation_history')
+        .select('*')
+        .order('timestamp', { ascending: true });
+      
+      if (!evalError) {
+        setEvalHistory(evalData || []);
+      }
       setDbStatus('connected');
     } catch (err) {
       console.error('Error fetching dispatches:', err);
@@ -389,6 +399,85 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     );
   }
 
+  // Render an SVG trend chart for WER and CER
+  const renderPerformanceChart = () => {
+    if (evalHistory.length === 0) return null;
+    
+    // Select last 10 entries for cleaner rendering
+    const history = evalHistory.slice(-12);
+    const height = 65;
+    const width = 300;
+    const padding = 10;
+    
+    // Find min and max values for scaling (typically 0% to 50%)
+    const maxVal = Math.max(...history.map(h => Math.max(h.new_wer || 0, h.new_cer || 0, h.old_wer || 0)), 30);
+    
+    const scaleX = (index) => padding + (index * (width - 2 * padding) / (history.length - 1 || 1));
+    const scaleY = (val) => height - padding - (val * (height - 2 * padding) / maxVal);
+    
+    // Build path strings
+    const oldWerPoints = history.map((h, i) => `${scaleX(i)},${scaleY(h.old_wer)}`).join(' ');
+    const newWerPoints = history.map((h, i) => `${scaleX(i)},${scaleY(h.new_wer)}`).join(' ');
+    
+    return (
+      <div className="bg-slate-950/60 border border-slate-850/60 rounded-xl p-3 mb-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-inner">
+        <div className="text-left">
+          <div className="text-[10px] font-mono font-extrabold uppercase tracking-wider text-slate-400">STT Performance History</div>
+          <div className="text-[9px] text-slate-500 mt-0.5 max-w-[17rem] leading-relaxed">
+            WER tracking on regression test cases. Local Whisper (green) vs Baseline Cloud (red).
+          </div>
+          <div className="flex gap-3 mt-1.5 font-mono text-[9px]">
+            <span className="flex items-center gap-1.5 text-rose-400 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Old WER: {Math.round(history[history.length - 1]?.old_wer)}%
+            </span>
+            <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> New WER: {Math.round(history[history.length - 1]?.new_wer)}%
+            </span>
+          </div>
+        </div>
+        <div className="relative w-[280px] h-[65px] select-none pointer-events-none">
+          <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${width} ${height}`}>
+            {/* Grid Lines */}
+            <line x1={padding} y1={scaleY(0)} x2={width - padding} y2={scaleY(0)} stroke="#1e293b" strokeWidth={1} />
+            <line x1={padding} y1={scaleY(maxVal/2)} x2={width - padding} y2={scaleY(maxVal/2)} stroke="#1e293b" strokeWidth={0.5} strokeDasharray="3 3" />
+            
+            {/* Old WER Line (Rose) */}
+            {history.length > 1 && (
+              <polyline
+                fill="none"
+                stroke="#f43f5e"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={oldWerPoints}
+                opacity={0.3}
+              />
+            )}
+            {/* New WER Line (Emerald) */}
+            {history.length > 1 && (
+              <polyline
+                fill="none"
+                stroke="#10b981"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={newWerPoints}
+              />
+            )}
+            
+            {/* Dots */}
+            {history.map((h, i) => (
+              <g key={i}>
+                <circle cx={scaleX(i)} cy={scaleY(h.old_wer)} r={1.5} fill="#f43f5e" opacity={0.4} />
+                <circle cx={scaleX(i)} cy={scaleY(h.new_wer)} r={2} fill="#10b981" />
+              </g>
+            ))}
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200">
       {/* Header */}
@@ -462,6 +551,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
               className="bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-white rounded-lg px-3 py-1.5 text-xs focus:outline-none placeholder-slate-600 w-72 transition-all font-mono"
             />
           </div>
+          
+          {/* Performance Accuracy Chart */}
+          {renderPerformanceChart()}
 
           {/* Table Container */}
           <div className="flex-grow overflow-auto pr-1">
@@ -503,11 +595,12 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   <thead>
                     <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono bg-slate-950/40 sticky top-0 backdrop-blur-sm">
                       <th className="py-2.5 px-3 w-[18%]">Date / Dispatch ID</th>
-                      <th className="py-2.5 px-3 w-[12%] text-center">Conf &gt;90%</th>
-                      <th className="py-2.5 px-3 w-[12%] text-center">HITL Reviewed</th>
-                      <th className="py-2.5 px-3 w-[12%] text-center">STT Synced</th>
-                      <th className="py-2.5 px-3 w-[33%]">System Prefills</th>
-                      <th className="py-2.5 px-3 text-right w-[13%]">Actions</th>
+                      <th className="py-2.5 px-3 w-[10%] text-center">Tones</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center">Conf &gt;90%</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center">HITL Reviewed</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center">STT Synced</th>
+                      <th className="py-2.5 px-3 w-[28%]">System Prefills</th>
+                      <th className="py-2.5 px-3 text-right w-[11%]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -525,6 +618,40 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                             <div className="text-slate-200 font-bold">{formatTimestampPT(call.timestamp)}</div>
                             <div className="text-[9.5px] text-sky-400 font-medium mt-0.5">
                               ID: {call.dispatch_id}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1 justify-center items-center font-mono text-[9px] font-extrabold">
+                              <span
+                                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                                  call.target?.tone_name?.toLowerCase().includes('chief')
+                                    ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.3)] font-black'
+                                    : 'bg-slate-900/60 border-slate-850 text-slate-600'
+                                }`}
+                                title={call.target?.tone_name?.toLowerCase().includes('chief') ? 'Chief Tone Captured' : 'Chief Tone Not Captured'}
+                              >
+                                C
+                              </span>
+                              <span
+                                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                                  call.target?.tone_name?.toLowerCase().includes('engine')
+                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)] font-black'
+                                    : 'bg-slate-900/60 border-slate-850 text-slate-600'
+                                }`}
+                                title={call.target?.tone_name?.toLowerCase().includes('engine') ? 'Engine Tone Captured' : 'Engine Tone Not Captured'}
+                              >
+                                E
+                              </span>
+                              <span
+                                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                                  call.target?.tone_name?.toLowerCase().includes('rescue')
+                                    ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.3)] font-black'
+                                    : 'bg-slate-900/60 border-slate-850 text-slate-600'
+                                }`}
+                                title={call.target?.tone_name?.toLowerCase().includes('rescue') ? 'Rescue Tone Captured' : 'Rescue Tone Not Captured'}
+                              >
+                                R
+                              </span>
                             </div>
                           </td>
                           <td className="py-3 px-3 text-center">

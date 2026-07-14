@@ -986,6 +986,46 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             
             if addresses_match:
                 logging.info(f"Phase 2 verification: Address matches Phase 1 ('{p1_candidate.address or p1_candidate.intersection}'). Updating database record to verified.")
+                
+                # Parse units, grid, channel, incident type from Phase 2
+                p2_units_str = p2_candidate.units if p2_candidate and p2_candidate.units else (p1_candidate.units if p1_candidate else None)
+                p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
+                p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
+                p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
+                p2_incident_type = match_incident_type(full_sanitized, CALL_TYPES)
+                
+                # Reconstruct template
+                reconstructed_transcript = full_sanitized
+                best_p2_candidate = p2_candidate or p1_candidate
+                if best_p2_candidate:
+                    try:
+                        candidate_copy = DispatchData(
+                            raw_text=best_p2_candidate.raw_text,
+                            units=p2_units_str,
+                            response_type=best_p2_candidate.response_type or "routine",
+                            call_type=p2_incident_type,
+                            address=p1_candidate.address if p1_candidate else best_p2_candidate.address,
+                            intersection=best_p2_candidate.intersection,
+                            radio_channel=p2_channel,
+                            map_grid=p2_grid
+                        )
+                        reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
+                        logging.info(f"Phase 2 reconstructed template transcript (match): '{reconstructed_transcript}'")
+                    except Exception as r_err:
+                        logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
+                
+                p1_target = p1_data.get("target") or {}
+                p1_address = p1_target.get("address") or (p1_candidate.address or p1_candidate.intersection if p1_candidate else "")
+                
+                target_payload = {
+                    "address": p1_address,
+                    "lat": p1_target.get("lat"),
+                    "lng": p1_target.get("lng"),
+                    "rings": p1_target.get("rings") or [],
+                    "map_grid": p2_grid,
+                    "radio_channel": p2_channel
+                }
+                
                 # Update Supabase record status to verified (verify_location=False)
                 if supabase_url and supabase_key:
                     update_payload = {
@@ -994,8 +1034,15 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         "audio_url": audio_url,
                         "audio_duration": audio_duration,
                         "raw_transcript": full_raw,
-                        "sanitized_transcript": full_sanitized
+                        "sanitized_transcript": reconstructed_transcript,
+                        "incident_type": p2_incident_type,
+                        "responding_units": p2_responding_units
                     }
+                    if INTEGRATION_PAYLOAD_OPTION == 1:
+                        update_payload["address"] = p1_address
+                    else:
+                        update_payload["target"] = target_payload
+                        
                     success = update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
                     if not success:
                         local_wav_path = None
@@ -1017,11 +1064,40 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                     res = validator.local_geocode(unique_addresses[0])
                     if res:
                         logging.info(f"Phase 2 geocoding corrected match SUCCEEDED: '{res['address']}' (Score: {res['confidence']}%)")
+                        
+                        p2_units_str = p2_candidate.units if p2_candidate and p2_candidate.units else (p1_candidate.units if p1_candidate else None)
+                        p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
+                        p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
+                        p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
+                        p2_incident_type = match_incident_type(full_sanitized, CALL_TYPES)
+                        
+                        # Reconstruct template
+                        reconstructed_transcript = full_sanitized
+                        best_p2_candidate = p2_candidate or p1_candidate
+                        if best_p2_candidate:
+                            try:
+                                candidate_copy = DispatchData(
+                                    raw_text=best_p2_candidate.raw_text,
+                                    units=p2_units_str,
+                                    response_type=best_p2_candidate.response_type or "routine",
+                                    call_type=p2_incident_type,
+                                    address=res["address"],
+                                    intersection=best_p2_candidate.intersection,
+                                    radio_channel=p2_channel,
+                                    map_grid=p2_grid
+                                )
+                                reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
+                                logging.info(f"Phase 2 reconstructed template transcript (corrected): '{reconstructed_transcript}'")
+                            except Exception as r_err:
+                                logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
+                        
                         target_payload = {
                             "address": res["address"],
                             "lat": res["lat"],
                             "lng": res["lng"],
-                            "rings": res["rings"]
+                            "rings": res["rings"],
+                            "map_grid": p2_grid,
+                            "radio_channel": p2_channel
                         }
                         
                         # Prepare update payload
@@ -1031,7 +1107,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             "audio_url": audio_url,
                             "audio_duration": audio_duration,
                             "raw_transcript": full_raw,
-                            "sanitized_transcript": full_sanitized
+                            "sanitized_transcript": reconstructed_transcript,
+                            "incident_type": p2_incident_type,
+                            "responding_units": p2_responding_units
                         }
                         if INTEGRATION_PAYLOAD_OPTION == 1:
                             update_payload["address"] = res["address"]
@@ -1057,8 +1135,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             if ntfy_topic:
                                 corr_payload = {
                                     "dispatch_id": dispatch_id,
-                                    "incident_type": match_incident_type(transcript, CALL_TYPES),
-                                    "responding_units": abbreviate_units(p2_candidate.units),
+                                    "incident_type": p2_incident_type,
+                                    "responding_units": p2_responding_units,
                                     "lat": res["lat"],
                                     "lng": res["lng"],
                                     "target": target_payload
@@ -1076,26 +1154,83 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                     else:
                         # Geocoding failed for Phase 2 as well, keep Phase 1 but mark as verify_location=True
                         logging.warning("Phase 2 geocoding failed. Keeping Phase 1 data but flagging verify_location=True.")
+                        
+                        p2_units_str = p2_candidate.units if p2_candidate and p2_candidate.units else (p1_candidate.units if p1_candidate else None)
+                        p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
+                        p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
+                        p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
+                        p2_incident_type = match_incident_type(full_sanitized, CALL_TYPES)
+                        
+                        # Reconstruct template
+                        reconstructed_transcript = full_sanitized
+                        best_p2_candidate = p2_candidate or p1_candidate
+                        if best_p2_candidate:
+                            try:
+                                candidate_copy = DispatchData(
+                                    raw_text=best_p2_candidate.raw_text,
+                                    units=p2_units_str,
+                                    response_type=best_p2_candidate.response_type or "routine",
+                                    call_type=p2_incident_type,
+                                    address=p1_candidate.address if p1_candidate else best_p2_candidate.address,
+                                    intersection=best_p2_candidate.intersection,
+                                    radio_channel=p2_channel,
+                                    map_grid=p2_grid
+                                )
+                                reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
+                                logging.info(f"Phase 2 reconstructed template transcript (failed geocode): '{reconstructed_transcript}'")
+                            except Exception as r_err:
+                                logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
+                                
                         if supabase_url and supabase_key:
                             update_payload = {
                                 "verify_location": True,
                                 "audio_url": audio_url,
                                 "audio_duration": audio_duration,
                                 "raw_transcript": full_raw,
-                                "sanitized_transcript": full_sanitized
+                                "sanitized_transcript": reconstructed_transcript,
+                                "incident_type": p2_incident_type,
+                                "responding_units": p2_responding_units
                             }
                             update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
                 else:
                     # No Phase 2 candidate found (e.g. dispatcher override, noise, cutoff)
                     # Gracefully fallback: keep Phase 1 data, mark as verified=True
                     logging.info("No valid candidate in Phase 2. Keeping Phase 1 data as verified.")
+                    
+                    p2_units_str = p1_candidate.units if p1_candidate else None
+                    p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
+                    p2_grid = p1_candidate.map_grid if p1_candidate else None
+                    p2_channel = p1_candidate.radio_channel if p1_candidate else None
+                    p2_incident_type = match_incident_type(full_sanitized, CALL_TYPES)
+                    
+                    # Reconstruct template
+                    reconstructed_transcript = full_sanitized
+                    if p1_candidate:
+                        try:
+                            candidate_copy = DispatchData(
+                                raw_text=p1_candidate.raw_text,
+                                units=p2_units_str,
+                                response_type=p1_candidate.response_type or "routine",
+                                call_type=p2_incident_type,
+                                address=p1_candidate.address,
+                                intersection=p1_candidate.intersection,
+                                radio_channel=p2_channel,
+                                map_grid=p2_grid
+                            )
+                            reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
+                            logging.info(f"Phase 2 reconstructed template transcript (no candidate): '{reconstructed_transcript}'")
+                        except Exception as r_err:
+                            logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
+                            
                     if supabase_url and supabase_key:
                         update_payload = {
                             "verify_location": False,
                             "audio_url": audio_url,
                             "audio_duration": audio_duration,
                             "raw_transcript": full_raw,
-                            "sanitized_transcript": full_sanitized
+                            "sanitized_transcript": reconstructed_transcript,
+                            "incident_type": p2_incident_type,
+                            "responding_units": p2_responding_units
                         }
                         update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
                         

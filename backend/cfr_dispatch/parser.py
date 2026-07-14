@@ -92,6 +92,8 @@ def sanitize_transcript(text: str) -> str:
         r'\bmedley\b': 'medical aid',
         r'\bvan\s+ruitens?\b': 'routine',
         r'\bportman(n)?\b': 'port mann',
+        r'\benramp\b': 'on-ramp',
+        r'\bonramp\b': 'on-ramp',
         
         # Cross streets and roads
         r'\bcross\s+roads?\b': 'cross roads',

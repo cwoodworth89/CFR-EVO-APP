@@ -77,6 +77,14 @@ def sanitize_transcript(text: str) -> str:
         r'\bhope\s+with\s+him\b': 'coquitlam',
         
         # Unit corrections
+        r'\bengines\b': 'engine',
+        r'\bladders\b': 'ladder',
+        r'\bmedics\b': 'medic',
+        r'\bquints\b': 'quint',
+        r'\brescues\b': 'rescue',
+        r'\bsquads\b': 'squad',
+        r'\bcars\b': 'car',
+        r'\btenders\b': 'tender',
         r'\bqueens\s+(\d+)\b': r'quint \1',
         
         # Respond & Priority

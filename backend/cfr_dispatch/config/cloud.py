@@ -9,7 +9,7 @@ from cfr_dispatch.config.paths import SHAPES_DIR
 STT_ENGINE = os.environ.get("STT_ENGINE", "whisper")  # Options: "google", "whisper"
 WHISPER_MODEL = "base"                                # Options: "tiny", "base", "small"
 INTEGRATION_PAYLOAD_OPTION = 2                        # 1: Lightweight, 2: Full parcel rings
-ENABLE_GOOGLE_MAPS_FALLBACK = False
+ENABLE_GOOGLE_MAPS_FALLBACK = os.environ.get("GOOGLE_API_KEY") is not None
 ENABLE_NTFY_PUSH = True
 USE_INTELLIGENT_PARSER = True
 VERBOSITY_LEVEL = int(os.environ.get("VERBOSITY_LEVEL", "1"))  # 0: Muted, 1: Standard, 2: Verbose, 3: Trace

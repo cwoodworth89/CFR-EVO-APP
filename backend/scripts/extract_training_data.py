@@ -17,6 +17,69 @@ def load_env():
                     env[parts[0].strip()] = parts[1].strip()
     return env
 
+def learn_new_incident_types(records, base_dir):
+    """
+    Scans retrieved verified records for 'verified_incident' values.
+    If any verified incident type is not in the local call_types.txt,
+    it automatically appends it to the file.
+    """
+    vocab_path = os.path.join(base_dir, "data", "vocabulary", "call_types.txt")
+    if not os.path.exists(vocab_path):
+        vocab_path = os.path.join(base_dir, "call_types.txt")
+        if not os.path.exists(vocab_path):
+            logging.warning(f"Could not find call_types.txt at {vocab_path}. Skipping dynamic vocabulary update.")
+            return
+
+    # 1. Read existing call types to avoid duplicates
+    existing_types = set()
+    try:
+        with open(vocab_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line_clean = f.name if hasattr(f, 'name') else '' # dummy line just to read
+                line_clean = line.strip()
+                if line_clean and not line_clean.startswith("#"):
+                    existing_types.add(line_clean.lower())
+    except Exception as e:
+        logging.error(f"Failed to read call_types.txt for duplicate check: {e}")
+        return
+
+    # 2. Extract new types from records
+    new_types_to_append = []
+    for r in records:
+        v_inc = r.get("verified_incident")
+        if v_inc:
+            v_inc_clean = v_inc.strip()
+            if v_inc_clean and v_inc_clean.lower() not in existing_types:
+                new_types_to_append.append(v_inc_clean)
+                existing_types.add(v_inc_clean.lower())
+
+    # 3. Append new types to the file
+    if new_types_to_append:
+        logging.info(f"Learned {len(new_types_to_append)} new incident types: {new_types_to_append}")
+        try:
+            # Check if we need to write a newline first
+            prepend_newline = False
+            if os.path.exists(vocab_path) and os.path.getsize(vocab_path) > 0:
+                with open(vocab_path, "r", encoding="utf-8") as f:
+                    f.seek(0, os.SEEK_END)
+                    # read last char
+                    try:
+                        f.seek(f.tell() - 1)
+                        if f.read(1) != "\n":
+                            prepend_newline = True
+                    except Exception:
+                        pass
+            
+            with open(vocab_path, "a", encoding="utf-8") as f:
+                if prepend_newline:
+                    f.write("\n")
+                f.write("\n# --- Dynamically Learned Call Types ---\n")
+                for nt in new_types_to_append:
+                    f.write(f"{nt}\n")
+            logging.info(f"Successfully appended learned call types to {vocab_path}.")
+        except Exception as e:
+            logging.error(f"Failed to append new call types to call_types.txt: {e}")
+
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     
@@ -54,6 +117,9 @@ def main():
         sys.exit(1)
         
     logging.info(f"Found {len(records)} verified records in database.")
+    
+    # 3b. Learn and append any new verified incident types
+    learn_new_incident_types(records, base_dir)
     
     if not records:
         logging.info("No verified data to extract. Add some human-in-the-loop reviews in the UI first.")

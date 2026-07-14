@@ -86,6 +86,13 @@ class CoquitlamDataValidator:
             if res:
                 res["address"] = "3080 GORDON AVE"
                 return res
+        if "2900 BARNET" in clean_address:
+            return {
+                "address": "2900 Barnet Hwy (Coquitlam Central Bus Loop)",
+                "lat": 49.2765771,
+                "lng": -122.8003925,
+                "rings": []
+            }
             
         if " and " in parsed_address.lower() and not re.match(r'^\d+', parsed_address):
             return None

@@ -93,6 +93,13 @@ class CoquitlamDataValidator:
                 "lng": -122.8003925,
                 "rings": []
             }
+        if "PORT MANN" in clean_address or "PORTMAN" in clean_address:
+            return {
+                "address": "Port Mann Bridge, Coquitlam, BC",
+                "lat": 49.2237874,
+                "lng": -122.8152597,
+                "rings": []
+            }
             
         if " and " in parsed_address.lower() and not re.match(r'^\d+', parsed_address):
             return None

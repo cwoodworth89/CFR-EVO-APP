@@ -36,6 +36,7 @@ Medical Aid - Maternity
 Medical Aid - Overdose
 Medical Aid - Traumatic Injuries
 Medical Aid - Assist
+Medical Aid - General Illness
 Medical Aid
 
 # --- Motor Vehicle Incidents ---

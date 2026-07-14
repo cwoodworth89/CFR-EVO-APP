@@ -58,6 +58,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedIncident, setVerifiedIncident] = useState('');
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
+  const [mapCoordsAccurate, setMapCoordsAccurate] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showUploader, setShowUploader] = useState(false);
@@ -166,6 +167,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       setVerifiedIncident(selectedCall.verified_incident || '');
       setQualityRating(selectedCall.quality_rating || 'PENDING');
       
+      const acc = selectedCall.target?.map_coords_accurate;
+      setMapCoordsAccurate(acc !== undefined && acc !== null ? acc : null);
+      
       const units = selectedCall.verified_units || [];
       setVerifiedUnits(units.join(', '));
       
@@ -241,6 +245,11 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       .filter((u) => u.length > 0);
 
     try {
+      const updatedTarget = {
+        ...(selectedCall.target || {}),
+        map_coords_accurate: mapCoordsAccurate
+      };
+
       const { error } = await supabase
         .from('live_calls')
         .update({
@@ -251,7 +260,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
           feedback_submitted: true,
           verify_location: false,
           quality_rating: qualityRating,
-          model_updated: false
+          model_updated: false,
+          target: updatedTarget
         })
         .eq('id', selectedCall.id);
 
@@ -403,21 +413,22 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const renderPerformanceChart = () => {
     if (evalHistory.length === 0) return null;
     
-    // Select last 10 entries for cleaner rendering
+    // Select last 12 entries for cleaner rendering
     const history = evalHistory.slice(-12);
     const height = 65;
     const width = 300;
     const padding = 10;
     
     // Find min and max values for scaling (typically 0% to 50%)
-    const maxVal = Math.max(...history.map(h => Math.max(h.new_wer || 0, h.new_cer || 0, h.old_wer || 0)), 30);
+    const maxVal = Math.max(...history.map(h => Math.max(h.wer || 0, 30)), 35);
     
     const scaleX = (index) => padding + (index * (width - 2 * padding) / (history.length - 1 || 1));
     const scaleY = (val) => height - padding - (val * (height - 2 * padding) / maxVal);
     
     // Build path strings
-    const oldWerPoints = history.map((h, i) => `${scaleX(i)},${scaleY(h.old_wer)}`).join(' ');
-    const newWerPoints = history.map((h, i) => `${scaleX(i)},${scaleY(h.new_wer)}`).join(' ');
+    const newWerPoints = history.map((h, i) => `${scaleX(i)},${scaleY(h.wer)}`).join(' ');
+    
+    const currentWer = history[history.length - 1]?.wer;
     
     return (
       <div className="bg-slate-950/60 border border-slate-850/60 rounded-xl p-3 mb-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-inner">
@@ -427,11 +438,11 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             WER tracking on regression test cases. Local Whisper (green) vs Baseline Cloud (red).
           </div>
           <div className="flex gap-3 mt-1.5 font-mono text-[9px]">
-            <span className="flex items-center gap-1.5 text-rose-400 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Old WER: {Math.round(history[history.length - 1]?.old_wer)}%
+            <span className="flex items-center gap-1.5 text-rose-400 font-bold" title="Cloud STT Baseline">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Old WER: 29%
             </span>
             <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> New WER: {Math.round(history[history.length - 1]?.new_wer)}%
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> New WER: {Math.round(currentWer)}%
             </span>
           </div>
         </div>
@@ -441,18 +452,18 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             <line x1={padding} y1={scaleY(0)} x2={width - padding} y2={scaleY(0)} stroke="#1e293b" strokeWidth={1} />
             <line x1={padding} y1={scaleY(maxVal/2)} x2={width - padding} y2={scaleY(maxVal/2)} stroke="#1e293b" strokeWidth={0.5} strokeDasharray="3 3" />
             
-            {/* Old WER Line (Rose) */}
-            {history.length > 1 && (
-              <polyline
-                fill="none"
-                stroke="#f43f5e"
-                strokeWidth={1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={oldWerPoints}
-                opacity={0.3}
-              />
-            )}
+            {/* Baseline Cloud STT (Dashed Red Line) */}
+            <line 
+              x1={padding} 
+              y1={scaleY(29.4)} 
+              x2={width - padding} 
+              y2={scaleY(29.4)} 
+              stroke="#f43f5e" 
+              strokeWidth={1.5} 
+              strokeDasharray="4 3" 
+              opacity={0.6}
+            />
+            
             {/* New WER Line (Emerald) */}
             {history.length > 1 && (
               <polyline
@@ -468,8 +479,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
             {/* Dots */}
             {history.map((h, i) => (
               <g key={i}>
-                <circle cx={scaleX(i)} cy={scaleY(h.old_wer)} r={1.5} fill="#f43f5e" opacity={0.4} />
-                <circle cx={scaleX(i)} cy={scaleY(h.new_wer)} r={2} fill="#10b981" />
+                <circle cx={scaleX(i)} cy={scaleY(h.wer)} r={2} fill="#10b981" />
               </g>
             ))}
           </svg>
@@ -697,8 +707,15 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                                 call.incident_type
                               )}
                             </div>
-                            <div className="text-[10px] truncate mt-0.5">
-                              📍 {call.feedback_submitted && call.verified_address ? (
+                            <div className="text-[10px] truncate mt-0.5 flex items-center gap-0.5">
+                              {call.target?.map_coords_accurate === true ? (
+                                <span className="text-emerald-400 font-extrabold" title="Map Coordinates Verified Accurate">📍✔️ </span>
+                              ) : call.target?.map_coords_accurate === false ? (
+                                <span className="text-rose-455 font-extrabold" title="Map Coordinates Flagged Inaccurate">📍⚠️ </span>
+                              ) : (
+                                <span className="text-slate-500" title="Map Coordinates Unverified">📍 </span>
+                              )}
+                              {call.feedback_submitted && call.verified_address ? (
                                 <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
                                   {call.verified_address}
                                 </span>
@@ -1014,6 +1031,48 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
                     placeholder="e.g. 2648 Sandstone Cres"
                   />
+                </div>
+                
+                {/* Map Coordinates Accuracy (HITL Verification) */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                    Map Location / Route Pin Accurate?
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMapCoordsAccurate(true)}
+                      className={`py-2 rounded-xl text-[10.5px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        mapCoordsAccurate === true
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      🟢 Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapCoordsAccurate(false)}
+                      className={`py-2 rounded-xl text-[10.5px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        mapCoordsAccurate === false
+                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-455 shadow-[0_0_8px_rgba(244,63,94,0.2)]'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      🔴 No
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapCoordsAccurate(null)}
+                      className={`py-2 rounded-xl text-[10.5px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        mapCoordsAccurate === null
+                          ? 'bg-slate-850 border-slate-700 text-slate-350 shadow-[0_0_8px_rgba(100,116,139,0.2)]'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      ⚪ Unverified
+                    </button>
+                  </div>
                 </div>
 
                 {/* Incident Type (Prefilled visual helper) */}

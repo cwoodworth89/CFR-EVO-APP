@@ -116,6 +116,13 @@ def main():
     regressions_found = 0
     improvements_found = 0
     
+    # Structured Metadata Match Rate (SMMR) trackers
+    addr_matches = []
+    units_matches = []
+    incident_matches = []
+    grid_matches = []
+    channel_matches = []
+    
     for idx, r in enumerate(records):
         file_name = r.get("file_name")
         ref_text = r.get("verified_transcript", "").strip()
@@ -151,6 +158,51 @@ def main():
         round_1_text = new_rounds[0] if new_rounds else sanitized_new_raw
         sanitized_new = round_1_text
         
+        # Parse and normalize human reference using the same template reconstruction
+        normalized_ref = sanitized_ref
+        ref_cand = None
+        ref_channel_val = ""
+        ref_r1 = sanitized_ref
+        
+        try:
+            ref_rounds = split_rounds(sanitized_ref, UNITS_VOCABULARY)
+            ref_r1 = ref_rounds[0] if ref_rounds else sanitized_ref
+            
+            if not ("contact dispatch" in ref_r1 or "location information" in ref_r1) and "unknown location" not in ref_r1:
+                ref_candidates = parse_dispatch_announcement(ref_r1, UNITS_VOCABULARY)
+                if ref_candidates:
+                    ref_cand = ref_candidates[0]
+                    ref_resolved_addr = ref_cand.address
+                    if ref_cand.address and validator:
+                        _, ref_matched_addr = validator.validate_address_exists(ref_cand.address)
+                        if ref_matched_addr:
+                            ref_resolved_addr = ref_matched_addr
+                            
+                    # Extract channel digit fallback
+                    ref_channel_val = ref_cand.radio_channel
+                    if not ref_channel_val and "use talk group" in ref_r1:
+                        parts = ref_r1.split("use talk group")
+                        if len(parts) > 1:
+                            words = parts[1].strip().split()
+                            if words and words[0].isdigit():
+                                ref_channel_val = words[0]
+                                
+                    ref_reconstructed = reconstruct_template_transcript(DispatchData(
+                        raw_text=ref_cand.raw_text,
+                        units=abbreviate_units(ref_cand.units) if ref_cand.units else None,
+                        response_type=ref_cand.response_type,
+                        call_type=match_incident_type(ref_r1, CALL_TYPES),
+                        address=ref_resolved_addr,
+                        intersection=ref_cand.intersection,
+                        radio_channel=ref_channel_val,
+                        map_grid=ref_cand.map_grid
+                    ))
+                    normalized_ref = sanitize_transcript(ref_reconstructed)
+        except Exception as ref_err:
+            logging.warning(f"Failed to normalize reference template in evaluation loop: {ref_err}")
+            
+        cand = None
+        channel_val = ""
         # Apply Post-Transcription Template Reconstruction to evaluate true parser performance
         if not ("contact dispatch" in round_1_text or "location information" in round_1_text) and "unknown location" not in round_1_text:
             try:
@@ -187,11 +239,44 @@ def main():
                 logging.warning(f"Failed to reconstruct hypothesis in evaluation loop: {eval_err}")
             
         # Calculate statistics based on sanitized outputs (what the parser actually sees)
-        old_wer = calculate_wer(sanitized_ref, sanitized_old)
-        new_wer = calculate_wer(sanitized_ref, sanitized_new)
-        old_cer = calculate_cer(sanitized_ref, sanitized_old)
-        new_cer = calculate_cer(sanitized_ref, sanitized_new)
+        old_wer = calculate_wer(normalized_ref, sanitized_old)
+        new_wer = calculate_wer(normalized_ref, sanitized_new)
+        old_cer = calculate_cer(normalized_ref, sanitized_old)
+        new_cer = calculate_cer(normalized_ref, sanitized_new)
         
+        # Structured Metadata Match Rate (SMMR) computation
+        ref_address = (ref_cand.address or ref_cand.intersection or "").strip().lower() if ref_cand else ""
+        hyp_address = (cand.address or cand.intersection or "").strip().lower() if cand else ""
+        addr_match = 1.0 if ref_address == hyp_address else 0.0
+        addr_matches.append(addr_match)
+
+        ref_units = set(abbreviate_units(ref_cand.units)) if ref_cand and ref_cand.units else set()
+        hyp_units = set(abbreviate_units(cand.units)) if cand and cand.units else set()
+        units_match = 1.0 if ref_units == hyp_units else 0.0
+        units_matches.append(units_match)
+
+        ref_incident = match_incident_type(ref_r1, CALL_TYPES).strip().lower()
+        hyp_incident = match_incident_type(round_1_text, CALL_TYPES).strip().lower()
+        incident_match = 1.0 if ref_incident == hyp_incident else 0.0
+        incident_matches.append(incident_match)
+
+        ref_grid = ref_cand.map_grid.strip() if ref_cand and ref_cand.map_grid else ""
+        hyp_grid = cand.map_grid.strip() if cand and cand.map_grid else ""
+        grid_match = 1.0 if ref_grid == hyp_grid else 0.0
+        grid_matches.append(grid_match)
+
+        ref_channel = ref_channel_val.strip() if ref_channel_val else ""
+        hyp_channel = channel_val.strip() if channel_val else ""
+        channel_match = 1.0 if ref_channel == hyp_channel else 0.0
+        channel_matches.append(channel_match)
+
+        # Helper for placeholders
+        if "contact dispatch" in ref_r1 or "location information" in ref_r1:
+            if "contact dispatch" in round_1_text or "location information" in round_1_text:
+                addr_matches[-1] = 1.0
+                grid_matches[-1] = 1.0
+                channel_matches[-1] = 1.0
+
         old_wers.append(old_wer)
         new_wers.append(new_wer)
         old_cers.append(old_cer)
@@ -271,6 +356,26 @@ def main():
     print(f"  - 100% Perfect:          {perfect_p:.1f}% ({quality_counts['100% Perfect']})")
     print(f"  - Operational:           {operational_p:.1f}% ({quality_counts['Operational']})")
     print(f"  - Failed:                {failed_p:.1f}% ({quality_counts['Failed']})")
+    print("==================================================")
+    
+    # Calculate SMMR averages
+    avg_addr_match = np.mean(addr_matches)
+    avg_units_match = np.mean(units_matches)
+    avg_incident_match = np.mean(incident_matches)
+    avg_grid_match = np.mean(grid_matches)
+    avg_channel_match = np.mean(channel_matches)
+    overall_smmr = np.mean([avg_addr_match, avg_units_match, avg_incident_match, avg_grid_match, avg_channel_match])
+
+    print("==================================================")
+    print("      STRUCTURED METADATA MATCH RATE (SMMR)       ")
+    print("==================================================")
+    print(f"  - Address Parse Accuracy:      {avg_addr_match:.1%}")
+    print(f"  - Responding Units Accuracy:   {avg_units_match:.1%}")
+    print(f"  - Incident Type Accuracy:      {avg_incident_match:.1%}")
+    print(f"  - Map Grid Accuracy:           {avg_grid_match:.1%}")
+    print(f"  - Radio Channel Accuracy:      {avg_channel_match:.1%}")
+    print("--------------------------------------------------")
+    print(f"  - OVERALL PIPELINE ACCURACY:   {overall_smmr:.1%}")
     print("==================================================")
     
     # 5. Log history

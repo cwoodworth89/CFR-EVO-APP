@@ -26,14 +26,20 @@ Hazmat 3
 
 # --- Medical ---
 Medical Aid - Significant Event - Multiple Patients
+Medical Aid - Allergic Reaction
+Medical Aid - Abdominal Pain
 Medical Aid - Cardiac Arrest
 Medical Aid - Cardiac Problems
 Medical Aid - Chest Pain
 Medical Aid - Collapse
 Medical Aid - Difficulty Breathing
+Medical Aid - Diabetic
 Medical Aid - Fall
+Medical Aid - Hemorrhage
 Medical Aid - Maternity
 Medical Aid - Overdose
+Medical Aid - Seizure
+Medical Aid - Stroke
 Medical Aid - Traumatic Injuries
 Medical Aid - Assist
 Medical Aid - General Illness

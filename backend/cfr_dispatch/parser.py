@@ -497,6 +497,15 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 else:
                     matched_call_type = "Unknown Incident"
             
+            # If the isolated address still has text before the first digit (house number), strip it
+            if address_part:
+                digit_match = re.search(r'\b\d+\b', address_part)
+                if digit_match:
+                    pre_digit_text = address_part[:digit_match.start()].strip()
+                    if pre_digit_text:
+                        logging.info(f"Stripping pre-digit noise '{pre_digit_text}' from address '{address_part}'")
+                        address_part = address_part[digit_match.start():].strip()
+            
             # Clean and normalize isolated address
             address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
             normalized_address = normalize_street_suffix(address_part)

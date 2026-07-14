@@ -72,6 +72,7 @@ from cfr_dispatch.parser import (
     reconstruct_template_transcript,
     CALL_TYPES
 )
+from cfr_dispatch.offline_sync import start_offline_sync_poller, queue_offline_dispatch
 from gis_service import CoquitlamDataValidator
 from notification_service import (
     post_to_supabase,
@@ -641,7 +642,15 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
         supabase_url = os.environ.get("SUPABASE_URL")
         supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
         if supabase_url and supabase_key:
-            post_to_supabase(db_payload, supabase_url, supabase_key)
+            success = post_to_supabase(db_payload, supabase_url, supabase_key)
+            if not success:
+                local_wav_path = None
+                try:
+                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    local_wav_path = os.path.join(base_dir, "frontend", "public", "recordings", f"{dispatch_id}.wav")
+                except Exception:
+                    pass
+                queue_offline_dispatch(dispatch_id, "insert", db_payload, local_wav_path)
             
         if ENABLE_NTFY_PUSH:
             ntfy_topic = os.environ.get("NTFY_TOPIC")
@@ -987,7 +996,15 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         "raw_transcript": full_raw,
                         "sanitized_transcript": full_sanitized
                     }
-                    update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                    success = update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                    if not success:
+                        local_wav_path = None
+                        try:
+                            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                            local_wav_path = os.path.join(base_dir, "frontend", "public", "recordings", f"{dispatch_id}.wav")
+                        except Exception:
+                            pass
+                        queue_offline_dispatch(dispatch_id, "update", update_payload, local_wav_path)
             else:
                 logging.warning(f"Phase 2 verification MISMATCH: Phase 1 address was '{p1_addr}', Phase 2 is '{p2_addr}'.")
                 
@@ -1023,7 +1040,15 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             
                         # Update Supabase
                         if supabase_url and supabase_key:
-                            update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                            success = update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                            if not success:
+                                local_wav_path = None
+                                try:
+                                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                                    local_wav_path = os.path.join(base_dir, "frontend", "public", "recordings", f"{dispatch_id}.wav")
+                                except Exception:
+                                    pass
+                                queue_offline_dispatch(dispatch_id, "update", update_payload, local_wav_path)
                             
                         # Send correction push notification
                         if ENABLE_NTFY_PUSH:
@@ -1360,6 +1385,12 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
 
     # Start dispatch uploads poller thread
     start_dispatch_upload_poller(validator, stt_model)
+
+    # Start offline queue sync poller thread
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+    if supabase_url and supabase_key:
+        start_offline_sync_poller(supabase_url, supabase_key, interval_seconds=60)
 
     triggered_phase_1_ids = set()
     phase_1_trigger_lengths = {}

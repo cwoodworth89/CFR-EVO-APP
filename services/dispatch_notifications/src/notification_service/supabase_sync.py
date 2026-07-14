@@ -25,6 +25,9 @@ def post_to_supabase(payload: dict, url: str, key: str) -> bool:
             fallback_payload.pop("audio_url", None)
             fallback_payload.pop("audio_duration", None)
             response = requests.post(endpoint, headers=headers, json=fallback_payload, timeout=10)
+        if response.status_code == 409:
+            logging.info("Supabase POST returned 409 Conflict. Record already exists, treating as success.")
+            return True
         response.raise_for_status()
         logging.info("Successfully posted to Supabase.")
         return True

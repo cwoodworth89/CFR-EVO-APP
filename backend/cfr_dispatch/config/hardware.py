@@ -4,5 +4,16 @@ import os
 # Core hardware config
 AUDIO_SAMPLE_RATE = 16000
 
-# Default audio hardware device ID from environment
-DEVICE_ID = int(os.environ.get("AUDIO_DEVICE_ID")) if os.environ.get("AUDIO_DEVICE_ID") is not None else None
+def _parse_device_id():
+    val = os.environ.get("AUDIO_DEVICE_ID")
+    if val is None or val.strip() == "":
+        return None
+    val = val.strip()
+    try:
+        return int(val)
+    except ValueError:
+        if len(val) >= 2 and ((val[0] == '"' and val[-1] == '"') or (val[0] == "'" and val[-1] == "'")):
+            val = val[1:-1]
+        return val
+
+DEVICE_ID = _parse_device_id()

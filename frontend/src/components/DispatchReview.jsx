@@ -59,6 +59,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
   const [mapCoordsAccurate, setMapCoordsAccurate] = useState(null);
+  const [editorToneName, setEditorToneName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showUploader, setShowUploader] = useState(false);
@@ -170,6 +171,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       const acc = selectedCall.target?.map_coords_accurate;
       setMapCoordsAccurate(acc !== undefined && acc !== null ? acc : null);
       
+      setEditorToneName(selectedCall.target?.tone_name || '');
+      
       const units = selectedCall.verified_units || [];
       setVerifiedUnits(units.join(', '));
       
@@ -247,7 +250,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     try {
       const updatedTarget = {
         ...(selectedCall.target || {}),
-        map_coords_accurate: mapCoordsAccurate
+        map_coords_accurate: mapCoordsAccurate,
+        tone_name: editorToneName || null
       };
 
       const { error } = await supabase
@@ -1071,6 +1075,59 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                       }`}
                     >
                       ⚪ Unverified
+                    </button>
+                  </div>
+                </div>
+
+                {/* Captured Dispatch Tone (HITL Verification & Backfill) */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                    Captured Dispatch Tone
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditorToneName('Chief Tone')}
+                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
+                        editorToneName === 'Chief Tone'
+                          ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.2)] font-black'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      🔵 Chief
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditorToneName('Engine Tone')}
+                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
+                        editorToneName === 'Engine Tone'
+                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)] font-black'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      🟡 Engine
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditorToneName('Rescue Tone')}
+                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
+                        editorToneName === 'Rescue Tone'
+                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-455 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-black'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      🔴 Rescue
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditorToneName('')}
+                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
+                        editorToneName === ''
+                          ? 'bg-slate-850 border-slate-700 text-slate-350 shadow-[0_0_8px_rgba(100,116,139,0.2)] font-black'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                    >
+                      ⚪ None
                     </button>
                   </div>
                 </div>

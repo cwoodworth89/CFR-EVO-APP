@@ -434,7 +434,7 @@ def google_geocode_fallback(address: str, api_key: str) -> tuple[dict | None, st
         return None, None
 
 
-def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None, verified_transcript=None):
+def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None, verified_transcript=None, tone_name=None):
     """Common logic for geocoding, preparing DB payload, and posting to Supabase/NTFY."""
     try:
         unique_addresses = []
@@ -595,6 +595,8 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
             "map_grid": map_grid,
             "radio_channel": radio_channel
         }
+        if tone_name:
+            target_payload["tone_name"] = tone_name
         
         # Post-Transcription Template Reconstruction
         reconstructed_transcript = sanitized_transcript
@@ -882,7 +884,7 @@ def process_phase_1_check(task: dict, validator: CoquitlamDataValidator, stt_mod
             
             # Post Phase 1 payload to Supabase
             db_payload, responding_units = process_and_post_payload(
-                dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab, verify_location_override=False
+                dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab, verify_location_override=False, tone_name=tone_name
             )
             
             if db_payload:
@@ -962,7 +964,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             # Fallback: Phase 1 never triggered, so we just treat this as a standard single-phase run
             logging.info("Phase 1 fallback: Inserting new record in single-phase mode.")
             process_and_post_payload(dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab,
-                                     audio_url=audio_url, audio_duration=audio_duration)
+                                     audio_url=audio_url, audio_duration=audio_duration, tone_name=tone_name)
         else:
             # Phase 1 did trigger! We compare Phase 2 with Phase 1 to verify or correct
             p1_candidate = next((d for d in p1_data["candidates"] if d.address or d.intersection), None)

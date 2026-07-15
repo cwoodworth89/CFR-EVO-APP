@@ -137,7 +137,7 @@ As an AI agent, you can propose and execute remote commands over SSH. Since the 
 
 ## 📈 Speech-to-Text Training & MLOps Feedback Pipeline
 
-To optimize transcription quality and test new grammar sets or model parameters without breaking historic dispatches, the project includes an automated evaluation and feedback pipeline.
+To optimize transcription quality and test new grammar sets or model parameters without breaking historic dispatches, the project includes an automated evaluation, feedback, and training pipeline.
 
 ### 1. Extract Training Ground-Truth Data
 Pull verified user corrections (ground truth reference transcripts) and their raw `.wav` recordings from Supabase to your local cache:
@@ -145,6 +145,8 @@ Pull verified user corrections (ground truth reference transcripts) and their ra
 ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/extract_training_data.py"
 ```
 * **Output**: Audio files cached at `backend/data/training/audio/` and metadata mappings saved to `backend/data/training/metadata.csv`.
+* **Standardization**: Text is converted to all-lowercase, and standard punctuation (periods, commas, semicolons) is stripped.
+* **Double-Round Duplication**: If the call represents a double-round template dispatch (duration > 25s), the clean transcript is duplicated to match the double-round audio timeline (e.g. `[clean_transcript] [clean_transcript]`). This teaches the model to align both rounds without deletion hallucinations.
 * **Database Action**: Automatically patches the database, setting `model_updated = true` for the cached records, shifting their status in the React Dashboard column from `🟡 QUEUED` to `🟢 YES` to verify the sync.
 
 ### 2. Run Backtest & Regression Evaluation
@@ -153,8 +155,36 @@ Evaluate the current model's accuracy (Word Error Rate & Character Error Rate) a
 ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/backtest_regression.py"
 ```
 * **Output**: Renders a side-by-side comparison (Human Reference, Old Hypothesis, New Hypothesis), logs results locally, and inserts a run summary into the Supabase `evaluation_history` table to feed the dashboard chart.
+* **Template-Normalized WER**: The backtest parses and reconstructs the Human Reference text before calculating WER, providing a true 0-to-100% structured accuracy check (SMMR - Structured Metadata Match Rate).
 
-### 3. Toggling Speech-to-Text Engines
+### 3. Sync Dataset to Google Drive (rclone)
+Sync your local training cache to Google Drive's private AppData folder:
+```bash
+ssh tcfire@100.95.146.94 "rclone sync /home/tcfire/CFR-EVO-APP/backend/data/training gdrive: --progress"
+```
+
+### 4. Load Dataset in Google Colab (Free T4 GPU)
+Mount `rclone` directly inside Google Colab using your kiosk config to download the training files:
+```python
+# Install rclone on Colab
+!apt-get update && apt-get install -y rclone
+
+# Write credentials (copied from /home/tcfire/.config/rclone/rclone.conf)
+import os
+os.makedirs("/root/.config/rclone/", exist_ok=True)
+with open("/root/.config/rclone/rclone.conf", "w") as f:
+    f.write("""[gdrive]
+type = drive
+scope = drive.appfolder
+root_folder_id = appDataFolder
+token = {"access_token":"ya29.a0ARG...","token_type":"Bearer","refresh_token":"1//065...","expiry":"..."}
+""")
+
+# Download files
+!rclone copy gdrive: /content/dataset
+```
+
+### 5. Toggling Speech-to-Text Engines
 To switch between Google Cloud STT V2 and Local Offline Whisper:
 * Edit `backend/.env` on the kiosk:
   * For Google: `STT_ENGINE=google`

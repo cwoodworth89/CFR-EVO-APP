@@ -483,7 +483,6 @@ export default function DispatchReview({ onClose }) {
   };
 
   if (!session) {
-    if (!isOpen) return null;
     return (
       <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex items-center justify-center p-6 text-slate-100 font-sans animate-in fade-in duration-200">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-left border-sky-500/20">

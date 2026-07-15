@@ -268,6 +268,7 @@ export default function MapBoard() {
   const [targetPolygon, setTargetPolygon] = useState(null);
   const [allNearbyHydrants, setAllNearbyHydrants] = useState([]);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const targetMarkerRef = useRef(null);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
 
   // Load all hydrants data and fire zones once on mount
@@ -306,6 +307,18 @@ export default function MapBoard() {
     setAllNearbyHydrants([]);
     setRouteCoordinates([]);
   }, []);
+
+  // Auto-open target address popup when targetAddress changes
+  useEffect(() => {
+    if (targetAddress && targetMarkerRef.current) {
+      const timer = setTimeout(() => {
+        if (targetMarkerRef.current) {
+          targetMarkerRef.current.openPopup();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [targetAddress]);
 
   useEffect(() => {
     localStorage.setItem('home_hall', homeHall);
@@ -1266,98 +1279,60 @@ export default function MapBoard() {
             {/* Active Target Address Marker & Suggested Route Overlay */}
             {appMode === "EXPLORE" && targetAddress && (
               <>
-                {targetPolygon ? (
+                {targetPolygon && (
                   <Polygon 
                     positions={targetPolygon} 
                     pathOptions={{ 
-                      color: '#4f46e5', 
-                      fillColor: '#818cf8', 
+                      color: '#ef4444', 
+                      fillColor: '#ef4444', 
                       fillOpacity: 0.35, 
-                      weight: 3 
+                      weight: 4 
                     }}
-                  >
-                    <Popup className="target-address-popup">
-                      <div className="bg-slate-950 text-white p-3 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="text-[9px] text-slate-400 font-mono font-medium">SEARCH TARGET</span>
-                          <span className="text-emerald-400 text-[9px] font-bold tracking-wider">ACTIVE ROUTE</span>
-                        </div>
-                        <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
-                        <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
-                        
-                        {nearestHydrants.length > 0 && (
-                          <div className="mt-2.5 pt-2 border-t border-slate-900 flex flex-col gap-1">
-                            <span className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono">💧 Nearest Hydrant</span>
-                            <div className="flex justify-between text-xs mt-0.5">
-                              <span className="text-slate-400">ID / Distance</span>
-                              <span className="text-white font-mono font-bold">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
-                            </div>
-                            {nearestHydrants[0].flowClass && (
-                              <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Flow Rating</span>
-                                <span className="text-sky-400 font-mono font-bold">{nearestHydrants[0].flowClass}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="mt-3 pt-2 border-t border-slate-900">
-                          <a 
-                            href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
-                          >
-                            🚙 NAVIGATE (GPS)
-                          </a>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Polygon>
-                ) : (
-                  <Marker 
-                    position={[targetAddress.lat, targetAddress.lng]} 
-                    icon={targetIcon}
-                  >
-                    <Popup className="target-address-popup">
-                      <div className="bg-slate-950 text-white p-3 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="text-[9px] text-slate-400 font-mono font-medium">SEARCH TARGET</span>
-                          <span className="text-emerald-400 text-[9px] font-bold tracking-wider">ACTIVE ROUTE</span>
-                        </div>
-                        <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
-                        <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
-                        
-                        {nearestHydrants.length > 0 && (
-                          <div className="mt-2.5 pt-2 border-t border-slate-900 flex flex-col gap-1">
-                            <span className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono">💧 Nearest Hydrant</span>
-                            <div className="flex justify-between text-xs mt-0.5">
-                              <span className="text-slate-400">ID / Distance</span>
-                              <span className="text-white font-mono font-bold">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
-                            </div>
-                            {nearestHydrants[0].flowClass && (
-                              <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Flow Rating</span>
-                                <span className="text-sky-400 font-mono font-bold">{nearestHydrants[0].flowClass}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="mt-3 pt-2 border-t border-slate-900">
-                          <a 
-                            href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
-                          >
-                            🚙 NAVIGATE (GPS)
-                          </a>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
+                  />
                 )}
+                <Marker 
+                  ref={targetMarkerRef}
+                  position={[targetAddress.lat, targetAddress.lng]} 
+                  icon={targetIcon}
+                >
+                  <Popup className="target-address-popup">
+                    <div className="bg-slate-950 text-white p-3 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-[9px] text-slate-400 font-mono font-medium">SEARCH TARGET</span>
+                        <span className="text-emerald-400 text-[9px] font-bold tracking-wider">ACTIVE ROUTE</span>
+                      </div>
+                      <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
+                      <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
+                      
+                      {nearestHydrants.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-slate-900 flex flex-col gap-1">
+                          <span className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono">💧 Nearest Hydrant</span>
+                          <div className="flex justify-between text-xs mt-0.5">
+                            <span className="text-slate-400">ID / Distance</span>
+                            <span className="text-white font-mono font-bold">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
+                          </div>
+                          {nearestHydrants[0].flowClass && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-400">Flow Rating</span>
+                              <span className="text-sky-400 font-mono font-bold">{nearestHydrants[0].flowClass}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="mt-3 pt-2 border-t border-slate-900">
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
+                        >
+                          🚙 NAVIGATE (GPS)
+                        </a>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
 
                 {/* Highlight Top 3 closest hydrants (No tracer line) */}
                 {nearestHydrants.map((hyd, idx) => {
@@ -1423,24 +1398,24 @@ export default function MapBoard() {
         />
       </div>
 
-      {appMode === "ADMIN_DISPATCHES" && (
-        <DispatchReview 
-          onClose={() => startMode("EXPLORE")} 
-          onLocateAddress={(call) => {
-            startMode("EXPLORE");
-            setActiveDispatch(call);
-            const target = call?.target || call;
-            if (target) {
-              updateTargetAddress(target);
-              if (map && target.lat && target.lng) {
-                map.flyTo([target.lat, target.lng], 17, { animate: true });
-              }
+      <DispatchReview 
+        isOpen={appMode === "ADMIN_DISPATCHES"}
+        onOpen={() => startMode("ADMIN_DISPATCHES")}
+        onClose={() => startMode("EXPLORE")} 
+        onLocateAddress={(call) => {
+          startMode("EXPLORE");
+          setActiveDispatch(call);
+          const target = call?.target || call;
+          if (target) {
+            updateTargetAddress(target);
+            if (map && target.lat && target.lng) {
+              map.flyTo([target.lat, target.lng], 17, { animate: true });
             }
-            setLeftSidebarOpen(true);
-            setRightSidebarOpen(false);
-          }}
-        />
-      )}
+          }
+          setLeftSidebarOpen(true);
+          setRightSidebarOpen(false);
+        }}
+      />
     </div>
   );
 }

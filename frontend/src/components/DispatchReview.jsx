@@ -34,7 +34,7 @@ const formatTimestampPT = (ts) => {
   }
 };
 
-export default function DispatchReview({ onClose, onLocateAddress }) {
+export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddress }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -492,6 +492,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   };
 
   if (!session) {
+    if (!isOpen) return null;
     return (
       <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex items-center justify-center p-6 text-slate-100 font-sans animate-in fade-in duration-200">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-left border-sky-500/20">
@@ -649,7 +650,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   };
 
   return (
-    <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200">
+    <>
+      <div className={`absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200 ${isOpen ? '' : 'hidden'}`}>
       {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-5 flex-shrink-0">
         <div>
@@ -1384,7 +1386,20 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
           }}
         />
       )}
-    </div>
+      </div>
+
+      {(!isOpen && session) && (
+        <div className="absolute bottom-4 right-4 z-[1500] pointer-events-auto">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="bg-indigo-650 hover:bg-indigo-600 border border-indigo-500 text-white font-black px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-xs transition-all cursor-pointer hover:scale-105 duration-150 animate-bounce"
+          >
+            📋 RESUME DISPATCH REVIEW
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

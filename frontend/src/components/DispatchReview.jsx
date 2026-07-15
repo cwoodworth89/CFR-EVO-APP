@@ -765,14 +765,14 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
               <div className="min-w-[800px]">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono bg-slate-950/40 sticky top-0 backdrop-blur-sm">
-                      <th className="py-2.5 px-3 w-[18%]">Date / Dispatch ID</th>
-                      <th className="py-2.5 px-3 w-[10%] text-center">Tones</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center">Conf &gt;90%</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center">HITL Reviewed</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center">STT Synced</th>
-                      <th className="py-2.5 px-3 w-[28%]">System Prefills</th>
-                      <th className="py-2.5 px-3 text-right w-[11%]">Actions</th>
+                    <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono sticky top-0 z-10">
+                      <th className="py-2.5 px-3 w-[18%] bg-slate-900">Date / Dispatch ID</th>
+                      <th className="py-2.5 px-3 w-[10%] text-center bg-slate-900">Tones</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">STT Synced</th>
+                      <th className="py-2.5 px-3 w-[28%] bg-slate-900">System Prefills</th>
+                      <th className="py-2.5 px-3 text-right w-[11%] bg-slate-900">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -80,6 +80,18 @@ def learn_new_incident_types(records, base_dir):
         except Exception as e:
             logging.error(f"Failed to append new call types to call_types.txt: {e}")
 
+def normalize_transcript_raw(verified_text: str) -> str:
+    # 1. Convert everything to lowercase
+    text = verified_text.lower()
+    
+    # 2. Remove all standard punctuation marks
+    punctuation_to_remove = [".", ",", ";", ":", "?", "!", '"', "'"]
+    for char in punctuation_to_remove:
+        text = text.replace(char, "")
+        
+    # 3. Clean up internal spaces
+    return " ".join(text.strip().split())
+
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     
@@ -158,9 +170,17 @@ def main():
                 logging.warning(f"Failed to download audio for {dispatch_id}: {e}")
                 continue
                 
+        # Clean and normalize transcript to raw format (lowercase, no punctuation)
+        normalized_text = normalize_transcript_raw(verified_text)
+        
+        # If call is a double-round dispatch (duration > 25s), duplicate the text label
+        duration = r.get("audio_duration") or 0.0
+        if duration > 25.0 and normalized_text:
+            normalized_text = f"{normalized_text} {normalized_text}"
+            
         csv_rows.append({
             "file_name": file_name,
-            "verified_transcript": verified_text,
+            "verified_transcript": normalized_text,
             "raw_transcript": raw_text
         })
         

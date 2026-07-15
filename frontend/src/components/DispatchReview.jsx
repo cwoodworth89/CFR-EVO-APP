@@ -1391,7 +1391,7 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
           <button
             type="button"
             onClick={onOpen}
-            className="bg-indigo-650 hover:bg-indigo-600 border border-indigo-500 text-white font-black px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-xs transition-all cursor-pointer hover:scale-105 duration-150 animate-bounce"
+            className="bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 text-white font-black px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-xs transition-all cursor-pointer hover:scale-105 duration-150 animate-bounce"
           >
             📋 RESUME DISPATCH REVIEW
           </button>

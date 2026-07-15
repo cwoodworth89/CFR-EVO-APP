@@ -348,7 +348,7 @@ function ActiveDispatchPanel({ activeDispatch, setActiveDispatch, nearestHydrant
                     href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`}
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold py-2 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1.5 transition-all text-center w-full shadow border border-indigo-500 mt-1"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1.5 transition-all text-center w-full shadow border border-indigo-500 mt-1"
                   >
                     🌐 OPEN GOOGLE STREET VIEW
                   </a>
@@ -660,7 +660,7 @@ export function LeftSidebar({
                                     href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="bg-indigo-650 hover:bg-indigo-600 text-white font-extrabold py-1.5 px-3 rounded-md text-[10px] flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-1.5 px-3 rounded-md text-[10px] flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
                                  >
                                     🚙 NAVIGATE (GPS)
                                  </a>

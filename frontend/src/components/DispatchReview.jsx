@@ -59,7 +59,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
   const [mapCoordsAccurate, setMapCoordsAccurate] = useState(null);
-  const [editorToneName, setEditorToneName] = useState('');
+  const [editorTones, setEditorTones] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showUploader, setShowUploader] = useState(false);
@@ -171,7 +171,11 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       const acc = selectedCall.target?.map_coords_accurate;
       setMapCoordsAccurate(acc !== undefined && acc !== null ? acc : null);
       
-      setEditorToneName(selectedCall.target?.tone_name || '');
+      const initialTones = (selectedCall.target?.tone_name || '')
+        .split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean);
+      setEditorTones(initialTones);
       
       const units = selectedCall.verified_units || [];
       setVerifiedUnits(units.join(', '));
@@ -248,10 +252,18 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       .filter((u) => u.length > 0);
 
     try {
+      const toneNamesMapping = {
+        chief: 'Chief Tone',
+        engine: 'Engine Tone',
+        rescue: 'Rescue Tone'
+      };
+      const mappedTones = editorTones.map(t => toneNamesMapping[t] || t);
+      const tonesString = mappedTones.join(', ');
+
       const updatedTarget = {
         ...(selectedCall.target || {}),
         map_coords_accurate: mapCoordsAccurate,
-        tone_name: editorToneName || null
+        tone_name: tonesString || null
       };
 
       const { error } = await supabase
@@ -1087,9 +1099,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   <div className="grid grid-cols-4 gap-2">
                     <button
                       type="button"
-                      onClick={() => setEditorToneName('Chief Tone')}
+                      onClick={() => setEditorTones(prev => prev.includes('chief') ? prev.filter(t => t !== 'chief') : [...prev, 'chief'])}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorToneName === 'Chief Tone'
+                        editorTones.includes('chief')
                           ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1098,9 +1110,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditorToneName('Engine Tone')}
+                      onClick={() => setEditorTones(prev => prev.includes('engine') ? prev.filter(t => t !== 'engine') : [...prev, 'engine'])}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorToneName === 'Engine Tone'
+                        editorTones.includes('engine')
                           ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1109,9 +1121,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditorToneName('Rescue Tone')}
+                      onClick={() => setEditorTones(prev => prev.includes('rescue') ? prev.filter(t => t !== 'rescue') : [...prev, 'rescue'])}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorToneName === 'Rescue Tone'
+                        editorTones.includes('rescue')
                           ? 'bg-rose-500/20 border-rose-500/50 text-rose-455 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1120,9 +1132,9 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditorToneName('')}
+                      onClick={() => setEditorTones([])}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorToneName === ''
+                        editorTones.length === 0
                           ? 'bg-slate-850 border-slate-700 text-slate-350 shadow-[0_0_8px_rgba(100,116,139,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}

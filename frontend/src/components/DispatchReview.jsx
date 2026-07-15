@@ -34,7 +34,7 @@ const formatTimestampPT = (ts) => {
   }
 };
 
-export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddress }) {
+export default function DispatchReview({ onClose }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,6 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
   const [verifiedIncident, setVerifiedIncident] = useState('');
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
-  const [mapCoordsAccurate, setMapCoordsAccurate] = useState(null);
   const [editorTones, setEditorTones] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -190,9 +189,6 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
         setVerifiedIncident(selectedCall.verified_incident || '');
         setQualityRating(selectedCall.quality_rating || 'PENDING');
         
-        const acc = selectedCall.target?.map_coords_accurate;
-        setMapCoordsAccurate(acc !== undefined && acc !== null ? acc : null);
-        
         const initialTones = (selectedCall.target?.tone_name || '')
           .split(',')
           .map(t => t.trim().toLowerCase())
@@ -289,10 +285,7 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
     setSelectedCall(call);
   };
 
-  const handleViewOnMap = () => {
-    if (!selectedCall) return;
-    onLocateAddress(selectedCall);
-  };
+  // handleViewOnMap removed
 
   const handleQuickRate = (rating) => {
     setQualityRating(rating);
@@ -405,7 +398,6 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
 
       const updatedTarget = {
         ...(selectedCall.target || {}),
-        map_coords_accurate: mapCoordsAccurate,
         tone_name: tonesString || null
       };
 
@@ -649,8 +641,7 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
   };
 
   return (
-    <>
-      <div className={`absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200 ${isOpen ? '' : 'hidden'}`}>
+    <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-5 flex-shrink-0">
         <div>
@@ -896,17 +887,7 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1.5 justify-end items-center">
-                              {call.target?.lat && call.target?.lng && (
-                                <button
-                                  onClick={() => {
-                                    onLocateAddress(call);
-                                  }}
-                                  className="bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-600/30 transition-all flex items-center gap-0.5 cursor-pointer shadow"
-                                  title="Display Route & Hydrants on Map"
-                                >
-                                  🗺️ MAP
-                                </button>
-                              )}
+                              {/* Map button removed */}
                               <button
                                 onClick={() => handleSelectCall(call)}
                                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded text-[10px] border border-slate-700 transition-all cursor-pointer"
@@ -959,15 +940,7 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
                     </span>
                   </div>
                 </div>
-                {selectedCall.target?.lat && selectedCall.target?.lng && (
-                  <button
-                    type="button"
-                    onClick={handleViewOnMap}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 shadow border border-indigo-500 cursor-pointer"
-                  >
-                    🗺️ VIEW ON MAP
-                  </button>
-                )}
+                {/* View on Map button removed */}
               </div>
 
               {/* Success Notification */}
@@ -1193,47 +1166,7 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
                   />
                 </div>
                 
-                {/* Map Coordinates Accuracy (HITL Verification) */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                    Map Location / Route Pin Accurate?
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMapCoordsAccurate(true)}
-                      className={`py-2 rounded-xl text-[10.5px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                        mapCoordsAccurate === true
-                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      🟢 Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMapCoordsAccurate(false)}
-                      className={`py-2 rounded-xl text-[10.5px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                        mapCoordsAccurate === false
-                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-455 shadow-[0_0_8px_rgba(244,63,94,0.2)]'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      🔴 No
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMapCoordsAccurate(null)}
-                      className={`py-2 rounded-xl text-[10.5px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                        mapCoordsAccurate === null
-                          ? 'bg-slate-850 border-slate-700 text-slate-350 shadow-[0_0_8px_rgba(100,116,139,0.2)]'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      ⚪ Unverified
-                    </button>
-                  </div>
-                </div>
+                {/* Map Location Pin Accuracy field removed */}
 
                 {/* Captured Dispatch Tone (HITL Verification & Backfill) */}
                 <div className="flex flex-col gap-1.5">
@@ -1380,24 +1313,11 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
           onClose={() => setShowUploader(false)}
           onTriggered={(uploadedCall) => {
             setShowUploader(false);
-            onLocateAddress(uploadedCall);
+            handleSelectCall(uploadedCall);
           }}
         />
       )}
-      </div>
-
-      {(!isOpen && session) && (
-        <div className="absolute bottom-4 right-4 z-[1500] pointer-events-auto">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 text-white font-black px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-xs transition-all cursor-pointer hover:scale-105 duration-150 animate-bounce"
-          >
-            📋 RESUME DISPATCH REVIEW
-          </button>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 

@@ -1398,24 +1398,11 @@ export default function MapBoard() {
         />
       </div>
 
-      <DispatchReview 
-        isOpen={appMode === "ADMIN_DISPATCHES"}
-        onOpen={() => startMode("ADMIN_DISPATCHES")}
-        onClose={() => startMode("EXPLORE")} 
-        onLocateAddress={(call) => {
-          startMode("EXPLORE");
-          setActiveDispatch(call);
-          const target = call?.target || call;
-          if (target) {
-            updateTargetAddress(target);
-            if (map && target.lat && target.lng) {
-              map.flyTo([target.lat, target.lng], 17, { animate: true });
-            }
-          }
-          setLeftSidebarOpen(true);
-          setRightSidebarOpen(false);
-        }}
-      />
+      {appMode === "ADMIN_DISPATCHES" && (
+        <DispatchReview 
+          onClose={() => startMode("EXPLORE")} 
+        />
+      )}
     </div>
   );
 }

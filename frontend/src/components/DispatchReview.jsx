@@ -1096,7 +1096,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
                     Captured Dispatch Tone
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setEditorTones(prev => prev.includes('chief') ? prev.filter(t => t !== 'chief') : [...prev, 'chief'])}
@@ -1129,17 +1129,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                       }`}
                     >
                       🔴 Rescue
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditorTones([])}
-                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorTones.length === 0
-                          ? 'bg-slate-850 border-slate-700 text-slate-350 shadow-[0_0_8px_rgba(100,116,139,0.2)] font-black'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      ⚪ None
                     </button>
                   </div>
                 </div>

@@ -292,7 +292,6 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
   const handleViewOnMap = () => {
     if (!selectedCall) return;
     onLocateAddress(selectedCall);
-    onClose(); // Close the review overlay to show map
   };
 
   const handleQuickRate = (rating) => {
@@ -901,7 +900,6 @@ export default function DispatchReview({ isOpen, onOpen, onClose, onLocateAddres
                                 <button
                                   onClick={() => {
                                     onLocateAddress(call);
-                                    onClose();
                                   }}
                                   className="bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-600/30 transition-all flex items-center gap-0.5 cursor-pointer shadow"
                                   title="Display Route & Hydrants on Map"

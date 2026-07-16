@@ -28,15 +28,27 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None
         else:
             headers["Tags"] = "fire_engine,rotating_light"
             
-        # Parse coordinates for direct tap-to-navigate action
+        # Use address for direct tap-to-navigate action (falls back to lat/lng coordinates)
+        import urllib.parse
+        address = payload.get("address")
+        if not address:
+            target = payload.get("target", {})
+            address = target.get("address")
+
         lat = payload.get("lat")
         lng = payload.get("lng")
         if not lat or not lng:
             target = payload.get("target", {})
             lat = target.get("lat")
             lng = target.get("lng")
-            
-        if lat and lng:
+
+        if address and address.strip() != "" and address != "Unknown Location":
+            query_str = address
+            if "Coquitlam" not in query_str and "BC" not in query_str:
+                query_str += ", Coquitlam, BC"
+            encoded_query = urllib.parse.quote_plus(query_str)
+            headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={encoded_query}"
+        elif lat and lng:
             headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
             
         # Format a clean, human-readable body message instead of raw JSON

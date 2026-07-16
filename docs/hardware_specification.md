@@ -164,9 +164,9 @@ arecord -D hw:1,0 -d 5 -f S16_LE -r 16000 test.wav
 ```
 *(Use a utility like `scp` to copy `test.wav` to your computer and listen to it to ensure there is no clipping or extreme static).*
 
-In your CFR EVO backend `.env` configuration file, set the device ID:
+In your CFR EVO backend `.env` configuration file, set the device ID. You can use either the numerical index or a stable name query string (highly recommended for USB cards to survive reboot index shifts, e.g., `alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input`):
 ```env
-AUDIO_DEVICE_ID=1
+AUDIO_DEVICE_ID=alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input
 STT_ENGINE=google  # Recommended for low CPU load on Pi
 ```
 Run the interactive calibration script to align your amplitude triggers with the background noise of the station:

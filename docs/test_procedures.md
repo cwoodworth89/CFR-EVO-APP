@@ -101,7 +101,7 @@ Run the sounddevice query utility to list all recording interfaces detected by t
 ```powershell
 python -c "import sounddevice as sd; print(sd.query_devices())"
 ```
-*Note the ID number of your microphone array or virtual cable (e.g., `1`). Set this value as `AUDIO_DEVICE_ID=1` in your `agent/.env` if you want to lock the agent to a specific device.*
+*Note the ID number or unique query name string of your microphone array or virtual cable (e.g., `1` or `alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input`). Set this value as `AUDIO_DEVICE_ID=...` in your `backend/.env` if you want to lock the agent to a specific device. A stable name string is highly recommended to survive reboot index shifts.*
 
 ### 2. Live Volume Meter Calibration
 Listen to a microphone and display live signal levels to check if sound is registering:

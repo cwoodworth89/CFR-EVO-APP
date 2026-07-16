@@ -324,7 +324,7 @@ scp gcp-service-account-key.json YOUR_USERNAME@<laptop-tailscale-ip>:/home/YOUR_
     Note the card index (e.g., `card 1`).
 4.  Open `~/CFR-EVO-APP/backend/.env` and update the audio configuration:
     ```env
-    AUDIO_DEVICE_ID=1  # Change to match card index from arecord -l
+    AUDIO_DEVICE_ID=alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input  # Stable hardware query name (highly recommended over raw indices)
     STT_ENGINE=whisper # Recommend local whisper since the laptop has the CPU power for it
     WHISPER_MODEL=base # base is fast and accurate on x86 laptops
     ```

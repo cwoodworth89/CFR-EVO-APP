@@ -159,6 +159,7 @@ export default function DispatchReview({ onClose }) {
 
   const [audioSignedUrl, setAudioSignedUrl] = useState(null);
   const prevSelectedCallIdRef = React.useRef(null);
+  const prevAudioUrlRef = useRef(null);
 
   const deriveTonesFromUnitsList = (units) => {
     const derived = [];

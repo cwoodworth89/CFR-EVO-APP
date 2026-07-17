@@ -139,6 +139,12 @@ As an AI agent, you can propose and execute remote commands over SSH. Since the 
 
 To optimize transcription quality and test new grammar sets or model parameters without breaking historic dispatches, the project includes an automated evaluation, feedback, and training pipeline.
 
+### 🔄 HITL Dispatch Verification & Corrections Workflow
+When reviewing dispatches in the admin interface:
+- **HITL Ratings**: The **Perfect**, **Operational**, and **Failed** rating badges purely tag dispatch quality without overwriting manual corrections.
+- **Prefilling System Data**: Use the **"📋 Prefill Defaults"** button to copy Stage 3 template text, geocoded address, incident type, and responding units into the text input boxes.
+- **Whisper Training Dataset Opt-in**: Automatically defaults to unchecked (`false`) for calls under 35 seconds (cut-off calls) and checked (`true`) for full calls. This is editable at any time.
+
 ### 1. Extract Training Ground-Truth Data
 Pull verified user corrections (ground truth reference transcripts) and their raw `.wav` recordings from Supabase to your local cache:
 ```bash
@@ -147,6 +153,7 @@ ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-AP
 * **Output**: Audio files cached at `backend/data/training/audio/` and metadata mappings saved to `backend/data/training/metadata.csv`.
 * **Standardization**: Text is converted to all-lowercase, and standard punctuation (periods, commas, semicolons) is stripped.
 * **Double-Round Duplication**: If the call represents a double-round template dispatch (duration > 25s), the clean transcript is duplicated to match the double-round audio timeline (e.g. `[clean_transcript] [clean_transcript]`). This teaches the model to align both rounds without deletion hallucinations.
+* **Dataset Opt-Out Filter**: The script automatically skips any records where `target.include_in_training` is set to `false` (e.g. cut-off or noisy calls opted out via the dashboard checkbox).
 * **Database Action**: Automatically patches the database, setting `model_updated = true` for the cached records, shifting their status in the React Dashboard column from `🟡 QUEUED` to `🟢 YES` to verify the sync.
 
 ### 2. Run Backtest & Regression Evaluation

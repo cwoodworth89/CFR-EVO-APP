@@ -147,6 +147,20 @@ def main():
         verified_text = r.get("verified_transcript", "").strip()
         raw_text = r.get("raw_transcript", "").strip()
         
+        # Respect dataset opt-in/opt-out flag inside target JSONB
+        target = r.get("target") or {}
+        if isinstance(target, str):
+            try:
+                import json
+                target = json.loads(target)
+            except Exception:
+                target = {}
+        
+        include_in_training = target.get("include_in_training", True)
+        if not include_in_training:
+            logging.info(f"Skipping call {dispatch_id} (explicitly excluded from training dataset).")
+            continue
+            
         if not dispatch_id or not verified_text:
             continue
             

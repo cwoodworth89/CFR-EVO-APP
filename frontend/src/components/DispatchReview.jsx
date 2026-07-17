@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 // Helper to format timestamps to Pacific Time matching database and local logs
@@ -58,7 +58,7 @@ export default function DispatchReview({ onClose }) {
   const [verifiedIncident, setVerifiedIncident] = useState('');
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
-  const [editorTones, setEditorTones] = useState([]);
+  const [includeInTraining, setIncludeInTraining] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showUploader, setShowUploader] = useState(false);
@@ -177,6 +177,32 @@ export default function DispatchReview({ onClose }) {
     return derived;
   };
 
+  const getCallTones = (call) => {
+    if (!call) return [];
+    const dbTones = (call.target?.tone_name || '')
+      .split(',')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean);
+    const units = (call.verified_units && call.verified_units.length > 0)
+      ? call.verified_units
+      : (call.responding_units || []);
+    const derived = deriveTonesFromUnitsList(units);
+    return Array.from(new Set([...dbTones, ...derived]));
+  };
+
+  const getCallTonesForSidebar = () => {
+    if (!selectedCall) return [];
+    const dbTones = (selectedCall.target?.tone_name || '')
+      .split(',')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean);
+    const units = verifiedUnits
+      ? verifiedUnits.split(',').map(u => u.trim()).filter(Boolean)
+      : (selectedCall.verified_units || selectedCall.responding_units || []);
+    const derived = deriveTonesFromUnitsList(units);
+    return Array.from(new Set([...dbTones, ...derived]));
+  };
+
   // Update form fields & fetch secure signed audio URL when selectedCall changes
   useEffect(() => {
     if (selectedCall) {
@@ -189,70 +215,34 @@ export default function DispatchReview({ onClose }) {
         setVerifiedIncident(selectedCall.verified_incident || '');
         setQualityRating(selectedCall.quality_rating || 'PENDING');
         
-        const initialTones = (selectedCall.target?.tone_name || '')
-          .split(',')
-          .map(t => t.trim().toLowerCase())
-          .filter(Boolean);
-        
-        // Auto-derive tones from verified units (or responding units)
-        const units = selectedCall.verified_units && selectedCall.verified_units.length > 0
-          ? selectedCall.verified_units
-          : (selectedCall.responding_units || []);
-        const derivedTones = deriveTonesFromUnitsList(units);
-        const finalTones = Array.from(new Set([...initialTones, ...derivedTones]));
-        
-        setEditorTones(finalTones);
+        // Auto-default training checkbox: false for < 35s audio_duration, true otherwise
+        const defaultInclude = selectedCall.audio_duration !== undefined && selectedCall.audio_duration !== null 
+          ? selectedCall.audio_duration >= 35.0 
+          : true;
+        const isInclude = selectedCall.target?.include_in_training !== undefined 
+          ? selectedCall.target.include_in_training 
+          : defaultInclude;
+        setIncludeInTraining(isInclude);
         
         const displayUnits = selectedCall.verified_units || [];
         setVerifiedUnits(displayUnits.join(', '));
         
-        // If we derived new tones that weren't in the database, save them back immediately!
-        const tonesChanged = finalTones.length !== initialTones.length || !finalTones.every(t => initialTones.includes(t));
-        if (tonesChanged) {
-          const toneNamesMapping = {
-            chief: 'Chief Tone',
-            engine: 'Engine Tone',
-            rescue: 'Rescue Tone'
-          };
-          const mappedTones = finalTones.map(t => toneNamesMapping[t] || t);
-          const tonesString = mappedTones.join(', ');
-          const updatedTarget = {
-            ...(selectedCall.target || {}),
-            tone_name: tonesString || null
-          };
-          
-          supabase
-            .from('live_calls')
-            .update({ target: updatedTarget })
-            .eq('id', selectedCall.id)
-            .then(({ error }) => {
-              if (!error) {
-                setCalls(prev => prev.map(c => c.id === selectedCall.id ? { ...c, target: updatedTarget } : c));
-              }
-            });
-        }
-        
         setSuccessMsg('');
-      } else {
-        // Same call update (e.g. from realtime). Only update editorTones if they changed in the database.
-        const dbTones = (selectedCall.target?.tone_name || '')
-          .split(',')
-          .map(t => t.trim().toLowerCase())
-          .filter(Boolean);
-        const tonesChanged = dbTones.length !== editorTones.length || !dbTones.every(t => editorTones.includes(t));
-        if (tonesChanged) {
-          setEditorTones(dbTones);
-        }
       }
       
-      // Securely fetch signed URL for private audio bucket
+      // Securely fetch signed URL for private audio bucket ONLY if the audio URL changed
       const getSignedAudio = async () => {
         if (!selectedCall.audio_url) {
           setAudioSignedUrl(null);
+          prevAudioUrlRef.current = null;
           return;
         }
         
         const path = selectedCall.audio_url;
+        if (prevAudioUrlRef.current === path) {
+          return;
+        }
+        prevAudioUrlRef.current = path;
         
         if (path.includes('/storage/v1/object/')) {
           try {
@@ -277,6 +267,7 @@ export default function DispatchReview({ onClose }) {
       getSignedAudio();
     } else {
       setAudioSignedUrl(null);
+      prevAudioUrlRef.current = null;
       prevSelectedCallIdRef.current = null;
     }
   }, [selectedCall]);
@@ -289,64 +280,26 @@ export default function DispatchReview({ onClose }) {
 
   const handleQuickRate = (rating) => {
     setQualityRating(rating);
+  };
+
+  const handlePrefillDefaults = () => {
     if (!selectedCall) return;
-    if (rating === 'PERFECT' || rating === 'OPERATIONAL') {
-      setVerifiedTranscript(prev => prev || selectedCall.raw_transcript || '');
-      setVerifiedAddress(prev => prev || selectedCall.target?.address || selectedCall.address || '');
-      setVerifiedIncident(prev => prev || selectedCall.incident_type || '');
-      const newUnitsStr = (selectedCall.responding_units || []).join(', ');
-      setVerifiedUnits(prev => {
-        const val = prev || newUnitsStr;
-        if (val) {
-          setTimeout(() => {
-            const typedUnits = val.split(',').map(u => u.trim()).filter(Boolean);
-            const derived = deriveTonesFromUnitsList(typedUnits);
-            if (derived.length > 0) {
-              setEditorTones(prevTones => {
-                const uniqueNewTones = Array.from(new Set([...prevTones, ...derived]));
-                const tonesChanged = uniqueNewTones.length !== prevTones.length || !uniqueNewTones.every(t => prevTones.includes(t));
-                if (tonesChanged && selectedCall) {
-                  const toneNamesMapping = {
-                    chief: 'Chief Tone',
-                    engine: 'Engine Tone',
-                    rescue: 'Rescue Tone'
-                  };
-                  const mappedTones = uniqueNewTones.map(t => toneNamesMapping[t] || t);
-                  const tonesString = mappedTones.join(', ');
-                  const updatedTarget = {
-                    ...(selectedCall.target || {}),
-                    tone_name: tonesString || null
-                  };
-                  supabase
-                    .from('live_calls')
-                    .update({ target: updatedTarget })
-                    .eq('id', selectedCall.id)
-                    .then(({ error }) => {
-                      if (!error) {
-                        setCalls(prevCalls => prevCalls.map(c => c.id === selectedCall.id ? { ...c, target: updatedTarget } : c));
-                        setSelectedCall(prevCall => prevCall && prevCall.id === selectedCall.id ? { ...prevCall, target: updatedTarget } : prevCall);
-                      }
-                    });
-                }
-                return uniqueNewTones;
-              });
-            }
-          }, 0);
-        }
-        return val;
-      });
-    }
+    const systemText = selectedCall.sanitized_transcript || selectedCall.raw_transcript || '';
+    setVerifiedTranscript(systemText);
+    setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
+    setVerifiedIncident(selectedCall.incident_type || '');
+    const displayUnits = selectedCall.responding_units || [];
+    setVerifiedUnits(displayUnits.join(', '));
   };
 
   const handleToneToggle = async (tone) => {
     if (!selectedCall) return;
     
-    const updatedTones = editorTones.includes(tone)
-      ? editorTones.filter(t => t !== tone)
-      : [...editorTones, tone];
+    const currentTones = getCallTonesForSidebar();
+    const updatedTones = currentTones.includes(tone)
+      ? currentTones.filter(t => t !== tone)
+      : [...currentTones, tone];
       
-    setEditorTones(updatedTones);
-    
     const toneNamesMapping = {
       chief: 'Chief Tone',
       engine: 'Engine Tone',
@@ -388,17 +341,19 @@ export default function DispatchReview({ onClose }) {
       .filter((u) => u.length > 0);
 
     try {
+      const currentTones = getCallTonesForSidebar();
       const toneNamesMapping = {
         chief: 'Chief Tone',
         engine: 'Engine Tone',
         rescue: 'Rescue Tone'
       };
-      const mappedTones = editorTones.map(t => toneNamesMapping[t] || t);
+      const mappedTones = currentTones.map(t => toneNamesMapping[t] || t);
       const tonesString = mappedTones.join(', ');
 
       const updatedTarget = {
         ...(selectedCall.target || {}),
-        tone_name: tonesString || null
+        tone_name: tonesString || null,
+        include_in_training: includeInTraining
       };
 
       const { error } = await supabase
@@ -418,6 +373,21 @@ export default function DispatchReview({ onClose }) {
 
       if (error) throw error;
       setSuccessMsg('Review and corrections submitted successfully!');
+      
+      const newCallData = {
+        ...selectedCall,
+        verified_transcript: verifiedTranscript,
+        verified_address: verifiedAddress,
+        verified_incident: verifiedIncident,
+        verified_units: unitsArray,
+        feedback_submitted: true,
+        verify_location: false,
+        quality_rating: qualityRating,
+        model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
+        target: updatedTarget
+      };
+      setCalls(prev => prev.map(c => c.id === selectedCall.id ? newCallData : c));
+      setSelectedCall(newCallData);
     } catch (err) {
       console.error('Error updating call:', err);
       alert('Failed to submit corrections.');
@@ -767,6 +737,7 @@ export default function DispatchReview({ onClose }) {
                   <tbody>
                     {filteredCalls.map((call) => {
                       const isSelected = selectedCall?.id === call.id;
+                      const rowTones = getCallTones(call);
                       return (
                         <tr
                           key={call.id}
@@ -785,31 +756,31 @@ export default function DispatchReview({ onClose }) {
                             <div className="flex gap-1 justify-center items-center font-mono text-[9px] font-extrabold">
                               <span
                                 className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                  call.target?.tone_name?.toLowerCase().includes('chief')
+                                  rowTones.includes('chief')
                                     ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.3)] font-black'
                                     : 'bg-slate-900/60 border-slate-850 text-slate-600'
                                 }`}
-                                title={call.target?.tone_name?.toLowerCase().includes('chief') ? 'Chief Tone Captured' : 'Chief Tone Not Captured'}
+                                title={rowTones.includes('chief') ? 'Chief Tone Captured' : 'Chief Tone Not Captured'}
                               >
                                 C
                               </span>
                               <span
                                 className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                  call.target?.tone_name?.toLowerCase().includes('engine')
+                                  rowTones.includes('engine')
                                     ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)] font-black'
                                     : 'bg-slate-900/60 border-slate-850 text-slate-600'
                                 }`}
-                                title={call.target?.tone_name?.toLowerCase().includes('engine') ? 'Engine Tone Captured' : 'Engine Tone Not Captured'}
+                                title={rowTones.includes('engine') ? 'Engine Tone Captured' : 'Engine Tone Not Captured'}
                               >
                                 E
                               </span>
                               <span
                                 className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                  call.target?.tone_name?.toLowerCase().includes('rescue')
+                                  rowTones.includes('rescue')
                                     ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.3)] font-black'
                                     : 'bg-slate-900/60 border-slate-850 text-slate-600'
                                 }`}
-                                title={call.target?.tone_name?.toLowerCase().includes('rescue') ? 'Rescue Tone Captured' : 'Rescue Tone Not Captured'}
+                                title={rowTones.includes('rescue') ? 'Rescue Tone Captured' : 'Rescue Tone Not Captured'}
                               >
                                 R
                               </span>
@@ -1001,7 +972,7 @@ export default function DispatchReview({ onClose }) {
                         </div>
                         {stage1Open && (
                           <div className="text-[11px] text-slate-400 font-mono italic mt-2 pt-2 border-t border-slate-850/50 leading-relaxed select-text select-all">
-                            "{selectedCall.raw_transcript || 'No transcript text captured'}"
+                            {selectedCall.raw_transcript || 'No transcript text captured'}
                           </div>
                         )}
                       </div>
@@ -1083,7 +1054,7 @@ export default function DispatchReview({ onClose }) {
                         </div>
                         {stage3Open && (
                           <div className="text-[11px] text-slate-300 font-mono mt-2 pt-2 border-t border-emerald-900/30 leading-relaxed select-text select-all">
-                            "{selectedCall.sanitized_transcript || selectedCall.raw_transcript || 'No text'}"
+                            {selectedCall.sanitized_transcript || selectedCall.raw_transcript || 'No text'}
                           </div>
                         )}
                       </div>
@@ -1134,9 +1105,19 @@ export default function DispatchReview({ onClose }) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                    Verified Ground-Truth Transcript
-                  </label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                      Verified Ground-Truth Transcript
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handlePrefillDefaults}
+                      className="text-[9px] font-bold text-sky-400 hover:text-sky-300 bg-sky-950/40 border border-sky-900/30 px-2 py-0.5 rounded cursor-pointer transition-all hover:bg-sky-900/30"
+                      title="Prefill transcript, address, incident type, and units using system-extracted data"
+                    >
+                      📋 Prefill Defaults
+                    </button>
+                  </div>
                   <textarea
                     rows={3}
                     placeholder="Enter the confirmed dispatch transcript..."
@@ -1165,8 +1146,6 @@ export default function DispatchReview({ onClose }) {
                   />
                 </div>
                 
-                {/* Map Location Pin Accuracy field removed */}
-
                 {/* Captured Dispatch Tone (HITL Verification & Backfill) */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
@@ -1177,7 +1156,7 @@ export default function DispatchReview({ onClose }) {
                       type="button"
                       onClick={() => handleToneToggle('chief')}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorTones.includes('chief')
+                        getCallTonesForSidebar().includes('chief')
                           ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1188,7 +1167,7 @@ export default function DispatchReview({ onClose }) {
                       type="button"
                       onClick={() => handleToneToggle('engine')}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorTones.includes('engine')
+                        getCallTonesForSidebar().includes('engine')
                           ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1199,7 +1178,7 @@ export default function DispatchReview({ onClose }) {
                       type="button"
                       onClick={() => handleToneToggle('rescue')}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        editorTones.includes('rescue')
+                        getCallTonesForSidebar().includes('rescue')
                           ? 'bg-rose-500/20 border-rose-500/50 text-rose-455 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1241,49 +1220,31 @@ export default function DispatchReview({ onClose }) {
                   <input
                     type="text"
                     value={verifiedUnits}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setVerifiedUnits(val);
-                      
-                      const typedUnits = val.split(',').map(u => u.trim()).filter(Boolean);
-                      const derived = deriveTonesFromUnitsList(typedUnits);
-                      
-                      if (derived.length > 0) {
-                        const uniqueNewTones = Array.from(new Set([...editorTones, ...derived]));
-                        const tonesChanged = uniqueNewTones.length !== editorTones.length || !uniqueNewTones.every(t => editorTones.includes(t));
-                        
-                        if (tonesChanged) {
-                          setEditorTones(uniqueNewTones);
-                          
-                          if (selectedCall) {
-                            const toneNamesMapping = {
-                              chief: 'Chief Tone',
-                              engine: 'Engine Tone',
-                              rescue: 'Rescue Tone'
-                            };
-                            const mappedTones = uniqueNewTones.map(t => toneNamesMapping[t] || t);
-                            const tonesString = mappedTones.join(', ');
-                            const updatedTarget = {
-                              ...(selectedCall.target || {}),
-                              tone_name: tonesString || null
-                            };
-                            supabase
-                              .from('live_calls')
-                              .update({ target: updatedTarget })
-                              .eq('id', selectedCall.id)
-                              .then(({ error }) => {
-                                if (!error) {
-                                  setCalls(prevCalls => prevCalls.map(c => c.id === selectedCall.id ? { ...c, target: updatedTarget } : c));
-                                }
-                              });
-                          }
-                        }
-                      }
-                    }}
+                    onChange={(e) => setVerifiedUnits(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
                     placeholder="e.g. E1, L1"
                   />
                 </div>
+
+                {/* Whisper Training Dataset Opt-In */}
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-850 p-3 rounded-xl mt-1.5">
+                  <input
+                    type="checkbox"
+                    id="include_in_training"
+                    checked={includeInTraining}
+                    onChange={(e) => setIncludeInTraining(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-800 bg-slate-900 text-sky-500 focus:ring-sky-500 cursor-pointer"
+                  />
+                  <label htmlFor="include_in_training" className="text-[10px] text-slate-300 font-extrabold uppercase font-mono cursor-pointer select-none">
+                    Include in Whisper training dataset?
+                  </label>
+                  {selectedCall.audio_duration !== undefined && selectedCall.audio_duration < 35.0 && (
+                    <span className="text-[8px] text-rose-455 font-bold uppercase tracking-wider ml-auto animate-pulse" title="This call is under 35 seconds and appears to be cut off, so it is automatically excluded from Whisper training by default.">
+                      ⚠️ Cut-Off Default
+                    </span>
+                  )}
+                </div>
+
               </div>
 
               {/* Submit Buttons */}

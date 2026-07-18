@@ -499,6 +499,28 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
             sub_val = f"Unit {sub_val.replace('#', '').strip()}"
             
         return cleaned_addr, sub_val
+    else:
+        # Fallback: check for explicit subaddress prefixes like "number", "unit", "apt", "suite", "basement", "room" without suffix
+        sub_pattern = r'\b(number|unit|apt|suite|basement|rm|room|#)\s*(\d+|\w+)?'
+        sub_match = re.search(sub_pattern, address_text, re.IGNORECASE)
+        if sub_match:
+            sub_val = sub_match.group(0).strip()
+            
+            # If the extracted subaddress contains "and" (indicating an intersection), bypass extraction
+            if re.search(r'\band\b', sub_val, re.IGNORECASE):
+                return address_text, None
+                
+            cleaned_addr = address_text[:sub_match.start()].strip()
+            cleaned_addr = " ".join(cleaned_addr.split())
+            cleaned_addr = cleaned_addr.rstrip(',- ').lstrip(',- ')
+            
+            # Format bare digits (e.g. "# 105" -> "Unit 105")
+            if re.match(r'^#?\s*\d+$', sub_val):
+                sub_val = f"Unit {sub_val.replace('#', '').strip()}"
+                
+            return cleaned_addr, sub_val
+
+    return address_text, None
 
 def split_street_base_suffix(street_text: str) -> Tuple[str, str]:
     """Splits a street name (e.g. 'Austin Ave') into ('Austin', 'Ave')."""
@@ -627,8 +649,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                         address_part = address_part[digit_match.start():].strip()
             
             # Clean and normalize isolated address
-            address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
             address_part, extracted_subaddr = extract_subaddress_info(address_part)
+            address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
             normalized_address = normalize_street_suffix(address_part)
             
             # Extract Cross Roads segment
@@ -675,13 +697,14 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                     else:
                         logging.warning(f"Parsed map grid '{grid_val}' is not in ground-truth MAP_GRIDS. Rejecting.")
                     
+            is_intersection = bool(normalized_address and re.search(r'\band\b', normalized_address, re.IGNORECASE))
             dispatch = DispatchData(
                 raw_text=text,
                 units=units_segment if units_segment else None,
                 response_type=respond_match.group(1).strip(),
                 call_type=matched_call_type,
-                address=normalized_address if normalized_address and "and" not in normalized_address.lower() else None,
-                intersection=normalized_address if normalized_address and "and" in normalized_address.lower() else cross_roads_str,
+                address=normalized_address if normalized_address and not is_intersection else None,
+                intersection=normalized_address if normalized_address and is_intersection else cross_roads_str,
                 map_grid=map_grid_str,
                 radio_channel=talk_group_str,
                 subaddress=extracted_subaddr

@@ -294,7 +294,10 @@ export default function DispatchReview({ onClose }) {
     setSelectedCall(call);
   };
 
-  // handleViewOnMap removed
+  const handleViewOnMap = () => {
+    if (!selectedCall) return;
+    onLocateAddress(selectedCall);
+  };
 
   const handleQuickRate = (rating) => {
     setQualityRating(rating);
@@ -918,7 +921,17 @@ export default function DispatchReview({ onClose }) {
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1.5 justify-end items-center">
-                              {/* Map button removed */}
+                              {call.target?.lat && call.target?.lng && (
+                                <button
+                                  onClick={() => {
+                                    onLocateAddress(call);
+                                  }}
+                                  className="bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-600/30 transition-all flex items-center gap-0.5 cursor-pointer shadow"
+                                  title="Display Route & Hydrants on Map"
+                                >
+                                  🗺️ MAP
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleSelectCall(call)}
                                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded text-[10px] border border-slate-700 transition-all cursor-pointer"
@@ -971,7 +984,15 @@ export default function DispatchReview({ onClose }) {
                     </span>
                   </div>
                 </div>
-                {/* View on Map button removed */}
+                {selectedCall.target?.lat && selectedCall.target?.lng && (
+                  <button
+                    type="button"
+                    onClick={handleViewOnMap}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 shadow border border-indigo-500 cursor-pointer"
+                  >
+                    🗺️ VIEW ON MAP
+                  </button>
+                )}
               </div>
 
               {/* Success Notification */}

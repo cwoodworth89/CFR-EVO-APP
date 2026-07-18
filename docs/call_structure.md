@@ -60,3 +60,105 @@ To ensure the template splits and segments correctly, the sanitizer automaticall
 * **Quint**: Maps `"queens"` followed by a number (e.g., `"queens 5"`) to `"quint 5"` (avoiding street names like *Queens Road*).
 * **Respond**: Maps `"respondents"`, `"responder"`, `"respawn"` to `"respond"` so that the priority splits line up correctly.
 * **Talk Group 10**: Maps `"Combined Response Coquitlam"` to `"Talk Group 10 Combined Response Coquitlam"`.
+
+---
+
+## 📡 Notification Push Payloads & Call Category Formats
+
+The python agent pushes notification payloads to `ntfy.sh` to trigger instant audio playback and maps-navigation shortcuts on Android handsets. The push payload structure is tailored to the geocoded quality of the parsed location.
+
+### 1. Known Good Address Category
+- **Condition**: Exact parcel match found in Coquitlam shapefiles.
+- **Ntfy Title**: `Dispatch: [Incident Type]` (e.g., *Dispatch: Medical*)
+- **Ntfy Tags**: `fire_engine,rotating_light`
+- **Click Action URL**: Launches Google Maps search with exact address (e.g., `https://www.google.com/maps/search/?api=1&query=3030+Gordon+Ave,+Coquitlam,+BC`).
+- **Ntfy Body Text**:
+  ```text
+  📍 Address: 3030 Gordon Ave
+  🚒 Units: E1, L1
+  🗺️ Map Grid: 42
+  📻 Channel: 10
+  📝 Transcript: coquitlam engine 1...
+  ```
+
+### 2. Approximate / Unmapped Address Category
+- **Condition**: Street name recognized, but specific house number is missing from the local GIS shapefiles.
+- **Ntfy Title**: `Dispatch: [Incident Type]`
+- **Ntfy Tags**: `fire_engine,rotating_light`
+- **Click Action URL**: Uses parsed approximate address, letting Google Maps handle fuzzy geocoding (e.g., `https://www.google.com/maps/search/?api=1&query=3080+Gordon+Ave,+Coquitlam,+BC`).
+- **Ntfy Body Text**:
+  ```text
+  📍 Address: 3080 Gordon Ave (Street Midpoint / Approx)
+  🚒 Units: E1, E2
+  🗺️ Map Grid: 42
+  📻 Channel: 10
+  📝 Transcript: coquitlam engine 1...
+  ```
+
+### 3. Strict Intersection Category
+- **Condition**: Two street names connected by "and" / "at" / "&".
+- **Ntfy Title**: `Dispatch: [Incident Type]`
+- **Ntfy Tags**: `fire_engine,rotating_light`
+- **Click Action URL**: Google Maps query of the intersection (e.g., `https://www.google.com/maps/search/?api=1&query=Gordon+Ave+%26+Christmas+Way,+Coquitlam,+BC`).
+- **Ntfy Body Text**:
+  ```text
+  📍 Address: Gordon Ave & Christmas Way
+  🚒 Units: E1, R1
+  🗺️ Map Grid: 42
+  📻 Channel: 10
+  📝 Transcript: coquitlam engine 1...
+  ```
+
+### 4. Confidential / Sensitive Placeholder Category
+- **Condition**: Dispatcher broadcasts generic confidential instructions (e.g., *"contact dispatch for location information"*).
+- **Ntfy Title**: `Dispatch: Confidential`
+- **Ntfy Tags**: `fire_engine,warning`
+- **Click Action URL**: *(No URL sent to prevent mapping errors)*
+- **Ntfy Body Text**:
+  ```text
+  📍 Address: Contact dispatch for location information
+  🚒 Units: E1
+  🗺️ Map Grid: 42
+  📻 Channel: 10
+  📝 Transcript: contact dispatch for location info...
+  ```
+
+### 5. Phase 2 Corrections / Updates
+- **Condition**: Human reviewer submits verified corrections or Phase 2 completes processing.
+- **Ntfy Title**: `[CORRECTION] Dispatch: [Incident Type]`
+- **Ntfy Tags**: `fire_engine,repeat`
+- **Click Action URL**: Direct coordinates/address search.
+- **Ntfy Body Text**:
+  ```text
+  📍 Address: [Verified Address]
+  🚒 Units: [Verified Units]
+  🗺️ Map Grid: [Verified Grid]
+  📻 Channel: [Verified Talk Group]
+  📝 Transcript: Location/units updated in Phase 2 processing.
+  ```
+
+---
+
+## 💾 Supabase Realtime Payload Schema
+
+Updates pushed via Supabase Realtime use a standardized json object layout for the React frontend client:
+
+*   **`live_calls` Table Schema**:
+    *   `dispatch_id` (Text): Unique alphanumeric index (`DISP-[Year]-[HEX]`).
+    *   `incident_type` (Text): Parsed or verified incident category.
+    *   `responding_units` (Array): Array of active units (e.g., `["E1", "L1"]`).
+    *   `raw_transcript` / `sanitized_transcript` (Text): Text representations.
+    *   `audio_url` (Text): Direct Supabase storage link.
+    *   `verify_location` (Boolean): Boolean flag. `true` triggers visual map warnings.
+    *   `target` (JSONB): Structured geocoding parameters:
+        ```json
+        {
+          "address": "3030 Gordon Ave",
+          "subaddress": "Unit 204",
+          "lat": 49.282138,
+          "lng": -122.791240,
+          "map_grid": "42",
+          "radio_channel": "10",
+          "tone_name": "Engine Tone"
+        }
+        ```

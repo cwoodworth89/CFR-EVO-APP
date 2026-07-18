@@ -212,8 +212,6 @@ export default function DispatchReview({ onClose }) {
     return Array.from(new Set([...dbTones, ...derived]));
   };
 
-  };
-
   // Update form fields & fetch secure signed audio URL when selectedCall changes
   useEffect(() => {
     if (selectedCall) {

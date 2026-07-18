@@ -840,9 +840,9 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
         intersection_part = ""
         
     # 6. Radio Channel (Map digital channels back to the full verbal name)
-    chan = dispatch.radio_channel or "combined response coquitlam"
+    chan = dispatch.radio_channel or "10 combined response coquitlam"
     if chan.strip() == "10" or "combined" in chan.lower():
-        channel_part = "use talk group combined response coquitlam"
+        channel_part = "use talk group 10 combined response coquitlam"
     else:
         chan_lower = chan.lower()
         if "talk group" in chan_lower:

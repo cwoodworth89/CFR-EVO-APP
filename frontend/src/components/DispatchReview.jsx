@@ -73,6 +73,7 @@ export default function DispatchReview({ onClose }) {
   const [verifiedTalkgroup, setVerifiedTalkgroup] = useState('');
   const [verifiedMapGrid, setVerifiedMapGrid] = useState('');
   const [includeInTraining, setIncludeInTraining] = useState(true);
+  const [verifiedTones, setVerifiedTones] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [showUploader, setShowUploader] = useState(false);
@@ -211,23 +212,6 @@ export default function DispatchReview({ onClose }) {
     return Array.from(new Set([...dbTones, ...derived]));
   };
 
-  const getCallTonesForSidebar = () => {
-    if (!selectedCall) return [];
-    const dbTones = (selectedCall.target?.tone_name || '')
-      .split(',')
-      .map(t => {
-        const clean = t.trim().toLowerCase();
-        if (clean.includes('chief')) return 'chief';
-        if (clean.includes('engine')) return 'engine';
-        if (clean.includes('rescue')) return 'rescue';
-        return clean;
-      })
-      .filter(Boolean);
-    const units = verifiedUnits
-      ? verifiedUnits.split(',').map(u => u.trim()).filter(Boolean)
-      : (selectedCall.verified_units || selectedCall.responding_units || []);
-    const derived = deriveTonesFromUnitsList(units);
-    return Array.from(new Set([...dbTones, ...derived]));
   };
 
   // Update form fields & fetch secure signed audio URL when selectedCall changes
@@ -256,6 +240,24 @@ export default function DispatchReview({ onClose }) {
         
         const displayUnits = selectedCall.verified_units || [];
         setVerifiedUnits(displayUnits.join(', '));
+        
+        const rawTonesStr = selectedCall.target?.tone_name;
+        let initialTones = [];
+        if (rawTonesStr) {
+          initialTones = rawTonesStr.split(',')
+            .map(t => {
+              const clean = t.trim().toLowerCase();
+              if (clean.includes('chief')) return 'chief';
+              if (clean.includes('engine')) return 'engine';
+              if (clean.includes('rescue')) return 'rescue';
+              return clean;
+            })
+            .filter(Boolean);
+        } else {
+          const checkUnits = selectedCall.responding_units || [];
+          initialTones = deriveTonesFromUnitsList(checkUnits);
+        }
+        setVerifiedTones(initialTones);
         
         setSuccessMsg('');
       }
@@ -365,39 +367,12 @@ export default function DispatchReview({ onClose }) {
     }
   };
 
-  const handleToneToggle = async (tone) => {
-    if (!selectedCall) return;
-    
-    const currentTones = getCallTonesForSidebar();
-    const updatedTones = currentTones.includes(tone)
-      ? currentTones.filter(t => t !== tone)
-      : [...currentTones, tone];
-      
-    const toneNamesMapping = {
-      chief: 'Chief Tone',
-      engine: 'Engine Tone',
-      rescue: 'Rescue Tone'
-    };
-    const mappedTones = updatedTones.map(t => toneNamesMapping[t] || t);
-    const tonesString = mappedTones.join(', ');
-    
-    const updatedTarget = {
-      ...(selectedCall.target || {}),
-      tone_name: tonesString || null
-    };
-    
-    try {
-      const { error } = await supabase
-        .from('live_calls')
-        .update({ target: updatedTarget })
-        .eq('id', selectedCall.id);
-        
-      if (error) throw error;
-      setCalls(prevCalls => prevCalls.map(c => c.id === selectedCall.id ? { ...c, target: updatedTarget } : c));
-      setSelectedCall(prevCall => prevCall && prevCall.id === selectedCall.id ? { ...prevCall, target: updatedTarget } : prevCall);
-    } catch (err) {
-      console.error('Error updating tone:', err);
-    }
+  const handleToneToggle = (tone) => {
+    setVerifiedTones(prev =>
+      prev.includes(tone)
+        ? prev.filter(t => t !== tone)
+        : [...prev, tone]
+    );
   };
 
   const handleSubmitReview = async (e) => {
@@ -414,13 +389,12 @@ export default function DispatchReview({ onClose }) {
       .filter((u) => u.length > 0);
 
     try {
-      const currentTones = getCallTonesForSidebar();
       const toneNamesMapping = {
         chief: 'Chief Tone',
         engine: 'Engine Tone',
         rescue: 'Rescue Tone'
       };
-      const mappedTones = currentTones.map(t => toneNamesMapping[t] || t);
+      const mappedTones = verifiedTones.map(t => toneNamesMapping[t] || t);
       const tonesString = mappedTones.join(', ');
 
       const updatedTarget = {
@@ -1214,7 +1188,7 @@ export default function DispatchReview({ onClose }) {
                   </div>
                   <textarea
                     rows={3}
-                    placeholder="Enter the confirmed dispatch transcript... (Ctrl+Space/Double-click to prefill)"
+                    placeholder={selectedCall.sanitized_transcript || selectedCall.raw_transcript || "Enter confirmed transcript... (Ctrl+Space to prefill)"}
                     value={verifiedTranscript}
                     onChange={(e) => setVerifiedTranscript(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, 'transcript')}
@@ -1244,7 +1218,7 @@ export default function DispatchReview({ onClose }) {
                     onKeyDown={(e) => handleInputKeyDown(e, 'units')}
                     onDoubleClick={() => prefillField('units')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                    placeholder="e.g. E1, L1"
+                    placeholder={(selectedCall.responding_units || []).join(', ') || "e.g. E1, L1"}
                   />
                 </div>
 
@@ -1258,7 +1232,7 @@ export default function DispatchReview({ onClose }) {
                       type="button"
                       onClick={() => handleToneToggle('chief')}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        getCallTonesForSidebar().includes('chief')
+                        verifiedTones.includes('chief')
                           ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1269,7 +1243,7 @@ export default function DispatchReview({ onClose }) {
                       type="button"
                       onClick={() => handleToneToggle('engine')}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        getCallTonesForSidebar().includes('engine')
+                        verifiedTones.includes('engine')
                           ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
@@ -1280,8 +1254,8 @@ export default function DispatchReview({ onClose }) {
                       type="button"
                       onClick={() => handleToneToggle('rescue')}
                       className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        getCallTonesForSidebar().includes('rescue')
-                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-455 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-black'
+                        verifiedTones.includes('rescue')
+                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-black'
                           : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                       }`}
                     >
@@ -1311,7 +1285,7 @@ export default function DispatchReview({ onClose }) {
                     onKeyDown={(e) => handleInputKeyDown(e, 'incident')}
                     onDoubleClick={() => prefillField('incident')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder="e.g. Structure Fire"
+                    placeholder={selectedCall.incident_type || "e.g. Structure Fire"}
                   />
                 </div>
 
@@ -1336,7 +1310,7 @@ export default function DispatchReview({ onClose }) {
                     onKeyDown={(e) => handleInputKeyDown(e, 'address')}
                     onDoubleClick={() => prefillField('address')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder="e.g. 2648 Sandstone Cres"
+                    placeholder={selectedCall.target?.address || selectedCall.address || "e.g. 2648 Sandstone Cres"}
                   />
                 </div>
 
@@ -1361,7 +1335,7 @@ export default function DispatchReview({ onClose }) {
                     onKeyDown={(e) => handleInputKeyDown(e, 'subaddress')}
                     onDoubleClick={() => prefillField('subaddress')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder="e.g. Apt 204, Suite 100, Save-on-Foods"
+                    placeholder={selectedCall.target?.subaddress || "None"}
                   />
                 </div>
 
@@ -1415,7 +1389,7 @@ export default function DispatchReview({ onClose }) {
                       onKeyDown={(e) => handleInputKeyDown(e, 'map_grid')}
                       onDoubleClick={() => prefillField('map_grid')}
                       className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                      placeholder="e.g. 92"
+                      placeholder={selectedCall.target?.map_grid || "e.g. 92"}
                     />
                   </div>
                 </div>

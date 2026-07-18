@@ -228,8 +228,8 @@ export default function DispatchReview({ onClose }) {
         setVerifiedTranscript(selectedCall.verified_transcript || '');
         setVerifiedAddress(selectedCall.verified_address || '');
         setVerifiedSubaddress(selectedCall.target?.subaddress || '');
-        setVerifiedMapGrid(selectedCall.target?.verified_map_grid || selectedCall.map_grid || '');
-        setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.radio_channel || '');
+        setVerifiedMapGrid(selectedCall.target?.verified_map_grid || selectedCall.target?.map_grid || '');
+        setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         setQualityRating(selectedCall.quality_rating || 'PENDING');
         
@@ -306,8 +306,8 @@ export default function DispatchReview({ onClose }) {
     setVerifiedTranscript(systemText);
     setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
     setVerifiedSubaddress(selectedCall.target?.subaddress || '');
-    setVerifiedMapGrid(selectedCall.map_grid || '');
-    setVerifiedTalkgroup(selectedCall.radio_channel || '');
+    setVerifiedMapGrid(selectedCall.target?.map_grid || '');
+    setVerifiedTalkgroup(selectedCall.target?.radio_channel || '');
     setVerifiedIncident(selectedCall.incident_type || '');
     const displayUnits = selectedCall.responding_units || [];
     setVerifiedUnits(displayUnits.join(', '));
@@ -391,9 +391,7 @@ export default function DispatchReview({ onClose }) {
           verify_location: false,
           quality_rating: qualityRating,
           model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
-          target: updatedTarget,
-          radio_channel: verifiedTalkgroup || null,
-          map_grid: verifiedMapGrid || null
+          target: updatedTarget
         })
         .eq('id', selectedCall.id);
 
@@ -410,9 +408,7 @@ export default function DispatchReview({ onClose }) {
         verify_location: false,
         quality_rating: qualityRating,
         model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
-        target: updatedTarget,
-        radio_channel: verifiedTalkgroup || null,
-        map_grid: verifiedMapGrid || null
+        target: updatedTarget
       };
       setCalls(prev => prev.map(c => c.id === selectedCall.id ? newCallData : c));
       setSelectedCall(newCallData);
@@ -1281,6 +1277,9 @@ export default function DispatchReview({ onClose }) {
                       <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Talk Group">
                         Verified Talk Group
                       </label>
+                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[70px]" title={selectedCall.target?.radio_channel}>
+                        Sys: {selectedCall.target?.radio_channel || 'None'}
+                      </span>
                     </div>
                     <select
                       value={verifiedTalkgroup}
@@ -1300,6 +1299,9 @@ export default function DispatchReview({ onClose }) {
                       <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Map Grid">
                         Verified Map Grid
                       </label>
+                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[70px]" title={selectedCall.target?.map_grid}>
+                        Sys: {selectedCall.target?.map_grid || 'Unknown'}
+                      </span>
                     </div>
                     <input
                       type="text"

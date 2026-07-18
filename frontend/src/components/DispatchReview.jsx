@@ -196,7 +196,13 @@ export default function DispatchReview({ onClose }) {
     if (!call) return [];
     const dbTones = (call.target?.tone_name || '')
       .split(',')
-      .map(t => t.trim().toLowerCase())
+      .map(t => {
+        const clean = t.trim().toLowerCase();
+        if (clean.includes('chief')) return 'chief';
+        if (clean.includes('engine')) return 'engine';
+        if (clean.includes('rescue')) return 'rescue';
+        return clean;
+      })
       .filter(Boolean);
     const units = (call.verified_units && call.verified_units.length > 0)
       ? call.verified_units
@@ -209,7 +215,13 @@ export default function DispatchReview({ onClose }) {
     if (!selectedCall) return [];
     const dbTones = (selectedCall.target?.tone_name || '')
       .split(',')
-      .map(t => t.trim().toLowerCase())
+      .map(t => {
+        const clean = t.trim().toLowerCase();
+        if (clean.includes('chief')) return 'chief';
+        if (clean.includes('engine')) return 'engine';
+        if (clean.includes('rescue')) return 'rescue';
+        return clean;
+      })
       .filter(Boolean);
     const units = verifiedUnits
       ? verifiedUnits.split(',').map(u => u.trim()).filter(Boolean)

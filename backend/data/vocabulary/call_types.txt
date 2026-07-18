@@ -60,6 +60,7 @@ Public Assist
 Lift Assist
 
 # --- Rescue ---
+Rescue
 Confined Space Rescue
 Rope Rescue
 Swift Water Rescue

@@ -161,6 +161,9 @@ def sanitize_transcript(text: str) -> str:
         r'\bquitlam\b': 'coquitlam',
         r'\bego\s+mountain\b': 'eagle mountain',
         r'\bcoquitlam\s+coquitlam\b': 'coquitlam',
+        
+        # Unit mishearings (e.g. water 1 -> ladder 1)
+        r'\bwater\s+(\d+)\b': r'ladder \1',
     }
     for pattern, replacement in phonetic_corrections.items():
         text = re.sub(pattern, replacement, text)

@@ -656,8 +656,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 address_str = f"{cleaned_number} {normalized_street}"
                 # Check for trailing subaddress right after the street type
                 post_address_text = text[match.end():].strip()
-                # Strip out any subsequent anchors (talk group, map grid) to isolate the subaddress
-                sub_clean = re.sub(r'\b(?:use talk group|talk group|map grid|math grade|math grid)\b.*', '', post_address_text, flags=re.IGNORECASE).strip()
+                # Strip out any subsequent anchors (cross roads, talk group, map grid) to isolate the subaddress
+                sub_clean = re.sub(r'\b(?:near|cross\s+roads|cross\s+street|cross\s+of|use\s+talk\s+group|talk\s+group|map\s+grid|math\s+grade|math\s+grid)\b.*', '', post_address_text, flags=re.IGNORECASE).strip()
                 sub_clean = sub_clean.rstrip(',- ').lstrip(',- ')
                 
                 extracted_subaddr = sub_clean if sub_clean else None

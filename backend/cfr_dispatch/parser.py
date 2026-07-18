@@ -449,7 +449,19 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
     if not address_text:
         return address_text, None
 
-    # Try explicit matches like "unit 204", "apartment 5", "suite 300", "ste 300", "room 101", "apt 10"
+    # 1. Detect leading business name preceding a house number (e.g. "Save-on-Foods 1205 Pinetree Way")
+    business_match = re.match(r'^([a-zA-Z\s\-\'\&]+?)\s+(\d+)\s+([a-zA-Z].*)$', address_text)
+    if business_match:
+        bus_name = business_match.group(1).strip()
+        house_num = business_match.group(2)
+        street_rest = business_match.group(3)
+        
+        ignore_words = {"east", "west", "north", "south", "n", "s", "e", "w", "new", "old", "block", "at", "near", "intersection", "on"}
+        if bus_name.lower() not in ignore_words and len(bus_name.split()) <= 4:
+            cleaned_addr = f"{house_num} {street_rest}"
+            return cleaned_addr, bus_name
+
+    # 2. Try explicit matches like "unit 204", "apartment 5", "suite 300", "ste 300", "room 101", "apt 10"
     sub_patterns = [
         r'\b(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\w+-\w+|\w+)',
         r'\b(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\d+\w*|\w+)'
@@ -465,7 +477,7 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
             cleaned_addr = cleaned_addr.rstrip(',- ').lstrip(',- ')
             return cleaned_addr, subaddress_val
 
-    # Also check for trailing numbers after common street suffix abbreviations (e.g. "1252 Town Centre Blvd 125")
+    # 3. Also check for trailing numbers after common street suffix abbreviations (e.g. "1252 Town Centre Blvd 125")
     suffixes = r"street|st|avenue|ave|drive|drv|way|road|rd|crescent|cres|boulevard|blvd|place|pl|court|ct|highway|hwy|lane|ln|close|cl|gate|gt"
     trailing_unit_pat = r'\b(' + suffixes + r')\b\s*#?\s*(\d+[a-zA-Z]?)\b\s*$'
     match = re.search(trailing_unit_pat, address_text, re.IGNORECASE)

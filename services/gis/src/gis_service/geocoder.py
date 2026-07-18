@@ -101,6 +101,19 @@ class CoquitlamDataValidator:
                 "rings": []
             }
             
+        # Manual Riverview Station overrides (e.g. "Station 15", "Station 37", etc.)
+        if "RIVERVIEW" in clean_address or "STATION" in clean_address:
+            station_match = re.search(r'\bSTATION\s*(\d+)\b', clean_address, re.IGNORECASE)
+            if station_match or clean_address in ["BROOKSIDE", "CENTRALE", "CREASE CLINIC"]:
+                station_num = station_match.group(1) if station_match else ""
+                label = f"Station {station_num}, Riverview Hospital (2601 Lougheed Hwy)" if station_num else f"{clean_address.title()}, Riverview Hospital (2601 Lougheed Hwy)"
+                return {
+                    "address": label,
+                    "lat": 49.245830,
+                    "lng": -122.805330,
+                    "rings": []
+                }
+            
         if " and " in parsed_address.lower() and not re.match(r'^\d+', parsed_address):
             return None
             

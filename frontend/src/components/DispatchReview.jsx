@@ -34,6 +34,17 @@ const formatTimestampPT = (ts) => {
   }
 };
 
+const TALK_GROUPS = [
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10 Combined Response",
+  "Combined Venue Port Mann",
+  "Combined Venue Transit System"
+];
+
 export default function DispatchReview({ onClose }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
@@ -58,6 +69,9 @@ export default function DispatchReview({ onClose }) {
   const [verifiedIncident, setVerifiedIncident] = useState('');
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
+  const [verifiedSubaddress, setVerifiedSubaddress] = useState('');
+  const [verifiedTalkgroup, setVerifiedTalkgroup] = useState('');
+  const [verifiedMapGrid, setVerifiedMapGrid] = useState('');
   const [includeInTraining, setIncludeInTraining] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -213,6 +227,9 @@ export default function DispatchReview({ onClose }) {
       if (isDifferentCall) {
         setVerifiedTranscript(selectedCall.verified_transcript || '');
         setVerifiedAddress(selectedCall.verified_address || '');
+        setVerifiedSubaddress(selectedCall.target?.subaddress || '');
+        setVerifiedMapGrid(selectedCall.target?.verified_map_grid || selectedCall.map_grid || '');
+        setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         setQualityRating(selectedCall.quality_rating || 'PENDING');
         
@@ -288,6 +305,9 @@ export default function DispatchReview({ onClose }) {
     const systemText = selectedCall.sanitized_transcript || selectedCall.raw_transcript || '';
     setVerifiedTranscript(systemText);
     setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
+    setVerifiedSubaddress(selectedCall.target?.subaddress || '');
+    setVerifiedMapGrid(selectedCall.map_grid || '');
+    setVerifiedTalkgroup(selectedCall.radio_channel || '');
     setVerifiedIncident(selectedCall.incident_type || '');
     const displayUnits = selectedCall.responding_units || [];
     setVerifiedUnits(displayUnits.join(', '));
@@ -354,7 +374,10 @@ export default function DispatchReview({ onClose }) {
       const updatedTarget = {
         ...(selectedCall.target || {}),
         tone_name: tonesString || null,
-        include_in_training: includeInTraining
+        include_in_training: includeInTraining,
+        subaddress: verifiedSubaddress || null,
+        verified_talkgroup: verifiedTalkgroup || null,
+        verified_map_grid: verifiedMapGrid || null
       };
 
       const { error } = await supabase
@@ -368,7 +391,9 @@ export default function DispatchReview({ onClose }) {
           verify_location: false,
           quality_rating: qualityRating,
           model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
-          target: updatedTarget
+          target: updatedTarget,
+          radio_channel: verifiedTalkgroup || null,
+          map_grid: verifiedMapGrid || null
         })
         .eq('id', selectedCall.id);
 
@@ -385,7 +410,9 @@ export default function DispatchReview({ onClose }) {
         verify_location: false,
         quality_rating: qualityRating,
         model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
-        target: updatedTarget
+        target: updatedTarget,
+        radio_channel: verifiedTalkgroup || null,
+        map_grid: verifiedMapGrid || null
       };
       setCalls(prev => prev.map(c => c.id === selectedCall.id ? newCallData : c));
       setSelectedCall(newCallData);
@@ -1146,6 +1173,44 @@ export default function DispatchReview({ onClose }) {
                     placeholder="e.g. 2648 Sandstone Cres"
                   />
                 </div>
+
+                {/* Subaddress Input */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                      Verified Subaddress / Unit / Business
+                    </label>
+                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.subaddress}>
+                      System: {selectedCall.target?.subaddress || 'None'}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={verifiedSubaddress}
+                    onChange={(e) => setVerifiedSubaddress(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
+                    placeholder="e.g. Apt 204, Suite 100, Save-on-Foods"
+                  />
+                </div>
+
+                {/* Map Grid Input */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                      Verified Map Grid
+                    </label>
+                    <span className="text-[8px] text-slate-500 font-bold">
+                      System: {selectedCall.map_grid || 'Unknown'}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={verifiedMapGrid}
+                    onChange={(e) => setVerifiedMapGrid(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
+                    placeholder="e.g. 92"
+                  />
+                </div>
                 
                 {/* Captured Dispatch Tone (HITL Verification & Backfill) */}
                 <div className="flex flex-col gap-1.5">
@@ -1225,6 +1290,28 @@ export default function DispatchReview({ onClose }) {
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
                     placeholder="e.g. E1, L1"
                   />
+                </div>
+
+                {/* Talk Group / Channel */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                      Verified Talk Group / Channel
+                    </label>
+                    <span className="text-[8px] text-slate-500 font-bold truncate max-w-[150px]" title={selectedCall.radio_channel}>
+                      System: {selectedCall.radio_channel || 'None'}
+                    </span>
+                  </div>
+                  <select
+                    value={verifiedTalkgroup}
+                    onChange={(e) => setVerifiedTalkgroup(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- No Channel Selected --</option>
+                    {TALK_GROUPS.map(tg => (
+                      <option key={tg} value={tg}>{tg}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Whisper Training Dataset Opt-In */}

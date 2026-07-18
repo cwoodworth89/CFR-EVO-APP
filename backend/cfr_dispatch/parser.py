@@ -443,51 +443,34 @@ def clean_channel_name_for_output(channel_name: str) -> str:
 
 def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
     """
-    Given an address string, extracts subaddress indicators (like unit, apartment, suite, room, or business)
-    and returns a tuple of: (cleaned_address_without_subaddress, extracted_subaddress_details).
+    Given an address string, extracts trailing subaddress indicators (like unit, apartment, 
+    suite, room, or business names) that always follow the main address.
     """
     if not address_text:
         return address_text, None
 
-    # 1. Detect leading business name preceding a house number (e.g. "Save-on-Foods 1205 Pinetree Way")
-    business_match = re.match(r'^([a-zA-Z\s\-\'\&]+?)\s+(\d+)\s+([a-zA-Z].*)$', address_text)
-    if business_match:
-        bus_name = business_match.group(1).strip()
-        house_num = business_match.group(2)
-        street_rest = business_match.group(3)
-        
-        ignore_words = {"east", "west", "north", "south", "n", "s", "e", "w", "new", "old", "block", "at", "near", "intersection", "on"}
-        if bus_name.lower() not in ignore_words and len(bus_name.split()) <= 4:
-            cleaned_addr = f"{house_num} {street_rest}"
-            return cleaned_addr, bus_name
-
-    # 2. Try explicit matches like "unit 204", "apartment 5", "suite 300", "ste 300", "room 101", "apt 10"
-    sub_patterns = [
-        r'\b(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\w+-\w+|\w+)',
-        r'\b(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\d+\w*|\w+)'
-    ]
+    suffixes = r"\b(?:street|st|avenue|ave|drive|drv|way|road|rd|crescent|cres|boulevard|blvd|place|pl|court|ct|highway|hwy|lane|ln|close|cl|gate|gt)\b"
     
-    for pat in sub_patterns:
-        match = re.search(pat, address_text, re.IGNORECASE)
-        if match:
-            full_indicator = match.group(0)
-            subaddress_val = match.group(0).strip()
-            cleaned_addr = address_text.replace(full_indicator, "").strip()
-            cleaned_addr = " ".join(cleaned_addr.split())
-            cleaned_addr = cleaned_addr.rstrip(',- ').lstrip(',- ')
-            return cleaned_addr, subaddress_val
-
-    # 3. Also check for trailing numbers after common street suffix abbreviations (e.g. "1252 Town Centre Blvd 125")
-    suffixes = r"street|st|avenue|ave|drive|drv|way|road|rd|crescent|cres|boulevard|blvd|place|pl|court|ct|highway|hwy|lane|ln|close|cl|gate|gt"
-    trailing_unit_pat = r'\b(' + suffixes + r')\b\s*#?\s*(\d+[a-zA-Z]?)\b\s*$'
-    match = re.search(trailing_unit_pat, address_text, re.IGNORECASE)
+    # Match suffix followed by any trailing words (business name, unit, station, etc.)
+    match = re.search(fr'({suffixes})\s+(.+)$', address_text, re.IGNORECASE)
     if match:
         suffix_word = match.group(1)
-        unit_val = match.group(2)
-        cleaned_addr = address_text[:match.start()] + suffix_word
-        cleaned_addr = " ".join(cleaned_addr.strip().split())
+        sub_val = match.group(2).strip()
+        
+        # Clean up any leftover punctuation or noise from subaddress
+        sub_val = sub_val.rstrip(',- ').lstrip(',- ')
+        
+        # Clean up main address (everything up to and including the suffix)
+        idx = match.start() + len(suffix_word)
+        cleaned_addr = address_text[:idx].strip()
+        cleaned_addr = " ".join(cleaned_addr.split())
         cleaned_addr = cleaned_addr.rstrip(',- ').lstrip(',- ')
-        return cleaned_addr, f"Unit {unit_val}"
+        
+        # If the extracted subaddress is just a number (e.g. "105"), format as "Unit 105"
+        if re.match(r'^#?\s*\d+$', sub_val):
+            sub_val = f"Unit {sub_val.replace('#', '').strip()}"
+            
+        return cleaned_addr, sub_val
 
     return address_text, None
 
@@ -673,19 +656,14 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 address_str = f"{cleaned_number} {normalized_street}"
                 # Check for trailing subaddress right after the street type
                 post_address_text = text[match.end():].strip()
-                extracted_subaddr = None
-                sub_patterns = [
-                    r'^(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\w+-\w+|\w+)',
-                    r'^(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\d+\w*|\w+)',
-                    r'^#?\s*(\d+[a-zA-Z]?)\b'
-                ]
-                for pat in sub_patterns:
-                    sub_match = re.match(pat, post_address_text, re.IGNORECASE)
-                    if sub_match:
-                        extracted_subaddr = sub_match.group(0).strip()
-                        if re.match(r'^#?\s*\d+$', extracted_subaddr):
-                            extracted_subaddr = f"Unit {extracted_subaddr.replace('#', '').strip()}"
-                        break
+                # Strip out any subsequent anchors (talk group, map grid) to isolate the subaddress
+                sub_clean = re.sub(r'\b(?:use talk group|talk group|map grid|math grade|math grid)\b.*', '', post_address_text, flags=re.IGNORECASE).strip()
+                sub_clean = sub_clean.rstrip(',- ').lstrip(',- ')
+                
+                extracted_subaddr = sub_clean if sub_clean else None
+                if extracted_subaddr and re.match(r'^#?\s*\d+$', extracted_subaddr):
+                    extracted_subaddr = f"Unit {extracted_subaddr.replace('#', '').strip()}"
+                
                 found_dispatches.append(DispatchData(raw_text=text, address=address_str, subaddress=extracted_subaddr))
                 
     if not found_dispatches and intersection_match:

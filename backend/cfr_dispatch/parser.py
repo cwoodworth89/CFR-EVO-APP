@@ -500,7 +500,55 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
             
         return cleaned_addr, sub_val
 
-    return address_text, None
+def split_street_base_suffix(street_text: str) -> Tuple[str, str]:
+    """Splits a street name (e.g. 'Austin Ave') into ('Austin', 'Ave')."""
+    words = street_text.strip().split()
+    if not words:
+        return "", ""
+    suffixes = {"street", "st", "avenue", "ave", "drive", "dr", "road", "rd", 
+                "crescent", "cres", "boulevard", "blvd", "place", "pl", 
+                "court", "ct", "highway", "hwy", "lane", "ln", "way", "wy", "close", "cl", "gate", "gt"}
+    if len(words) >= 2 and words[-1].lower() in suffixes:
+        return " ".join(words[:-1]), words[-1]
+    return street_text, ""
+
+def fuzzy_correct_street(street_name: str, known_streets: List[str]) -> str:
+    """Fuzzy corrects a single street name against a list of known Coquitlam base street names."""
+    if not street_name or not known_streets:
+        return street_name
+    base, suffix = split_street_base_suffix(street_name)
+    clean_base = base.strip().lower()
+    clean_base = re.sub(r'^(?:near|at)\s+', '', clean_base, flags=re.IGNORECASE).strip()
+    if not clean_base:
+        return street_name
+    
+    # If base name is 4 characters or less, require higher match threshold to prevent collision errors
+    threshold = 90 if len(clean_base) <= 4 else 75
+    
+    best_match = None
+    best_score = 0
+    for ks in known_streets:
+        ks_lower = ks.strip().lower()
+        score = fuzz.ratio(clean_base, ks_lower)
+        if score > best_score:
+            best_score = score
+            best_match = ks
+    if best_score >= threshold:
+        corrected_street = best_match.title()
+        if suffix:
+            corrected_street = f"{corrected_street} {suffix.title()}"
+        return corrected_street
+    return street_name
+
+def fuzzy_correct_cross_roads(cross_roads_text: str, known_streets: List[str]) -> str:
+    """Corrects misspelled street names inside cross road intersections."""
+    if not cross_roads_text or not known_streets:
+        return cross_roads_text
+    parts = re.split(r'\s+(?:and|at|&)\s+', cross_roads_text, flags=re.IGNORECASE)
+    corrected_parts = []
+    for part in parts:
+        corrected_parts.append(fuzzy_correct_street(part, known_streets))
+    return " and ".join(corrected_parts)
 
 def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) -> List[DispatchData]:
     """
@@ -595,6 +643,12 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 cross_roads_raw = remainder[cross_roads_start:cross_roads_end].strip()
                 cross_roads_clean = clean_location_text(cross_roads_raw, CALL_TYPES, units_vocab)
                 cross_roads_str = normalize_street_suffix(cross_roads_clean)
+                try:
+                    from cfr_dispatch.config.vocab import COQUITLAM_STREETS
+                    if COQUITLAM_STREETS:
+                        cross_roads_str = fuzzy_correct_cross_roads(cross_roads_str, COQUITLAM_STREETS)
+                except Exception as ex:
+                    logging.warning(f"Failed to fuzzy correct cross roads: {ex}")
                 
             # Extract Talk Group (Radio channel)
             talk_group_str = None

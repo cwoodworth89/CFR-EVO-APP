@@ -587,6 +587,7 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
         if verify_location_override is not None:
             verify_location = verify_location_override
             
+        subaddress = next((d.subaddress for d in all_candidates if d.subaddress), None)
         target_payload = {
             "address": best_address,
             "lat": lat,
@@ -595,6 +596,8 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
             "map_grid": map_grid,
             "radio_channel": radio_channel
         }
+        if subaddress:
+            target_payload["subaddress"] = subaddress
         if tone_name:
             target_payload["tone_name"] = tone_name
         
@@ -610,7 +613,8 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
                     address=best_address,
                     intersection=all_candidates[0].intersection,
                     radio_channel=radio_channel,
-                    map_grid=map_grid
+                    map_grid=map_grid,
+                    subaddress=subaddress
                 )
                 reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                 logging.info(f"Reconstructed template transcript: '{reconstructed_transcript}'")

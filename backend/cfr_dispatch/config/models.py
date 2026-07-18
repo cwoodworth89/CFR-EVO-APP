@@ -14,3 +14,4 @@ class DispatchData:
     intersection: Optional[str] = None
     radio_channel: Optional[str] = None
     map_grid: Optional[str] = None
+    subaddress: Optional[str] = None

@@ -5,7 +5,7 @@
 import os
 import regex as re
 import logging
-from typing import List
+from typing import List, Tuple, Optional
 from word2number import w2n
 from thefuzz import fuzz
 
@@ -441,6 +441,44 @@ def clean_channel_name_for_output(channel_name: str) -> str:
     cleaned = cleaned.strip()
     return cleaned if cleaned else channel_name
 
+def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
+    """
+    Given an address string, extracts subaddress indicators (like unit, apartment, suite, room, or business)
+    and returns a tuple of: (cleaned_address_without_subaddress, extracted_subaddress_details).
+    """
+    if not address_text:
+        return address_text, None
+
+    # Try explicit matches like "unit 204", "apartment 5", "suite 300", "ste 300", "room 101", "apt 10"
+    sub_patterns = [
+        r'\b(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\w+-\w+|\w+)',
+        r'\b(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\d+\w*|\w+)'
+    ]
+    
+    for pat in sub_patterns:
+        match = re.search(pat, address_text, re.IGNORECASE)
+        if match:
+            full_indicator = match.group(0)
+            subaddress_val = match.group(0).strip()
+            cleaned_addr = address_text.replace(full_indicator, "").strip()
+            cleaned_addr = " ".join(cleaned_addr.split())
+            cleaned_addr = cleaned_addr.rstrip(',- ').lstrip(',- ')
+            return cleaned_addr, subaddress_val
+
+    # Also check for trailing numbers after common street suffix abbreviations (e.g. "1252 Town Centre Blvd 125")
+    suffixes = r"street|st|avenue|ave|drive|drv|way|road|rd|crescent|cres|boulevard|blvd|place|pl|court|ct|highway|hwy|lane|ln|close|cl|gate|gt"
+    trailing_unit_pat = r'\b(' + suffixes + r')\b\s*#?\s*(\d+[a-zA-Z]?)\b\s*$'
+    match = re.search(trailing_unit_pat, address_text, re.IGNORECASE)
+    if match:
+        suffix_word = match.group(1)
+        unit_val = match.group(2)
+        cleaned_addr = address_text[:match.start()] + suffix_word
+        cleaned_addr = " ".join(cleaned_addr.strip().split())
+        cleaned_addr = cleaned_addr.rstrip(',- ').lstrip(',- ')
+        return cleaned_addr, f"Unit {unit_val}"
+
+    return address_text, None
+
 def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) -> List[DispatchData]:
     """
     Parses sanitized text for dispatch fields, including addresses, intersections, units,
@@ -519,6 +557,7 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             
             # Clean and normalize isolated address
             address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
+            address_part, extracted_subaddr = extract_subaddress_info(address_part)
             normalized_address = normalize_street_suffix(address_part)
             
             # Extract Cross Roads segment
@@ -567,7 +606,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 address=normalized_address if normalized_address and "and" not in normalized_address.lower() else None,
                 intersection=normalized_address if normalized_address and "and" in normalized_address.lower() else cross_roads_str,
                 map_grid=map_grid_str,
-                radio_channel=talk_group_str
+                radio_channel=talk_group_str,
+                subaddress=extracted_subaddr
             )
             
             if dispatch.address or dispatch.intersection:
@@ -619,7 +659,22 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             
             if normalized_street:
                 address_str = f"{cleaned_number} {normalized_street}"
-                found_dispatches.append(DispatchData(raw_text=text, address=address_str))
+                # Check for trailing subaddress right after the street type
+                post_address_text = text[match.end():].strip()
+                extracted_subaddr = None
+                sub_patterns = [
+                    r'^(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\w+-\w+|\w+)',
+                    r'^(?:unit|apartment|apt|suite|ste|room|rm|bay|building|bldg|box)\b\s*#?\s*(\d+\w*|\w+)',
+                    r'^#?\s*(\d+[a-zA-Z]?)\b'
+                ]
+                for pat in sub_patterns:
+                    sub_match = re.match(pat, post_address_text, re.IGNORECASE)
+                    if sub_match:
+                        extracted_subaddr = sub_match.group(0).strip()
+                        if re.match(r'^#?\s*\d+$', extracted_subaddr):
+                            extracted_subaddr = f"Unit {extracted_subaddr.replace('#', '').strip()}"
+                        break
+                found_dispatches.append(DispatchData(raw_text=text, address=address_str, subaddress=extracted_subaddr))
                 
     if not found_dispatches and intersection_match:
         leg1 = clean_location_text(intersection_match.group(1), CALL_TYPES, units_vocab)
@@ -752,9 +807,13 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
 
     if dispatch.address:
         address_part = expand_address_suffix(dispatch.address)
+        if dispatch.subaddress:
+            address_part = f"{address_part} {dispatch.subaddress.lower()}"
         intersection_part = f", near {expand_address_suffix(dispatch.intersection)}" if dispatch.intersection else ""
     elif dispatch.intersection:
         address_part = expand_address_suffix(dispatch.intersection)
+        if dispatch.subaddress:
+            address_part = f"{address_part} {dispatch.subaddress.lower()}"
         intersection_part = ""
     else:
         address_part = "address"

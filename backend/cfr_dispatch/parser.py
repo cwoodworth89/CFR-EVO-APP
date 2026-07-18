@@ -905,12 +905,12 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     if dispatch.address:
         address_part = expand_address_suffix(dispatch.address)
         if dispatch.subaddress:
-            address_part = f"{address_part} {dispatch.subaddress.lower()}"
+            address_part = f"{address_part} {dispatch.subaddress}"
         intersection_part = f", near {expand_address_suffix(dispatch.intersection)}" if dispatch.intersection else ""
     elif dispatch.intersection:
         address_part = expand_address_suffix(dispatch.intersection)
         if dispatch.subaddress:
-            address_part = f"{address_part} {dispatch.subaddress.lower()}"
+            address_part = f"{address_part} {dispatch.subaddress}"
         intersection_part = ""
     else:
         address_part = "address"

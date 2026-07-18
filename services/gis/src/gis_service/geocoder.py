@@ -226,8 +226,22 @@ class CoquitlamDataValidator:
                     return r
                     
                 rings = extract_rings(matched_geom)
+                
+                street_type_val = best_row[self.street_type_col]
+                if street_type_val:
+                    clean_addr_val = f"{best_row[self.house_num_col]} {best_row[self.street_name_col]} {street_type_val}"
+                else:
+                    clean_addr_val = f"{best_row[self.house_num_col]} {best_row[self.street_name_col]}"
+                
+                clean_addr_val = " ".join(clean_addr_val.strip().split()).title()
+                try:
+                    from cfr_dispatch.parser import normalize_street_suffix
+                    clean_addr_val = normalize_street_suffix(clean_addr_val)
+                except Exception:
+                    pass
+
                 return {
-                    "address": best_row[self.full_addr_col],
+                    "address": clean_addr_val,
                     "lat": centroid.y,
                     "lng": centroid.x,
                     "rings": rings,

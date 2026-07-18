@@ -221,8 +221,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       if (isDifferentCall) {
         setVerifiedTranscript(selectedCall.verified_transcript || '');
         setVerifiedAddress(selectedCall.verified_address || '');
-        setVerifiedSubaddress(selectedCall.target?.subaddress || '');
-        setVerifiedMapGrid(selectedCall.target?.verified_map_grid || selectedCall.target?.map_grid || '');
+        setVerifiedSubaddress(selectedCall.feedback_submitted ? (selectedCall.target?.subaddress || '') : '');
+        setVerifiedMapGrid(selectedCall.target?.verified_map_grid || '');
         setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         setQualityRating(selectedCall.quality_rating || 'PENDING');

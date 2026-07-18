@@ -71,3 +71,11 @@ Report of Smoke
 
 # --- Testing ---
 Testing Only
+
+# --- Dynamically Learned Call Types ---
+Burning Complaint
+Medical Aid - Breathing Problem
+Compressed Gas Smell - Inside
+Medical Aid - Headache
+Medical Aid - Breathing Problems
+Medical Aid - Cardiac Problem

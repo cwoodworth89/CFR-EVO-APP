@@ -33,6 +33,7 @@ NUM_PEAKS_TO_FIND = 20
 # === GOLDEN FINGERPRINTS (Paste your longer, source-generated fingerprints here)
 # ==============================================================================
 GOLDEN_FINGERPRINTS = {
+    "PA Tone":     [595.00, 647.00],
     "Chief Tone":  [437.50, 656.25],
     "Engine Tone": [601.56, 1351.56],
     "Rescue Tone": [726.56, 890.62, 2179.69]

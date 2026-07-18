@@ -437,26 +437,6 @@ def google_geocode_fallback(address: str, api_key: str) -> tuple[dict | None, st
 def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, all_candidates, validator, units_vocabulary, verify_location_override=None, audio_url=None, audio_duration=None, verified_transcript=None, tone_name=None):
     """Common logic for geocoding, preparing DB payload, and posting to Supabase/NTFY."""
     try:
-        # Check if this transcript corresponds to a PA page, radio test, or station noise
-        if sanitized_transcript:
-            lower_t = sanitized_transcript.lower()
-            pa_patterns = [
-                r"\bto\s+the\s+kitchen\b",
-                r"\bpa\s+test\b",
-                r"\bpa\s+testing\b",
-                r"\btesting\s+the\s+pa\b",
-                r"\bradio\s+test\b",
-                r"\btesting\s+(?:the\s+)?radio\b",
-                r"\bmic\s+check\b",
-                r"\bmicrophone\s+check\b",
-                r"\btesting\s+1\s+2\s+3\b",
-                r"\bstation\s+page\b"
-            ]
-            for pattern in pa_patterns:
-                if re.search(pattern, lower_t):
-                    logging.warning(f"Bypassing/Ignoring dispatch {dispatch_id} as PA page or station noise: '{sanitized_transcript}'")
-                    return None, None
-
         unique_addresses = []
         for d in all_candidates:
             if d.address and d.address not in unique_addresses:
@@ -1638,6 +1618,12 @@ def run_dispatch_system():
                             live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD)
                             matched_tone, score = get_best_match(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
                             if matched_tone:
+                                if matched_tone == "PA Tone":
+                                    logging.info("TONE DETECTED: 'PA Tone' (station paging page). Disregarding and resetting listener.")
+                                    is_capturing_tone = False
+                                    baseline_rms_history.clear()
+                                    baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
+                                    continue
                                 logging.info(f"TONE CONFIRMED: '{matched_tone}' (Match: {score*100:.0f}%)")
                                 break
                             else:

@@ -45,7 +45,7 @@ const TALK_GROUPS = [
   "Combined Venue Transit System"
 ];
 
-export default function DispatchReview({ onClose }) {
+export default function DispatchReview({ onClose, onLocateAddress }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -308,7 +308,9 @@ export default function DispatchReview({ onClose }) {
 
   const handleViewOnMap = () => {
     if (!selectedCall) return;
-    onLocateAddress(selectedCall);
+    if (typeof onLocateAddress === 'function') {
+      onLocateAddress(selectedCall);
+    }
   };
 
   const handleQuickRate = (rating) => {
@@ -908,7 +910,9 @@ export default function DispatchReview({ onClose }) {
                               {call.target?.lat && call.target?.lng && (
                                 <button
                                   onClick={() => {
-                                    onLocateAddress(call);
+                                    if (typeof onLocateAddress === 'function') {
+                                      onLocateAddress(call);
+                                    }
                                   }}
                                   className="bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-600/30 transition-all flex items-center gap-0.5 cursor-pointer shadow"
                                   title="Display Route & Hydrants on Map"

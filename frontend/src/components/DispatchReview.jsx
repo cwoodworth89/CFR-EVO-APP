@@ -1155,64 +1155,26 @@ export default function DispatchReview({ onClose }) {
                   />
                 </div>
 
-                {/* Location Input (Prefilled side-by-side visual reminder) */}
+                {/* 1. Responding Units */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Address / Location
+                      Verified Units
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.address || selectedCall.address}>
-                      System: {selectedCall.target?.address || selectedCall.address || 'Unknown'}
+                    <span className="text-[8px] text-slate-500 font-bold truncate max-w-[150px]" title={selectedCall.responding_units?.join(', ')}>
+                      Sys: {selectedCall.responding_units?.join(', ') || 'None'}
                     </span>
                   </div>
                   <input
                     type="text"
-                    value={verifiedAddress}
-                    onChange={(e) => setVerifiedAddress(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder="e.g. 2648 Sandstone Cres"
+                    value={verifiedUnits}
+                    onChange={(e) => setVerifiedUnits(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
+                    placeholder="e.g. E1, L1"
                   />
                 </div>
 
-                {/* Subaddress Input */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Subaddress / Unit / Business
-                    </label>
-                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.subaddress}>
-                      System: {selectedCall.target?.subaddress || 'None'}
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={verifiedSubaddress}
-                    onChange={(e) => setVerifiedSubaddress(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder="e.g. Apt 204, Suite 100, Save-on-Foods"
-                  />
-                </div>
-
-                {/* Map Grid Input */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Map Grid
-                    </label>
-                    <span className="text-[8px] text-slate-500 font-bold">
-                      System: {selectedCall.map_grid || 'Unknown'}
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={verifiedMapGrid}
-                    onChange={(e) => setVerifiedMapGrid(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder="e.g. 92"
-                  />
-                </div>
-                
-                {/* Captured Dispatch Tone (HITL Verification & Backfill) */}
+                {/* 2. Captured Dispatch Tone (HITL Verification & Backfill) */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
                     Captured Dispatch Tone
@@ -1254,7 +1216,7 @@ export default function DispatchReview({ onClose }) {
                   </div>
                 </div>
 
-                {/* Incident Type (Prefilled visual helper) */}
+                {/* 3. Incident Type (Prefilled visual helper) */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
@@ -1273,45 +1235,80 @@ export default function DispatchReview({ onClose }) {
                   />
                 </div>
 
-                {/* Responding Units */}
+                {/* 4. Location Input (Prefilled side-by-side visual reminder) */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Units
+                      Verified Address / Location
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold truncate max-w-[150px]" title={selectedCall.responding_units?.join(', ')}>
-                      Sys: {selectedCall.responding_units?.join(', ') || 'None'}
+                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.address || selectedCall.address}>
+                      System: {selectedCall.target?.address || selectedCall.address || 'Unknown'}
                     </span>
                   </div>
                   <input
                     type="text"
-                    value={verifiedUnits}
-                    onChange={(e) => setVerifiedUnits(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                    placeholder="e.g. E1, L1"
+                    value={verifiedAddress}
+                    onChange={(e) => setVerifiedAddress(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
+                    placeholder="e.g. 2648 Sandstone Cres"
                   />
                 </div>
 
-                {/* Talk Group / Channel */}
+                {/* 5. Subaddress Input */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Talk Group / Channel
+                      Verified Subaddress / Unit / Business
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold truncate max-w-[150px]" title={selectedCall.radio_channel}>
-                      System: {selectedCall.radio_channel || 'None'}
+                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.subaddress}>
+                      System: {selectedCall.target?.subaddress || 'None'}
                     </span>
                   </div>
-                  <select
-                    value={verifiedTalkgroup}
-                    onChange={(e) => setVerifiedTalkgroup(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- No Channel Selected --</option>
-                    {TALK_GROUPS.map(tg => (
-                      <option key={tg} value={tg}>{tg}</option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={verifiedSubaddress}
+                    onChange={(e) => setVerifiedSubaddress(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
+                    placeholder="e.g. Apt 204, Suite 100, Save-on-Foods"
+                  />
+                </div>
+
+                {/* 6. Talk Group and Map Grid (Side-by-Side) */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Talk Group / Channel */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Talk Group">
+                        Verified Talk Group
+                      </label>
+                    </div>
+                    <select
+                      value={verifiedTalkgroup}
+                      onChange={(e) => setVerifiedTalkgroup(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+                    >
+                      <option value="">-- No Channel --</option>
+                      {TALK_GROUPS.map(tg => (
+                        <option key={tg} value={tg}>{tg}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Map Grid */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Map Grid">
+                        Verified Map Grid
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      value={verifiedMapGrid}
+                      onChange={(e) => setVerifiedMapGrid(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
+                      placeholder="e.g. 92"
+                    />
+                  </div>
                 </div>
 
                 {/* Whisper Training Dataset Opt-In */}

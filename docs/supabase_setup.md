@@ -124,6 +124,17 @@ USING (true)
 WITH CHECK (true);
 ```
 
+### 5. Delete Policy: Admin Interface
+To allow authenticated users to permanently delete dispatches from the React Dashboard UX:
+
+```sql
+CREATE POLICY "Allow authenticated users to delete dispatches" 
+ON public.live_calls
+FOR DELETE 
+TO authenticated 
+USING (true);
+```
+
 ---
 
 ## 📡 CFR EVO Real-Time Subscription (React Frontend)

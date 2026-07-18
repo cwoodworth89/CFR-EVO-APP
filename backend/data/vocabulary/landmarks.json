@@ -1,0 +1,47 @@
+{
+  "eagle mountain park": {
+    "address": "Eagle Mountain Park (Eagle Mountain Dr)",
+    "lat": 49.301258,
+    "lng": -122.783611
+  },
+  "town centre park": {
+    "address": "Town Centre Park (1299 Pinetree Way)",
+    "lat": 49.289125,
+    "lng": -122.786542
+  },
+  "mundy park": {
+    "address": "Mundy Park (641 Hillcrest St)",
+    "lat": 49.262521,
+    "lng": -122.825638
+  },
+  "lafarge lake": {
+    "address": "Lafarge Lake (1240 Pinetree Way)",
+    "lat": 49.287212,
+    "lng": -122.782845
+  },
+  "city hall": {
+    "address": "Coquitlam City Hall (3000 Guildford Way)",
+    "lat": 49.286241,
+    "lng": -122.793215
+  },
+  "pinetree secondary": {
+    "address": "Pinetree Secondary School (3000 Pinewood Ave)",
+    "lat": 49.287812,
+    "lng": -122.788541
+  },
+  "gleneagle secondary": {
+    "address": "Gleneagle Secondary School (1195 Lansdowne Dr)",
+    "lat": 49.283120,
+    "lng": -122.799512
+  },
+  "centennial secondary": {
+    "address": "Centennial Secondary School (570 Poirier St)",
+    "lat": 49.264210,
+    "lng": -122.831510
+  },
+  "eagle ridge hospital": {
+    "address": "Eagle Ridge Hospital (475 Guildford Way)",
+    "lat": 49.279812,
+    "lng": -122.835512
+  }
+}

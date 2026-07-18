@@ -156,9 +156,17 @@ def sanitize_transcript(text: str) -> str:
         r'\bdo\s+we\s+need\s+from\s+growing\b': 'dewdney trunk road',
         r'\bdo\s+we\s+need\s+from\s+bro\b': 'dewdney trunk road',
         r'\bdo\s+we\s+need\s+from\b': 'dewdney trunk road',
+        
+        # Coquitlam / Quitlam mishearings and collapses
+        r'\bquitlam\b': 'coquitlam',
+        r'\bego\s+mountain\b': 'eagle mountain',
+        r'\bcoquitlam\s+coquitlam\b': 'coquitlam',
     }
     for pattern, replacement in phonetic_corrections.items():
         text = re.sub(pattern, replacement, text)
+
+    # Secondary sweep to collapse any remaining double occurrences of coquitlam
+    text = re.sub(r'\b(coquitlam)\s+\1\b', r'\1', text, flags=re.IGNORECASE)
 
     number_words = {
         'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
@@ -472,6 +480,10 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
         
         # Clean up any leftover punctuation or noise from subaddress
         sub_val = sub_val.rstrip(',- ').lstrip(',- ')
+        
+        # If the extracted subaddress contains "and" (indicating an intersection), bypass extraction
+        if re.search(r'\band\b', sub_val, re.IGNORECASE):
+            return address_text, None
         
         # Clean up main address (everything up to and including the suffix)
         idx = match.start() + len(suffix_word)
@@ -829,10 +841,14 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     if chan.strip() == "10" or "combined" in chan.lower():
         channel_part = "use talk group combined response coquitlam"
     else:
-        if "talk group" in chan.lower():
-            channel_part = chan.lower()
+        chan_lower = chan.lower()
+        if "talk group" in chan_lower:
+            channel_part = chan_lower
         else:
-            channel_part = f"use talk group {chan.lower()}"
+            channel_part = f"use talk group {chan_lower}"
+            
+        if not channel_part.endswith("coquitlam"):
+            channel_part = f"{channel_part} coquitlam"
             
     # 7. Map Grid
     grid_part = f"map grid {dispatch.map_grid}" if dispatch.map_grid else "map grid"

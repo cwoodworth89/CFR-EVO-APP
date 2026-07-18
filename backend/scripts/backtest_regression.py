@@ -70,6 +70,12 @@ def get_quality_rating(wer: float) -> str:
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     
+    # Silence verbose HTTP/huggingface API requests logs
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("transformers").setLevel(logging.WARNING)
+    logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+    
     # 1. Paths setup
     training_dir = os.path.join(backend_dir, "data", "training")
     audio_dir = os.path.join(training_dir, "audio")

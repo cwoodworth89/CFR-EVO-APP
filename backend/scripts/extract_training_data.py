@@ -5,6 +5,14 @@ import sys
 import logging
 import requests
 
+# Set up paths so we can import cfr_dispatch package
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
+from cfr_dispatch.parser import split_rounds
+from cfr_dispatch.config import UNITS_VOCABULARY
+
 def load_env():
     # Simple parser for .env
     env = {}
@@ -187,10 +195,12 @@ def main():
         # Clean and normalize transcript to raw format (lowercase, no punctuation)
         normalized_text = normalize_transcript_raw(verified_text)
         
-        # If call is a double-round dispatch (duration > 25s), duplicate the text label
+        # If call is a double-round dispatch (duration > 25s), duplicate the text label ONLY if it doesn't already contain multiple rounds
         duration = r.get("audio_duration") or 0.0
         if duration > 25.0 and normalized_text:
-            normalized_text = f"{normalized_text} {normalized_text}"
+            rounds = split_rounds(normalized_text, UNITS_VOCABULARY)
+            if len(rounds) < 2:
+                normalized_text = f"{normalized_text} {normalized_text}"
             
         csv_rows.append({
             "file_name": file_name,

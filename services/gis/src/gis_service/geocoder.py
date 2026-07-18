@@ -31,10 +31,39 @@ class CoquitlamDataValidator:
         )
         self.zones_gdf, self.zones_crs, self.zones_sindex = load_zones(zones_shp_path)
 
+        # Load landmarks configuration if it exists
+        self.landmarks = {}
+        try:
+            import json
+            import os
+            landmarks_path = os.path.join(os.path.dirname(os.path.dirname(address_shp_path)), "vocabulary", "landmarks.json")
+            if os.path.exists(landmarks_path):
+                with open(landmarks_path, 'r', encoding='utf-8') as f:
+                    self.landmarks = json.load(f)
+                logging.info(f"Loaded {len(self.landmarks)} landmarks from landmarks.json")
+        except Exception as e:
+            logging.error(f"Failed to load landmarks.json: {e}")
+
     def validate_address_exists(self, parsed_address: str) -> Tuple[int, str | None]:
         """Surgically checks if a parsed address exists in our local GIS database."""
-        if self.addresses_gdf is None or not parsed_address:
+        if not parsed_address:
             return 0, None
+        if self.addresses_gdf is None and not self.landmarks:
+            return 0, None
+
+        # Check landmarks first (parks, schools, facilities)
+        if self.landmarks:
+            clean_addr_lower = parsed_address.strip().lower()
+            best_l_match = None
+            best_l_score = 0
+            for name, details in self.landmarks.items():
+                score = fuzz.token_set_ratio(clean_addr_lower, name)
+                if score > best_l_score:
+                    best_l_score = score
+                    best_l_match = details
+            
+            if best_l_score >= 85:
+                return best_l_score, best_l_match["address"]
 
         # Manual geocoding override for 3080 Gordon Ave
         clean_address = parsed_address.split(',')[0].strip().upper()
@@ -76,8 +105,29 @@ class CoquitlamDataValidator:
         Geocodes address string locally, converting parcel shape to WGS84 coordinates
         and extracting boundary rings. Returns None if unresolvable.
         """
-        if self.addresses_gdf is None or not parsed_address:
+        if not parsed_address:
             return None
+        if self.addresses_gdf is None and not self.landmarks:
+            return None
+
+        # Check landmarks first (parks, schools, facilities)
+        if self.landmarks:
+            clean_addr_lower = parsed_address.strip().lower()
+            best_l_match = None
+            best_l_score = 0
+            for name, details in self.landmarks.items():
+                score = fuzz.token_set_ratio(clean_addr_lower, name)
+                if score > best_l_score:
+                    best_l_score = score
+                    best_l_match = details
+            
+            if best_l_score >= 85:
+                return {
+                    "address": best_l_match["address"],
+                    "lat": best_l_match["lat"],
+                    "lng": best_l_match["lng"],
+                    "rings": []
+                }
 
         # Manual geocoding override for 3080 Gordon Ave
         clean_address = parsed_address.split(',')[0].strip().upper()

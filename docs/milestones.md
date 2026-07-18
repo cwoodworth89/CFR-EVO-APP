@@ -48,6 +48,8 @@ This document outlines the key milestones achieved during the development of CFR
 *   **DSP PA System Page Interception**: Configured `PA Tone` (`595 Hz` / `647 Hz`) in `GOLDEN_FINGERPRINTS` to intercept station PA pages at the hardware DSP stage, immediately resetting the audio listener without saving or recording non-call pages.
 *   **Rapid Review & Keyboard Shortcuts**: Enhanced the dispatch verification panel with `Ctrl` + `Space` and `Alt` + `Enter` hotkeys, double-click input prefilling, and clickable `Sys: [val] 📥` badges to import system-parsed metadata instantly.
 *   **Sequential Dispatch Alignment**: Reordered input fields to match verbal dispatch announcements (Units $\rightarrow$ Tone $\rightarrow$ Incident $\rightarrow$ Address $\rightarrow$ Subaddress $\rightarrow$ Talk Group & Map Grid).
+*   **Whisper LoRA Fine-Tuning & Local Quantization**: Trained `openai/whisper-base` on local CPUs using the 51-sample station dataset, reducing Word Error Rate (WER) from **22.6% to 3.5%** with **93.3% SMMR overall accuracy**. Merged LoRA adapters and quantized to `int8` (CTranslate2) for high-performance offline CPU execution on the kiosk.
+*   **Phonetic Homophone Sanitizer**: Configured fallback corrections mapping `won`, `Juan`, `run`, `Agent 1` to `Engine 1` to prevent apparatus drops.
 
 ---
 

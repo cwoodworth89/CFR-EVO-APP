@@ -313,6 +313,43 @@ export default function DispatchReview({ onClose }) {
     setVerifiedUnits(displayUnits.join(', '));
   };
 
+  const prefillField = (fieldType) => {
+    if (!selectedCall) return;
+    switch (fieldType) {
+      case 'transcript':
+        setVerifiedTranscript(selectedCall.sanitized_transcript || selectedCall.raw_transcript || '');
+        break;
+      case 'units':
+        const displayUnits = selectedCall.responding_units || [];
+        setVerifiedUnits(displayUnits.join(', '));
+        break;
+      case 'incident':
+        setVerifiedIncident(selectedCall.incident_type || '');
+        break;
+      case 'address':
+        setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
+        break;
+      case 'subaddress':
+        setVerifiedSubaddress(selectedCall.target?.subaddress || '');
+        break;
+      case 'talkgroup':
+        setVerifiedTalkgroup(selectedCall.target?.radio_channel || '');
+        break;
+      case 'map_grid':
+        setVerifiedMapGrid(selectedCall.target?.map_grid || '');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleInputKeyDown = (e, fieldType) => {
+    if ((e.ctrlKey && e.code === 'Space') || (e.altKey && e.key === 'Enter')) {
+      e.preventDefault();
+      prefillField(fieldType);
+    }
+  };
+
   const handleToneToggle = async (tone) => {
     if (!selectedCall) return;
     
@@ -1144,9 +1181,11 @@ export default function DispatchReview({ onClose }) {
                   </div>
                   <textarea
                     rows={3}
-                    placeholder="Enter the confirmed dispatch transcript..."
+                    placeholder="Enter the confirmed dispatch transcript... (Ctrl+Space/Double-click to prefill)"
                     value={verifiedTranscript}
                     onChange={(e) => setVerifiedTranscript(e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, 'transcript')}
+                    onDoubleClick={() => prefillField('transcript')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono resize-none leading-relaxed"
                   />
                 </div>
@@ -1157,14 +1196,20 @@ export default function DispatchReview({ onClose }) {
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
                       Verified Units
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold truncate max-w-[150px]" title={selectedCall.responding_units?.join(', ')}>
-                      Sys: {selectedCall.responding_units?.join(', ') || 'None'}
+                    <span 
+                      onClick={() => prefillField('units')}
+                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[150px] cursor-pointer transition-colors" 
+                      title="Click, double-click input, or press Ctrl+Space to import"
+                    >
+                      Sys: {selectedCall.responding_units?.join(', ') || 'None'} 📥
                     </span>
                   </div>
                   <input
                     type="text"
                     value={verifiedUnits}
                     onChange={(e) => setVerifiedUnits(e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, 'units')}
+                    onDoubleClick={() => prefillField('units')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
                     placeholder="e.g. E1, L1"
                   />
@@ -1218,14 +1263,20 @@ export default function DispatchReview({ onClose }) {
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
                       Verified Incident Type
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold">
-                      System: {selectedCall.incident_type || 'Unknown'}
+                    <span 
+                      onClick={() => prefillField('incident')}
+                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold cursor-pointer transition-colors" 
+                      title="Click, double-click input, or press Ctrl+Space to import"
+                    >
+                      System: {selectedCall.incident_type || 'Unknown'} 📥
                     </span>
                   </div>
                   <input
                     type="text"
                     value={verifiedIncident}
                     onChange={(e) => setVerifiedIncident(e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, 'incident')}
+                    onDoubleClick={() => prefillField('incident')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
                     placeholder="e.g. Structure Fire"
                   />
@@ -1237,14 +1288,20 @@ export default function DispatchReview({ onClose }) {
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
                       Verified Address / Location
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.address || selectedCall.address}>
-                      System: {selectedCall.target?.address || selectedCall.address || 'Unknown'}
+                    <span 
+                      onClick={() => prefillField('address')}
+                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
+                      title="Click, double-click input, or press Ctrl+Space to import"
+                    >
+                      System: {selectedCall.target?.address || selectedCall.address || 'Unknown'} 📥
                     </span>
                   </div>
                   <input
                     type="text"
                     value={verifiedAddress}
                     onChange={(e) => setVerifiedAddress(e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, 'address')}
+                    onDoubleClick={() => prefillField('address')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
                     placeholder="e.g. 2648 Sandstone Cres"
                   />
@@ -1256,14 +1313,20 @@ export default function DispatchReview({ onClose }) {
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
                       Verified Subaddress / Unit / Business
                     </label>
-                    <span className="text-[8px] text-slate-500 font-bold max-w-[180px] truncate" title={selectedCall.target?.subaddress}>
-                      System: {selectedCall.target?.subaddress || 'None'}
+                    <span 
+                      onClick={() => prefillField('subaddress')}
+                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
+                      title="Click, double-click input, or press Ctrl+Space to import"
+                    >
+                      System: {selectedCall.target?.subaddress || 'None'} 📥
                     </span>
                   </div>
                   <input
                     type="text"
                     value={verifiedSubaddress}
                     onChange={(e) => setVerifiedSubaddress(e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, 'subaddress')}
+                    onDoubleClick={() => prefillField('subaddress')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
                     placeholder="e.g. Apt 204, Suite 100, Save-on-Foods"
                   />
@@ -1277,13 +1340,18 @@ export default function DispatchReview({ onClose }) {
                       <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Talk Group">
                         Verified Talk Group
                       </label>
-                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[70px]" title={selectedCall.target?.radio_channel}>
-                        Sys: {selectedCall.target?.radio_channel || 'None'}
+                      <span 
+                        onClick={() => prefillField('talkgroup')}
+                        className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[70px] cursor-pointer transition-colors" 
+                        title="Click or press Ctrl+Space to import"
+                      >
+                        Sys: {selectedCall.target?.radio_channel || 'None'} 📥
                       </span>
                     </div>
                     <select
                       value={verifiedTalkgroup}
                       onChange={(e) => setVerifiedTalkgroup(e.target.value)}
+                      onKeyDown={(e) => handleInputKeyDown(e, 'talkgroup')}
                       className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
                     >
                       <option value="">-- No Channel --</option>
@@ -1299,14 +1367,20 @@ export default function DispatchReview({ onClose }) {
                       <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Map Grid">
                         Verified Map Grid
                       </label>
-                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[70px]" title={selectedCall.target?.map_grid}>
-                        Sys: {selectedCall.target?.map_grid || 'Unknown'}
+                      <span 
+                        onClick={() => prefillField('map_grid')}
+                        className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[70px] cursor-pointer transition-colors" 
+                        title="Click, double-click input, or press Ctrl+Space to import"
+                      >
+                        Sys: {selectedCall.target?.map_grid || 'Unknown'} 📥
                       </span>
                     </div>
                     <input
                       type="text"
                       value={verifiedMapGrid}
                       onChange={(e) => setVerifiedMapGrid(e.target.value)}
+                      onKeyDown={(e) => handleInputKeyDown(e, 'map_grid')}
+                      onDoubleClick={() => prefillField('map_grid')}
                       className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
                       placeholder="e.g. 92"
                     />

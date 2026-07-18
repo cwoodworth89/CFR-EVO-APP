@@ -27,9 +27,16 @@ CREATE TABLE IF NOT EXISTS public.live_calls (
     -- Geocoding & Target Info (Option 2 Format)
     target JSONB NOT NULL DEFAULT '{
         "address": "Unknown Location",
+        "subaddress": null,
         "lat": null,
         "lng": null,
-        "rings": []
+        "rings": [],
+        "radio_channel": null,
+        "map_grid": null,
+        "verified_talkgroup": null,
+        "verified_map_grid": null,
+        "tone_name": null,
+        "include_in_training": false
     }'::jsonb,
     
     -- Ground Truth, Performance & Quality Logging
@@ -58,6 +65,23 @@ ALTER publication supabase_realtime ADD TABLE public.live_calls;
 CREATE INDEX IF NOT EXISTS idx_live_calls_timestamp ON public.live_calls (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_live_calls_feedback ON public.live_calls (feedback_submitted, verify_location);
 ```
+
+### 📦 `target` JSONB Attributes
+
+All location, subaddress, talk group, map grid, and admin verification attributes are stored cleanly inside the `target` JSONB dictionary:
+
+| Key | Type | Description |
+| :--- | :--- | :--- |
+| `address` | String | Primary street address (e.g. `2648 Sandstone Cres`). |
+| `subaddress` | String | Secondary location info, unit number, or business name (e.g. `Unit 105`, `Save-on-Foods`). |
+| `lat` / `lng` | Float | Geocoded WGS84 coordinates. |
+| `rings` | Array | Spatial parcel polygon rings. |
+| `radio_channel` | String | System-parsed talk group (e.g. `10 Combined Response`). |
+| `map_grid` | String | System-parsed map grid number (e.g. `92`). |
+| `verified_talkgroup` | String | Ground-truth channel verified via admin review form. |
+| `verified_map_grid` | String | Ground-truth grid number verified via admin review form. |
+| `tone_name` | String | Captured tone classification (`Engine Tone`, `Chief Tone`, `Rescue Tone`). |
+| `include_in_training` | Boolean | Whisper training dataset opt-in flag. |
 
 ---
 
@@ -131,14 +155,3 @@ const dispatchSubscription = supabase
   )
   .subscribe()
 ```
-
----
-
-## 📱 Tasker Auto-Navigation integration (Ntfy alternative)
-The Python agent publishes updates to `ntfy.sh` which triggers Android Tasker navigation. If you want to use the database directly, Tasker can query Supabase:
-1.  Use Tasker's HTTP Request action.
-2.  Set URL to: `https://your-project-ref.supabase.co/rest/v1/live_calls?select=target&order=timestamp.desc&limit=1`
-3.  Add Headers:
-    *   `apikey: <your-anon-key>`
-    *   `Authorization: Bearer <your-anon-key>`
-4.  Parse the returned JSON payload and trigger the Google Maps Intent.

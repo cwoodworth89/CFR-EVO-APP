@@ -42,14 +42,21 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Objective**: Minimize time-to-alert down to <15 seconds.
 *   **Implementation**: Refactored the listening loop to process incoming dispatch announcements in two stages: Phase 1 sends a rapid preliminary geocoded location to the UI/Map within 15 seconds, and Phase 2 uploads the finalized call recording, full transcript, and executes correction verifications after the broadcast finishes.
 
+### 🏢 Milestone 7: Subaddress, Business Name, DSP PA Tone & HITL Corrections Optimization
+*   **Subaddress & Business Extractor**: Automatically parses unit numbers (`Unit 105`, `Apt 204`) and business names (`Save-on-Foods`), isolating them under `target.subaddress` while stripping them from geocoding queries for clean shapefile matching.
+*   **Riverview Hospital Station Overrides**: Added geocoding overrides for historic Riverview Hospital cottages (`Station 15`, `Station 37`, `Brookside`, `Centrale`) pointing to Riverview grounds (`49.245830, -122.805330`).
+*   **DSP PA System Page Interception**: Configured `PA Tone` (`595 Hz` / `647 Hz`) in `GOLDEN_FINGERPRINTS` to intercept station PA pages at the hardware DSP stage, immediately resetting the audio listener without saving or recording non-call pages.
+*   **Rapid Review & Keyboard Shortcuts**: Enhanced the dispatch verification panel with `Ctrl` + `Space` and `Alt` + `Enter` hotkeys, double-click input prefilling, and clickable `Sys: [val] 📥` badges to import system-parsed metadata instantly.
+*   **Sequential Dispatch Alignment**: Reordered input fields to match verbal dispatch announcements (Units $\rightarrow$ Tone $\rightarrow$ Incident $\rightarrow$ Address $\rightarrow$ Subaddress $\rightarrow$ Talk Group & Map Grid).
+
 ---
 
 ## 🗓️ Future Milestones
 
-### 📺 Milestone 7: Hall Kiosk Touchscreen Mounts
+### 📺 Milestone 8: Hall Kiosk Touchscreen Mounts
 *   **Objective**: Deploy permanent station monitors.
 *   **Implementation**: Package the React client into a localized Electron kiosk container running on wall-mounted touchscreen displays inside hall bays, powered by dedicated Raspberry Pi 5 boards.
 
-### 📲 Milestone 8: Shift-Based Apparatus Subscriptions
+### 📲 Milestone 9: Shift-Based Apparatus Subscriptions
 *   **Objective**: Filter push notifications dynamically.
 *   **Implementation**: Build a mobile-friendly onboarding interface where firefighters can subscribe their devices to a specific apparatus (e.g., E1, L1, or R1) on shift startup, receiving alerts only when their assigned vehicle is dispatched.

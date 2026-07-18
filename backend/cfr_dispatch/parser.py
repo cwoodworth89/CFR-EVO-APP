@@ -498,7 +498,7 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
         if re.match(r'^#?\s*\d+$', sub_val):
             sub_val = f"Unit {sub_val.replace('#', '').strip()}"
             
-        return cleaned_addr, sub_val
+        return cleaned_addr, sub_val.title()
     else:
         # Fallback: check for explicit subaddress prefixes like "number", "unit", "apt", "suite", "basement", "room" without suffix
         sub_pattern = r'\b(number|unit|apt|suite|basement|rm|room|#)\s*(\d+|\w+)?'
@@ -518,7 +518,7 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
             if re.match(r'^#?\s*\d+$', sub_val):
                 sub_val = f"Unit {sub_val.replace('#', '').strip()}"
                 
-            return cleaned_addr, sub_val
+            return cleaned_addr, sub_val.title()
 
     return address_text, None
 

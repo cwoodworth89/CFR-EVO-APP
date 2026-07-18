@@ -50,9 +50,22 @@ def sanitize_transcript(text: str) -> str:
 
     # Apply phonetic corrections for common mishearings in dispatch templates and names
     phonetic_corrections = {
-        # Unit number homophones
+        # Unit number homophones & Engine 1 mishearings
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+won\b': r'\1 1',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+juan\b': r'\1 1',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+run\b': r'\1 1',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+on\b': r'\1 1',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+when\b': r'\1 1',
         r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+to\b': r'\1 2',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+too\b': r'\1 2',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+two\b': r'\1 2',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+free\b': r'\1 3',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+three\b': r'\1 3',
         r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+for\b': r'\1 4',
+        r'\b(engine|ladder|rescue|car|squad|medic|quint|tender|hazmat)\s+four\b': r'\1 4',
+
+        # Unit type STT mishearings
+        r'\b(agent|ancient|angel|asian)\s+(\d+|1|2|3|4|5|one|two|three|four|five)\b': r'engine \2',
 
         # Responding units & Coquitlam mishearings
         r'\bcolquitt\s+loom\b': 'coquitlam',
@@ -763,6 +776,8 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     if dispatch.units:
         unit_list = dispatch.units if isinstance(dispatch.units, list) else [dispatch.units]
         units_part = ", ".join(expand_unit(u) for u in unit_list)
+        # Strip any leading 'coquitlam' from units_part to avoid doubled-up "Coquitlam Coquitlam"
+        units_part = re.sub(r'^(?:coquitlam\s+)+', '', units_part, flags=re.IGNORECASE).strip()
     else:
         units_part = "units"
         
@@ -812,7 +827,7 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
     # 6. Radio Channel (Map digital channels back to the full verbal name)
     chan = dispatch.radio_channel or "combined response coquitlam"
     if chan.strip() == "10" or "combined" in chan.lower():
-        channel_part = "us talk group combined response coquitlam"
+        channel_part = "use talk group combined response coquitlam"
     else:
         if "talk group" in chan.lower():
             channel_part = chan.lower()

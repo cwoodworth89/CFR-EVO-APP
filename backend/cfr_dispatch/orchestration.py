@@ -1017,7 +1017,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             address=p1_candidate.address if p1_candidate else best_p2_candidate.address,
                             intersection=best_p2_candidate.intersection,
                             radio_channel=p2_channel,
-                            map_grid=p2_grid
+                            map_grid=p2_grid,
+                            subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")
                         )
                         reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                         logging.info(f"Phase 2 reconstructed template transcript (match): '{reconstructed_transcript}'")
@@ -1101,7 +1102,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                     address=res["address"],
                                     intersection=best_p2_candidate.intersection,
                                     radio_channel=p2_channel,
-                                    map_grid=p2_grid
+                                    map_grid=p2_grid,
+                                    subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")
                                 )
                                 reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                                 logging.info(f"Phase 2 reconstructed template transcript (corrected): '{reconstructed_transcript}'")
@@ -1203,7 +1205,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                     address=p1_candidate.address if p1_candidate else best_p2_candidate.address,
                                     intersection=best_p2_candidate.intersection,
                                     radio_channel=p2_channel,
-                                    map_grid=p2_grid
+                                    map_grid=p2_grid,
+                                    subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")
                                 )
                                 reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                                 logging.info(f"Phase 2 reconstructed template transcript (failed geocode): '{reconstructed_transcript}'")
@@ -1244,7 +1247,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                 address=p1_candidate.address,
                                 intersection=p1_candidate.intersection,
                                 radio_channel=p2_channel,
-                                map_grid=p2_grid
+                                map_grid=p2_grid,
+                                subaddress=p1_candidate.subaddress or p1_target.get("subaddress")
                             )
                             reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                             logging.info(f"Phase 2 reconstructed template transcript (no candidate): '{reconstructed_transcript}'")

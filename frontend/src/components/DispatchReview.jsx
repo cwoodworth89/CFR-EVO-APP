@@ -1099,6 +1099,52 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                                   : 'Null'}
                               </span>
                             </div>
+
+                            {/* Subaddress Badge */}
+                            {selectedCall.target?.subaddress && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Subaddress</span>
+                                <span className="text-[10px] font-bold text-sky-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                                  🏢 {selectedCall.target.subaddress}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Cross Roads Badge */}
+                            {selectedCall.target?.intersection && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Cross Roads</span>
+                                <span className="text-[10px] font-bold text-amber-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                                  🔀 {selectedCall.target.intersection}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Talk Group Badge */}
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Talk Group</span>
+                              <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                                📻 {selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || 'None'}
+                              </span>
+                            </div>
+
+                            {/* Map Grid Badge */}
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Map Grid</span>
+                              <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                                🗺️ {selectedCall.target?.verified_map_grid || selectedCall.target?.map_grid || 'None'}
+                              </span>
+                            </div>
+
+                            {/* Tones Badge */}
+                            {selectedCall.target?.tone_name && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Tones</span>
+                                <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
+                                  🔔 {selectedCall.target.tone_name}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

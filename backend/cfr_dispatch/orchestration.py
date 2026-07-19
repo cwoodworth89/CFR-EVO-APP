@@ -600,6 +600,8 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
             target_payload["subaddress"] = subaddress
         if tone_name:
             target_payload["tone_name"] = tone_name
+        if all_candidates and all_candidates[0].intersection:
+            target_payload["intersection"] = all_candidates[0].intersection
         
         # Post-Transcription Template Reconstruction
         reconstructed_transcript = sanitized_transcript
@@ -1031,6 +1033,14 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                     "map_grid": p2_grid,
                     "radio_channel": p2_channel
                 }
+                if p1_target.get("subaddress"):
+                    target_payload["subaddress"] = p1_target.get("subaddress")
+                if p1_target.get("tone_name"):
+                    target_payload["tone_name"] = p1_target.get("tone_name")
+                if p1_target.get("intersection"):
+                    target_payload["intersection"] = p1_target.get("intersection")
+                elif best_p2_candidate.intersection:
+                    target_payload["intersection"] = best_p2_candidate.intersection
                 
                 # Update Supabase record status to verified (verify_location=False)
                 if supabase_url and supabase_key:
@@ -1105,6 +1115,18 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             "map_grid": p2_grid,
                             "radio_channel": p2_channel
                         }
+                        if p1_target.get("subaddress"):
+                            target_payload["subaddress"] = p1_target.get("subaddress")
+                        elif best_p2_candidate and best_p2_candidate.subaddress:
+                            target_payload["subaddress"] = best_p2_candidate.subaddress
+                            
+                        if p1_target.get("tone_name"):
+                            target_payload["tone_name"] = p1_target.get("tone_name")
+                            
+                        if best_p2_candidate and best_p2_candidate.intersection:
+                            target_payload["intersection"] = best_p2_candidate.intersection
+                        elif p1_target.get("intersection"):
+                            target_payload["intersection"] = p1_target.get("intersection")
                         
                         # Prepare update payload
                         update_payload = {

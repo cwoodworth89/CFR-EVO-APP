@@ -175,6 +175,10 @@ class CoquitlamDataValidator:
         # Clean unit/suite numbers (e.g. "number 105", "unit B") to ensure parcel match
         parsed_street_raw = re.sub(r'\b(number|num|unit|suite|apt|apartment|#)\s+\w+\b.*', '', parsed_street_raw, flags=re.IGNORECASE).strip()
         
+        # Clean block designations (e.g. "1080 block ponderosa street" or "1000 blk of ponderosa")
+        parsed_street_raw = re.sub(r'\b(block|blk|of)\b', '', parsed_street_raw, flags=re.IGNORECASE).strip()
+        parsed_street_raw = " ".join(parsed_street_raw.split())
+        
         # Normalize suffix to map indices
         words = parsed_street_raw.split()
         if len(words) >= 1:
@@ -192,17 +196,16 @@ class CoquitlamDataValidator:
             
         # O(1) Dictionary Lookup
         possible_matches = self.house_number_index.get(parsed_num, [])
-        if not possible_matches:
-            return None
-            
         best_score = 0
         best_row = None
-        for row in possible_matches:
-            db_full_street = f"{row[self.street_name_col]} {row[self.street_type_col]}".upper().strip()
-            score = fuzz.token_set_ratio(parsed_street, db_full_street)
-            if score > best_score:
-                best_score = score
-                best_row = row
+        
+        if possible_matches:
+            for row in possible_matches:
+                db_full_street = f"{row[self.street_name_col]} {row[self.street_type_col]}".upper().strip()
+                score = fuzz.token_set_ratio(parsed_street, db_full_street)
+                if score > best_score:
+                    best_score = score
+                    best_row = row
                 
         if best_score >= self.street_confidence_threshold and best_row is not None:
             try:

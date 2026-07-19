@@ -45,6 +45,11 @@ const TALK_GROUPS = [
   "Combined Venue Transit System"
 ];
 
+const toTitleCase = (str) => {
+  if (!str) return '';
+  return str.replace(/\b\w/g, c => c.toUpperCase());
+};
+
 export default function DispatchReview({ onClose, onLocateAddress }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
@@ -221,7 +226,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
       if (isDifferentCall) {
         setVerifiedTranscript(selectedCall.verified_transcript || '');
         setVerifiedAddress(selectedCall.verified_address || '');
-        setVerifiedSubaddress(selectedCall.feedback_submitted ? (selectedCall.target?.subaddress || '') : '');
+        setVerifiedSubaddress(selectedCall.feedback_submitted ? toTitleCase(selectedCall.target?.subaddress || '') : '');
         setVerifiedMapGrid(selectedCall.target?.verified_map_grid || '');
         setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
@@ -322,7 +327,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
     const systemText = selectedCall.sanitized_transcript || selectedCall.raw_transcript || '';
     setVerifiedTranscript(systemText);
     setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
-    setVerifiedSubaddress(selectedCall.target?.subaddress || '');
+    setVerifiedSubaddress(toTitleCase(selectedCall.target?.subaddress || ''));
     setVerifiedMapGrid(selectedCall.target?.map_grid || '');
     setVerifiedTalkgroup(selectedCall.target?.radio_channel || '');
     setVerifiedIncident(selectedCall.incident_type || '');
@@ -347,7 +352,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
         setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
         break;
       case 'subaddress':
-        setVerifiedSubaddress(selectedCall.target?.subaddress || '');
+        setVerifiedSubaddress(toTitleCase(selectedCall.target?.subaddress || ''));
         break;
       case 'talkgroup':
         setVerifiedTalkgroup(selectedCall.target?.radio_channel || '');
@@ -1105,7 +1110,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               <div className="flex flex-col gap-0.5">
                                 <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Subaddress</span>
                                 <span className="text-[10px] font-bold text-sky-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                  🏢 {selectedCall.target.subaddress}
+                                  🏢 {toTitleCase(selectedCall.target.subaddress)}
                                 </span>
                               </div>
                             )}
@@ -1364,7 +1369,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                       className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
                       title="Click, double-click input, or press Ctrl+Space to import"
                     >
-                      System: {selectedCall.target?.subaddress || 'None'} 📥
+                      System: {toTitleCase(selectedCall.target?.subaddress) || 'None'} 📥
                     </span>
                   </div>
                   <input
@@ -1374,7 +1379,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                     onKeyDown={(e) => handleInputKeyDown(e, 'subaddress')}
                     onDoubleClick={() => prefillField('subaddress')}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder={selectedCall.target?.subaddress || "None"}
+                    placeholder={toTitleCase(selectedCall.target?.subaddress) || "None"}
                   />
                 </div>
 

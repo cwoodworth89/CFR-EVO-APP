@@ -316,6 +316,41 @@ def abbreviate_units(units_str: str) -> List[str]:
             
     return found_units
 
+def merge_units(p1_str: str, p2_str: str) -> str:
+    """
+    Merges units lists from Phase 1 and Phase 2.
+    Parses them, takes the union, and formats back into a verbal list.
+    """
+    if not p1_str:
+        return p2_str or ""
+    if not p2_str:
+        return p1_str or ""
+        
+    sorted_vocab = sorted(UNITS_VOCABULARY, key=len, reverse=True)
+    vocab_pattern = '|'.join(re.escape(ut.lower()) for ut in sorted_vocab)
+    pattern = r'\b(' + vocab_pattern + r')\s+([\w\d-]+)\b'
+    
+    def extract_units(s):
+        matches = re.findall(pattern, s.lower())
+        units_list = []
+        seen = set()
+        for ut, num in matches:
+            u_name = f"{ut.strip().title()} {num.strip().upper()}"
+            if u_name.lower() not in seen:
+                seen.add(u_name.lower())
+                units_list.append(u_name)
+        return units_list
+
+    u1 = extract_units(p1_str)
+    u2 = extract_units(p2_str)
+    
+    merged = list(u1)
+    for u in u2:
+        if u.lower() not in [m.lower() for m in merged]:
+            merged.append(u)
+            
+    return ", ".join(merged)
+
 def normalize_street_suffix(text: str) -> str:
     """Normalizes and capitalizes street type suffixes to standardized casings (e.g., Crescent -> Cres)."""
     type_mapping = {
@@ -918,25 +953,36 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
         intersection_part = ""
         
     # 6. Radio Channel (Map digital channels back to the full verbal name)
-    chan = dispatch.radio_channel or "10 combined response coquitlam"
-    if chan.strip() == "10" or "combined" in chan.lower():
-        channel_part = "use talk group 10 combined response coquitlam"
-    else:
-        chan_lower = chan.lower()
-        if "talk group" in chan_lower:
-            channel_part = chan_lower
+    channel_part = None
+    if dispatch.radio_channel:
+        chan = dispatch.radio_channel.strip()
+        if chan == "10" or "combined" in chan.lower():
+            channel_part = "use talk group 10 combined response coquitlam"
         else:
-            channel_part = f"use talk group {chan_lower}"
-            
-        if not channel_part.endswith("coquitlam"):
-            channel_part = f"{channel_part} coquitlam"
+            chan_lower = chan.lower()
+            if "talk group" in chan_lower:
+                channel_part = chan_lower
+            else:
+                channel_part = f"use talk group {chan_lower}"
+            if not channel_part.endswith("coquitlam"):
+                channel_part = f"{channel_part} coquitlam"
             
     # 7. Map Grid
-    grid_part = f"map grid {dispatch.map_grid}" if dispatch.map_grid else "map grid"
+    grid_part = f"map grid {dispatch.map_grid}" if dispatch.map_grid else None
         
     # Reconstruct transcript matching template punctuation/commas
     # Format: "Coquitlam [Units], respond [Priority], [Incident], [Address], [near Intersection], [Talk Group], [Map Grid]"
-    reconstructed = f"Coquitlam {units_part}, {priority_part}, {call_type_part}, {address_part}{intersection_part}, {channel_part}, {grid_part}"
-    
+    parts = [
+        f"Coquitlam {units_part}",
+        priority_part,
+        call_type_part,
+        f"{address_part}{intersection_part}"
+    ]
+    if channel_part:
+        parts.append(channel_part)
+    if grid_part:
+        parts.append(grid_part)
+        
+    reconstructed = ", ".join(parts)
     return reconstructed
 

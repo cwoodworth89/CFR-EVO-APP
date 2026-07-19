@@ -70,6 +70,7 @@ from cfr_dispatch.parser import (
     parse_dispatch_announcement,
     split_rounds,
     reconstruct_template_transcript,
+    merge_units,
     CALL_TYPES
 )
 from cfr_dispatch.offline_sync import start_offline_sync_poller, queue_offline_dispatch
@@ -997,8 +998,10 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             if addresses_match:
                 logging.info(f"Phase 2 verification: Address matches Phase 1 ('{p1_candidate.address or p1_candidate.intersection}'). Updating database record to verified.")
                 
-                # Parse units, grid, channel, incident type from Phase 2
-                p2_units_str = p2_candidate.units if p2_candidate and p2_candidate.units else (p1_candidate.units if p1_candidate else None)
+                # Parse units, grid, channel, incident type from Phase 2 (merge with Phase 1 units to prevent dropping units)
+                p1_units = p1_candidate.units if p1_candidate else None
+                p2_units = p2_candidate.units if p2_candidate else None
+                p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                 p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                 p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
                 p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
@@ -1083,7 +1086,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                     if res:
                         logging.info(f"Phase 2 geocoding corrected match SUCCEEDED: '{res['address']}' (Score: {res['confidence']}%)")
                         
-                        p2_units_str = p2_candidate.units if p2_candidate and p2_candidate.units else (p1_candidate.units if p1_candidate else None)
+                        p1_units = p1_candidate.units if p1_candidate else None
+                        p2_units = p2_candidate.units if p2_candidate else None
+                        p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                         p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                         p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
                         p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
@@ -1186,7 +1191,9 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         # Geocoding failed for Phase 2 as well, keep Phase 1 but mark as verify_location=True
                         logging.warning("Phase 2 geocoding failed. Keeping Phase 1 data but flagging verify_location=True.")
                         
-                        p2_units_str = p2_candidate.units if p2_candidate and p2_candidate.units else (p1_candidate.units if p1_candidate else None)
+                        p1_units = p1_candidate.units if p1_candidate else None
+                        p2_units = p2_candidate.units if p2_candidate else None
+                        p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                         p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                         p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
                         p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))

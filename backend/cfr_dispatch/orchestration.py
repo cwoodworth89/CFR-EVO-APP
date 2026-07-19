@@ -1716,16 +1716,9 @@ def run_dispatch_system():
                         "units_vocab": UNITS_VOCABULARY
                     })
 
-                logging.info(f"Waiting for {POST_EVENT_RESET_SILENCE_S}s of silence before resetting...")
-                silence_chunks_needed = int((AUDIO_SAMPLE_RATE / blocksize) * POST_EVENT_RESET_SILENCE_S)
-                consecutive_silent_chunks = 0
-                while consecutive_silent_chunks < silence_chunks_needed:
-                    pcm, _ = stream.read(blocksize)
-                    if get_rms(pcm) < NOISE_AMPLITUDE_THRESHOLD:
-                        consecutive_silent_chunks += 1
-                    else:
-                        consecutive_silent_chunks = 0
-                logging.info("Silence detected. Resetting system.")
+                # Reset immediately to ensure back-to-back dispatches are not missed.
+                # (The end of the current dispatch was already determined by silence in capture_full_dispatch).
+                logging.info("Resetting listener to LISTENING_FOR_TONE.")
 
     except KeyboardInterrupt:
         logging.info("Listener stopped by user.")

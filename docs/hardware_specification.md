@@ -268,6 +268,18 @@ sudo systemctl enable cfr-agent.service
 sudo systemctl start cfr-agent.service
 ```
 
+### 2.5 Passwordless Service Restarts (For Remote/CI/CD Deployment)
+To allow remote developers or agentic coding assistants to deploy code updates and restart the dispatch listener non-interactively via SSH/Tailscale without being blocked by interactive password prompts:
+1. Open the sudoers configuration on the kiosk:
+   ```bash
+   sudo visudo
+   ```
+2. Append the following rule to the bottom of the file (replace `pi`/`tcfire` with your actual username):
+   ```text
+   tcfire ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart cfr-agent
+   ```
+This allows the deployment pipeline to execute `sudo systemctl restart cfr-agent` non-interactively.
+
 ### 3. Chromium Kiosk Mode (Wayland / Wayfire)
 Raspberry Pi OS Bookworm uses the **Wayland** display server with **Wayfire** as the window manager by default. 
 

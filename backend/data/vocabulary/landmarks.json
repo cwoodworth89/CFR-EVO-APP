@@ -31,17 +31,392 @@
   },
   "gleneagle secondary": {
     "address": "Gleneagle Secondary School (1195 Lansdowne Dr)",
-    "lat": 49.283120,
+    "lat": 49.28312,
     "lng": -122.799512
   },
   "centennial secondary": {
     "address": "Centennial Secondary School (570 Poirier St)",
-    "lat": 49.264210,
-    "lng": -122.831510
+    "lat": 49.26421,
+    "lng": -122.83151
   },
   "eagle ridge hospital": {
     "address": "Eagle Ridge Hospital (475 Guildford Way)",
     "lat": 49.279812,
     "lng": -122.835512
+  },
+  "cottonwood park": {
+    "address": "Cottonwood Park (672 Aspen Street)",
+    "lat": 49.25810431275782,
+    "lng": -122.88739138417432
+  },
+  "alouette park": {
+    "address": "Alouette Park (485 Alouette Drive)",
+    "lat": 49.24983667223709,
+    "lng": -122.80969304277548
+  },
+  "blue jay tot lot": {
+    "address": "Blue Jay Tot Lot (1625 Blue Jay Place)",
+    "lat": 49.30584003157775,
+    "lng": -122.78222609266452
+  },
+  "blue mountain park": {
+    "address": "Blue Mountain Park (975 King Albert Avenue)",
+    "lat": 49.25268926272803,
+    "lng": -122.86616221142874
+  },
+  "bramble park": {
+    "address": "Bramble Park (2775 Panorama Drive)",
+    "lat": 49.29761623193843,
+    "lng": -122.81526427828494
+  },
+  "brookmere park": {
+    "address": "Brookmere Park (565 Austin Avenue)",
+    "lat": 49.25006941532945,
+    "lng": -122.88819925078744
+  },
+  "burke mountain pioneer park": {
+    "address": "Burke Mountain Pioneer Park (3000 Highland Drive)",
+    "lat": 49.29911502760464,
+    "lng": -122.76239371394747
+  },
+  "burns park": {
+    "address": "Burns Park (802 Edgar Avenue)",
+    "lat": 49.24225968115211,
+    "lng": -122.87630813369225
+  },
+  "burquitlam community garden park": {
+    "address": "Burquitlam Community Garden Park (515 Ebert Avenue)",
+    "lat": 49.25586894903619,
+    "lng": -122.89162621759516
+  },
+  "cape horn tot lot": {
+    "address": "Cape Horn Tot Lot (186 San Juan Place)",
+    "lat": 49.23546772771645,
+    "lng": -122.8264085019169
+  },
+  "como lake park": {
+    "address": "Como Lake Park (700 Gatensbury Street)",
+    "lat": 49.26004815681395,
+    "lng": -122.85859612669374
+  },
+  "coquitlam river park": {
+    "address": "Coquitlam River Park (1190 Shaughnessy Street)",
+    "lat": 49.28527859316177,
+    "lng": -122.7728718547626
+  },
+  "crane park": {
+    "address": "Crane Park (2060 Crane Avenue)",
+    "lat": 49.25753835476261,
+    "lng": -122.83792424449594
+  },
+  "crestwood park": {
+    "address": "Crestwood Park (907 Crestwood Drive)",
+    "lat": 49.26592078324186,
+    "lng": -122.8519206955118
+  },
+  "dacre park": {
+    "address": "Dacre Park (2884 Dacre Avenue)",
+    "lat": 49.27216952922923,
+    "lng": -122.80050466980764
+  },
+  "dawes hill park": {
+    "address": "Dawes Hill Park (2215 Dawes Hill Road)",
+    "lat": 49.236754958198325,
+    "lng": -122.83152748149489
+  },
+  "coquitlam crunch trail": {
+    "address": "Coquitlam Crunch Trail (Eagle Ridge Park to Eagle Mountain Drive)",
+    "lat": 49.28916578986121,
+    "lng": -122.8150699394513
+  },
+  "eagle ridge park": {
+    "address": "Eagle Ridge Park (2635 Runnel Drive)",
+    "lat": 49.2811995612572,
+    "lng": -122.81507856776962
+  },
+  "upper coquitlam river park": {
+    "address": "Upper Coquitlam River Park (1791 Pipeline Road)",
+    "lat": 49.32527373688761,
+    "lng": -122.77212190882405
+  },
+  "victoria park": {
+    "address": "Victoria Park (3435 Victoria Drive)",
+    "lat": 49.2861932454621,
+    "lng": -122.74894003760265
+  },
+  "walton park": {
+    "address": "Walton Park (1255 Durant Drive)",
+    "lat": 49.28881148177263,
+    "lng": -122.80704689879924
+  },
+  "deboville slough trail management area": {
+    "address": "Deboville Slough Trail Management Area (4100 Cedar Drive)",
+    "lat": 49.28270951594285,
+    "lng": -122.72726852363142
+  },
+  "eagle ridge pool grounds and park": {
+    "address": "Eagle Ridge Pool Grounds and Park (1200 Lansdowne Drive)",
+    "lat": 49.2846983344609,
+    "lng": -122.81102380254582
+  },
+  "galette park": {
+    "address": "Galette Park (3252 Galette Avenue)",
+    "lat": 49.30348315289135,
+    "lng": -122.77008394405811
+  },
+  "galloway park": {
+    "address": "Galloway Park (3404 Galloway Avenue)",
+    "lat": 49.294622414441164,
+    "lng": -122.75338773401658
+  },
+  "glen park": {
+    "address": "Glen Park (1149 Westwood Street)",
+    "lat": 49.2804957951608,
+    "lng": -122.78893584128693
+  },
+  "good neighbour park": {
+    "address": "Good Neighbour Park (1415 Foster Avenue)",
+    "lat": 49.25671601239027,
+    "lng": -122.8536371667123
+  },
+  "guilby park": {
+    "address": "Guilby Park (345 Guilby Street)",
+    "lat": 49.24332805994901,
+    "lng": -122.88426346382975
+  },
+  "hampton park": {
+    "address": "Hampton Park (1760 Paddock Drive)",
+    "lat": 49.310136021874,
+    "lng": -122.78852337982424
+  },
+  "harrier tot lot": {
+    "address": "Harrier Tot Lot (2573 Harrier Drive)",
+    "lat": 49.280782732850916,
+    "lng": -122.81632946551454
+  },
+  "hickey street reservoir park": {
+    "address": "Hickey Street Reservoir Park (320 Hickey Drive)",
+    "lat": 49.24494987471257,
+    "lng": -122.8191020635367
+  },
+  "hockaday park": {
+    "address": "Hockaday Park (3318 McTavish Court)",
+    "lat": 49.29869190268591,
+    "lng": -122.7698197881606
+  },
+  "hoy creek linear park": {
+    "address": "Hoy Creek Linear Park (2777 Lougheed Hwy)",
+    "lat": 49.287410558782156,
+    "lng": -122.79694654268023
+  },
+  "inspiration garden": {
+    "address": "Inspiration Garden (Corner of Guildford Way & Pipeline Road)",
+    "lat": 49.28615200189649,
+    "lng": -122.785475190351
+  },
+  "leigh park": {
+    "address": "Leigh Park (1254 Soball Street)",
+    "lat": 49.287859890956554,
+    "lng": -122.75175991755148
+  },
+  "lower lougheed park": {
+    "address": "Lower Lougheed Park (576 Alderson Avenue)",
+    "lat": 49.23935957660663,
+    "lng": -122.8870578540824
+  },
+  "mariner park": {
+    "address": "Mariner Park (2985 Mariner Way)",
+    "lat": 49.2666595662286,
+    "lng": -122.8126604880777
+  },
+  "mackin park": {
+    "address": "Mackin Park (1046 Brunette Avenue)",
+    "lat": 49.23671364279384,
+    "lng": -122.86311875338214
+  },
+  "maquabeak park": {
+    "address": "Maquabeak Park (5 Burbridge Street)",
+    "lat": 49.22406112890834,
+    "lng": -122.81704343212932
+  },
+  "marguerite park": {
+    "address": "Marguerite Park (1480 Marguerite Street)",
+    "lat": 49.303049710523254,
+    "lng": -122.75992449945464
+  },
+  "meadowbrook park": {
+    "address": "Meadowbrook Park (3000 Maplebrook Place)",
+    "lat": 49.265661611709426,
+    "lng": -122.79291682607985
+  },
+  "millard orchard park": {
+    "address": "Millard Orchard Park (3360 Millard Avenue)",
+    "lat": 49.29629880505571,
+    "lng": -122.75776153681186
+  },
+  "miller park": {
+    "address": "Miller Park (900 Oakview Street)",
+    "lat": 49.26703949194858,
+    "lng": -122.8731950032105
+  },
+  "mountain view park": {
+    "address": "Mountain View Park (751 Smith Avenue)",
+    "lat": 49.260916413654954,
+    "lng": -122.87777347277023
+  },
+  "nestor park": {
+    "address": "Nestor Park (1270 Nestor Street)",
+    "lat": 49.291032415436256,
+    "lng": -122.77977900637208
+  },
+  "noons creek park": {
+    "address": "Noons Creek Park (2500 Panorama Drive)",
+    "lat": 49.30013756864337,
+    "lng": -122.82200926601932
+  },
+  "norm staff park": {
+    "address": "Norm Staff Park (3320 David Avenue)",
+    "lat": 49.292488349788826,
+    "lng": -122.76220306359639
+  },
+  "north hoy creek park": {
+    "address": "North Hoy Creek Park (2231 Parkway Boulevard)",
+    "lat": 49.31792336251265,
+    "lng": -122.79377182729588
+  },
+  "oakdale park": {
+    "address": "Oakdale Park (835 North Road)",
+    "lat": 49.26520661795017,
+    "lng": -122.89256218037451
+  },
+  "ozada tot lot": {
+    "address": "Ozada Tot Lot (3201 Ozada Avenue)",
+    "lat": 49.284357684423696,
+    "lng": -122.77794921180016
+  },
+  "pacific reach linear park / don roberts park": {
+    "address": "Pacific Reach Linear Park / Don Roberts Park (1780 United Boulevard)",
+    "lat": 49.225591492705476,
+    "lng": -122.85089793211979
+  },
+  "ridge park": {
+    "address": "Ridge Park (1685 Parkway Boulevard)",
+    "lat": 49.308558121638704,
+    "lng": -122.79778087276331
+  },
+  "panorama park": {
+    "address": "Panorama Park (1485 Johnson Street)",
+    "lat": 49.299721949486496,
+    "lng": -122.79729939643228
+  },
+  "poirier civic grounds / park": {
+    "address": "Poirier Civic Grounds / Park (624 Poirier Street )",
+    "lat": 49.25505973596116,
+    "lng": -122.8472121588821
+  },
+  "princeton park": {
+    "address": "Princeton Park (1398 Marguerite Street)",
+    "lat": 49.29824184675981,
+    "lng": -122.75791872222362
+  },
+  "queenston park": {
+    "address": "Queenston Park (3415 Queenston Ave.)",
+    "lat": 49.29786779690438,
+    "lng": -122.75379890639684
+  },
+  "ranch park": {
+    "address": "Ranch Park (3060 Daybreak Avenue)",
+    "lat": 49.26499128913487,
+    "lng": -122.80622921719335
+  },
+  "riley park": {
+    "address": "Riley Park (1315 Riley Street)",
+    "lat": 49.2931222969351,
+    "lng": -122.74367164393844
+  },
+  "riverview forest": {
+    "address": "Riverview Forest (501 Mariner Way)",
+    "lat": 49.252004720612895,
+    "lng": -122.8121456815547
+  },
+  "riverview park": {
+    "address": "Riverview Park (728 Clearwater Way)",
+    "lat": 49.258859911169445,
+    "lng": -122.80590050476629
+  },
+  "robson park": {
+    "address": "Robson Park (1420 Pinentree Way)",
+    "lat": 49.29962933548385,
+    "lng": -122.78750707262418
+  },
+  "rochester park": {
+    "address": "Rochester Park (1390 Rochester Avenue)",
+    "lat": 49.24390074508277,
+    "lng": -122.85382180014757
+  },
+  "scott creek linear park": {
+    "address": "Scott Creek Linear Park (2695 Runnel Drive)",
+    "lat": 49.281940482321936,
+    "lng": -122.81214707843496
+  },
+  "selkirk park": {
+    "address": "Selkirk Park (928 Selkirk Crescent)",
+    "lat": 49.26688415356693,
+    "lng": -122.84536961901293
+  },
+  "sheffield park": {
+    "address": "Sheffield Park (3510 Sheffield Ave)",
+    "lat": 49.29761905499671,
+    "lng": -122.74259851200848
+  },
+  "shiloh park": {
+    "address": "Shiloh Park (2992 Shiloh Place)",
+    "lat": 49.2666669597941,
+    "lng": -122.79532141397448
+  },
+  "smiling creek park": {
+    "address": "Smiling Creek Park (3456 Queenston Ave)",
+    "lat": 49.29706795744403,
+    "lng": -122.75056877034935
+  },
+  "spirit square": {
+    "address": "Spirit Square (3000 Burlington Drive)",
+    "lat": 49.283656658338764,
+    "lng": -122.7944249303552
+  },
+  "tanglewood tot lot": {
+    "address": "Tanglewood Tot Lot (1533 Tanglewood Lane)",
+    "lat": 49.300671194903494,
+    "lng": -122.81030903104053
+  },
+  "westwood summit tot lot": {
+    "address": "Westwood Summit Tot Lot (1342 Honeysuckle Lane)",
+    "lat": 49.294168380865194,
+    "lng": -122.81907548867564
+  },
+  "turnberry tot lot": {
+    "address": "Turnberry Tot Lot (2208 Turnberry Lane)",
+    "lat": 49.31750756427491,
+    "lng": -122.797061989669
+  },
+  "port mann bridge": {
+    "address": "Port Mann Bridge (Fraser River)",
+    "lat": 49.21972,
+    "lng": -122.81306
+  },
+  "eleanor ward bridge": {
+    "address": "Eleanor Ward Bridge (David Ave / Coquitlam River)",
+    "lat": 49.2949,
+    "lng": -122.7748
+  },
+  "pitt river bridge": {
+    "address": "Pitt River Bridge (Lougheed Hwy / Pitt River)",
+    "lat": 49.2458,
+    "lng": -122.7403
+  },
+  "coast meridian overpass": {
+    "address": "Coast Meridian Overpass (CP Rail Yard)",
+    "lat": 49.253,
+    "lng": -122.776
   }
 }

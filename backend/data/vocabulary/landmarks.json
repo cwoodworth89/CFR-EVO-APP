@@ -418,5 +418,345 @@
     "address": "Coast Meridian Overpass (CP Rail Yard)",
     "lat": 49.253,
     "lng": -122.776
+  },
+  "centennial secondary school": {
+    "address": "Centennial Secondary School (570 Poirier St, Coquitlam, BC V3J 5T2)",
+    "lat": 49.2524435,
+    "lng": -122.8489227
+  },
+  "dr. charles best secondary": {
+    "address": "Dr. Charles Best Secondary School (2525 Como Lake Ave, Coquitlam, BC V3J 3R8)",
+    "lat": 49.2639269,
+    "lng": -122.8220984
+  },
+  "dr. charles best secondary school": {
+    "address": "Dr. Charles Best Secondary School (2525 Como Lake Ave, Coquitlam, BC V3J 3R8)",
+    "lat": 49.2639269,
+    "lng": -122.8220984
+  },
+  "gleneagle secondary school": {
+    "address": "Gleneagle Secondary School (1195 Lansdowne Dr, Coquitlam, BC V3B 7Y8)",
+    "lat": 49.2842121,
+    "lng": -122.8066751
+  },
+  "pinetree secondary school": {
+    "address": "Pinetree Secondary School (3000 Pinewood Ave, Coquitlam, BC V3B 7Y7)",
+    "lat": 49.2902946,
+    "lng": -122.7904968
+  },
+  "cabe secondary": {
+    "address": "CABE Secondary School (1411 Foster Ave, Coquitlam, BC V3J 2N1)",
+    "lat": 49.2567744,
+    "lng": -122.8546485
+  },
+  "cabe secondary school": {
+    "address": "CABE Secondary School (1411 Foster Ave, Coquitlam, BC V3J 2N1)",
+    "lat": 49.2567744,
+    "lng": -122.8546485
+  },
+  "inquiry hub secondary": {
+    "address": "Inquiry Hub Secondary School (1432 Brunette Ave, Coquitlam, BC V3K 6X5)",
+    "lat": 49.2401109,
+    "lng": -122.8530753
+  },
+  "inquiry hub secondary school": {
+    "address": "Inquiry Hub Secondary School (1432 Brunette Ave, Coquitlam, BC V3K 6X5)",
+    "lat": 49.2401109,
+    "lng": -122.8530753
+  },
+  "banting middle": {
+    "address": "Banting Middle School (820 Banting St, Coquitlam, BC V3J 4J4)",
+    "lat": 49.26490949999999,
+    "lng": -122.8775799
+  },
+  "banting middle school": {
+    "address": "Banting Middle School (820 Banting St, Coquitlam, BC V3J 4J4)",
+    "lat": 49.26490949999999,
+    "lng": -122.8775799
+  },
+  "como lake middle": {
+    "address": "Como Lake Middle School (1121 King Albert Ave, Coquitlam, BC V3J 1X8)",
+    "lat": 49.251757,
+    "lng": -122.8598559
+  },
+  "como lake middle school": {
+    "address": "Como Lake Middle School (1121 King Albert Ave, Coquitlam, BC V3J 1X8)",
+    "lat": 49.251757,
+    "lng": -122.8598559
+  },
+  "hillcrest middle": {
+    "address": "Hillcrest Middle School (2161 Regan Ave, Coquitlam, BC V3J 3R6)",
+    "lat": 49.2620134,
+    "lng": -122.8345392
+  },
+  "hillcrest middle school": {
+    "address": "Hillcrest Middle School (2161 Regan Ave, Coquitlam, BC V3J 3R6)",
+    "lat": 49.2620134,
+    "lng": -122.8345392
+  },
+  "maillard middle": {
+    "address": "Maillard Middle School (1300 Rochester Ave, Coquitlam, BC V3K 2X5)",
+    "lat": 49.2445112,
+    "lng": -122.8557161
+  },
+  "maillard middle school": {
+    "address": "Maillard Middle School (1300 Rochester Ave, Coquitlam, BC V3K 2X5)",
+    "lat": 49.2445112,
+    "lng": -122.8557161
+  },
+  "montgomery middle": {
+    "address": "Montgomery Middle School (1900 Edgewood Ave, Coquitlam, BC V3K 2Y1)",
+    "lat": 49.2442981,
+    "lng": -122.8409162
+  },
+  "montgomery middle school": {
+    "address": "Montgomery Middle School (1900 Edgewood Ave, Coquitlam, BC V3K 2Y1)",
+    "lat": 49.2442981,
+    "lng": -122.8409162
+  },
+  "scott creek middle": {
+    "address": "Scott Creek Middle School (1240 Lansdowne Dr, Coquitlam, BC V3E 3E7)",
+    "lat": 49.2851468,
+    "lng": -122.8133484
+  },
+  "scott creek middle school": {
+    "address": "Scott Creek Middle School (1240 Lansdowne Dr, Coquitlam, BC V3E 3E7)",
+    "lat": 49.2851468,
+    "lng": -122.8133484
+  },
+  "summit middle": {
+    "address": "Summit Middle School (1450 Parkway Blvd, Coquitlam, BC V3E 3L2)",
+    "lat": 49.2955031,
+    "lng": -122.8065523
+  },
+  "summit middle school": {
+    "address": "Summit Middle School (1450 Parkway Blvd, Coquitlam, BC V3E 3L2)",
+    "lat": 49.2955031,
+    "lng": -122.8065523
+  },
+  "alderson elementary": {
+    "address": "Alderson Elementary School (825 Gauthier Ave, Coquitlam, BC V3K 7C4)",
+    "lat": 49.2390307,
+    "lng": -122.8750943
+  },
+  "alderson elementary school": {
+    "address": "Alderson Elementary School (825 Gauthier Ave, Coquitlam, BC V3K 7C4)",
+    "lat": 49.2390307,
+    "lng": -122.8750943
+  },
+  "baker drive elementary": {
+    "address": "Baker Drive Elementary School (885 Baker Dr, Coquitlam, BC V3J 6W9)",
+    "lat": 49.2688894,
+    "lng": -122.8239714
+  },
+  "baker drive elementary school": {
+    "address": "Baker Drive Elementary School (885 Baker Dr, Coquitlam, BC V3J 6W9)",
+    "lat": 49.2688894,
+    "lng": -122.8239714
+  },
+  "bramblewood elementary": {
+    "address": "Bramblewood Elementary School (2875 Panorama Dr, Coquitlam, BC V3E 2S7)",
+    "lat": 49.29829729999999,
+    "lng": -122.813079
+  },
+  "bramblewood elementary school": {
+    "address": "Bramblewood Elementary School (2875 Panorama Dr, Coquitlam, BC V3E 2S7)",
+    "lat": 49.29829729999999,
+    "lng": -122.813079
+  },
+  "cape horn elementary": {
+    "address": "Cape Horn Elementary School (155 Finnigan St, Coquitlam, BC V3K 5J2)",
+    "lat": 49.2347912,
+    "lng": -122.8364022
+  },
+  "cape horn elementary school": {
+    "address": "Cape Horn Elementary School (155 Finnigan St, Coquitlam, BC V3K 5J2)",
+    "lat": 49.2347912,
+    "lng": -122.8364022
+  },
+  "eagle ridge elementary": {
+    "address": "Eagle Ridge Elementary School (1215 Falcon Dr, Coquitlam, BC V3E 2M4)",
+    "lat": 49.2856436,
+    "lng": -122.8176316
+  },
+  "eagle ridge elementary school": {
+    "address": "Eagle Ridge Elementary School (1215 Falcon Dr, Coquitlam, BC V3E 2M4)",
+    "lat": 49.2856436,
+    "lng": -122.8176316
+  },
+  "glenayre elementary": {
+    "address": "Glenayre Elementary School (495 Glencoe Dr, Port Moody, BC V3H 1G8)",
+    "lat": 49.274083,
+    "lng": -122.8878288
+  },
+  "glenayre elementary school": {
+    "address": "Glenayre Elementary School (495 Glencoe Dr, Port Moody, BC V3H 1G8)",
+    "lat": 49.274083,
+    "lng": -122.8878288
+  },
+  "irvine elementary": {
+    "address": "Irvine Elementary School (3862 Wellington St, Port Coquitlam, BC V3B 3Z4)",
+    "lat": 49.2825241,
+    "lng": -122.760652
+  },
+  "irvine elementary school": {
+    "address": "Irvine Elementary School (3862 Wellington St, Port Coquitlam, BC V3B 3Z4)",
+    "lat": 49.2825241,
+    "lng": -122.760652
+  },
+  "nestor elementary": {
+    "address": "Nestor Elementary School (Nestor Elementary School Park, 1270 Nestor St, Coquitlam, BC V3E 2A4)",
+    "lat": 49.2909326,
+    "lng": -122.7796347
+  },
+  "nestor elementary school": {
+    "address": "Nestor Elementary School (Nestor Elementary School Park, 1270 Nestor St, Coquitlam, BC V3E 2A4)",
+    "lat": 49.2909326,
+    "lng": -122.7796347
+  },
+  "rochester elementary": {
+    "address": "Rochester Elementary School (411 Schoolhouse St, Coquitlam, BC V3K 4Y7)",
+    "lat": 49.2464323,
+    "lng": -122.8513906
+  },
+  "rochester elementary school": {
+    "address": "Rochester Elementary School (411 Schoolhouse St, Coquitlam, BC V3K 4Y7)",
+    "lat": 49.2464323,
+    "lng": -122.8513906
+  },
+  "panorama heights elementary": {
+    "address": "Panorama Heights Elementary School (1455 Johnson St, Coquitlam, BC V3E 2P5)",
+    "lat": 49.2999783,
+    "lng": -122.7995994
+  },
+  "panorama heights elementary school": {
+    "address": "Panorama Heights Elementary School (1455 Johnson St, Coquitlam, BC V3E 2P5)",
+    "lat": 49.2999783,
+    "lng": -122.7995994
+  },
+  "riverview park elementary": {
+    "address": "Riverview Park Elementary School (700 Clearwater Way, Coquitlam, BC V3C 6A3)",
+    "lat": 49.2570284,
+    "lng": -122.8059302
+  },
+  "riverview park elementary school": {
+    "address": "Riverview Park Elementary School (700 Clearwater Way, Coquitlam, BC V3C 6A3)",
+    "lat": 49.2570284,
+    "lng": -122.8059302
+  },
+  "roy stibbs elementary": {
+    "address": "Roy Stibbs Elementary School (600Fairview St, Coquitlam, BC V3J 4A7)",
+    "lat": 49.25389999999999,
+    "lng": -122.884291
+  },
+  "roy stibbs elementary school": {
+    "address": "Roy Stibbs Elementary School (600Fairview St, Coquitlam, BC V3J 4A7)",
+    "lat": 49.25389999999999,
+    "lng": -122.884291
+  },
+  "seaview community": {
+    "address": "Seaview Community School (1215 Cecile Dr, Port Moody, BC V3H 1N2)",
+    "lat": 49.2802111,
+    "lng": -122.876587
+  },
+  "seaview community school": {
+    "address": "Seaview Community School (1215 Cecile Dr, Port Moody, BC V3H 1N2)",
+    "lat": 49.2802111,
+    "lng": -122.876587
+  },
+  "ranch park elementary": {
+    "address": "Ranch Park Elementary School (2701 Spuraway Ave, Coquitlam, BC V3C 2C4)",
+    "lat": 49.2649902,
+    "lng": -122.8130683
+  },
+  "ranch park elementary school": {
+    "address": "Ranch Park Elementary School (2701 Spuraway Ave, Coquitlam, BC V3C 2C4)",
+    "lat": 49.2649902,
+    "lng": -122.8130683
+  },
+  "coquitlam river elementary": {
+    "address": "Coquitlam River Elementary School (4250 Shaughnessy St, Port Coquitlam, BC V3E 3E5)",
+    "lat": 49.2885005,
+    "lng": -122.7665926
+  },
+  "coquitlam river elementary school": {
+    "address": "Coquitlam River Elementary School (4250 Shaughnessy St, Port Coquitlam, BC V3E 3E5)",
+    "lat": 49.2885005,
+    "lng": -122.7665926
+  },
+  "harbour connections": {
+    "address": "Harbour Connections (Harbour Dr, Coquitlam)",
+    "lat": 49.2673505,
+    "lng": -122.8502004
+  },
+  "mountain view elementary": {
+    "address": "Mountain View Elementary School (740 Smith Ave, Coquitlam, BC V3J 4E7)",
+    "lat": 49.2594742,
+    "lng": -122.8789395
+  },
+  "mountain view elementary school": {
+    "address": "Mountain View Elementary School (740 Smith Ave, Coquitlam, BC V3J 4E7)",
+    "lat": 49.2594742,
+    "lng": -122.8789395
+  },
+  "miller park elementary": {
+    "address": "Miller Park Elementary School (800 Egmont Ave, Coquitlam, BC V3J 4J8)",
+    "lat": 49.2660281,
+    "lng": -122.8784075
+  },
+  "miller park elementary school": {
+    "address": "Miller Park Elementary School (800 Egmont Ave, Coquitlam, BC V3J 4J8)",
+    "lat": 49.2660281,
+    "lng": -122.8784075
+  },
+  "lord baden-powell elementary": {
+    "address": "Lord Baden-Powell Elementary School (450 Joyce St, Coquitlam, BC V3K 4G4)",
+    "lat": 49.247209,
+    "lng": -122.8739065
+  },
+  "lord baden-powell elementary school": {
+    "address": "Lord Baden-Powell Elementary School (450 Joyce St, Coquitlam, BC V3K 4G4)",
+    "lat": 49.247209,
+    "lng": -122.8739065
+  },
+  "smiling creek elementary": {
+    "address": "Smiling Creek Elementary School (3456 Princeton Ave, Coquitlam, BC V3E 0G1)",
+    "lat": 49.2980668,
+    "lng": -122.7503512
+  },
+  "smiling creek elementary school": {
+    "address": "Smiling Creek Elementary School (3456 Princeton Ave, Coquitlam, BC V3E 0G1)",
+    "lat": 49.2980668,
+    "lng": -122.7503512
+  },
+  "coast salish elementary": {
+    "address": "Coast Salish Elementary School (3538 Sheffield Ave, Coquitlam, BC V3E 3H1)",
+    "lat": 49.2975474,
+    "lng": -122.7388839
+  },
+  "coast salish elementary school": {
+    "address": "Coast Salish Elementary School (3538 Sheffield Ave, Coquitlam, BC V3E 3H1)",
+    "lat": 49.2975474,
+    "lng": -122.7388839
+  },
+  "parkland elementary": {
+    "address": "Parkland Elementary School (1563 Regan Ave, Coquitlam, BC V3J 3B7)",
+    "lat": 49.262109,
+    "lng": -122.8496632
+  },
+  "parkland elementary school": {
+    "address": "Parkland Elementary School (1563 Regan Ave, Coquitlam, BC V3J 3B7)",
+    "lat": 49.262109,
+    "lng": -122.8496632
+  },
+  "meadowbrook elementary": {
+    "address": "Meadowbrook Elementary School (900 Sharpe St, Coquitlam, BC V3C 3M3)",
+    "lat": 49.2667024,
+    "lng": -122.8010869
+  },
+  "meadowbrook elementary school": {
+    "address": "Meadowbrook Elementary School (900 Sharpe St, Coquitlam, BC V3C 3M3)",
+    "lat": 49.2667024,
+    "lng": -122.8010869
   }
 }

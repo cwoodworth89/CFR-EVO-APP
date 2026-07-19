@@ -145,6 +145,7 @@ def sanitize_transcript(text: str) -> str:
         r'\btreat\b': 'street',
         
         # Specific major streets / locations
+        r'\bheavily\s+(cres|crescent)\b': r'heffley \1',
         r'\blow\s+heat\s+high\s*ways?\b': 'lougheed highway',
         r'\blow\s+heed\s+high\s*ways?\b': 'lougheed highway',
         r'\blove\s+heat\s+high\s*ways?\b': 'lougheed highway',

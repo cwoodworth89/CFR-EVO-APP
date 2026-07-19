@@ -1136,15 +1136,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               </span>
                             </div>
 
-                            {/* Tones Badge */}
-                            {selectedCall.target?.tone_name && (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Tones</span>
-                                <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                  🔔 {selectedCall.target.tone_name}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>

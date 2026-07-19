@@ -992,6 +992,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             supabase_url = os.environ.get("SUPABASE_URL")
             supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
             
+            p1_target = p1_data.get("target") or {} if p1_data else {}
+            
             if addresses_match:
                 logging.info(f"Phase 2 verification: Address matches Phase 1 ('{p1_candidate.address or p1_candidate.intersection}'). Updating database record to verified.")
                 
@@ -1022,7 +1024,6 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                     except Exception as r_err:
                         logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
                 
-                p1_target = p1_data.get("target") or {}
                 p1_address = p1_target.get("address") or (p1_candidate.address or p1_candidate.intersection if p1_candidate else "")
                 
                 target_payload = {

@@ -925,12 +925,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                                   🗺️ MAP
                                 </button>
                               )}
-                              <button
-                                onClick={() => handleSelectCall(call)}
-                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded text-[10px] border border-slate-700 transition-all cursor-pointer"
-                              >
-                                EDIT
-                              </button>
+
                               <button
                                 onClick={() => handleDeleteCall(call.id, call.dispatch_id)}
                                 className="bg-rose-950/30 hover:bg-rose-900/20 text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded text-[10px] border border-rose-900/20 transition-all cursor-pointer flex items-center justify-center"

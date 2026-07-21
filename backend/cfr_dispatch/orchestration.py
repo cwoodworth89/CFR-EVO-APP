@@ -942,17 +942,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
         p1_len = phase_1_trigger_lengths.get(dispatch_id, 0)
         p1_data = phase_1_candidates.get(dispatch_id)
         
-        # If Phase 1 triggered, we slice and transcribe the second round only to bypass de-duplication
-        if p1_data and p1_len > 0 and p1_len < len(buffer):
-            logging.info(f"Phase 1 was triggered at block {p1_len}/{len(buffer)}. Slicing buffer for Round 2.")
-            second_round_buffer = buffer[p1_len:]
-        else:
-            logging.info("Phase 1 was not triggered (or buffer invalid). Transcribing full audio as fallback.")
-            second_round_buffer = buffer
-            p1_data = None
-            
-        # 1. Combine and Filter Audio
-        full_dispatch_audio = np.concatenate(second_round_buffer)
+        # 1. Combine and Filter Full Audio (do not slice mid-audio to preserve complete context)
+        full_dispatch_audio = np.concatenate(buffer)
         filtered_audio = filter_known_tones(full_dispatch_audio, tone_name, AUDIO_SAMPLE_RATE, GOLDEN_FINGERPRINTS)
         
         # 2. Transcribe Audio (100% In-Memory)
@@ -996,12 +987,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
             p1_addr = (p1_candidate.address or p1_candidate.intersection or "").lower() if p1_candidate else ""
             p2_addr = (p2_candidate.address or p2_candidate.intersection or "").lower() if p2_candidate else ""
             
-            # Combine Phase 1 and Phase 2 transcripts
-            p1_raw = p1_data.get("raw_transcript") or p1_data.get("transcript") or ""
-            p1_sanitized = p1_data.get("transcript") or ""
-            
-            full_raw = f"{p1_raw} {raw_transcript}".strip() if p1_raw else raw_transcript
-            full_sanitized = f"{p1_sanitized} {transcript}".strip() if p1_sanitized else transcript
+            full_raw = raw_transcript
+            full_sanitized = transcript
             
             # Compare addresses
             addresses_match = p1_addr == p2_addr and p1_addr != ""

@@ -787,7 +787,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                       <th className="py-2.5 px-3 w-[10%] text-center bg-slate-900">Tones</th>
                       <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
                       <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">STT Synced</th>
+                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Training Status</th>
                       <th className="py-2.5 px-3 w-[28%] bg-slate-900">System Prefills</th>
                       <th className="py-2.5 px-3 text-right w-[11%] bg-slate-900">Actions</th>
                     </tr>
@@ -869,7 +869,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                               <span className="text-slate-500 font-mono text-[10.5px]">—</span>
                             ) : call.model_updated ? (
                               <span className="text-[11px] text-emerald-400 font-extrabold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
-                                🟢 YES
+                                🟢 Fine-Tuned
                               </span>
                             ) : (
                               <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse font-mono" title="Queued for next model retuning run">

@@ -31,6 +31,20 @@ class CoquitlamDataValidator:
         )
         self.zones_gdf, self.zones_crs, self.zones_sindex = load_zones(zones_shp_path)
 
+        # Pre-compute spatial grid-to-streets index for fast low-confidence disambiguation
+        self.grid_to_streets = {}
+        try:
+            if self.addresses_gdf is not None and self.zones_gdf is not None:
+                zones_matching = self.zones_gdf.to_crs(self.addresses_gdf.crs) if self.addresses_gdf.crs != self.zones_crs else self.zones_gdf
+                joined = gpd.sjoin(self.addresses_gdf, zones_matching[[self.zone_map_name_col, 'geometry']], how="inner", predicate="within")
+                for grid_id, group in joined.groupby(self.zone_map_name_col):
+                    grid_key = str(grid_id).strip()
+                    streets = set(group[self.street_name_col].fillna('').astype(str).str.upper().unique()) - {''}
+                    self.grid_to_streets[grid_key] = streets
+                logging.info(f"Pre-computed spatial street indexes for {len(self.grid_to_streets)} emergency response grids.")
+        except Exception as e:
+            logging.error(f"Failed to pre-compute spatial grid-to-street index: {e}")
+
         # Load landmarks configuration if it exists
         self.landmarks = {}
         try:
@@ -318,3 +332,10 @@ class CoquitlamDataValidator:
         except Exception as e:
             logging.error(f"Point-to-grid spatial lookup error: {e}", exc_info=True)
             return None
+
+    def get_streets_in_grid(self, grid_id: str) -> List[str]:
+        """Returns the list of unique street names contained within a specific map grid."""
+        if not grid_id:
+            return []
+        grid_key = str(grid_id).strip()
+        return sorted(list(self.grid_to_streets.get(grid_key, [])))

@@ -78,6 +78,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
   const [verifiedTalkgroup, setVerifiedTalkgroup] = useState('');
   const [verifiedMapGrid, setVerifiedMapGrid] = useState('');
   const [includeInTraining, setIncludeInTraining] = useState(true);
+  const [reviewNotes, setReviewNotes] = useState('');
   const [verifiedTones, setVerifiedTones] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -231,6 +232,7 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
         setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         setQualityRating(selectedCall.quality_rating || 'PENDING');
+        setReviewNotes(selectedCall.target?.review_notes || selectedCall.review_notes || '');
         
         // Auto-default training checkbox: false for < 35s audio_duration, true otherwise
         const defaultInclude = selectedCall.audio_duration !== undefined && selectedCall.audio_duration !== null 
@@ -408,7 +410,8 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
         include_in_training: includeInTraining,
         subaddress: verifiedSubaddress || null,
         verified_talkgroup: verifiedTalkgroup || null,
-        verified_map_grid: verifiedMapGrid || null
+        verified_map_grid: verifiedMapGrid || null,
+        review_notes: reviewNotes || null
       };
 
       const { error } = await supabase
@@ -1450,6 +1453,20 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                       ⚠️ Cut-Off Default
                     </span>
                   )}
+                </div>
+
+                {/* HITL Review Notes / Agent Notes */}
+                <div className="flex flex-col gap-1.5 mt-1.5">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                    📝 Review Notes / Agent Feedback
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none placeholder:text-slate-600 font-sans"
+                    placeholder="Enter human review notes, error explanations, or observations for AI agent review..."
+                  />
                 </div>
 
               </div>

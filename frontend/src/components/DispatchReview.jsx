@@ -1172,48 +1172,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   </div>
                 </div>
 
-                {/* HITL Quality Rating Selector */}
-                <div className="flex flex-col gap-1.5 bg-slate-950 p-3 border border-slate-850 rounded-xl flex-shrink-0">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                    HITL Quality Rating
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRate('PERFECT')}
-                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
-                        qualityRating === 'PERFECT'
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm font-mono'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
-                      }`}
-                    >
-                      🟢 Perfect
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRate('OPERATIONAL')}
-                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
-                        qualityRating === 'OPERATIONAL'
-                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm font-mono'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
-                      }`}
-                    >
-                      🟡 Operational
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRate('FAILED')}
-                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
-                        qualityRating === 'FAILED'
-                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-sm font-mono'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
-                      }`}
-                    >
-                      🔴 Failed
-                    </button>
-                  </div>
-                </div>
-
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
@@ -1436,7 +1394,63 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                   </div>
                 </div>
 
-                {/* Whisper Training Dataset Opt-In */}
+                {/* 1. HITL Quality Rating Selector */}
+                <div className="flex flex-col gap-1.5 bg-slate-950 p-3 border border-slate-850 rounded-xl flex-shrink-0 mt-1.5">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                    HITL Quality Rating
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRate('PERFECT')}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                        qualityRating === 'PERFECT'
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm font-mono'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
+                      }`}
+                    >
+                      🟢 Perfect
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRate('OPERATIONAL')}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                        qualityRating === 'OPERATIONAL'
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm font-mono'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
+                      }`}
+                    >
+                      🟡 Operational
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRate('FAILED')}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                        qualityRating === 'FAILED'
+                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-sm font-mono'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
+                      }`}
+                    >
+                      🔴 Failed
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. HITL Review Notes / Agent Notes */}
+                <div className="flex flex-col gap-1.5 mt-1.5">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
+                    📝 Review Notes / Agent Feedback
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none placeholder:text-slate-600 font-sans"
+                    placeholder="Enter human review notes, error explanations, or observations for AI agent review..."
+                  />
+                </div>
+
+                {/* 3. Whisper Training Dataset Opt-In */}
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-850 p-3 rounded-xl mt-1.5">
                   <input
                     type="checkbox"
@@ -1453,20 +1467,6 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                       ⚠️ Cut-Off Default
                     </span>
                   )}
-                </div>
-
-                {/* HITL Review Notes / Agent Notes */}
-                <div className="flex flex-col gap-1.5 mt-1.5">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                    📝 Review Notes / Agent Feedback
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none placeholder:text-slate-600 font-sans"
-                    placeholder="Enter human review notes, error explanations, or observations for AI agent review..."
-                  />
                 </div>
 
               </div>

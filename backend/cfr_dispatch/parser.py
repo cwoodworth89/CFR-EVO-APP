@@ -614,10 +614,7 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
     response priority types, and map response grids. Attempts template-aligned anchor
     segmentation first, and falls back to standard regex parsing if necessary.
     """
-    text = announcement_text.strip()
-    
-    # Normalize spaces
-    text = ' '.join(text.split())
+    text = sanitize_transcript(announcement_text)
     
     street_types = r"street|avenue|drive|way|road|crescent|boulevard|place|court|highway|lane"
     

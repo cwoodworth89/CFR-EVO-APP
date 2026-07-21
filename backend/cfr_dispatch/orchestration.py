@@ -132,6 +132,16 @@ def setup_logging():
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+def clean_address_string(addr: str) -> str:
+    if not addr:
+        return addr
+    addr = re.sub(r',\s*[A-Z]\d[A-Z]\s*\d[A-Z]\d', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r',\s*(BC|British Columbia)\b.*', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r',\s*Canada\b.*', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r',\s*Coquitlam\b.*', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r',\s*Port Coquitlam\b.*', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r',\s*Port Moody\b.*', '', addr, flags=re.IGNORECASE)
+    return addr.strip()
 
 def transcribe_audio_bytes(content: bytes) -> str | None:
     """Transcribes raw WAV audio bytes using Google Cloud Speech-to-Text v2 with custom phrase adaptation."""
@@ -541,7 +551,7 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
                 verify_location = True
 
         # 7. Extract incident details and build metadata
-        best_address = local_geocode_result["address"]
+        best_address = clean_address_string(local_geocode_result["address"])
         lat = local_geocode_result["lat"]
         lng = local_geocode_result["lng"]
         rings = local_geocode_result["rings"]
@@ -563,6 +573,12 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
         timestamp = datetime.datetime.now().astimezone().isoformat()
         
         map_grid = next((d.map_grid for d in all_candidates if d.map_grid), None)
+        if (not map_grid or str(map_grid).lower() == "none") and lat is not None and lng is not None:
+            spatial_grid = validator.get_map_grid_for_point(lat, lng)
+            if spatial_grid:
+                map_grid = spatial_grid
+                logging.info(f"Spatial fallback: Map grid auto-populated from emergency response zones -> '{map_grid}'")
+
         radio_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), None)
         
         # Structured Confidence Index Calculation
@@ -1004,6 +1020,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                 p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                 p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                 p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
+                if (not p2_grid or str(p2_grid).lower() == "none") and p1_target and p1_target.get("lat") is not None and p1_target.get("lng") is not None:
+                    p2_grid = validator.get_map_grid_for_point(p1_target["lat"], p1_target["lng"])
                 p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
                 p2_incident_type = match_incident_type(full_sanitized, CALL_TYPES)
                 
@@ -1091,6 +1109,8 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                         p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                         p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
+                        if (not p2_grid or str(p2_grid).lower() == "none") and res and res.get("lat") is not None and res.get("lng") is not None:
+                            p2_grid = validator.get_map_grid_for_point(res["lat"], res["lng"])
                         p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
                         p2_incident_type = match_incident_type(full_sanitized, CALL_TYPES)
                         

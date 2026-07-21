@@ -32,6 +32,13 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
         L.latLng(fromLat, fromLng),
         L.latLng(toLat, toLng)
       ],
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1',
+        profile: 'car',
+        useHints: false
+      }),
+      // Emergency response routing: allow arriving at destination from any direction without forcing curb U-turns
+      approaches: ['unrestricted', 'unrestricted'],
       routeWhileDragging: false,
       addWaypoints: false,
       draggableWaypoints: false,

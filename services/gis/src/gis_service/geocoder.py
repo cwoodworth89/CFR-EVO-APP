@@ -299,3 +299,22 @@ class CoquitlamDataValidator:
         except Exception as e:
             logging.error(f"Point-in-grid validation error: {e}", exc_info=True)
             return False
+
+    def get_map_grid_for_point(self, lat: float, lon: float) -> str | None:
+        """Looks up the emergency response map grid ID containing the given lat/lon coordinates."""
+        if self.zones_gdf is None or self.zones_sindex is None or lat is None or lon is None:
+            return None
+        try:
+            point = Point(lon, lat)
+            point_gdf = gpd.GeoDataFrame([{'geometry': point}], crs="EPSG:4326").to_crs(self.zones_crs)
+            point_geom = point_gdf.geometry.iloc[0]
+            possible_matches_idx = list(self.zones_sindex.intersection(point_geom.bounds))
+            possible_matches = self.zones_gdf.iloc[possible_matches_idx]
+            match = possible_matches[possible_matches.geometry.contains(point_geom)]
+            if not match.empty:
+                grid_id = str(match.iloc[0][self.zone_map_name_col]).strip()
+                return grid_id
+            return None
+        except Exception as e:
+            logging.error(f"Point-to-grid spatial lookup error: {e}", exc_info=True)
+            return None

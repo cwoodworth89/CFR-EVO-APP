@@ -34,8 +34,8 @@ from cfr_dispatch.config import (
     END_OF_DISPATCH_RMS_THRESHOLD,
     POST_EVENT_RESET_SILENCE_S,
     PHASE_1_CHECK_INTERVAL_S,
-    MIN_PHASE_1_DURATION_S,
     DEVICE_ID,
+    resolve_audio_device,
     UNITS_VOCABULARY,
     ADDRESS_SHAPEFILE_PATH,
     ZONES_SHAPEFILE_PATH,
@@ -1630,8 +1630,10 @@ def run_dispatch_system():
     # Audio device query
     logging.info("Initializing Audio Input Stream Listener...")
     blocksize = 1024
+    dev_idx, dev_name = resolve_audio_device(DEVICE_ID)
+    logging.info(f"Targeting Audio Input Interface: [{dev_idx}] '{dev_name}'")
     try:
-        with sd.InputStream(samplerate=AUDIO_SAMPLE_RATE, channels=1, blocksize=blocksize, dtype='int16', device=DEVICE_ID) as stream:
+        with sd.InputStream(samplerate=AUDIO_SAMPLE_RATE, channels=1, blocksize=blocksize, dtype='int16', device=dev_idx) as stream:
             try:
                 device_info = sd.query_devices(stream.device, 'input')
                 logging.info(f"Successfully opened audio stream on: '{device_info.get('name', 'Unknown')}'")

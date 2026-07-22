@@ -13,7 +13,8 @@ from .models import (
 
 from .hardware import (
     AUDIO_SAMPLE_RATE,
-    DEVICE_ID
+    DEVICE_ID,
+    resolve_audio_device
 )
 
 from .dsp import (

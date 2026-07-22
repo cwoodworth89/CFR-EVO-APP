@@ -45,6 +45,7 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 | `python main.py` | `backend/` | Launch the continuous audio listener background runner. |
 | `python tests/run_test_suite.py` | `backend/` | Execute the QA verification test suite (transcription accuracy and geocoder matching checks). |
 | `python scripts/feed_recorded_call.py <wav_path> [tone]` | `backend/` | Simulate an incoming radio dispatch feed by streaming a WAV file to the listener. |
+| `python scripts/backtest_parser.py` | `backend/` | Run comparative accuracy benchmarks between production and test parsers on database ground-truth calls. |
 | `python scripts/update_gis_data.py` | `backend/` | Execute the monthly GIS update and compare cache changes (runs automated via Windows Scheduler). |
 | `npm run dev` | `frontend/` | Run the React dashboard development server. |
 | `npm run build` | `frontend/` | Compile the frontend client production build into `frontend/dist`. |

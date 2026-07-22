@@ -34,6 +34,52 @@ The parser in [parser.py](../backend/cfr_dispatch/parser.py) maps this template 
 
 ---
 
+## 🧹 Top-of-Pipeline Sanitization (Punctuation & Comma Immunity)
+
+A critical discovery in our parsing pipeline was that raw Speech-to-Text outputs from Whisper frequently include unpredictable punctuation and formatting (e.g. `"respond, routine, burning complaint..."` vs `"respond emergency medical aid..."`).
+
+To prevent punctuation from breaking regex anchor matching:
+*   `sanitize_transcript(text)` runs at the **very beginning** of `parse_dispatch_announcement()` in [parser.py](../backend/cfr_dispatch/parser.py) before any regex or anchor evaluations occur.
+*   It strips all non-alphanumeric characters (commas, hyphens, periods, quotes), converts word-form numbers to digits (e.g. `"one"` $\rightarrow$ `"1"`), applies phonetic corrections, and normalizes spaces.
+*   **Performance Impact**: Adding top-of-pipeline sanitization boosted production parser accuracy across all 81 historical human-verified calls:
+    *   **Responding Units**: 49.4% $\rightarrow$ **97.5%**
+    *   **Incident Type**: 8.6% $\rightarrow$ **88.9%**
+    *   **Map Grid**: 27.2% $\rightarrow$ **75.3%**
+    *   **Address / Location**: 29.6% $\rightarrow$ **67.9%**
+
+---
+
+## 🔬 Sequential Destructive Parser vs. Production Anchor Parser
+
+To test alternative parsing philosophies for structured Computer-Aided Dispatch (CAD) audio, we created a secondary test module in [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py) alongside a backtester [backtest_parser.py](../backend/scripts/backtest_parser.py).
+
+### Design Philosophies
+
+1. **Production Anchor Parser ([parser.py](../backend/cfr_dispatch/parser.py))**:
+   - Uses anchor keyword regexes (`respond`, `near`, `use talk group`, `map grid`) to segment the transcript.
+   - Preserves strict street-suffix rules and candidate list outputs.
+   - **Strength**: High precision on single-round addresses and clean handling of street suffixes.
+
+2. **Sequential Destructive Parser ([destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py))**:
+   - Leverages the rigid CAD sequence of operations: `[Agency] -> [Units] -> [Response Type] -> [Incident] -> [Location] -> [Talk Group] -> [Map Grid]`.
+   - **Destructive Consumption**: Matches and strips tokens one-by-one from the string (left-to-right for Agency/Units/Priority/Incident, right-to-left for Grid/TalkGroup).
+   - What remains is guaranteed to be *only* the location text.
+   - **Strength**: Extremely high resilience to unknown incident phrasings and complex multi-word unit announcements.
+
+### Comparative Backtest Results (81 Verified Calls)
+
+| Parameter | Production Parser (`parser.py`) | Test Destructive Parser (`destructive_parser.py`) | Winner / Reasoning |
+| :--- | :---: | :---: | :--- |
+| **Address/Location** | **67.9%** | 61.7% | **Production Parser**: Better at filtering repeated address text in double-round transcripts. |
+| **Incident Type** | **88.9%** | **88.9%** | **Tied**: Both achieve high accuracy when fed sanitized text. |
+| **Responding Units** | 97.5% | **98.8%** | **Destructive Parser**: Slight edge in multi-unit matching. |
+| **Map Grid** | 75.3% | **77.8%** | **Destructive Parser**: Non-greedy right-side scan handles tail-end noise slightly better. |
+| **Talk Group** | **59.3%** | 39.5% | **Production Parser**: Far superior at capturing verbal channel names (e.g. `"10 Combined Response"`). |
+
+**Conclusion**: Running `sanitize_transcript` at the top of `parser.py` gives the production parser the best overall performance (67.9% address & 59.3% talk group accuracy) while keeping `destructive_parser.py` available in the codebase as a test module for comparative evaluation.
+
+---
+
 ## 🏢 Subaddress & Business Name Parsing
 
 Subaddresses (unit numbers, apartment numbers, suite numbers) and business names are automatically parsed and separated:

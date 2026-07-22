@@ -164,6 +164,27 @@ The python agent runs a background poller thread that checks for simulation requ
 
 ---
 
+## 🧪 Procedure 6: Comparative Parser Backtesting Suite (`backtest_parser.py`)
+
+This test script evaluates the performance of the production parser ([parser.py](../backend/cfr_dispatch/parser.py)) against alternative parsing modules (such as [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py)) by benchmarking their extractions against the entire dataset of human-verified calls stored in Supabase.
+
+### 🏃 Running the Backtest Suite
+```powershell
+.venv\Scripts\python.exe backend/scripts/backtest_parser.py
+```
+
+### 📋 What it Validates & Reports:
+1. **Ground-Truth Data Pull**: Queries all live calls from Supabase where `feedback_submitted = true`.
+2. **Side-by-Side Accuracy Metrics**: Calculates exact precision for 5 key extraction variables:
+   - **Address / Location**: Normalizes street suffixes (e.g. `Street` $\rightarrow$ `St`, `Avenue` $\rightarrow$ `Ave`) and performs set-overlap intersection comparisons.
+   - **Incident Type**: Evaluates full incident name resolution (e.g. `Medical Aid - Fall` vs generic `Medical Aid`).
+   - **Responding Units**: Normalizes parsed apparatuses via `abbreviate_units` and computes set equality.
+   - **Map Grid**: Compares extracted grid numbers against verified database grids.
+   - **Talk Group**: Compares radio channels (e.g. `10 Combined Response` vs `5`).
+3. **Discrepancy Log**: Prints a detailed side-by-side diff table for any dispatches where the parsers diverged, allowing developers to audit edge cases without impacting production listener services.
+
+---
+
 ## 🛑 Troubleshooting Reference
 
 | Issue | Root Cause | Resolution |

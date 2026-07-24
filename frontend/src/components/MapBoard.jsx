@@ -229,7 +229,7 @@ function getAlphaSegment(rings, referencePt) {
   return alphaSeg;
 }
 
-export default function MapBoard() {
+export default function MapBoard({ onSimulateCall, onLaunchKiosk }) {
   const [map, setMap] = useState(null);
 
   // Safe dynamic compile-time stamp
@@ -1416,6 +1416,7 @@ export default function MapBoard() {
         <DispatchReview 
           onClose={() => startMode("EXPLORE")} 
           onLocateAddress={handleLocateCallOnMap}
+          onSimulateCall={onSimulateCall}
         />
       )}
     </div>

@@ -86,6 +86,13 @@ export default function KioskView({ kioskState }) {
             {isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'}
           </div>
 
+          {(isSimulationMode || activeCall?.isSimulated) && (
+            <div className="bg-purple-950/90 border border-purple-500/80 text-purple-200 px-3 py-1.5 rounded-xl font-mono text-xs font-bold flex items-center gap-1.5 shadow-lg animate-pulse">
+              <span>🧪</span>
+              <span>SIMULATED DISPATCH CALL</span>
+            </div>
+          )}
+
           {!activeCall.verify_location && (
             <div className="bg-amber-950/80 border border-amber-600/80 text-amber-300 px-3 py-1.5 rounded-xl font-mono text-xs font-bold flex items-center gap-1.5 animate-pulse">
               <span>⚠️</span>
@@ -131,31 +138,32 @@ export default function KioskView({ kioskState }) {
             <div className="text-[10px] text-slate-500">Auto-Dismiss in {timeoutFormatted}</div>
           </div>
 
-          {!isTvMode && (
+          {(isSimulationMode || activeCall?.isSimulated) ? (
             <button
-              onClick={dismissActiveCall}
-              className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition shadow"
+              onClick={exitSimulation}
+              className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow cursor-pointer border border-purple-500 flex items-center gap-1"
             >
-              Dismiss
+              <span>🚪</span>
+              <span>EXIT SIMULATION</span>
             </button>
+          ) : (
+            !isTvMode && (
+              <button
+                onClick={dismissActiveCall}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition shadow cursor-pointer"
+              >
+                Dismiss
+              </button>
+            )
           )}
 
           <button
             onClick={toggleTvMode}
-            className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold transition shadow"
+            className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold transition shadow cursor-pointer"
             title="Toggle TV Viewing Mode"
           >
             {isTvMode ? '📺 TV Mode (Active)' : '💻 Normal Mode'}
           </button>
-
-          {isSimulationMode && (
-            <button
-              onClick={exitSimulation}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow"
-            >
-              Exit Simulation
-            </button>
-          )}
         </div>
       </header>
 

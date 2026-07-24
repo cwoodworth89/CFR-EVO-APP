@@ -50,7 +50,7 @@ const toTitleCase = (str) => {
   return str.replace(/\b\w/g, c => c.toUpperCase());
 };
 
-export default function DispatchReview({ onClose, onLocateAddress }) {
+export default function DispatchReview({ onClose, onLocateAddress, onSimulateCall }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -915,6 +915,16 @@ export default function DispatchReview({ onClose, onLocateAddress }) {
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1.5 justify-end items-center">
+                              {typeof onSimulateCall === 'function' && (
+                                <button
+                                  onClick={() => onSimulateCall(call)}
+                                  className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer shadow"
+                                  title="Simulate this registered dispatch in Kiosk Mode"
+                                >
+                                  🚀 SIMULATE
+                                </button>
+                              )}
+
                               {call.target?.lat && call.target?.lng && (
                                 <button
                                   onClick={() => {

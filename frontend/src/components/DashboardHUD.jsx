@@ -73,6 +73,7 @@ export function Header({
               }}
             >
               <option value="EXPLORE">🧭 Notifications / Explore</option>
+              <option value="KIOSK_VIEW">🖥️ KIOSK: IN-STATION MODE</option>
               <option value="TRAINING_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
               <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
               <option value="TRAINING_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
@@ -84,6 +85,15 @@ export function Header({
 
         {/* Right Side: Options & Alerts Panel Trigger */}
         <div className="flex gap-3 items-center">
+          {/* Kiosk Mode Button */}
+          <button 
+            onClick={() => setAppMode("KIOSK_VIEW")}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg border bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Launch In-Station Kiosk Display Mode"
+          >
+            🖥️ KIOSK VIEW
+          </button>
+
           {/* Map Options Button */}
           <div className="relative">
              <button 

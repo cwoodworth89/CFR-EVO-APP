@@ -1,55 +1,55 @@
 import React, { useState } from 'react';
 import MapBoard from './components/MapBoard';
 import KioskView from './components/kiosk/KioskView';
-import SimulationControl from './components/admin/SimulationControl';
 import { useKioskQueue } from './hooks/useKioskQueue';
 
 function App() {
   const kioskState = useKioskQueue();
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [forceKioskMode, setForceKioskMode] = useState(false);
+  const [explicitKioskMode, setExplicitKioskMode] = useState(false);
 
-  const shouldRenderKiosk = forceKioskMode || !!kioskState.activeCall || kioskState.isSimulationMode;
+  const shouldRenderKiosk = explicitKioskMode || !!kioskState.activeCall || kioskState.isSimulationMode;
+
+  const handleSimulateCall = (call) => {
+    if (!call) return;
+
+    const mockCall = {
+      id: call.id || 'sim-' + Date.now(),
+      address: call.verified_address || call.target?.address || call.address || 'Simulated Address',
+      subaddress: call.target?.subaddress || '',
+      intersection: call.target?.intersection || '',
+      lat: call.target?.lat ?? call.lat ?? 49.27305,
+      lng: call.target?.lng ?? call.lng ?? -122.88452,
+      rings: call.target?.rings || call.rings || [],
+      incident_type: call.verified_incident || call.incident_type || 'SIMULATED DISPATCH',
+      priority_code: call.priority_code || 1,
+      verify_location: call.verify_location ?? (call.confidence_score ? call.confidence_score >= 90 : true),
+      map_grid: call.target?.verified_map_grid || call.target?.map_grid || '',
+      radio_channel: call.target?.verified_talkgroup || call.target?.radio_channel || '',
+      tone_name: call.target?.tone_name || '',
+      isSimulated: true,
+      created_at: new Date().toISOString()
+    };
+
+    kioskState.triggerSimulationCall(mockCall);
+  };
+
+  const extendedKioskState = {
+    ...kioskState,
+    exitSimulation: () => {
+      kioskState.exitSimulation();
+      setExplicitKioskMode(false);
+    }
+  };
 
   return (
     <div className="App w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 relative">
-      {/* Kiosk Mode Display */}
       {shouldRenderKiosk ? (
-        <KioskView kioskState={kioskState} />
+        <KioskView kioskState={extendedKioskState} />
       ) : (
-        /* Standard MapBoard Dashboard */
-        <MapBoard />
-      )}
-
-      {/* Admin Simulation & Mode Toolbar (Floating Top-Right) */}
-      <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2">
-        <button
-          onClick={() => setForceKioskMode((prev) => !prev)}
-          className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg backdrop-blur flex items-center gap-1.5"
-        >
-          <span>🖥️</span>
-          <span>{forceKioskMode ? 'Exit Kiosk View' : 'Launch Kiosk View'}</span>
-        </button>
-
-        <button
-          onClick={() => setShowAdminPanel((prev) => !prev)}
-          className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg backdrop-blur flex items-center gap-1.5"
-        >
-          <span>⚙️</span>
-          <span>Admin Simulation</span>
-        </button>
-      </div>
-
-      {/* Admin Simulation Drawer Modal */}
-      {showAdminPanel && (
-        <div className="fixed bottom-6 right-6 z-[99999] max-w-lg">
-          <SimulationControl
-            onRunSimulation={kioskState.triggerSimulationCall}
-            onUpdateSimulation={kioskState.triggerSimulationUpdate}
-            onExitSimulation={kioskState.exitSimulation}
-            isSimulationActive={kioskState.isSimulationMode}
-          />
-        </div>
+        <MapBoard
+          onSimulateCall={handleSimulateCall}
+          onLaunchKiosk={() => setExplicitKioskMode(true)}
+        />
       )}
     </div>
   );

@@ -1,7 +1,20 @@
-import React from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
+
+// Force Leaflet map resize invalidation on render
+function InvalidateSizeOnMount() {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [map]);
+  return null;
+}
 
 const targetIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
@@ -23,9 +36,9 @@ export default function BlockParcelPanel({ activeCall }) {
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
-      <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-bold text-sky-400 flex items-center gap-1.5 shadow">
+      <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-sky-400 flex items-center gap-1.5 shadow">
         <span>📦</span>
-        <span>Cadastral Parcel & Hydrants Overlay</span>
+        <span>Cadastral Parcel & Hydrants</span>
       </div>
 
       <MapContainer
@@ -35,8 +48,9 @@ export default function BlockParcelPanel({ activeCall }) {
         zoomControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          maxZoom={20}
         />
 
         {/* Official Coquitlam Municipal Cadastral Roads & Parcels */}
@@ -52,6 +66,8 @@ export default function BlockParcelPanel({ activeCall }) {
         <Marker position={[destLat, destLng]} icon={targetIcon}>
           <Popup>Target Parcel: {activeCall?.address}</Popup>
         </Marker>
+
+        <InvalidateSizeOnMount />
       </MapContainer>
     </div>
   );

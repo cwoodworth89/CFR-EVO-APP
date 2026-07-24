@@ -14,21 +14,11 @@ function AutoFitBounds({ origin, destination }) {
       [origin.lat, origin.lng],
       [destination.lat, destination.lng]
     );
-    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
   }, [map, origin, destination]);
 
   return null;
 }
-
-// Hall Icon
-const hallIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
 
 // Destination Target Icon
 const destIcon = new L.Icon({
@@ -57,11 +47,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
       {/* Route Badge Header */}
-      <div className="absolute top-4 left-4 z-[1000] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl px-4 py-2.5 flex items-center gap-3 text-white shadow-lg">
-        <span className="text-xl">🚒</span>
+      <div className="absolute top-3 left-3 z-[1000] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl px-3.5 py-2 flex items-center gap-2.5 text-white shadow-lg">
+        <span className="text-lg">🚒</span>
         <div>
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Suggested Emergency Response Route</h3>
-          <p className="text-sm font-bold text-emerald-400">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Suggested Emergency Route</h3>
+          <p className="text-xs font-bold text-emerald-400">
             From {origin.name || 'Station Hall'} → {activeCall?.address || 'Destination'}
           </p>
         </div>
@@ -73,9 +63,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         className="w-full h-full z-0"
         zoomControl={false}
       >
+        {/* CartoDB Voyager High-Contrast Basemap for sleek dark UI integration */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          maxZoom={20}
         />
 
         {/* Coquitlam Municipal Cadastral Layer */}
@@ -90,10 +82,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           to={[destLat, destLng]}
           onRouteCalculated={handleRouteCalculated}
         />
-
-        <Marker position={[origin.lat, origin.lng]} icon={hallIcon}>
-          <Popup>Origin: {origin.name}</Popup>
-        </Marker>
 
         <Marker position={[destLat, destLng]} icon={destIcon}>
           <Popup>Target Destination: {activeCall?.address}</Popup>

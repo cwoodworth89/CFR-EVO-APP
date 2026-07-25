@@ -50,30 +50,26 @@ export function BaseMap({ style, useLabelsFallback }) {
 
         cleanup();
 
-        const config = BASE_LAYERS[style];
-        if (!config) {
-            console.warn(`Unknown base layer style: ${style}`);
-            return;
-        }
-
-        let url = config.url;
-        if (useLabelsFallback && url.includes('_nolabels')) {
+        const config = BASE_LAYERS[style] || BASE_LAYERS.GREY;
+        let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.GREY.url || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
+        if (useLabelsFallback && url && url.includes('_nolabels')) {
             url = url.replace('_nolabels', '_all');
         }
 
-        if (config.type === 'tile') {
-            const tileLayer = L.tileLayer(url, {
-                attribution: config.attribution,
-                subdomains: config.subdomains,
-                maxNativeZoom: config.maxNativeZoom ?? 19,
-                maxZoom: config.maxZoom ?? 22,
-                noWrap: true,
-            });
-            tileLayer.addTo(map);
-            layerRef.current = tileLayer;
-        } else {
-            console.warn('Unsupported base layer type:', config.type);
-        }
+        const attribution = typeof config === 'object' ? config.attribution : '&copy; <a href="https://carto.com/">CARTO</a>';
+        const subdomains = typeof config === 'object' ? config.subdomains : 'abcd';
+        const maxNativeZoom = typeof config === 'object' ? (config.maxNativeZoom ?? 19) : 19;
+        const maxZoom = typeof config === 'object' ? (config.maxZoom ?? 22) : 22;
+
+        const tileLayer = L.tileLayer(url, {
+            attribution: attribution,
+            subdomains: subdomains,
+            maxNativeZoom: maxNativeZoom,
+            maxZoom: maxZoom,
+            noWrap: true,
+        });
+        tileLayer.addTo(map);
+        layerRef.current = tileLayer;
 
         return cleanup;
     }, [map, style, useLabelsFallback]);

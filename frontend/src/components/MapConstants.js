@@ -1,10 +1,38 @@
 // Map & Layer Constants
 
 export const BASE_LAYERS = {
-  GREY: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  DARK: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-  SATELLITE: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  OSM: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  GREY: {
+    type: 'tile',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxNativeZoom: 19,
+    maxZoom: 22
+  },
+  DARK: {
+    type: 'tile',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxNativeZoom: 19,
+    maxZoom: 22
+  },
+  SATELLITE: {
+    type: 'tile',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Esri, Maxar, Earthstar Geographics',
+    subdomains: 'abc',
+    maxNativeZoom: 18,
+    maxZoom: 22
+  },
+  OSM: {
+    type: 'tile',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+    subdomains: 'abc',
+    maxNativeZoom: 19,
+    maxZoom: 22
+  }
 };
 
 export const MODE_DEFAULTS = {

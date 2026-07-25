@@ -537,12 +537,16 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     return targetAddress ? [targetAddress.lat, targetAddress.lng] : null;
   }, [targetAddress]);
 
-  // Adaptive Zooming: fit bounds to show both the selected Fire Hall (origin) and searched address (destination)
+  // Adaptive Zooming: fit bounds to show both origin hall & destination address (padded for 1/3 right sidebar)
   useEffect(() => {
     if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE") {
       const origin = STATIONS[homeHall];
       const dest = [targetAddress.lat, targetAddress.lng];
-      map.fitBounds([origin, dest], { padding: [50, 50], animate: true });
+      map.fitBounds([origin, dest], { 
+        paddingTopLeft: [60, 60], 
+        paddingBottomRight: [420, 60], 
+        animate: true 
+      });
     }
   }, [map, targetAddress, homeHall, appMode]);
 
@@ -1230,8 +1234,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               style={{ height: "100%", width: "100%" }} 
               className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
           >
-            {/* 1. BASE MAP (z-index 200) */}
-            <BaseMap style={mapStyle} useLabelsFallback={cadastralError} />
+            {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) in Active Routing mode */}
+            <BaseMap style={targetAddress ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
             
             <CoquitlamOverlays 
                 visible={showLabels && !cadastralError} 

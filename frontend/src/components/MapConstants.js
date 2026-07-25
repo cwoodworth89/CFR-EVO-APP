@@ -33,6 +33,14 @@ export const BASE_LAYERS = {
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 19,
     maxZoom: 22
+  },
+  VOYAGER: {
+    type: 'tile',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap contributors & Carto',
+    subdomains: ['a', 'b', 'c', 'd'],
+    maxNativeZoom: 19,
+    maxZoom: 22
   }
 };
 

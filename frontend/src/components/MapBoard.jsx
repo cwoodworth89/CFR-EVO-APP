@@ -233,7 +233,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [map, setMap] = useState(null);
 
   // Safe dynamic compile-time stamp
-  const buildDateStr = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
+  const buildTime = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
 
   // RAW DATA STATES
   const [zones, setZones] = useState([]);

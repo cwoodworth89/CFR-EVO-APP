@@ -956,6 +956,12 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk }) {
 
   const startMode = useCallback((mode) => {
       clearTimeout(autoAdvanceTimer.current); // Clear any pending jumps
+      if (mode === "KIOSK_VIEW") {
+        if (typeof onLaunchKiosk === 'function') {
+          onLaunchKiosk();
+        }
+        return;
+      }
       setAppMode(mode);
       setActiveDispatch(null);
       setScore(0);

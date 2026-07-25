@@ -34,14 +34,13 @@ export default function KioskView({ kioskState }) {
             <span>DB Real-Time Sync: Connected</span>
           </div>
 
-          {isSimulationMode && (
-            <button
-              onClick={exitSimulation}
-              className="mt-4 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold text-xs transition shadow-lg cursor-pointer"
-            >
-              Exit Simulation Mode
-            </button>
-          )}
+          <button
+            onClick={exitSimulation}
+            className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-semibold text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
+          >
+            <span>🚪</span>
+            <span>Exit Kiosk View</span>
+          </button>
         </div>
       </div>
     );

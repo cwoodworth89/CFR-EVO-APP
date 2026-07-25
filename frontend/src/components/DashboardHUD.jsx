@@ -462,13 +462,15 @@ export function LeftSidebar({
     const delayDebounce = setTimeout(() => {
       const upperQuery = query.toUpperCase().replace(/'/g, "''");
       const encodedWhere = encodeURIComponent(`UPPER(ADDRESS) LIKE '%${upperQuery}%'`);
-      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=${encodedWhere}&outFields=ADDRESS&returnGeometry=true&outSR=4326&resultRecordCount=5&f=json`;
+      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=${encodedWhere}&outFields=ADDRESS&returnGeometry=true&outSR=4326&resultRecordCount=25&f=json`;
 
       fetch(url)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data && data.features) {
-            const items = data.features.map(f => {
+            const userSearchedUnit = /\b(UNIT|APT|SUITE|STE|#)\b/i.test(query);
+
+            const rawItems = data.features.map(f => {
               const address = f.attributes.ADDRESS;
               const geom = f.geometry;
               let lat = 0;
@@ -494,7 +496,31 @@ export function LeftSidebar({
                 rings
               };
             });
-            setSuggestions(items);
+
+            // Deduplicate multi-unit addresses down to base building address unless user searched a specific unit
+            const seen = new Set();
+            const deduplicated = [];
+
+            rawItems.forEach(item => {
+              let cleanAddr = item.address;
+              if (!userSearchedUnit) {
+                cleanAddr = item.address
+                  .replace(/\s+(UNIT|APT|SUITE|STE|#)\s*[\w-]+/gi, '')
+                  .replace(/\s+#\d+/gi, '')
+                  .trim();
+              }
+
+              const key = cleanAddr.toUpperCase();
+              if (!seen.has(key)) {
+                seen.add(key);
+                deduplicated.push({
+                  ...item,
+                  address: cleanAddr
+                });
+              }
+            });
+
+            setSuggestions(deduplicated.slice(0, 6));
           } else {
             setSuggestions([]);
           }

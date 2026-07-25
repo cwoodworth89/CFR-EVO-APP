@@ -7,8 +7,9 @@ export default function PropertySatellitePanel({ activeCall }) {
   const destLng = activeCall?.lng ?? -122.7932;
 
   // High-Resolution ESRI World Imagery Bounding Box Export URL centered on property
-  const deltaLat = 0.0008;
-  const deltaLng = 0.0013;
+  // Widened delta span (~200m) for comfortable aerial context of entire building complex & access roads
+  const deltaLat = 0.0018;
+  const deltaLng = 0.0028;
   const minLng = destLng - deltaLng;
   const maxLng = destLng + deltaLng;
   const minLat = destLat - deltaLat;
@@ -37,14 +38,15 @@ export default function PropertySatellitePanel({ activeCall }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
 
-          {/* Target Location Pin Overlay Dead Center */}
+          {/* Static Target Location Pin Overlay (Clean non-bouncing CAD pin) */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="flex flex-col items-center animate-bounce">
-              <div className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-lg border border-slate-900 uppercase tracking-wider">
-                📍 {activeCall?.address || 'Target Property'}
+            <div className="flex flex-col items-center">
+              <div className="bg-slate-950/90 text-amber-300 text-[10px] font-black px-2 py-1 rounded-lg shadow-xl border border-amber-500/60 uppercase tracking-wider font-mono flex items-center gap-1">
+                <span>📍</span>
+                <span>{activeCall?.address || 'Target Property'}</span>
               </div>
-              <div className="w-0.5 h-3 bg-amber-500 shadow" />
-              <div className="w-3 h-3 rounded-full border-2 border-amber-300 bg-amber-500/60 animate-ping" />
+              <div className="w-0.5 h-2.5 bg-amber-400 shadow-md" />
+              <div className="w-2.5 h-2.5 rounded-full border-2 border-amber-300 bg-amber-500 shadow-md" />
             </div>
           </div>
 

@@ -7,8 +7,8 @@ export default function PropertySatellitePanel({ activeCall }) {
   const destLng = activeCall?.lng ?? -122.7932;
 
   // High-Resolution ESRI World Imagery Bounding Box Export URL centered on property
-  const deltaLat = 0.0012;
-  const deltaLng = 0.002;
+  const deltaLat = 0.0008;
+  const deltaLng = 0.0013;
   const minLng = destLng - deltaLng;
   const maxLng = destLng + deltaLng;
   const minLat = destLat - deltaLat;
@@ -18,7 +18,8 @@ export default function PropertySatellitePanel({ activeCall }) {
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center">
-      <div className="absolute top-2 left-2 z-10 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
+      {/* Header Badge */}
+      <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
         <span>🛰️</span>
         <span>3D Property Satellite View</span>
         {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">WAN Failsafe Mode</span>}
@@ -35,7 +36,19 @@ export default function PropertySatellitePanel({ activeCall }) {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute bottom-2 left-2 text-[10px] text-slate-300 font-mono bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+
+          {/* Target Location Pin Overlay Dead Center */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className="flex flex-col items-center animate-bounce">
+              <div className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-lg border border-slate-900 uppercase tracking-wider">
+                📍 {activeCall?.address || 'Target Property'}
+              </div>
+              <div className="w-0.5 h-3 bg-amber-500 shadow" />
+              <div className="w-3 h-3 rounded-full border-2 border-amber-300 bg-amber-500/60 animate-ping" />
+            </div>
+          </div>
+
+          <div className="absolute bottom-2 left-2 text-[10px] text-slate-300 font-mono bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800 z-20">
             WGS84: {destLat.toFixed(4)}, {destLng.toFixed(4)}
           </div>
         </div>

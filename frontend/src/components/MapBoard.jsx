@@ -229,13 +229,13 @@ function getAlphaSegment(rings, referencePt) {
   return alphaSeg;
 }
 
-export default function MapBoard({ onSimulateCall, onLaunchKiosk }) {
+export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = "EXPLORE" }) {
   const [map, setMap] = useState(null);
 
   // Safe dynamic compile-time stamp
-  const buildTime = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'LOCAL_DEV';
+  const buildDateStr = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
 
-  // DATA STATE
+  // RAW DATA STATES
   const [zones, setZones] = useState([]);
   const [intersections, setIntersections] = useState([]);
   const [blocks, setBlocks] = useState([]);
@@ -244,7 +244,13 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk }) {
   const [selectedClosure, setSelectedClosure] = useState(null);
   
   // APP/TERMINAL STATE
-  const [appMode, setAppMode] = useState("EXPLORE"); 
+  const [appMode, setAppMode] = useState(initialMode);
+
+  useEffect(() => {
+    if (initialMode) {
+      setAppMode(initialMode);
+    }
+  }, [initialMode]);
   const [activeDispatch, setActiveDispatch] = useState(null);
   const [trainingDataLoaded, setTrainingDataLoaded] = useState(false);
   const [loadingTraining, setLoadingTraining] = useState(false);

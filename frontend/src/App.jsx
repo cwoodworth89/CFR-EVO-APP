@@ -6,11 +6,15 @@ import { useKioskQueue } from './hooks/useKioskQueue';
 function App() {
   const kioskState = useKioskQueue();
   const [explicitKioskMode, setExplicitKioskMode] = useState(false);
+  const [returnMode, setReturnMode] = useState('EXPLORE');
 
   const shouldRenderKiosk = explicitKioskMode || !!kioskState.activeCall || kioskState.isSimulationMode;
 
   const handleSimulateCall = (call) => {
     if (!call) return;
+
+    // Track that we originated from Admin Dispatch Review panel
+    setReturnMode('ADMIN_DISPATCHES');
 
     const mockCall = {
       id: call.id || 'sim-' + Date.now(),
@@ -47,8 +51,12 @@ function App() {
         <KioskView kioskState={extendedKioskState} />
       ) : (
         <MapBoard
+          initialMode={returnMode}
           onSimulateCall={handleSimulateCall}
-          onLaunchKiosk={() => setExplicitKioskMode(true)}
+          onLaunchKiosk={() => {
+            setReturnMode('EXPLORE');
+            setExplicitKioskMode(true);
+          }}
         />
       )}
     </div>

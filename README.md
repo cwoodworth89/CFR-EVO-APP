@@ -137,6 +137,7 @@ The project has been split into isolated domain packages to ensure zero cyclical
 For detailed developer setup instructions, credential configuration, and dependencies, please refer to the README files inside the respective subfolders:
 - Read [**Backend Setup Guide**](./backend/README.md) for running the listener.
 - Read [**Frontend Setup Guide**](./frontend/README.md) for running or deploying the website.
+- Read [**EVO Routing Engine Architecture**](./docs/evo_routing_engine.md) for 3-tier apparatus physics, EMTRAC preemption, elevation drag, and CP Rail avoidance specifications.
 
 ---
 

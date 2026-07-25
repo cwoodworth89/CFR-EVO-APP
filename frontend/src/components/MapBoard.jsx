@@ -279,6 +279,29 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const targetMarkerRef = useRef(null);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
 
+  // Compute Response Route Metrics (Distance & EMTRAC Code 3 ETA)
+  const routeMetrics = useMemo(() => {
+    if (!targetAddress || !STATIONS[homeHall]) return null;
+    const origin = STATIONS[homeHall];
+    const target = [targetAddress.lat, targetAddress.lng];
+    
+    let distKm = 0;
+    if (routeCoordinates && routeCoordinates.length > 1) {
+      const line = turf.lineString(routeCoordinates.map(c => [c.lng || c[1], c.lat || c[0]]));
+      distKm = turf.length(line, { units: 'kilometers' });
+    } else {
+      const fromPt = turf.point([origin[1], origin[0]]);
+      const toPt = turf.point([target[1], target[0]]);
+      distKm = turf.distance(fromPt, toPt, { units: 'kilometers' }) * 1.3;
+    }
+
+    const etaMin = Math.max(0.5, (distKm / 52 * 60)).toFixed(1);
+    return {
+      distanceKm: distKm.toFixed(1),
+      etaMinutes: etaMin
+    };
+  }, [targetAddress, homeHall, routeCoordinates]);
+
   // Load all hydrants data and fire zones once on mount
   useEffect(() => {
     const baseUrl = import.meta.env.BASE_URL;
@@ -1175,6 +1198,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setTargetAddress={updateTargetAddress}
           nearestHydrant={nearestHydrants[0] || null}
           nearestHydrants={nearestHydrants}
+          routeMetrics={routeMetrics}
           filterNoAccess={filterNoAccess}
           setFilterNoAccess={setFilterNoAccess}
           filterAccessOnly={filterAccessOnly}

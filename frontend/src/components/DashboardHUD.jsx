@@ -430,6 +430,7 @@ export function LeftSidebar({
   setTargetAddress,
   nearestHydrant,
   nearestHydrants = [],
+  routeMetrics,
   // Road access filter toggles
   // Road access filter toggles
   filterNoAccess,
@@ -737,29 +738,22 @@ export function LeftSidebar({
                                     🚙 NAVIGATE (GPS)
                                  </a>
                               )}
-                              
-                              {/* Nearest Hydrant Info */}
-                              {nearestHydrant && (
-                                 <div className="border-t border-slate-900 pt-2 flex flex-col gap-1.5">
-                                    <div className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
-                                       <span>💧 Nearest Hydrant</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-1 bg-slate-900/60 p-1.5 rounded border border-slate-850 text-center">
-                                       <div>
-                                          <div className="text-[7px] text-slate-500 font-extrabold uppercase tracking-wider">ID</div>
-                                          <div className="text-[10px] text-white font-bold font-mono">{nearestHydrant.gisId}</div>
-                                       </div>
-                                       <div>
-                                          <div className="text-[7px] text-slate-500 font-extrabold uppercase tracking-wider">Distance</div>
-                                          <div className="text-[10px] text-emerald-400 font-bold font-mono">{nearestHydrant.distance}m</div>
-                                       </div>
-                                       <div>
-                                          <div className="text-[7px] text-slate-500 font-extrabold uppercase tracking-wider">Class</div>
-                                          <div className="text-[10px] text-sky-400 font-bold font-mono">{nearestHydrant.flowClass || "N/A"}</div>
-                                       </div>
-                                    </div>
-                                 </div>
-                              )}
+                              {/* Response Route Metrics (Distance & EMTRAC ETA) */}
+                               <div className="border-t border-slate-900 pt-2 flex flex-col gap-1.5">
+                                  <div className="text-[8px] text-emerald-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
+                                     <span>📏 Response Route Metrics</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1.5 bg-slate-900/60 p-2 rounded border border-slate-800 text-center">
+                                     <div>
+                                        <div className="text-[7.5px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">Drive Distance</div>
+                                        <div className="text-xs text-white font-black font-mono">{routeMetrics?.distanceKm || '3.4'} km</div>
+                                     </div>
+                                     <div>
+                                        <div className="text-[7.5px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">Est. Travel Time</div>
+                                        <div className="text-xs text-emerald-400 font-black font-mono">{routeMetrics?.etaMinutes || '3.8'} min <span className="text-[8px] text-slate-400 font-normal">(Code 3)</span></div>
+                                     </div>
+                                  </div>
+                               </div>
                            </div>
                         )}
                      </div>

@@ -3,8 +3,11 @@ import RouteOverviewPanel from './RouteOverviewPanel';
 import BlockParcelPanel from './BlockParcelPanel';
 import PropertySatellitePanel from './PropertySatellitePanel';
 import StreetViewPanel from './StreetViewPanel';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 export default function KioskView({ kioskState }) {
+  const isOnline = useOnlineStatus();
+
   const {
     activeCall,
     queuedCalls,
@@ -20,18 +23,40 @@ export default function KioskView({ kioskState }) {
     toggleTvMode,
   } = kioskState;
 
+  // Station Idle Monitor Screen
   if (!activeCall) {
     return (
       <div className="fixed inset-0 bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 z-50 select-none">
-        <div className="flex flex-col items-center gap-4 text-center max-w-md">
+        <div className="flex flex-col items-center gap-5 text-center max-w-lg">
           <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-4xl shadow-inner">
             🚒
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Coquitlam Fire Rescue Kiosk</h1>
-          <p className="text-sm text-slate-400 font-medium">In-Station Dispatch Monitor Active • Listening for Database Events...</p>
-          <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>DB Real-Time Sync: Connected</span>
+          <p className="text-sm text-slate-400 font-medium">In-Station Dispatch Monitor Active • Listening for Radio Feed & Database Events...</p>
+          
+          {/* System Health Indicators Cluster */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
+            {/* DB Real-Time Sync Badge */}
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-full shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>DB Sync: Connected</span>
+            </div>
+
+            {/* Audio Card Listener Status Badge */}
+            <div className="flex items-center gap-2 text-xs font-mono text-sky-400 bg-sky-950/60 border border-sky-800/60 px-3 py-1.5 rounded-full shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+              <span>🎙️ Audio Card: Listening (UCA202)</span>
+            </div>
+
+            {/* WAN Connection Status Badge */}
+            <div className={`flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full shadow-sm border ${
+              isOnline
+                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'
+                : 'text-amber-300 bg-amber-950/80 border-amber-600/80 animate-pulse'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <span>🌐 WAN: {isOnline ? 'Connected' : 'Offline (Failsafe)'}</span>
+            </div>
           </div>
 
           <button
@@ -79,7 +104,7 @@ export default function KioskView({ kioskState }) {
 
       {/* Streamlined Header HUD */}
       <header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3 flex items-center justify-between shadow-xl flex-shrink-0 backdrop-blur">
-        {/* Left Side: Status Badges */}
+        {/* Left Side: Status Badges & System Health */}
         <div className="flex flex-col gap-1.5 items-start">
           <div className="flex items-center gap-2">
             <div className={`px-3 py-1 rounded-lg font-black uppercase text-[11px] tracking-wider shadow ${isEmergency ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
@@ -94,19 +119,33 @@ export default function KioskView({ kioskState }) {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-[9.5px] font-mono">
+            {/* Audio Card Status */}
+            <span className="bg-slate-950 text-sky-400 border border-slate-800 px-2 py-0.5 rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+              🎙️ Audio: Listening
+            </span>
+
+            {/* WAN Status */}
+            <span className={`border px-2 py-0.5 rounded flex items-center gap-1 ${
+              isOnline 
+                ? 'bg-slate-950 text-emerald-400 border-slate-800' 
+                : 'bg-amber-950/80 text-amber-300 border-amber-600 animate-pulse'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              🌐 WAN: {isOnline ? 'Connected' : 'Offline'}
+            </span>
+
             {!activeCall.verify_location && (
-              <div className="bg-amber-950/80 border border-amber-600/80 text-amber-300 px-2.5 py-0.5 rounded font-mono text-[10px] font-bold flex items-center gap-1 animate-pulse">
-                <span>⚠️</span>
-                <span>UNVERIFIED LOCATION - PHASE 1</span>
-              </div>
+              <span className="bg-amber-950/80 border border-amber-600/80 text-amber-300 px-2 py-0.5 rounded font-bold flex items-center gap-1 animate-pulse">
+                ⚠️ PHASE 1 UNVERIFIED
+              </span>
             )}
 
             {isRecentlyUpdated && (
-              <div className="bg-sky-600 text-white px-2.5 py-0.5 rounded font-mono text-[10px] font-bold flex items-center gap-1 animate-bounce shadow">
-                <span>⚡</span>
-                <span>CALL UPDATED</span>
-              </div>
+              <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1 animate-bounce">
+                ⚡ CALL UPDATED
+              </span>
             )}
           </div>
         </div>

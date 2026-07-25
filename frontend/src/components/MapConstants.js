@@ -1,50 +1,64 @@
-// 🎨 COLORS
-export const UNIT_COLORS = { 
-  "E1": "#ef4444", "E2": "#3b82f6", "E3": "#22c55e", 
-  "Q5": "#eab308", "E4": "#a855f7", "UNKNOWN": "#9ca3af" 
-};
+// Map & Layer Constants
 
-// 🗺️ BASE LAYERS (No-label basemaps)
 export const BASE_LAYERS = {
-  GREY: {
-    type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 19,
-    maxZoom: 22,
-  },
-  DARK: {
-    type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 19,
-    maxZoom: 22,
-  },
+  GREY: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+  DARK: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  SATELLITE: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  OSM: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 };
 
-// 🎮 DEFAULTS
 export const MODE_DEFAULTS = {
-    EXPLORE: "GREY",
-    TRAINING_ZONES: "DARK",
-    TRAINING_INTERSECTIONS: "GREY",
-    TRAINING_BLOCKS: "GREY",
-    TRAINING_ADDRESSES: "GREY",
-    ROAD_CLOSURES: "GREY"
+  EXPLORE: "GREY",
+  TRAINING_ZONES: "DARK",
+  TRAINING_INTERSECTIONS: "GREY",
+  TRAINING_BLOCKS: "GREY",
+  TRAINING_ADDRESSES: "GREY",
+  KIOSK_VIEW: "DARK"
 };
 
-// 🚒 FIRE STATIONS COORDINATES
-// Verified coordinates for Coquitlam Fire Halls
+// Emergency Unit Colors
+export const UNIT_COLORS = {
+  ENGINE: "#ef4444",
+  LADDER: "#f97316",
+  RESCUE: "#3b82f6",
+  CHIEF: "#eab308",
+  DEFAULT: "#10b981"
+};
+
+// 🚒 COQUITLAM FIRE HALLS
+// Official municipal civic addresses with verified driveway front-apron GPS coordinates for emergency routing
 export const STATIONS = [
-  { id: "1", name: "Town Centre Fire Hall (TCFH)", coords: [49.29109654571679, -122.79072561861948] },
-  { id: "2", name: "Mariner Fire Hall", coords: [49.2622197420057, -122.81747986099539] },
-  { id: "3", name: "Austin Heights Fire Hall", coords: [49.24803974681661, -122.86546062387211] },
-  { id: "4", name: "Burke Mountain Fire Hall", coords: [49.29510006403205, -122.74247651791484] }
+  {
+    id: "1",
+    hall: 1,
+    name: "Town Centre Fire Hall (Hall 1)",
+    address: "1300 Pinetree Way",
+    coords: [49.29109654571679, -122.79072561861948] // Front apron driveway GPS
+  },
+  {
+    id: "2",
+    hall: 2,
+    name: "Mariner Fire Hall (Hall 2)",
+    address: "2680 Mariner Way",
+    coords: [49.2622197420057, -122.81747986099539] // Front apron driveway GPS
+  },
+  {
+    id: "3",
+    hall: 3,
+    name: "Austin Heights Fire Hall (Hall 3)",
+    address: "1001 Austin Ave",
+    coords: [49.24803974681661, -122.86546062387211] // Front apron driveway GPS
+  },
+  {
+    id: "4",
+    hall: 4,
+    name: "Burke Mountain Fire Hall (Hall 4)",
+    address: "3501 David Ave",
+    coords: [49.29510006403205, -122.74247651791484] // Front apron driveway GPS
+  }
 ];
 
 export const STATIONS_MAP = STATIONS.reduce((acc, stn) => {
   acc[stn.id] = stn.coords;
   return acc;
 }, {});
-

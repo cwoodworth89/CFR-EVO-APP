@@ -31,7 +31,11 @@ const destIcon = new L.Icon({
 });
 
 export default function RouteOverviewPanel({ activeCall, stationHall }) {
-  const origin = stationHall || { lat: 49.2882, lng: -122.7915, name: 'Hall 1 (Pinetree Way)' };
+  const origin = stationHall || {
+    lat: 49.29109654571679,
+    lng: -122.79072561861948,
+    name: 'Hall 1 (1300 Pinetree Way)'
+  };
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
   const destination = { lat: destLat, lng: destLng };

@@ -1,35 +1,36 @@
 // Map & Layer Constants
 
+// 🗺️ BASE LAYERS (Clean no-label basemaps for Coquitlam municipal vector overlays)
 export const BASE_LAYERS = {
   GREY: {
     type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd',
+    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap contributors & Carto',
+    subdomains: ['a', 'b', 'c', 'd'],
     maxNativeZoom: 19,
-    maxZoom: 22
+    maxZoom: 22,
   },
   DARK: {
     type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap contributors & Carto',
+    subdomains: ['a', 'b', 'c', 'd'],
     maxNativeZoom: 19,
-    maxZoom: 22
+    maxZoom: 22,
   },
   SATELLITE: {
     type: 'tile',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Esri, Maxar, Earthstar Geographics',
-    subdomains: 'abc',
+    subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 18,
     maxZoom: 22
   },
   OSM: {
     type: 'tile',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors',
-    subdomains: 'abc',
+    attribution: '© OpenStreetMap contributors',
+    subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 19,
     maxZoom: 22
   }

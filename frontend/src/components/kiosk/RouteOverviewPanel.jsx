@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
 import { CoquitlamOverlays, StationsLayer } from '../MapLayers';
+import { BASE_LAYERS } from '../MapConstants';
 
 // Custom Map Bounds Auto-Fitter
 function AutoFitBounds({ origin, destination }) {
@@ -67,11 +68,12 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         className="w-full h-full z-0"
         zoomControl={false}
       >
-        {/* CartoDB Voyager High-Contrast Basemap for sleek dark UI integration */}
+        {/* Original CartoDB light_nolabels Basemap for vector layer compatibility */}
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          maxZoom={20}
+          attribution={BASE_LAYERS.GREY.attribution}
+          url={BASE_LAYERS.GREY.url}
+          subdomains={BASE_LAYERS.GREY.subdomains}
+          maxZoom={22}
         />
 
         {/* Coquitlam Municipal Cadastral Layer */}

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
+import { BASE_LAYERS } from '../MapConstants';
 
 // Force Leaflet map resize invalidation on render & center map
 function AutoCenterAndResize({ center }) {
@@ -50,9 +51,10 @@ export default function BlockParcelPanel({ activeCall }) {
         zoomControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          maxZoom={20}
+          attribution={BASE_LAYERS.GREY.attribution}
+          url={BASE_LAYERS.GREY.url}
+          subdomains={BASE_LAYERS.GREY.subdomains}
+          maxZoom={22}
         />
 
         {/* Official Coquitlam Municipal Cadastral Roads & Parcels */}

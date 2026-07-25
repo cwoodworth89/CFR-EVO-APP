@@ -1320,45 +1320,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
                   ref={targetMarkerRef}
                   position={[targetAddress.lat, targetAddress.lng]} 
                   icon={targetIcon}
-                >
-                  <Popup className="target-address-popup">
-                    <div className="bg-slate-950 text-white p-3 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
-                      <div className="flex justify-between items-center gap-2">
-                        <span className="text-[9px] text-slate-400 font-mono font-medium">SEARCH TARGET</span>
-                        <span className="text-emerald-400 text-[9px] font-bold tracking-wider">ACTIVE ROUTE</span>
-                      </div>
-                      <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">{targetAddress.address}</h3>
-                      <p className="text-[9px] text-slate-450 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
-                      
-                      {nearestHydrants.length > 0 && (
-                        <div className="mt-2.5 pt-2 border-t border-slate-900 flex flex-col gap-1">
-                          <span className="text-[8px] text-sky-400 font-extrabold uppercase tracking-wider font-mono">💧 Nearest Hydrant</span>
-                          <div className="flex justify-between text-xs mt-0.5">
-                            <span className="text-slate-400">ID / Distance</span>
-                            <span className="text-white font-mono font-bold">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
-                          </div>
-                          {nearestHydrants[0].flowClass && (
-                            <div className="flex justify-between text-xs">
-                              <span className="text-slate-400">Flow Rating</span>
-                              <span className="text-sky-400 font-mono font-bold">{nearestHydrants[0].flowClass}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="mt-3 pt-2 border-t border-slate-900">
-                        <a 
-                          href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all text-center w-full shadow-md border border-indigo-500"
-                        >
-                          🚙 NAVIGATE (GPS)
-                        </a>
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
+                />
 
                 {/* Highlight Top 3 closest hydrants (No tracer line) */}
                 {nearestHydrants.map((hyd, idx) => {
@@ -1402,6 +1364,58 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               </>
             )}
           </MapContainer>
+
+          {/* FLOATING TARGET HUD CARD (Unobscured Map View) */}
+          {appMode === "EXPLORE" && targetAddress && (
+            <div className="absolute top-4 right-14 z-[1000] bg-slate-950/95 border border-slate-800 backdrop-blur rounded-2xl p-4 shadow-2xl w-72 text-white animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex justify-between items-center gap-2 pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">SEARCH TARGET</span>
+                  <span className="text-emerald-400 text-[9px] font-black tracking-wider bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded">ACTIVE ROUTE</span>
+                </div>
+                <button 
+                  onClick={() => setTargetAddress(null)}
+                  className="text-slate-400 hover:text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-800 transition cursor-pointer"
+                  title="Clear Target"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <h3 className="font-extrabold text-base text-sky-400 mt-2 leading-tight uppercase">{targetAddress.address}</h3>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
+              
+              {nearestHydrants.length > 0 && (
+                <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col gap-1.5">
+                  <span className="text-[9px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
+                    💧 Nearest Hydrant
+                  </span>
+                  <div className="flex justify-between text-xs bg-slate-900/60 px-2.5 py-1 rounded border border-slate-800/60">
+                    <span className="text-slate-400 font-mono">ID / Distance</span>
+                    <span className="text-white font-mono font-black">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
+                  </div>
+                  {nearestHydrants[0].flowClass && (
+                    <div className="flex justify-between text-xs bg-slate-900/60 px-2.5 py-1 rounded border border-slate-800/60">
+                      <span className="text-slate-400 font-mono">Flow Rating</span>
+                      <span className="text-sky-400 font-mono font-black">{nearestHydrants[0].flowClass}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-3.5">
+                <a 
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all text-center w-full shadow-lg border border-indigo-400 cursor-pointer"
+                >
+                  <span>🚙</span>
+                  <span>NAVIGATE (GPS)</span>
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
           <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">

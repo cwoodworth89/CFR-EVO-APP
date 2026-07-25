@@ -33,18 +33,30 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div className="w-screen h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none font-sans">
-          <div className="max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4">
-            <span className="text-4xl">⚠️</span>
-            <h1 className="text-xl font-bold text-white uppercase tracking-wider">Application Refresh Recovery</h1>
+          <div className="max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4 text-left">
+            <div className="flex items-center gap-2 text-rose-400">
+              <span className="text-3xl">⚠️</span>
+              <h1 className="text-lg font-bold uppercase tracking-wider">Application Diagnostic Error</h1>
+            </div>
             <p className="text-xs text-slate-400 font-mono leading-relaxed">
-              A temporary rendering issue was encountered. Click below to reload the app interface cleanly.
+              An unhandled exception occurred during application execution:
             </p>
+            {this.state.error && (
+              <div className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-rose-300 overflow-x-auto max-h-48 whitespace-pre-wrap">
+                {this.state.error.toString()}
+                {this.state.error.stack && (
+                  <div className="text-[9.5px] text-slate-500 mt-2 border-t border-slate-800 pt-2">
+                    {this.state.error.stack}
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={() => {
                 this.setState({ hasError: false, error: null });
                 window.location.reload();
               }}
-              className="bg-sky-500 hover:bg-sky-400 text-black font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-lg transition cursor-pointer"
+              className="bg-sky-500 hover:bg-sky-400 text-black font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-lg transition cursor-pointer self-center"
             >
               🔄 RELOAD APPLICATION
             </button>

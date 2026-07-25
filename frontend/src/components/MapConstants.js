@@ -39,14 +39,14 @@ export const STATIONS = [
     id: "2",
     hall: 2,
     name: "Mariner Fire Hall (Hall 2)",
-    address: "2680 Mariner Way",
+    address: "775 Mariner Way",
     coords: [49.2622197420057, -122.81747986099539] // Front apron driveway GPS
   },
   {
     id: "3",
     hall: 3,
     name: "Austin Heights Fire Hall (Hall 3)",
-    address: "1001 Austin Ave",
+    address: "438 Nelson Street",
     coords: [49.24803974681661, -122.86546062387211] // Front apron driveway GPS
   },
   {

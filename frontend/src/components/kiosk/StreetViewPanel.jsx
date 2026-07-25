@@ -1,21 +1,45 @@
 import React, { useState } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
+// Verified Street View Frontage & Heading Overrides for Large Complexes
+export const STREETVIEW_OVERRIDES = {
+  "3100 OZADA AVE": { lat: 49.3015, lng: -122.7758, heading: 170, fov: 90, pitch: 5 },
+  "2680 MARINER WAY": { lat: 49.2780, lng: -122.8050, heading: 240, fov: 90, pitch: 0 },
+  "1190 PIPELINE RD": { lat: 49.2965, lng: -122.7910, heading: 90, fov: 90, pitch: 0 },
+  "1300 PINETREE WAY": { lat: 49.2838, lng: -122.7932, heading: 270, fov: 90, pitch: 0 },
+  "775 MARINER WAY": { lat: 49.2635, lng: -122.8048, heading: 180, fov: 90, pitch: 0 },
+  "438 NELSON ST": { lat: 49.2475, lng: -122.8682, heading: 320, fov: 90, pitch: 0 },
+  "3501 DAVID AVE": { lat: 49.3012, lng: -122.7560, heading: 190, fov: 90, pitch: 0 }
+};
+
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
-  const destLat = activeCall?.lat ?? 49.2838;
-  const destLng = activeCall?.lng ?? -122.7932;
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
   const [imageError, setImageError] = useState(false);
 
-  // Google Static Street View API URL
+  // Clean address key to check override table (e.g. "3100 OZADA AVE 116" -> "3100 OZADA AVE")
+  const rawAddr = (activeCall?.address || '').toUpperCase().trim();
+  const cleanAddrKey = rawAddr
+    .replace(/\s+(UNIT|APT|SUITE|STE|#)\s*[\w-]+/gi, '')
+    .replace(/(\b(AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|CRES|PL|LN|HWY)\b)\s+[A-Z0-9-]+$/i, '$1')
+    .trim();
+
+  const override = STREETVIEW_OVERRIDES[cleanAddrKey];
+
+  const destLat = override ? override.lat : (activeCall?.lat ?? 49.2838);
+  const destLng = override ? override.lng : (activeCall?.lng ?? -122.7932);
+  const heading = override ? override.heading : 0;
+  const pitch = override ? override.pitch : 0;
+  const fov = override ? override.fov : 90;
+
+  // Google Static Street View API URL (with source=outdoor to ignore indoor photo spheres)
   const staticStreetViewUrl = apiKey
-    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${destLat},${destLng}&fov=90&heading=0&pitch=0&key=${apiKey}`
+    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${destLat},${destLng}&fov=${fov}&heading=${heading}&pitch=${pitch}&source=outdoor&key=${apiKey}`
     : null;
 
   // Google Maps Embed API StreetView URL
   const embedStreetViewUrl = apiKey
-    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${destLat},${destLng}`
+    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${destLat},${destLng}&heading=${heading}&pitch=${pitch}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${destLng}!3d${destLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
   return (

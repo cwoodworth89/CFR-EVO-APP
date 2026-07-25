@@ -34,22 +34,22 @@ export default function KioskView({ kioskState }) {
           <h1 className="text-2xl font-bold tracking-tight text-white">Coquitlam Fire Rescue Kiosk</h1>
           <p className="text-sm text-slate-400 font-medium">In-Station Dispatch Monitor Active • Listening for Radio Feed & Database Events...</p>
           
-          {/* System Health Indicators Cluster */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
+          {/* Centered Vertically Stacked System Health Indicators */}
+          <div className="flex flex-col items-center justify-center gap-2 w-full mt-2">
             {/* DB Real-Time Sync Badge */}
-            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-full shadow-sm">
+            <div className="flex items-center justify-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-4 py-1.5 rounded-full shadow-sm w-72">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span>DB Sync: Connected</span>
             </div>
 
             {/* Audio Card Listener Status Badge */}
-            <div className="flex items-center gap-2 text-xs font-mono text-sky-400 bg-sky-950/60 border border-sky-800/60 px-3 py-1.5 rounded-full shadow-sm">
+            <div className="flex items-center justify-center gap-2 text-xs font-mono text-sky-400 bg-sky-950/60 border border-sky-800/60 px-4 py-1.5 rounded-full shadow-sm w-72">
               <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
               <span>🎙️ Audio Card: Listening (UCA202)</span>
             </div>
 
             {/* WAN Connection Status Badge */}
-            <div className={`flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full shadow-sm border ${
+            <div className={`flex items-center justify-center gap-2 text-xs font-mono px-4 py-1.5 rounded-full shadow-sm border w-72 ${
               isOnline
                 ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'
                 : 'text-amber-300 bg-amber-950/80 border-amber-600/80 animate-pulse'
@@ -104,8 +104,8 @@ export default function KioskView({ kioskState }) {
 
       {/* Streamlined Header HUD */}
       <header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3 flex items-center justify-between shadow-xl flex-shrink-0 backdrop-blur">
-        {/* Left Side: Status Badges & System Health */}
-        <div className="flex flex-col gap-1.5 items-start">
+        {/* Left Side: Status Badges & System Health Stacked */}
+        <div className="flex flex-col items-center gap-1.5 text-center">
           <div className="flex items-center gap-2">
             <div className={`px-3 py-1 rounded-lg font-black uppercase text-[11px] tracking-wider shadow ${isEmergency ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
               {isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'}
@@ -119,15 +119,14 @@ export default function KioskView({ kioskState }) {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[9.5px] font-mono">
-            {/* Audio Card Status */}
-            <span className="bg-slate-950 text-sky-400 border border-slate-800 px-2 py-0.5 rounded flex items-center gap-1">
+          {/* Centered Vertically Stacked Health Badges */}
+          <div className="flex flex-col items-center gap-1 font-mono text-[9px] w-full">
+            <span className="bg-slate-950 text-sky-400 border border-slate-800 px-2.5 py-0.5 rounded flex items-center justify-center gap-1 w-44">
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
               🎙️ Audio: Listening
             </span>
 
-            {/* WAN Status */}
-            <span className={`border px-2 py-0.5 rounded flex items-center gap-1 ${
+            <span className={`border px-2.5 py-0.5 rounded flex items-center justify-center gap-1 w-44 ${
               isOnline 
                 ? 'bg-slate-950 text-emerald-400 border-slate-800' 
                 : 'bg-amber-950/80 text-amber-300 border-amber-600 animate-pulse'
@@ -137,13 +136,13 @@ export default function KioskView({ kioskState }) {
             </span>
 
             {!activeCall.verify_location && (
-              <span className="bg-amber-950/80 border border-amber-600/80 text-amber-300 px-2 py-0.5 rounded font-bold flex items-center gap-1 animate-pulse">
+              <span className="bg-amber-950/80 border border-amber-600/80 text-amber-300 px-2.5 py-0.5 rounded font-bold flex items-center justify-center gap-1 animate-pulse w-44">
                 ⚠️ PHASE 1 UNVERIFIED
               </span>
             )}
 
             {isRecentlyUpdated && (
-              <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1 animate-bounce">
+              <span className="bg-sky-600 text-white px-2.5 py-0.5 rounded font-bold flex items-center justify-center gap-1 animate-bounce w-44">
                 ⚡ CALL UPDATED
               </span>
             )}

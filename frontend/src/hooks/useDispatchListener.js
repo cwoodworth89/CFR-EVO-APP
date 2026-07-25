@@ -12,7 +12,9 @@ import { supabase } from '../supabaseClient';
  */
 export function useDispatchListener({ onInsert, onUpdate, enabled = true }) {
   useEffect(() => {
-    if (!enabled || !supabase) return;
+    if (!enabled || !supabase || typeof supabase.channel !== 'function') return;
+
+    let channel = null;
 
     // Standardize raw payload from Supabase to unified dispatch object structure
     const formatDispatchPayload = (record) => {
@@ -44,33 +46,41 @@ export function useDispatchListener({ onInsert, onUpdate, enabled = true }) {
       };
     };
 
-    const channel = supabase
-      .channel('kiosk_live_calls_realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'live_calls' },
-        (payload) => {
-          const dispatch = formatDispatchPayload(payload.new);
-          if (dispatch && onInsert) {
-            onInsert(dispatch);
+    try {
+      channel = supabase
+        .channel('kiosk_live_calls_realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'live_calls' },
+          (payload) => {
+            const dispatch = formatDispatchPayload(payload.new);
+            if (dispatch && onInsert) {
+              onInsert(dispatch);
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'live_calls' },
-        (payload) => {
-          const dispatch = formatDispatchPayload(payload.new);
-          if (dispatch && onUpdate) {
-            onUpdate(dispatch);
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'live_calls' },
+          (payload) => {
+            const dispatch = formatDispatchPayload(payload.new);
+            if (dispatch && onUpdate) {
+              onUpdate(dispatch);
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Real-time channel subscription error:', err);
+    }
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (channel && typeof supabase.removeChannel === 'function') {
+        try {
+          supabase.removeChannel(channel);
+        } catch (e) {
+          // ignore cleanup warning
+        }
       }
     };
   }, [onInsert, onUpdate, enabled]);

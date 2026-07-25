@@ -542,3 +542,58 @@ export function CranesLayer({ visible, onSelectCrane }) {
     </>
   );
 }
+
+// Custom Railroad Crossing Marker Icon
+const railroadIcon = L.divIcon({
+  className: 'custom-railroad-icon',
+  html: `<div style="
+    background-color: #0f172a;
+    border: 2px solid #f59e0b;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
+    font-size: 14px;
+    cursor: pointer;
+  ">🚂</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14]
+});
+
+// Coquitlam & Port Coquitlam At-Grade CP Rail Crossings
+export const COQUITLAM_RAILROAD_CROSSINGS = [
+  { id: 'RR-01', name: 'Brunette Ave At-Grade Crossing', lat: 49.2315, lng: -122.8710, location: 'Brunette Ave & Lougheed Hwy' },
+  { id: 'RR-02', name: 'Schoolhouse Rd At-Grade Crossing', lat: 49.2332, lng: -122.8565, location: 'Schoolhouse Rd south of Lougheed' },
+  { id: 'RR-03', name: 'King Edward St At-Grade Crossing', lat: 49.2318, lng: -122.8450, location: 'King Edward St & United Blvd' },
+  { id: 'RR-04', name: 'Shaughnessy St CP Crossing', lat: 49.2595, lng: -122.7790, location: 'Shaughnessy St at CP Rail mainline' },
+  { id: 'RR-05', name: 'Coast Meridian Rd CP Crossing', lat: 49.2610, lng: -122.7630, location: 'Coast Meridian Rd at CP Rail mainline' },
+  { id: 'RR-06', name: 'McLean Ave CP Crossing', lat: 49.2618, lng: -122.7505, location: 'McLean Ave near PoCo border' }
+];
+
+export function RailroadCrossingsLayer({ visible }) {
+  if (!visible) return null;
+
+  return (
+    <>
+      {COQUITLAM_RAILROAD_CROSSINGS.map(rr => (
+        <Marker
+          key={rr.id}
+          position={[rr.lat, rr.lng]}
+          icon={railroadIcon}
+        >
+          <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
+            <div className="flex flex-col gap-0.5 font-mono">
+              <span className="text-[9px] text-amber-400 font-black uppercase tracking-wider">🚂 CP RAIL CROSSING</span>
+              <span className="text-white text-xs font-bold">{rr.name}</span>
+              <span className="text-[8.5px] text-slate-400">{rr.location}</span>
+            </div>
+          </Tooltip>
+        </Marker>
+      ))}
+    </>
+  );
+}

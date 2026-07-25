@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, CranesLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, CranesLayer, RailroadCrossingsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
@@ -264,6 +264,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showZones, setShowZones] = useState(false); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
   const [showCranes, setShowCranes] = useState(false); 
+  const [showRailroadCrossings, setShowRailroadCrossings] = useState(true);
   const [cadastralError, setCadastralError] = useState(false); 
   
   // COLLAPSIBLE SIDEBAR STATES
@@ -1195,6 +1196,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setShowLabels={setShowLabels}
           showCranes={showCranes}
           setShowCranes={setShowCranes}
+          showRailroadCrossings={showRailroadCrossings}
+          setShowRailroadCrossings={setShowRailroadCrossings}
           addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
@@ -1275,6 +1278,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
 
             {/* HIDE STATIONS IN TRAINING MODE */}
             {appMode !== "TRAINING_ZONES" && <StationsLayer />}
+
+            {/* AT-GRADE RAILROAD CROSSINGS LAYER */}
+            <RailroadCrossingsLayer visible={showRailroadCrossings} />
             
             <MapClickEvents onMapClick={handleMapClick} />
             

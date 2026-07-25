@@ -14,6 +14,8 @@ import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConst
 
 import { RoutingOverlay } from './RoutingOverlay';
 import DispatchReview from './DispatchReview';
+import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
+import StreetViewPanel from './kiosk/StreetViewPanel';
 import { supabase } from '../supabaseClient';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
@@ -1365,77 +1367,96 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             )}
           </MapContainer>
 
-          {/* FLOATING TARGET HUD CARD (Unobscured Map View) */}
-          {appMode === "EXPLORE" && targetAddress && (
-            <div className="absolute top-4 right-14 z-[1000] bg-slate-950/95 border border-slate-800 backdrop-blur rounded-2xl p-4 shadow-2xl w-72 text-white animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex justify-between items-center gap-2 pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">SEARCH TARGET</span>
-                  <span className="text-emerald-400 text-[9px] font-black tracking-wider bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded">ACTIVE ROUTE</span>
-                </div>
-                <button 
-                  onClick={() => setTargetAddress(null)}
-                  className="text-slate-400 hover:text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-800 transition cursor-pointer"
-                  title="Clear Target"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <h3 className="font-extrabold text-base text-sky-400 mt-2 leading-tight uppercase">{targetAddress.address}</h3>
-              <p className="text-[10px] text-slate-400 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
-              
-              {nearestHydrants.length > 0 && (
-                <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col gap-1.5">
-                  <span className="text-[9px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
-                    💧 Nearest Hydrant
-                  </span>
-                  <div className="flex justify-between text-xs bg-slate-900/60 px-2.5 py-1 rounded border border-slate-800/60">
-                    <span className="text-slate-400 font-mono">ID / Distance</span>
-                    <span className="text-white font-mono font-black">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
-                  </div>
-                  {nearestHydrants[0].flowClass && (
-                    <div className="flex justify-between text-xs bg-slate-900/60 px-2.5 py-1 rounded border border-slate-800/60">
-                      <span className="text-slate-400 font-mono">Flow Rating</span>
-                      <span className="text-sky-400 font-mono font-black">{nearestHydrants[0].flowClass}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-3.5">
-                <a 
-                  href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all text-center w-full shadow-lg border border-indigo-400 cursor-pointer"
-                >
-                  <span>🚙</span>
-                  <span>NAVIGATE (GPS)</span>
-                </a>
-              </div>
-            </div>
-          )}
-
           {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
           <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
             CFR EVO APP | BUILD: {buildTime} | LICENSE: POLYFORM NONCOMMERCIAL 1.0.0
           </div>
         </div>
 
+        {/* Right 1/3 Spatial Inspection Stack Panel (Target Address, 3D Satellite, Street View) */}
+        {appMode === "EXPLORE" && targetAddress && (
+          <aside className="w-[380px] h-full bg-slate-950 border-l border-slate-800 p-3 flex flex-col gap-3 z-[1000] flex-shrink-0 shadow-2xl animate-in slide-in-from-right duration-300">
+            {/* Top 1/3 Address Information Card */}
+            <div className="flex-1 min-h-0 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-xl backdrop-blur relative overflow-hidden">
+              <div>
+                <div className="flex justify-between items-center gap-2 pb-2.5 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">SEARCH TARGET</span>
+                    <span className="text-emerald-400 text-[9px] font-black tracking-wider bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded">ACTIVE ROUTE</span>
+                  </div>
+                  <button 
+                    onClick={() => setTargetAddress(null)}
+                    className="text-slate-400 hover:text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-800 transition cursor-pointer"
+                    title="Close Inspection Panel"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <h3 className="font-black text-lg text-sky-400 mt-2.5 leading-tight uppercase font-sans tracking-tight">
+                  {targetAddress.address}
+                </h3>
+                <p className="text-[11px] text-slate-400 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
+                
+                {nearestHydrants.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col gap-1.5">
+                    <span className="text-[9.5px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
+                      💧 Nearest Hydrant
+                    </span>
+                    <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
+                      <span className="text-slate-400">ID / Distance</span>
+                      <span className="text-white font-black">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
+                    </div>
+                    {nearestHydrants[0].flowClass && (
+                      <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
+                        <span className="text-slate-400">Flow Rating</span>
+                        <span className="text-sky-400 font-black">{nearestHydrants[0].flowClass}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <a 
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all text-center w-full shadow-lg border border-indigo-400 cursor-pointer"
+                >
+                  <span>🚙</span>
+                  <span>NAVIGATE (GPS)</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Middle 1/3 3D Property Satellite View */}
+            <div className="flex-1 min-h-0 relative">
+              <PropertySatellitePanel activeCall={targetAddress} />
+            </div>
+
+            {/* Bottom 1/3 Google Street View */}
+            <div className="flex-1 min-h-0 relative">
+              <StreetViewPanel activeCall={targetAddress} />
+            </div>
+          </aside>
+        )}
+
         {/* Right Sidebar Alerts Panel */}
-        <RightSidebar 
-          rightSidebarOpen={rightSidebarOpen}
-          setRightSidebarOpen={setRightSidebarOpen}
-          appMode={appMode}
-          roadClosures={roadClosures}
-          showRoadClosures={showRoadClosures}
-          filterNoAccess={filterNoAccess}
-          filterAccessOnly={filterAccessOnly}
-          filterCaution={filterCaution}
-          map={map}
-          onSelectClosure={setSelectedClosure}
-        />
+        {(!targetAddress || appMode !== "EXPLORE") && (
+          <RightSidebar 
+            rightSidebarOpen={rightSidebarOpen}
+            setRightSidebarOpen={setRightSidebarOpen}
+            appMode={appMode}
+            roadClosures={roadClosures}
+            showRoadClosures={showRoadClosures}
+            filterNoAccess={filterNoAccess}
+            filterAccessOnly={filterAccessOnly}
+            filterCaution={filterCaution}
+            map={map}
+            onSelectClosure={setSelectedClosure}
+          />
+        )}
       </div>
 
       {appMode === "ADMIN_DISPATCHES" && (

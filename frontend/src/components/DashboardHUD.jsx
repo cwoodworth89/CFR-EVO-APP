@@ -73,6 +73,7 @@ export function Header({
               }}
             >
               <option value="EXPLORE">🧭 Notifications / Explore</option>
+              <option value="ROAD_HAZARDS">🚧 ROAD HAZARDS & CLOSURES</option>
               <option value="KIOSK_VIEW">🖥️ KIOSK: IN-STATION MODE</option>
               <option value="TRAINING_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
               <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
@@ -85,6 +86,23 @@ export function Header({
 
         {/* Right Side: Options & Alerts Panel Trigger */}
         <div className="flex gap-3 items-center">
+          {/* Road Hazards & Closures Quick Toggle Button */}
+          <button 
+            onClick={() => {
+              const next = !showRoadClosures;
+              if (setShowRoadClosures) setShowRoadClosures(next);
+              if (next) setRightSidebarOpen(true);
+            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
+              showRoadClosures 
+                ? "bg-amber-950/80 border-amber-600/80 text-amber-300 shadow-md animate-pulse" 
+                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+            }`}
+            title="Toggle Road Hazards & Closures Layer"
+          >
+            🚧 HAZARDS {alertsCount > 0 && <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full ml-0.5">{alertsCount}</span>}
+          </button>
+
           {/* Kiosk Mode Button */}
           <button 
             onClick={() => setAppMode("KIOSK_VIEW")}
@@ -138,7 +156,7 @@ export function Header({
                              className={`px-2 py-0.5 rounded text-[8px] font-black border transition-all ${
                                showLabels 
                                  ? "bg-amber-500 text-black border-amber-600 shadow-sm" 
-                                 : "bg-slate-950 text-slate-500 border-slate-850 hover:border-slate-700 hover:text-slate-400"
+                                 : "bg-slate-950 text-slate-500 border-slate-855 hover:border-slate-700 hover:text-slate-400"
                              }`}
                           >
                              {showLabels ? "ON" : "OFF"}

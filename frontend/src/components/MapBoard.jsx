@@ -537,14 +537,14 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     return targetAddress ? [targetAddress.lat, targetAddress.lng] : null;
   }, [targetAddress]);
 
-  // Adaptive Zooming: fit bounds to show both origin hall & destination address (padded for 1/3 right sidebar)
+  // Adaptive Zooming: fit bounds to show both origin hall & destination address inside middle window (between Left 320px & Right 380px sidebars)
   useEffect(() => {
     if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE") {
       const origin = STATIONS[homeHall];
       const dest = [targetAddress.lat, targetAddress.lng];
       map.fitBounds([origin, dest], { 
-        paddingTopLeft: [60, 60], 
-        paddingBottomRight: [420, 60], 
+        paddingTopLeft: [340, 80], 
+        paddingBottomRight: [400, 80], 
         animate: true 
       });
     }
@@ -986,7 +986,10 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     if (target) {
       setTargetAddress(target);
       if (map && target.lat && target.lng) {
-        map.flyTo([target.lat, target.lng], 17, { animate: true });
+        const point = map.project([target.lat, target.lng], 17);
+        const offsetPoint = L.point(point.x + 30, point.y);
+        const offsetLatLng = map.unproject(offsetPoint, 17);
+        map.flyTo(offsetLatLng, 17, { animate: true });
       }
     }
     setLeftSidebarOpen(true);

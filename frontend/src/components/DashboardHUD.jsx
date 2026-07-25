@@ -18,6 +18,7 @@ export function Header({
   setRightSidebarOpen,
   showRoadClosures,
   setShowRoadClosures,
+  onOpenRoutingConfig,
   alertsCount,
   gisOffline
 }) {
@@ -165,6 +166,20 @@ export function Header({
                           </button>
                        </div>
                      </div>
+
+                     {onOpenRoutingConfig && (
+                       <div className="border-t border-slate-850 pt-2">
+                         <button 
+                           onClick={() => {
+                             setShowLayersMenu(false);
+                             onOpenRoutingConfig();
+                           }}
+                           className="w-full bg-slate-950 hover:bg-slate-800 text-sky-400 hover:text-sky-300 font-extrabold py-1.5 px-2 rounded text-[9px] border border-slate-800 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                         >
+                           ⚙️ ROUTING CONFIG
+                         </button>
+                       </div>
+                     )}
                   </div>
                 </>
              )}
@@ -738,20 +753,41 @@ export function LeftSidebar({
                                     🚙 NAVIGATE (GPS)
                                  </a>
                               )}
-                              {/* Response Route Metrics (Distance & EMTRAC ETA) */}
-                               <div className="border-t border-slate-900 pt-2 flex flex-col gap-1.5">
-                                  <div className="text-[8px] text-emerald-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
-                                     <span>📏 Response Route Metrics</span>
+                              {/* Multi-Unit Response ETAs & Rail Warning */}
+                               <div className="border-t border-slate-900 pt-2.5 flex flex-col gap-2">
+                                  <div className="flex justify-between items-center">
+                                     <span className="text-[8.5px] text-emerald-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
+                                        🚒 Dispatched Unit ETAs
+                                     </span>
+                                     <span className="text-[8px] text-slate-400 font-mono">EMTRAC Code 3</span>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-1.5 bg-slate-900/60 p-2 rounded border border-slate-800 text-center">
-                                     <div>
-                                        <div className="text-[7.5px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">Drive Distance</div>
-                                        <div className="text-xs text-white font-black font-mono">{routeMetrics?.distanceKm || '3.4'} km</div>
+
+                                  {/* Driver Railroad Warning Badge */}
+                                  {routeMetrics?.railroadWarning && (
+                                     <div className={`p-2 rounded-lg text-[9px] font-mono font-bold leading-snug flex items-center gap-1.5 border ${
+                                        routeMetrics.railroadWarning.type === 'AVOIDED'
+                                          ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-300'
+                                          : 'bg-amber-950/80 border-amber-700/80 text-amber-300'
+                                     }`}>
+                                        {routeMetrics.railroadWarning.badge}
                                      </div>
-                                     <div>
-                                        <div className="text-[7.5px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">Est. Travel Time</div>
-                                        <div className="text-xs text-emerald-400 font-black font-mono">{routeMetrics?.etaMinutes || '3.8'} min <span className="text-[8px] text-slate-400 font-normal">(Code 3)</span></div>
-                                     </div>
+                                  )}
+
+                                  {/* Unit List */}
+                                  <div className="flex flex-col gap-1.5">
+                                     {routeMetrics?.units?.map((u, idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 font-mono text-xs">
+                                           <div className="flex items-center gap-2">
+                                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: u.color }} />
+                                              <span className="text-white font-black">{u.unit}</span>
+                                              <span className="text-[7.5px] text-slate-400 uppercase font-bold">{u.tierKey}</span>
+                                           </div>
+                                           <div className="flex items-center gap-2">
+                                              <span className="text-slate-400 text-[10px]">{u.distanceKm} km</span>
+                                              <span className="text-emerald-400 font-black">{u.etaMinutes} min</span>
+                                           </div>
+                                        </div>
+                                     ))}
                                   </div>
                                </div>
                            </div>

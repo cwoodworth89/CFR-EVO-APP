@@ -16,6 +16,8 @@ import { RoutingOverlay } from './RoutingOverlay';
 import DispatchReview from './DispatchReview';
 import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
 import StreetViewPanel from './kiosk/StreetViewPanel';
+import EVORoutingConfigModal from './EVORoutingConfigModal';
+import { calculateEVORouteMetrics, DEFAULT_ROUTING_CONFIG } from '../utils/EVORoutingEngine';
 import { supabase } from '../supabaseClient';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
@@ -279,28 +281,29 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const targetMarkerRef = useRef(null);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
 
-  // Compute Response Route Metrics (Distance & EMTRAC Code 3 ETA)
+  // EVO Routing Engine Configuration State
+  const [routingConfig, setRoutingConfig] = useState(DEFAULT_ROUTING_CONFIG);
+  const [showRoutingConfigModal, setShowRoutingConfigModal] = useState(false);
+
+  // Compute Response Route Metrics via CFR-EVORoutingEngine
   const routeMetrics = useMemo(() => {
     if (!targetAddress || !STATIONS[homeHall]) return null;
     const origin = STATIONS[homeHall];
     const target = [targetAddress.lat, targetAddress.lng];
     
-    let distKm = 0;
-    if (routeCoordinates && routeCoordinates.length > 1) {
-      const line = turf.lineString(routeCoordinates.map(c => [c.lng || c[1], c.lat || c[0]]));
-      distKm = turf.length(line, { units: 'kilometers' });
-    } else {
-      const fromPt = turf.point([origin[1], origin[0]]);
-      const toPt = turf.point([target[1], target[0]]);
-      distKm = turf.distance(fromPt, toPt, { units: 'kilometers' }) * 1.3;
-    }
+    const dispatchedUnits = activeDispatch?.units 
+      ? activeDispatch.units.split(',').map(u => u.trim()) 
+      : ['SQ1', 'E1', 'L1'];
 
-    const etaMin = Math.max(0.5, (distKm / 52 * 60)).toFixed(1);
-    return {
-      distanceKm: distKm.toFixed(1),
-      etaMinutes: etaMin
-    };
-  }, [targetAddress, homeHall, routeCoordinates]);
+    return calculateEVORouteMetrics({
+      originCoords: origin,
+      targetCoords: target,
+      dispatchedUnits,
+      routeCoordinates,
+      config: routingConfig,
+      timeOfDay: new Date()
+    });
+  }, [targetAddress, homeHall, routeCoordinates, activeDispatch, routingConfig]);
 
   // Load all hydrants data and fire zones once on mount
   useEffect(() => {
@@ -1168,6 +1171,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         setRightSidebarOpen={setRightSidebarOpen}
         showRoadClosures={showRoadClosures}
         setShowRoadClosures={setShowRoadClosures}
+        onOpenRoutingConfig={() => setShowRoutingConfigModal(true)}
         alertsCount={showRoadClosures ? activeClosures.length : 0}
         gisOffline={cadastralError}
       />
@@ -1492,6 +1496,14 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           onSimulateCall={onSimulateCall}
         />
       )}
+
+      {/* EVO Routing Engine Tuning Configuration Modal */}
+      <EVORoutingConfigModal 
+        isOpen={showRoutingConfigModal}
+        onClose={() => setShowRoutingConfigModal(false)}
+        config={routingConfig}
+        setConfig={setRoutingConfig}
+      />
     </div>
   );
 }

@@ -16,6 +16,8 @@ export function Header({
   setLeftSidebarOpen,
   rightSidebarOpen,
   setRightSidebarOpen,
+  showRoadClosures,
+  setShowRoadClosures,
   alertsCount,
   gisOffline
 }) {

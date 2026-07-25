@@ -1143,6 +1143,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         setLeftSidebarOpen={setLeftSidebarOpen}
         rightSidebarOpen={rightSidebarOpen}
         setRightSidebarOpen={setRightSidebarOpen}
+        showRoadClosures={showRoadClosures}
+        setShowRoadClosures={setShowRoadClosures}
         alertsCount={showRoadClosures ? activeClosures.length : 0}
         gisOffline={cadastralError}
       />

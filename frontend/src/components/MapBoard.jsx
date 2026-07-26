@@ -18,6 +18,7 @@ import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
 import StreetViewPanel from './kiosk/StreetViewPanel';
 import EVORoutingConfigModal from './EVORoutingConfigModal';
 import { calculateEVORouteMetrics, DEFAULT_ROUTING_CONFIG } from '../utils/EVORoutingEngine';
+import { sanitizeAddress } from '../utils/addressUtils';
 import { supabase } from '../supabaseClient';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
@@ -330,7 +331,12 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   }, []);
 
   const updateTargetAddress = useCallback((addr) => {
-    setTargetAddress(addr);
+    if (addr && addr.address) {
+      const clean = sanitizeAddress(addr.address);
+      setTargetAddress({ ...addr, address: clean });
+    } else {
+      setTargetAddress(addr);
+    }
     if (addr && addr.rings) {
       const leafletPolygon = addr.rings.map(ring => 
         ring.map(coord => [coord[1], coord[0]])

@@ -3,6 +3,7 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import { UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
+import { sanitizeAddress } from '../utils/addressUtils';
 
 
 export function Header({ 
@@ -535,25 +536,6 @@ export function LeftSidebar({
               };
             });
 
-            // Clean address function to strip unit designations & trailing suite numbers (e.g. "3100 OZADA AVE 116" -> "3100 OZADA AVE")
-            const stripUnitFromAddress = (rawAddr) => {
-              if (!rawAddr) return '';
-              let addr = rawAddr.trim();
-
-              // Remove hyphenated unit numbers: "3100-116 OZADA AVE" -> "3100 OZADA AVE"
-              addr = addr.replace(/^(\d+)-\d+\s+/, '$1 ');
-
-              // Remove standard unit keywords: "UNIT 116", "APT 4", "SUITE 200", "#116", "STE B"
-              addr = addr.replace(/\s+(UNIT|APT|SUITE|STE|BLDG|BUILDING|#)\s*[\w-]+/gi, '');
-
-              // Remove trailing unit numbers after street suffixes (e.g. "3100 OZADA AVE 116" -> "3100 OZADA AVE")
-              const streetSuffixes = '(AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|BOULEVARD|CRES|CRESCENT|PL|PLACE|LANE|LN|HWY|HIGHWAY)';
-              const trailingUnitRegex = new RegExp(`(\\b${streetSuffixes}\\b)\\s+[A-Z0-9-]+$`, 'i');
-              addr = addr.replace(trailingUnitRegex, '$1');
-
-              return addr.trim();
-            };
-
             // Deduplicate multi-unit addresses down to base building address unless user searched a specific unit
             const seen = new Set();
             const deduplicated = [];
@@ -561,7 +543,7 @@ export function LeftSidebar({
             rawItems.forEach(item => {
               let cleanAddr = item.address;
               if (!userSearchedUnit) {
-                cleanAddr = stripUnitFromAddress(item.address);
+                cleanAddr = sanitizeAddress(item.address);
               }
 
               const key = cleanAddr.toUpperCase();

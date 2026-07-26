@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { sanitizeAddress } from '../../utils/addressUtils';
 
 // Verified Street View Frontage & Heading Overrides for Large Complexes
 export const STREETVIEW_OVERRIDES = {
+  "3000 RIVERBEND DR": { lat: 49.2552, lng: -122.7840, heading: 180, fov: 90, pitch: 0 },
   "3100 OZADA AVE": { lat: 49.3015, lng: -122.7758, heading: 170, fov: 90, pitch: 5 },
   "2680 MARINER WAY": { lat: 49.2780, lng: -122.8050, heading: 240, fov: 90, pitch: 0 },
   "1190 PIPELINE RD": { lat: 49.2965, lng: -122.7910, heading: 90, fov: 90, pitch: 0 },
@@ -17,12 +19,8 @@ export default function StreetViewPanel({ activeCall }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
   const [imageError, setImageError] = useState(false);
 
-  // Clean address key to check override table (e.g. "3100 OZADA AVE 116" -> "3100 OZADA AVE")
-  const rawAddr = (activeCall?.address || '').toUpperCase().trim();
-  const cleanAddrKey = rawAddr
-    .replace(/\s+(UNIT|APT|SUITE|STE|#)\s*[\w-]+/gi, '')
-    .replace(/(\b(AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|CRES|PL|LN|HWY)\b)\s+[A-Z0-9-]+$/i, '$1')
-    .trim();
+  // Universal clean address key to check override table (e.g. "3000 RIVERBEND DR UNIT 105" -> "3000 RIVERBEND DR")
+  const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
 
   const override = STREETVIEW_OVERRIDES[cleanAddrKey];
 

@@ -94,12 +94,32 @@ export function calculateEVORouteMetrics({
   const isPmRush = timeVal >= 15.5 && timeVal <= 18.5;
   const isRushHour = isAmRush || isPmRush;
 
-  // Check for CP Rail crossing interaction (Coordinates near Port Coquitlam / Brunette Ave CP rail corridor)
-  const crossesRailroad = (originCoords[0] < 49.25 && targetCoords[0] > 49.25) || (originCoords[0] > 49.25 && targetCoords[0] < 49.25);
+  // Check for CP Rail crossing interaction across Coquitlam corridor
+  const crossesRailroad = (originCoords[0] < 49.26 && targetCoords[0] > 49.26) || (originCoords[0] > 49.26 && targetCoords[0] < 49.26) || (originCoords[1] < -122.80 && targetCoords[1] > -122.80);
   let railroadWarning = null;
   let railDelayKm = 0;
 
-  if (crossesRailroad) {
+  // Proximity check for Colony Farm Rd (Sole Access) & Kingsway Ave (Riverbend Corridor)
+  const targetPt = turf.point([targetCoords[1], targetCoords[0]]);
+  const colonyPt = turf.point([-122.8142995, 49.2397800]);
+  const kingswayPt = turf.point([-122.7911077, 49.2650819]);
+
+  const distToColony = turf.distance(targetPt, colonyPt, { units: 'kilometers' });
+  const distToKingsway = turf.distance(targetPt, kingswayPt, { units: 'kilometers' });
+
+  if (distToColony <= 1.2) {
+    railroadWarning = {
+      type: 'AT_GRADE',
+      badge: '⚠️ MANDATORY AT-GRADE CP RAIL CROSSING (Colony Farm Rd) — SOLE ACCESS ROAD, CANNOT DETOUR',
+      color: 'amber'
+    };
+  } else if (distToKingsway <= 0.8) {
+    railroadWarning = {
+      type: 'AT_GRADE',
+      badge: '⚠️ AT-GRADE CP RAIL CROSSING (Kingsway Ave) — RIVERBEND ACCESS ROUTE (TRAIN DELAY RISK)',
+      color: 'amber'
+    };
+  } else if (crossesRailroad) {
     if (config.railroadAvoidanceEnabled) {
       railroadWarning = {
         type: 'AVOIDED',
@@ -110,7 +130,7 @@ export function calculateEVORouteMetrics({
     } else {
       railroadWarning = {
         type: 'AT_GRADE',
-        badge: '⚠️ AT-GRADE RAIL CROSSING AHEAD (CP Rail) — TRAIN DELAY RISK',
+        badge: '⚠️ AT-GRADE CP RAIL CROSSING AHEAD (Westwood / Pitt River) — TRAIN DELAY RISK',
         color: 'amber'
       };
     }

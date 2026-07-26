@@ -558,14 +558,12 @@ export const createRailroadCrossingIcon = () => L.divIcon({
   popupAnchor: [0, -17]
 });
 
-// Coquitlam & Port Coquitlam At-Grade CP Rail Crossings
+// Coquitlam At-Grade CP Rail Crossings (Verified Coquitlam Fire Rescue Coordinates)
 export const COQUITLAM_RAILROAD_CROSSINGS = [
-  { id: 'RR-01', name: 'Brunette Ave At-Grade Crossing', lat: 49.2315, lng: -122.8710, location: 'Brunette Ave & Lougheed Hwy' },
-  { id: 'RR-02', name: 'Schoolhouse Rd At-Grade Crossing', lat: 49.2332, lng: -122.8565, location: 'Schoolhouse Rd south of Lougheed' },
-  { id: 'RR-03', name: 'King Edward St At-Grade Crossing', lat: 49.2318, lng: -122.8450, location: 'King Edward St & United Blvd' },
-  { id: 'RR-04', name: 'Shaughnessy St CP Crossing', lat: 49.2595, lng: -122.7790, location: 'Shaughnessy St at CP Rail mainline' },
-  { id: 'RR-05', name: 'Coast Meridian Rd CP Crossing', lat: 49.2610, lng: -122.7630, location: 'Coast Meridian Rd at CP Rail mainline' },
-  { id: 'RR-06', name: 'McLean Ave CP Crossing', lat: 49.2618, lng: -122.7505, location: 'McLean Ave near PoCo border' }
+  { id: 'RR-01', name: 'Westwood St Crossing', lat: 49.2692679, lng: -122.7912637, location: 'Westwood St & Kingsway Ave', avoidable: true },
+  { id: 'RR-02', name: 'Kingsway Ave Crossing', lat: 49.2650819, lng: -122.7911077, location: 'Kingsway Ave (Riverbend Corridor)', avoidable: false, note: 'Difficult to avoid for Riverbend' },
+  { id: 'RR-03', name: 'Pitt River Rd Crossing', lat: 49.2505499, lng: -122.8016317, location: 'Pitt River Rd at CP Rail mainline', avoidable: true },
+  { id: 'RR-04', name: 'Colony Farm Rd Crossing', lat: 49.2397800, lng: -122.8142995, location: 'Colony Farm Rd (Sole Access)', avoidable: false, note: 'Sole access road - Cannot route around' }
 ];
 
 export function RailroadCrossingsLayer({ visible }) {
@@ -583,7 +581,8 @@ export function RailroadCrossingsLayer({ visible }) {
             <div className="flex flex-col gap-0.5 font-mono">
               <span className="text-[9px] text-amber-400 font-black uppercase tracking-wider">⚠️ CP RAIL AT-GRADE CROSSING</span>
               <span className="text-white text-xs font-bold">{rr.name}</span>
-              <span className="text-[8.5px] text-slate-400">{rr.location}</span>
+              <span className="text-[8.5px] text-slate-300">{rr.location}</span>
+              {rr.note && <span className="text-[8px] text-amber-300/90 font-sans italic mt-0.5">ℹ️ {rr.note}</span>}
             </div>
           </Tooltip>
         </Marker>

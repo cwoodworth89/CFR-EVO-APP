@@ -8,21 +8,21 @@ import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 
 
 
-// 🚒 Custom Fire Hall Icon Loader (Loads custom user logo from /icons/fire_hall.png or /icons/fire_hall.svg)
+// 🚒 Custom Fire Hall Icon Loader (Supports /icons/firehall.png, /icons/fire_hall.png, or /icons/fire_hall.svg)
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
 export const createFireHallIcon = (stationId = '1') => L.divIcon({
   className: 'custom-station-user-icon',
   html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-    <img src="${BASE_URL}icons/fire_hall.png" 
-         onerror="this.onerror=null; this.src='${BASE_URL}icons/fire_hall.svg';" 
-         style="width:36px;height:36px;object-fit:contain;" 
+    <img src="${BASE_URL}icons/firehall.png" 
+         onerror="if(this.src.includes('firehall.png')){this.src='${BASE_URL}icons/fire_hall.png';}else if(this.src.includes('fire_hall.png')){this.src='${BASE_URL}icons/fire_hall.svg';}else{this.onerror=null;}" 
+         style="width:38px;height:38px;max-width:38px;max-height:38px;object-fit:contain;" 
          alt="Fire Hall ${stationId}" />
-    <span style="position:absolute;bottom:-2px;right:-2px;background:#0f172a;color:#fbbf24;border:1px solid #fbbf24;border-radius:9999px;font-size:10px;font-weight:900;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-family:monospace;">${stationId}</span>
+    <span style="position:absolute;bottom:-2px;right:-2px;background:#0f172a;color:#fbbf24;border:1.5px solid #fbbf24;border-radius:9999px;font-size:10px;font-weight:900;width:17px;height:17px;display:flex;align-items:center;justify-content:center;font-family:monospace;box-shadow:0 2px 4px rgba(0,0,0,0.5);">${stationId}</span>
   </div>`,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-  popupAnchor: [0, -18]
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
+  popupAnchor: [0, -19]
 });
 
 // 🗺️ BASEMAP COMPONENT
@@ -550,12 +550,12 @@ export const createRailroadCrossingIcon = () => L.divIcon({
   html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
     <img src="${BASE_URL}icons/railroad_crossing.png" 
          onerror="this.onerror=null; this.src='${BASE_URL}icons/railroad_crossing.svg';" 
-         style="width:32px;height:32px;object-fit:contain;" 
+         style="width:34px;height:34px;max-width:34px;max-height:34px;object-fit:contain;" 
          alt="Railroad Crossing" />
   </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -16]
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
+  popupAnchor: [0, -17]
 });
 
 // Coquitlam & Port Coquitlam At-Grade CP Rail Crossings

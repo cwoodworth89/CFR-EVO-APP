@@ -77,7 +77,6 @@ export function Header({
               }}
             >
               <option value="EXPLORE">🧭 Notifications / Explore</option>
-              <option value="ROAD_HAZARDS">🚧 ROAD HAZARDS & CLOSURES</option>
               <option value="KIOSK_VIEW">🖥️ KIOSK: IN-STATION MODE</option>
               <option value="TRAINING_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
               <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
@@ -438,10 +437,10 @@ export function LeftSidebar({
   setShowRoadClosures,
   showLabels,
   setShowLabels,
-  showCranes,
-  setShowCranes,
   showRailroadCrossings,
   setShowRailroadCrossings,
+  showSchools,
+  setShowSchools,
   homeHall,
   setHomeHall,
   targetAddress,
@@ -473,16 +472,6 @@ export function LeftSidebar({
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const [suggestions, setSuggestions] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [cranesList, setCranesList] = React.useState([]);
-
-  React.useEffect(() => {
-    if (showCranes) {
-      fetch('/data/tower_cranes.json')
-        .then(r => r.json())
-        .then(setCranesList)
-        .catch(console.warn);
-    }
-  }, [showCranes]);
 
   // Reset activeIndex whenever query changes or suggestions show status shifts
   React.useEffect(() => {
@@ -837,17 +826,6 @@ export function LeftSidebar({
                              <span className="flex items-center gap-1.5">📐 Emergency Zones</span>
                           </label>
                           
-                          {/* 🏗️ TOWER CRANES OVERLAY */}
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
-                             <input 
-                                type="checkbox" 
-                                checked={showCranes} 
-                                onChange={(e) => setShowCranes(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-orange-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
-                             />
-                             <span className="flex items-center gap-1.5">🏗️ Tower Cranes</span>
-                          </label>
-
                           {/* 🛤️ RAILROAD CROSSINGS OVERLAY */}
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 
@@ -858,37 +836,17 @@ export function LeftSidebar({
                              />
                              <span className="flex items-center gap-1.5">🛤️ Railroad Crossings</span>
                           </label>
-                          {showCranes && cranesList.length > 0 && (
-                             <div className="flex flex-col gap-1 pl-6.5 mt-1 transition-all duration-300">
-                                <select
-                                   onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val && map) {
-                                         const selected = cranesList.find(c => c.id === val);
-                                         if (selected) {
-                                            map.setView([selected.lat, selected.lng], 17);
-                                            setTimeout(() => {
-                                               map.eachLayer(layer => {
-                                                  if (layer instanceof L.Marker) {
-                                                     const latlng = layer.getLatLng();
-                                                     if (Math.abs(latlng.lat - selected.lat) < 0.0001 && Math.abs(latlng.lng - selected.lng) < 0.0001) {
-                                                        layer.openPopup();
-                                                     }
-                                                  }
-                                               });
-                                            }, 300);
-                                         }
-                                      }
-                                   }}
-                                   className="rounded border-slate-800 bg-slate-950 text-slate-300 text-xs w-full py-1.5 px-2 focus:ring-orange-500 focus:border-orange-500 border cursor-pointer"
-                                >
-                                   <option value="">-- Zoom to Crane --</option>
-                                   {cranesList.map(c => (
-                                      <option key={c.id} value={c.id}>{c.name}</option>
-                                   ))}
-                                </select>
-                             </div>
-                          )}
+
+                          {/* 🏫 SCHOOLS OVERLAY */}
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                             <input 
+                                type="checkbox" 
+                                checked={showSchools} 
+                                onChange={(e) => setShowSchools && setShowSchools(e.target.checked)} 
+                                className="rounded border-slate-800 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                             />
+                             <span className="flex items-center gap-1.5">🏫 Schools</span>
+                          </label>
                        </div>
                     </div>
 
@@ -929,26 +887,34 @@ export function LeftSidebar({
                     {/* 4. Legend Section */}
                     <div className="flex flex-col gap-2 mt-auto border-t border-slate-855 pt-4">
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono mb-2">MAP LEGEND</h3>
-                       <div className="flex flex-col gap-3 font-mono text-[9px] text-slate-400">
+                       <div className="flex flex-col gap-2.5 font-mono text-[9px] text-slate-400">
+                          <div className="flex items-center gap-2.5">
+                             <div className="w-4 h-4 rounded bg-slate-900 border border-red-500/50 flex items-center justify-center text-[10px]">🚒</div>
+                             <span className="text-slate-300">Coquitlam Fire Halls</span>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                             <div className="w-4 h-4 rounded bg-slate-900 border border-blue-500/50 flex items-center justify-center text-[10px]">🏫</div>
+                             <span className="text-slate-300">Schools & School Zones</span>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                             <div className="w-4 h-4 rounded bg-slate-900 border border-amber-500/50 flex items-center justify-center text-[10px]">🛤️</div>
+                             <span className="text-slate-300">CP Rail Crossings</span>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                             <div className="w-4 h-4 rounded-full bg-slate-900 border border-sky-500/50 flex items-center justify-center text-[9px] font-bold text-sky-400">💧</div>
+                             <span className="text-slate-300">City Fire Hydrants</span>
+                          </div>
                           <div className="flex items-center gap-2.5">
                              <div className="w-6 border-b-2 border-dashed border-red-500"></div>
-                             <span>Full Road Closure (No Emergency Access) - Fire Truck Blocked</span>
+                             <span className="text-slate-400">Full Road Closure</span>
                           </div>
                           <div className="flex items-center gap-2.5">
                              <div className="w-6 border-b-2 border-dashed border-amber-500"></div>
-                             <span>Restricted Road Closure (Emergency/Local Only) - Fire Truck Passable</span>
+                             <span className="text-slate-400">Restricted Local Access</span>
                           </div>
                           <div className="flex items-center gap-2.5">
                              <div className="w-6 border-b-2 border-dashed border-yellow-500"></div>
-                             <span>Lane Closure & Construction - Passable</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded-full bg-slate-900 border border-slate-750 flex items-center justify-center text-[8px] font-bold text-sky-400">💧</div>
-                             <span>City Fire Hydrant Overlay</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded-full bg-white border-2 border-red-500 flex items-center justify-center text-[8px]">🚒</div>
-                             <span>Coquitlam Fire Hall</span>
+                             <span className="text-slate-400">Lane Closure & Construction</span>
                           </div>
                        </div>
                     </div>

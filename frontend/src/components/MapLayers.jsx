@@ -452,97 +452,7 @@ export function StationsLayer() {
     );
 }
 
-// 🏗️ NEW: TOWER CRANES LAYER
-const craneIcon = L.divIcon({
-  className: 'custom-crane-icon',
-  html: `<div style="
-    background-color: #fff;
-    border: 2px solid #ea580c;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-    font-size: 15px;
-    box-sizing: content-box;
-  ">🏗️</div>`,
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-  popupAnchor: [0, -15]
-});
 
-export function CranesLayer({ visible, onSelectCrane }) {
-  const [cranes, setCranes] = React.useState([]);
-
-  React.useEffect(() => {
-    if (!visible) return;
-
-    fetch('/data/tower_cranes.json')
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      })
-      .then(data => {
-        setCranes(data);
-      })
-      .catch(err => {
-        console.warn("Failed to load Coquitlam tower cranes:", err);
-      });
-  }, [visible]);
-
-  if (!visible) return null;
-
-  return (
-    <>
-      {cranes.map(c => (
-        <Marker 
-          key={c.id} 
-          position={[c.lat, c.lng]} 
-          icon={craneIcon}
-          eventHandlers={{
-            click: () => {
-              if (onSelectCrane) onSelectCrane(c);
-            }
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">TOWER CRANE</span>
-              <span className="text-white text-xs font-bold">{c.id}</span>
-            </div>
-          </Tooltip>
-          <Popup className="crane-popup">
-            <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '180px', maxWidth: '240px' }}>
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-[9px] text-slate-400 font-mono font-medium">PRE-INCIDENT DATA</span>
-                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30">ACTIVE</span>
-              </div>
-              <h3 className="font-bold text-sm text-orange-400 mt-2 leading-tight">{c.name}</h3>
-              
-              <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-xs">
-                <span className="text-slate-400 font-sans">Location</span>
-                <span className="text-slate-300 text-right leading-tight ml-2">{c.address}</span>
-              </div>
-              
-              <div className="mt-3">
-                <a 
-                  href={c.pre_incident_plan_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/50 rounded text-center text-xs font-bold transition-all shadow-md cursor-pointer"
-                >
-                  🔗 View Pre-Incident Plan
-                </a>
-              </div>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </>
-  );
-}
 
 // Custom Railroad Crossing Icon Loader (Loads custom user logo from /icons/railroad_crossing.png or /icons/railroad_crossing.svg)
 export const createRailroadCrossingIcon = () => L.divIcon({
@@ -583,6 +493,60 @@ export function RailroadCrossingsLayer({ visible }) {
               <span className="text-white text-xs font-bold">{rr.name}</span>
               <span className="text-[8.5px] text-slate-300">{rr.location}</span>
               {rr.note && <span className="text-[8px] text-amber-300/90 font-sans italic mt-0.5">ℹ️ {rr.note}</span>}
+            </div>
+          </Tooltip>
+        </Marker>
+      ))}
+    </>
+  );
+}
+
+// 🏫 Custom School Icon Loader (Loads custom user logo from /icons/school.png or /icons/school.svg)
+export const createSchoolIcon = () => L.divIcon({
+  className: 'custom-school-user-icon',
+  html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+    <img src="${BASE_URL}icons/school.png" 
+         onerror="this.onerror=null; this.src='${BASE_URL}icons/school.svg';" 
+         style="width:32px;height:32px;max-width:32px;max-height:32px;object-fit:contain;" 
+         alt="School" />
+  </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16]
+});
+
+// Coquitlam & Port Coquitlam Schools GIS Dataset
+export const COQUITLAM_SCHOOLS = [
+  { id: 'SCH-01', name: 'Pinetree Secondary', type: 'Secondary (9-12)', lat: 49.2848, lng: -122.7885, address: '3000 Pipeline Rd, Coquitlam' },
+  { id: 'SCH-02', name: 'Gleneagle Secondary', type: 'Secondary (9-12)', lat: 49.2882, lng: -122.8155, address: '1195 Lansdowne Dr, Coquitlam' },
+  { id: 'SCH-03', name: 'Centennial Secondary', type: 'Secondary (9-12)', lat: 49.2618, lng: -122.8682, address: '570 Poirier St, Coquitlam' },
+  { id: 'SCH-04', name: 'Dr. Charles Best Secondary', type: 'Secondary (9-12)', lat: 49.2552, lng: -122.8465, address: '2525 Como Lake Ave, Coquitlam' },
+  { id: 'SCH-05', name: 'Heritage Woods Secondary', type: 'Secondary (9-12)', lat: 49.3088, lng: -122.8335, address: '1300 David Ave, Port Moody/Coquitlam' },
+  { id: 'SCH-06', name: 'Maple Creek Middle School', type: 'Middle (6-8)', lat: 49.2865, lng: -122.7932, address: '3700 Townline Rd, Coquitlam' },
+  { id: 'SCH-07', name: 'Scott Creek Middle School', type: 'Middle (6-8)', lat: 49.2895, lng: -122.8025, address: '1240 Lansdowne Dr, Coquitlam' },
+  { id: 'SCH-08', name: 'Summit Middle School', type: 'Middle (6-8)', lat: 49.2942, lng: -122.8258, address: '1450 Westwood St, Coquitlam' },
+  { id: 'SCH-09', name: 'Westwood Elementary', type: 'Elementary (K-5)', lat: 49.2825, lng: -122.7955, address: '3610 Pinetree Way, Coquitlam' },
+  { id: 'SCH-10', name: 'Meadowbrook Elementary', type: 'Elementary (K-5)', lat: 49.2735, lng: -122.8082, address: '900 Meadowbrook Way, Coquitlam' },
+  { id: 'SCH-11', name: 'Terry Fox Secondary', type: 'Secondary (9-12)', lat: 49.2685, lng: -122.7562, address: '1260 Riverwood Gate, Port Coquitlam' },
+  { id: 'SCH-12', name: 'Riverside Secondary', type: 'Secondary (9-12)', lat: 49.2525, lng: -122.7758, address: '2215 Reeve St, Port Coquitlam' }
+];
+
+export function SchoolsLayer({ visible }) {
+  if (!visible) return null;
+
+  return (
+    <>
+      {COQUITLAM_SCHOOLS.map(sch => (
+        <Marker
+          key={sch.id}
+          position={[sch.lat, sch.lng]}
+          icon={createSchoolIcon()}
+        >
+          <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
+            <div className="flex flex-col gap-0.5 font-mono">
+              <span className="text-[9px] text-blue-400 font-black uppercase tracking-wider">🏫 SCHOOL ZONE</span>
+              <span className="text-white text-xs font-bold">{sch.name}</span>
+              <span className="text-[8.5px] text-slate-300">{sch.type} — {sch.address}</span>
             </div>
           </Tooltip>
         </Marker>

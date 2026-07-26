@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, CranesLayer, RailroadCrossingsLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
@@ -264,8 +264,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showHydrants, setShowHydrants] = useState(true); 
   const [showZones, setShowZones] = useState(false); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
-  const [showCranes, setShowCranes] = useState(false); 
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(true);
+  const [showSchools, setShowSchools] = useState(true);
+  const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
   // COLLAPSIBLE SIDEBAR STATES
@@ -306,6 +307,15 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
       timeOfDay: new Date()
     });
   }, [targetAddress, homeHall, routeCoordinates, activeDispatch, routingConfig]);
+
+  // Track map zoom level for automatic zoom-threshold basemap switching (Voyager <= 14, Cadastral > 14)
+  useEffect(() => {
+    if (!map) return;
+    const updateZoom = () => setCurrentZoom(map.getZoom());
+    map.on('zoomend', updateZoom);
+    updateZoom();
+    return () => map.off('zoomend', updateZoom);
+  }, [map]);
 
   // Load all hydrants data and fire zones once on mount
   useEffect(() => {
@@ -1207,10 +1217,10 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setShowRoadClosures={setShowRoadClosures}
           showLabels={showLabels}
           setShowLabels={setShowLabels}
-          showCranes={showCranes}
-          setShowCranes={setShowCranes}
           showRailroadCrossings={showRailroadCrossings}
           setShowRailroadCrossings={setShowRailroadCrossings}
+          showSchools={showSchools}
+          setShowSchools={setShowSchools}
           addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
@@ -1243,8 +1253,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               style={{ height: "100%", width: "100%" }} 
               className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
           >
-            {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) in Active Routing mode */}
-            <BaseMap style={targetAddress ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
+            {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) at zoomed-out levels <=14 or active routing */}
+            <BaseMap style={(targetAddress || currentZoom <= 14) ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
             
             <CoquitlamOverlays 
                 visible={showLabels && !cadastralError} 
@@ -1254,8 +1264,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             {/* Hydrants Visual GIS Overlay */}
             <HydrantsLayer visible={showHydrants} />
             
-            {/* Tower Cranes Map Overlay */}
-            <CranesLayer visible={showCranes} />
+            {/* Schools GIS Overlay */}
+            <SchoolsLayer visible={showSchools} />
             
             {/* 2. DEFINE CUSTOM PANES */}
             <Pane name="underlayPane" style={{ zIndex: 390 }} />

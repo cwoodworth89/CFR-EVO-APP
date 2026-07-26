@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="46" fill="#1e3a8a" stroke="#3b82f6" stroke-width="4"/>
+  <!-- School Building -->
+  <polygon points="50,15 15,35 85,35" fill="#f87171"/>
+  <rect x="25" y="35" width="50" height="45" fill="#38bdf8" stroke="#ffffff" stroke-width="3"/>
+  <!-- Door -->
+  <rect x="42" y="55" width="16" height="25" fill="#1e293b"/>
+  <!-- Windows -->
+  <rect x="30" y="42" width="10" height="10" fill="#fef08a"/>
+  <rect x="60" y="42" width="10" height="10" fill="#fef08a"/>
+  <!-- Flag on roof -->
+  <line x1="50" y1="15" x2="50" y2="5" stroke="#ffffff" stroke-width="2"/>
+  <polygon points="50,5 65,10 50,15" fill="#ef4444"/>
+</svg>

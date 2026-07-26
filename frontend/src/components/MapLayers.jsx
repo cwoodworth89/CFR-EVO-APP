@@ -515,20 +515,35 @@ export const createSchoolIcon = () => L.divIcon({
   popupAnchor: [0, -16]
 });
 
-// Coquitlam & Port Coquitlam Schools GIS Dataset
+// Official School District 43 (SD43 Coquitlam) GIS Dataset
 export const COQUITLAM_SCHOOLS = [
-  { id: 'SCH-01', name: 'Pinetree Secondary', type: 'Secondary (9-12)', lat: 49.2848, lng: -122.7885, address: '3000 Pipeline Rd, Coquitlam' },
-  { id: 'SCH-02', name: 'Gleneagle Secondary', type: 'Secondary (9-12)', lat: 49.2882, lng: -122.8155, address: '1195 Lansdowne Dr, Coquitlam' },
-  { id: 'SCH-03', name: 'Centennial Secondary', type: 'Secondary (9-12)', lat: 49.2618, lng: -122.8682, address: '570 Poirier St, Coquitlam' },
-  { id: 'SCH-04', name: 'Dr. Charles Best Secondary', type: 'Secondary (9-12)', lat: 49.2552, lng: -122.8465, address: '2525 Como Lake Ave, Coquitlam' },
+  // SECONDARY SCHOOLS (9-12)
+  { id: 'SCH-01', name: 'Pinetree Secondary', type: 'Secondary (9-12)', lat: 49.2849, lng: -122.7863, address: '3000 Pinewood Ave, Coquitlam' },
+  { id: 'SCH-02', name: 'Gleneagle Secondary', type: 'Secondary (9-12)', lat: 49.2853, lng: -122.8096, address: '1195 Lansdowne Dr, Coquitlam' },
+  { id: 'SCH-03', name: 'Centennial Secondary', type: 'Secondary (9-12)', lat: 49.2629, lng: -122.8460, address: '570 Poirier St, Coquitlam' },
+  { id: 'SCH-04', name: 'Dr. Charles Best Secondary', type: 'Secondary (9-12)', lat: 49.2558, lng: -122.8447, address: '2525 Como Lake Ave, Coquitlam' },
   { id: 'SCH-05', name: 'Heritage Woods Secondary', type: 'Secondary (9-12)', lat: 49.3088, lng: -122.8335, address: '1300 David Ave, Port Moody/Coquitlam' },
-  { id: 'SCH-06', name: 'Maple Creek Middle School', type: 'Middle (6-8)', lat: 49.2865, lng: -122.7932, address: '3700 Townline Rd, Coquitlam' },
-  { id: 'SCH-07', name: 'Scott Creek Middle School', type: 'Middle (6-8)', lat: 49.2895, lng: -122.8025, address: '1240 Lansdowne Dr, Coquitlam' },
-  { id: 'SCH-08', name: 'Summit Middle School', type: 'Middle (6-8)', lat: 49.2942, lng: -122.8258, address: '1450 Westwood St, Coquitlam' },
-  { id: 'SCH-09', name: 'Westwood Elementary', type: 'Elementary (K-5)', lat: 49.2825, lng: -122.7955, address: '3610 Pinetree Way, Coquitlam' },
-  { id: 'SCH-10', name: 'Meadowbrook Elementary', type: 'Elementary (K-5)', lat: 49.2735, lng: -122.8082, address: '900 Meadowbrook Way, Coquitlam' },
-  { id: 'SCH-11', name: 'Terry Fox Secondary', type: 'Secondary (9-12)', lat: 49.2685, lng: -122.7562, address: '1260 Riverwood Gate, Port Coquitlam' },
-  { id: 'SCH-12', name: 'Riverside Secondary', type: 'Secondary (9-12)', lat: 49.2525, lng: -122.7758, address: '2215 Reeve St, Port Coquitlam' }
+  { id: 'SCH-06', name: 'Terry Fox Secondary', type: 'Secondary (9-12)', lat: 49.2685, lng: -122.7562, address: '1260 Riverwood Gate, Port Coquitlam' },
+  { id: 'SCH-07', name: 'Riverside Secondary', type: 'Secondary (9-12)', lat: 49.2525, lng: -122.7758, address: '2215 Reeve St, Port Coquitlam' },
+  { id: 'SCH-08', name: 'CABE Secondary', type: 'Secondary (9-12)', lat: 49.2558, lng: -122.8447, address: '1411 Foster Ave, Coquitlam' },
+
+  // MIDDLE SCHOOLS (6-8)
+  { id: 'SCH-09', name: 'Como Lake Middle', type: 'Middle (6-8)', lat: 49.2511, lng: -122.8589, address: '1121 King Albert Ave, Coquitlam' },
+  { id: 'SCH-10', name: 'École Banting Middle', type: 'Middle (6-8)', lat: 49.2649, lng: -122.8474, address: '820 Banting St, Coquitlam' },
+  { id: 'SCH-11', name: 'Hillcrest Middle', type: 'Middle (6-8)', lat: 49.2619, lng: -122.8425, address: '2161 Regan Ave, Coquitlam' },
+  { id: 'SCH-12', name: 'Maple Creek Middle', type: 'Middle (6-8)', lat: 49.2865, lng: -122.7932, address: '3700 Townline Rd, Coquitlam' },
+  { id: 'SCH-13', name: 'Scott Creek Middle', type: 'Middle (6-8)', lat: 49.2895, lng: -122.8025, address: '1240 Lansdowne Dr, Coquitlam' },
+  { id: 'SCH-14', name: 'Summit Middle', type: 'Middle (6-8)', lat: 49.2942, lng: -122.8258, address: '1450 Westwood St, Coquitlam' },
+  { id: 'SCH-15', name: 'École Citadel Middle', type: 'Middle (6-8)', lat: 49.2485, lng: -122.7750, address: '1265 Citadel Dr, Port Coquitlam' },
+
+  // ELEMENTARY SCHOOLS (K-5)
+  { id: 'SCH-16', name: 'Alderson Elementary', type: 'Elementary (K-5)', lat: 49.2382, lng: -122.8735, address: '825 Gauthier Ave, Coquitlam' },
+  { id: 'SCH-17', name: 'Baker Drive Elementary', type: 'Elementary (K-5)', lat: 49.2644, lng: -122.8021, address: '885 Baker Dr, Coquitlam' },
+  { id: 'SCH-18', name: 'Bramblewood Elementary', type: 'Elementary (K-5)', lat: 49.3002, lng: -122.8023, address: '2875 Panorama Dr, Coquitlam' },
+  { id: 'SCH-19', name: 'Cape Horn Elementary', type: 'Elementary (K-5)', lat: 49.2378, lng: -122.8357, address: '155 Finnigan St, Coquitlam' },
+  { id: 'SCH-20', name: 'Coast Salish Elementary', type: 'Elementary (K-5)', lat: 49.2997, lng: -122.7322, address: '3538 Sheffield Ave, Coquitlam' },
+  { id: 'SCH-21', name: 'Meadowbrook Elementary', type: 'Elementary (K-5)', lat: 49.2735, lng: -122.8082, address: '900 Meadowbrook Way, Coquitlam' },
+  { id: 'SCH-22', name: 'Westwood Elementary', type: 'Elementary (K-5)', lat: 49.2825, lng: -122.7955, address: '3610 Pinetree Way, Coquitlam' }
 ];
 
 export function SchoolsLayer({ visible }) {

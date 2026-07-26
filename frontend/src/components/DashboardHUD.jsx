@@ -89,22 +89,7 @@ export function Header({
 
         {/* Right Side: Options & Alerts Panel Trigger */}
         <div className="flex gap-3 items-center">
-          {/* Road Hazards & Closures Quick Toggle Button */}
-          <button 
-            onClick={() => {
-              const next = !showRoadClosures;
-              if (setShowRoadClosures) setShowRoadClosures(next);
-              if (next) setRightSidebarOpen(true);
-            }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-              showRoadClosures 
-                ? "bg-amber-950/80 border-amber-600/80 text-amber-300 shadow-md animate-pulse" 
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
-            }`}
-            title="Toggle Road Hazards & Closures Layer"
-          >
-            🚧 HAZARDS {alertsCount > 0 && <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full ml-0.5">{alertsCount}</span>}
-          </button>
+
 
           {/* Kiosk Mode Button */}
           <button 
@@ -185,17 +170,20 @@ export function Header({
              )}
           </div>
 
-          {/* Right Sidebar Alerts Panel Toggle */}
+          {/* Right Sidebar Hazards & Alerts Panel Toggle */}
           <button 
-            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
+            onClick={() => {
+              setRightSidebarOpen(!rightSidebarOpen);
+              if (setShowRoadClosures) setShowRoadClosures(true);
+            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
               rightSidebarOpen 
-                ? "bg-slate-800 border-slate-700 text-rose-400" 
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                ? "bg-amber-950/80 border-amber-600/80 text-amber-300 shadow-md animate-pulse" 
+                : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white"
             }`}
-            title="Toggle Alerts List"
+            title="Toggle Road Hazards & Active Alerts Panel"
           >
-            🔔 ALERTS {alertsCount > 0 && <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full ml-1">{alertsCount}</span>}
+            🚧 HAZARDS & ALERTS {alertsCount > 0 && <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full ml-1">{alertsCount}</span>}
           </button>
         </div>
     </div>

@@ -1253,8 +1253,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               style={{ height: "100%", width: "100%" }} 
               className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
           >
-            {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) at zoomed-out levels <=14 or active routing */}
-            <BaseMap style={(targetAddress || currentZoom <= 14) ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
+            {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) at zoomed-out levels <=15 or active routing */}
+            <BaseMap style={(targetAddress || currentZoom <= 15) ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
             
             <CoquitlamOverlays 
                 visible={showLabels && !cadastralError} 

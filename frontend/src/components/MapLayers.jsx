@@ -8,19 +8,17 @@ import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 
 
 
-// 🚒 Classic Red & Gold Maltese Cross Icon for Fire Stations
-export const createMalteseCrossIcon = (stationId = '1') => L.divIcon({
-  className: 'custom-station-maltese-icon',
-  html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-    <svg width="36" height="36" viewBox="0 0 100 100">
-      <!-- Outer Maltese Cross Body -->
-      <path d="M 50 10 L 60 32 L 84 32 L 68 50 L 84 68 L 60 68 L 50 90 L 40 68 L 16 68 L 32 50 L 16 32 L 40 32 Z" 
-            fill="#dc2626" stroke="#fbbf24" stroke-width="4" stroke-linejoin="round" />
-      <!-- Center Circle Shield -->
-      <circle cx="50" cy="50" r="16" fill="#0f172a" stroke="#fbbf24" stroke-width="3" />
-      <!-- Station Number Text -->
-      <text x="50" y="56" font-family="'Courier New', monospace, sans-serif" font-weight="900" font-size="18" fill="#ffffff" text-anchor="middle">${stationId}</text>
-    </svg>
+// 🚒 Custom Fire Hall Icon Loader (Loads custom user logo from /icons/fire_hall.png or /icons/fire_hall.svg)
+const BASE_URL = import.meta.env.BASE_URL || '/';
+
+export const createFireHallIcon = (stationId = '1') => L.divIcon({
+  className: 'custom-station-user-icon',
+  html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+    <img src="${BASE_URL}icons/fire_hall.png" 
+         onerror="this.onerror=null; this.src='${BASE_URL}icons/fire_hall.svg';" 
+         style="width:36px;height:36px;object-fit:contain;" 
+         alt="Fire Hall ${stationId}" />
+    <span style="position:absolute;bottom:-2px;right:-2px;background:#0f172a;color:#fbbf24;border:1px solid #fbbf24;border-radius:9999px;font-size:10px;font-weight:900;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-family:monospace;">${stationId}</span>
   </div>`,
   iconSize: [36, 36],
   iconAnchor: [18, 18],
@@ -441,7 +439,7 @@ export function StationsLayer() {
     return (
         <>
             {STATIONS.map(stn => (
-                <Marker key={stn.id} position={stn.coords} icon={createMalteseCrossIcon(stn.id)}>
+                <Marker key={stn.id} position={stn.coords} icon={createFireHallIcon(stn.id)}>
                     <Tooltip direction="top" offset={[0, -18]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
                         <div className="flex flex-col gap-0.5 font-mono">
                           <span className="text-[9px] text-red-400 font-black uppercase tracking-wider">🚒 COQUITLAM FIRE HALL #{stn.id}</span>
@@ -546,21 +544,14 @@ export function CranesLayer({ visible, onSelectCrane }) {
   );
 }
 
-// Classic MUTCD Yellow & Black Circular Railroad Crossing (W10-1) Sign Icon
-const railroadIcon = L.divIcon({
-  className: 'custom-railroad-icon',
+// Custom Railroad Crossing Icon Loader (Loads custom user logo from /icons/railroad_crossing.png or /icons/railroad_crossing.svg)
+export const createRailroadCrossingIcon = () => L.divIcon({
+  className: 'custom-railroad-user-icon',
   html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-    <svg width="32" height="32" viewBox="0 0 100 100">
-      <!-- Yellow Warning Circle -->
-      <circle cx="50" cy="50" r="46" fill="#facc15" stroke="#000000" stroke-width="6"/>
-      <circle cx="50" cy="50" r="40" fill="none" stroke="#000000" stroke-width="2"/>
-      <!-- Crossbuck X -->
-      <line x1="26" y1="26" x2="74" y2="74" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
-      <line x1="74" y1="26" x2="26" y2="74" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
-      <!-- R R Text -->
-      <text x="21" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#000000">R</text>
-      <text x="63" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#000000">R</text>
-    </svg>
+    <img src="${BASE_URL}icons/railroad_crossing.png" 
+         onerror="this.onerror=null; this.src='${BASE_URL}icons/railroad_crossing.svg';" 
+         style="width:32px;height:32px;object-fit:contain;" 
+         alt="Railroad Crossing" />
   </div>`,
   iconSize: [32, 32],
   iconAnchor: [16, 16],
@@ -586,7 +577,7 @@ export function RailroadCrossingsLayer({ visible }) {
         <Marker
           key={rr.id}
           position={[rr.lat, rr.lng]}
-          icon={railroadIcon}
+          icon={createRailroadCrossingIcon()}
         >
           <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
             <div className="flex flex-col gap-0.5 font-mono">

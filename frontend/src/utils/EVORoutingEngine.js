@@ -97,9 +97,9 @@ export function calculateEVORouteMetrics({
   // Check for CP Rail crossing interaction across Coquitlam corridor
   const crossesRailroad = (originCoords[0] < 49.26 && targetCoords[0] > 49.26) || (originCoords[0] > 49.26 && targetCoords[0] < 49.26) || (originCoords[1] < -122.80 && targetCoords[1] > -122.80);
   let railroadWarning = null;
-  let railDelayKm = 0;
+  const railDelayKm = 0; // No rerouting or detour distance added per operational driver advisory directive
 
-  // Proximity check for Colony Farm Rd (Sole Access) & Kingsway Ave (Riverbend Corridor)
+  // Proximity check for Colony Farm Rd & Kingsway Ave (Riverbend Corridor)
   const targetPt = turf.point([targetCoords[1], targetCoords[0]]);
   const colonyPt = turf.point([-122.8142995, 49.2397800]);
   const kingswayPt = turf.point([-122.7911077, 49.2650819]);
@@ -109,31 +109,22 @@ export function calculateEVORouteMetrics({
 
   if (distToColony <= 1.2) {
     railroadWarning = {
-      type: 'AT_GRADE',
-      badge: '⚠️ MANDATORY AT-GRADE CP RAIL CROSSING (Colony Farm Rd) — SOLE ACCESS ROAD, CANNOT DETOUR',
+      type: 'ADVISORY',
+      badge: '🚂 RAIL CROSSING AHEAD (Colony Farm Rd)',
       color: 'amber'
     };
   } else if (distToKingsway <= 0.8) {
     railroadWarning = {
-      type: 'AT_GRADE',
-      badge: '⚠️ AT-GRADE CP RAIL CROSSING (Kingsway Ave) — RIVERBEND ACCESS ROUTE (TRAIN DELAY RISK)',
+      type: 'ADVISORY',
+      badge: '🚂 RAIL CROSSING AHEAD (Kingsway Ave / Riverbend)',
       color: 'amber'
     };
   } else if (crossesRailroad) {
-    if (config.railroadAvoidanceEnabled) {
-      railroadWarning = {
-        type: 'AVOIDED',
-        badge: '🚂 CP RAIL CROSSING AVOIDED — ROUTED VIA MARY HILL OVERPASS',
-        color: 'emerald'
-      };
-      railDelayKm = 0.8; // ~0.8km overpass detour loop
-    } else {
-      railroadWarning = {
-        type: 'AT_GRADE',
-        badge: '⚠️ AT-GRADE CP RAIL CROSSING AHEAD (Westwood / Pitt River) — TRAIN DELAY RISK',
-        color: 'amber'
-      };
-    }
+    railroadWarning = {
+      type: 'ADVISORY',
+      badge: '🚂 RAIL CROSSING AHEAD (CP Rail Line)',
+      color: 'amber'
+    };
   }
 
   // If no units provided, default to Engine + Ladder + Squad benchmark

@@ -8,25 +8,23 @@ import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 
 
 
-// 🎨 TUNED ICON (Fixed anchor centering)
-const stationIcon = L.divIcon({
-  className: 'custom-icon',
-  html: `<div style="
-    background-color: white;
-    border: 2px solid #ef4444;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    font-size: 18px;
-    box-sizing: content-box;
-  ">🚒</div>`,
-  iconSize: [34, 34],   // Width (30) + Border (4)
-  iconAnchor: [17, 17], // Center (17)
-  popupAnchor: [0, -20]
+// 🚒 Classic Red & Gold Maltese Cross Icon for Fire Stations
+export const createMalteseCrossIcon = (stationId = '1') => L.divIcon({
+  className: 'custom-station-maltese-icon',
+  html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+    <svg width="36" height="36" viewBox="0 0 100 100">
+      <!-- Outer Maltese Cross Body -->
+      <path d="M 50 10 L 60 32 L 84 32 L 68 50 L 84 68 L 60 68 L 50 90 L 40 68 L 16 68 L 32 50 L 16 32 L 40 32 Z" 
+            fill="#dc2626" stroke="#fbbf24" stroke-width="4" stroke-linejoin="round" />
+      <!-- Center Circle Shield -->
+      <circle cx="50" cy="50" r="16" fill="#0f172a" stroke="#fbbf24" stroke-width="3" />
+      <!-- Station Number Text -->
+      <text x="50" y="56" font-family="'Courier New', monospace, sans-serif" font-weight="900" font-size="18" fill="#ffffff" text-anchor="middle">${stationId}</text>
+    </svg>
+  </div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -18]
 });
 
 // 🗺️ BASEMAP COMPONENT
@@ -443,8 +441,13 @@ export function StationsLayer() {
     return (
         <>
             {STATIONS.map(stn => (
-                <Marker key={stn.id} position={stn.coords} icon={stationIcon}>
-                    <Tooltip direction="top" offset={[0, -15]} className="font-bold text-xs">{stn.name}</Tooltip>
+                <Marker key={stn.id} position={stn.coords} icon={createMalteseCrossIcon(stn.id)}>
+                    <Tooltip direction="top" offset={[0, -18]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
+                        <div className="flex flex-col gap-0.5 font-mono">
+                          <span className="text-[9px] text-red-400 font-black uppercase tracking-wider">🚒 COQUITLAM FIRE HALL #{stn.id}</span>
+                          <span className="text-white text-xs font-bold">{stn.name}</span>
+                        </div>
+                    </Tooltip>
                 </Marker>
             ))}
         </>
@@ -543,25 +546,25 @@ export function CranesLayer({ visible, onSelectCrane }) {
   );
 }
 
-// Custom Railroad Crossing Marker Icon
+// Classic MUTCD Yellow & Black Circular Railroad Crossing (W10-1) Sign Icon
 const railroadIcon = L.divIcon({
   className: 'custom-railroad-icon',
-  html: `<div style="
-    background-color: #0f172a;
-    border: 2px solid #f59e0b;
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
-    font-size: 14px;
-    cursor: pointer;
-  ">🚂</div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-  popupAnchor: [0, -14]
+  html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+    <svg width="32" height="32" viewBox="0 0 100 100">
+      <!-- Yellow Warning Circle -->
+      <circle cx="50" cy="50" r="46" fill="#facc15" stroke="#000000" stroke-width="6"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="#000000" stroke-width="2"/>
+      <!-- Crossbuck X -->
+      <line x1="26" y1="26" x2="74" y2="74" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
+      <line x1="74" y1="26" x2="26" y2="74" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
+      <!-- R R Text -->
+      <text x="21" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#000000">R</text>
+      <text x="63" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#000000">R</text>
+    </svg>
+  </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16]
 });
 
 // Coquitlam & Port Coquitlam At-Grade CP Rail Crossings
@@ -587,7 +590,7 @@ export function RailroadCrossingsLayer({ visible }) {
         >
           <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
             <div className="flex flex-col gap-0.5 font-mono">
-              <span className="text-[9px] text-amber-400 font-black uppercase tracking-wider">🚂 CP RAIL CROSSING</span>
+              <span className="text-[9px] text-amber-400 font-black uppercase tracking-wider">⚠️ CP RAIL AT-GRADE CROSSING</span>
               <span className="text-white text-xs font-bold">{rr.name}</span>
               <span className="text-[8.5px] text-slate-400">{rr.location}</span>
             </div>

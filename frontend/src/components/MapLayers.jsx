@@ -518,7 +518,7 @@ export const createSchoolIcon = () => L.divIcon({
 // Official School District 43 (SD43 Coquitlam) GIS Dataset
 export const COQUITLAM_SCHOOLS = [
   // SECONDARY SCHOOLS (9-12)
-  { id: 'SCH-01', name: 'Pinetree Secondary', type: 'Secondary (9-12)', lat: 49.290971, lng: -122.789727, address: '3000 Pinewood Ave, Coquitlam' },
+  { id: 'SCH-01', name: 'Pinetree Secondary', type: 'Secondary (9-12)', lat: 49.288200, lng: -122.786500, address: '3000 Pinewood Ave, Coquitlam' },
   { id: 'SCH-02', name: 'Gleneagle Secondary', type: 'Secondary (9-12)', lat: 49.284324, lng: -122.809637, address: '1195 Lansdowne Dr, Coquitlam' },
   { id: 'SCH-03', name: 'Centennial Secondary', type: 'Secondary (9-12)', lat: 49.256094, lng: -122.846422, address: '570 Poirier St, Coquitlam' },
   { id: 'SCH-04', name: 'Dr. Charles Best Secondary', type: 'Secondary (9-12)', lat: 49.263301, lng: -122.834416, address: '2525 Como Lake Ave, Coquitlam' },
@@ -533,7 +533,7 @@ export const COQUITLAM_SCHOOLS = [
   { id: 'SCH-11', name: 'Hillcrest Middle', type: 'Middle (6-8)', lat: 49.245015, lng: -122.844075, address: '2161 Regan Ave, Coquitlam' },
   { id: 'SCH-12', name: 'Maple Creek Middle', type: 'Middle (6-8)', lat: 49.287890, lng: -122.783570, address: '3700 Townline Rd, Coquitlam' },
   { id: 'SCH-13', name: 'Scott Creek Middle', type: 'Middle (6-8)', lat: 49.284324, lng: -122.809637, address: '1240 Lansdowne Dr, Coquitlam' },
-  { id: 'SCH-14', name: 'Summit Middle', type: 'Middle (6-8)', lat: 49.294200, lng: -122.790500, address: '1450 Westwood St, Coquitlam' },
+  { id: 'SCH-14', name: 'Summit Middle', type: 'Middle (6-8)', lat: 49.296161, lng: -122.806378, address: '1450 Parkway Blvd, Coquitlam' },
   { id: 'SCH-15', name: 'École Citadel Middle', type: 'Middle (6-8)', lat: 49.248500, lng: -122.775000, address: '1265 Citadel Dr, Port Coquitlam' },
 
   // ELEMENTARY SCHOOLS (K-5)
@@ -543,7 +543,7 @@ export const COQUITLAM_SCHOOLS = [
   { id: 'SCH-19', name: 'Cape Horn Elementary', type: 'Elementary (K-5)', lat: 49.230790, lng: -122.836984, address: '155 Finnigan St, Coquitlam' },
   { id: 'SCH-20', name: 'Coast Salish Elementary', type: 'Elementary (K-5)', lat: 49.297952, lng: -122.740824, address: '3538 Sheffield Ave, Coquitlam' },
   { id: 'SCH-21', name: 'Meadowbrook Elementary', type: 'Elementary (K-5)', lat: 49.272861, lng: -122.804093, address: '900 Meadowbrook Way, Coquitlam' },
-  { id: 'SCH-22', name: 'Westwood Elementary', type: 'Elementary (K-5)', lat: 49.294205, lng: -122.789993, address: '3610 Pinetree Way, Coquitlam' }
+  { id: 'SCH-22', name: 'Westwood Elementary', type: 'Elementary (K-5)', lat: 49.272000, lng: -122.775000, address: '3610 Hastings St, Port Coquitlam' }
 ];
 
 export function SchoolsLayer({ visible }) {

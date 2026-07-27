@@ -2,7 +2,7 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
-import { UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
+import { UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
 import { sanitizeAddress } from '../utils/addressUtils';
 
 
@@ -513,9 +513,24 @@ export function LeftSidebar({
               };
             });
 
+            // Check known building matches
+            const q = query.toUpperCase();
+            const knownMatches = KNOWN_BUILDINGS.filter(b => 
+              b.name.toUpperCase().includes(q) || 
+              b.address.toUpperCase().includes(q) || 
+              b.aliases.some(alias => alias.includes(q))
+            ).map(b => ({
+              address: b.address,
+              buildingName: b.name,
+              lat: b.frontEntrance ? b.frontEntrance[0] : b.lat,
+              lng: b.frontEntrance ? b.frontEntrance[1] : b.lng,
+              frontEntrance: b.frontEntrance,
+              note: b.note
+            }));
+
             // Deduplicate multi-unit addresses down to base building address unless user searched a specific unit
-            const seen = new Set();
-            const deduplicated = [];
+            const seen = new Set(knownMatches.map(m => m.address.toUpperCase()));
+            const deduplicated = [...knownMatches];
 
             rawItems.forEach(item => {
               let cleanAddr = item.address;

@@ -42,7 +42,7 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
       routeWhileDragging: false,
       addWaypoints: false,
       draggableWaypoints: false,
-      fitSelectedRoutes: true,
+      fitSelectedRoutes: false,
       show: false, // Hides the textual routing directions panel
       createMarker: () => null, // Disables default start/end waypoint markers (we render our own Hall/Target icons)
       lineOptions: {

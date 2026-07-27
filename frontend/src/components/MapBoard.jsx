@@ -10,7 +10,32 @@ import L from 'leaflet';
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
-import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS } from './MapConstants';
+import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
+
+export function enrichAddressWithBuilding(targetObj) {
+  if (!targetObj) return null;
+  const rawAddr = (targetObj.address || '').toUpperCase().trim();
+  
+  const matchedBuilding = KNOWN_BUILDINGS.find(b => {
+    if (rawAddr.includes(b.name.toUpperCase())) return true;
+    if (rawAddr.includes(b.address.toUpperCase())) return true;
+    return b.aliases.some(alias => rawAddr.includes(alias));
+  });
+
+  if (matchedBuilding) {
+    return {
+      ...targetObj,
+      address: matchedBuilding.address,
+      buildingName: matchedBuilding.name,
+      lat: matchedBuilding.frontEntrance ? matchedBuilding.frontEntrance[0] : matchedBuilding.lat,
+      lng: matchedBuilding.frontEntrance ? matchedBuilding.frontEntrance[1] : matchedBuilding.lng,
+      frontEntrance: matchedBuilding.frontEntrance,
+      note: matchedBuilding.note
+    };
+  }
+
+  return targetObj;
+}
 
 import { RoutingOverlay } from './RoutingOverlay';
 import DispatchReview from './DispatchReview';
@@ -308,13 +333,24 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     });
   }, [targetAddress, homeHall, routeCoordinates, activeDispatch, routingConfig]);
 
+  const [userPanned, setUserPanned] = useState(false);
+
   // Track map zoom level for automatic zoom-threshold basemap switching (Voyager <= 14, Cadastral > 14)
   useEffect(() => {
     if (!map) return;
     const updateZoom = () => setCurrentZoom(map.getZoom());
+    const onUserGesture = (e) => {
+      if (e && e.originalEvent) {
+        setUserPanned(true);
+      }
+    };
     map.on('zoomend', updateZoom);
+    map.on('dragstart zoomstart touchstart', onUserGesture);
     updateZoom();
-    return () => map.off('zoomend', updateZoom);
+    return () => {
+      map.off('zoomend', updateZoom);
+      map.off('dragstart zoomstart touchstart', onUserGesture);
+    };
   }, [map]);
 
   // Load all hydrants data and fire zones once on mount
@@ -342,11 +378,13 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
 
   const updateTargetAddress = useCallback((addr) => {
     if (addr && addr.address) {
-      const clean = sanitizeAddress(addr.address);
-      setTargetAddress({ ...addr, address: clean });
+      const enriched = enrichAddressWithBuilding(addr);
+      const clean = sanitizeAddress(enriched.address);
+      setTargetAddress({ ...enriched, address: clean });
     } else {
-      setTargetAddress(addr);
+      setTargetAddress(enrichAddressWithBuilding(addr));
     }
+    setUserPanned(false); // Reset user pan state when a new target address is selected
     if (addr && addr.rings) {
       const leafletPolygon = addr.rings.map(ring => 
         ring.map(coord => [coord[1], coord[0]])
@@ -555,7 +593,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
 
   // Adaptive Zooming: fit bounds to show both origin hall & destination address inside middle window (between Left 320px & Right 380px sidebars)
   useEffect(() => {
-    if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE") {
+    if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE" && !userPanned) {
       const origin = STATIONS[homeHall];
       const dest = [targetAddress.lat, targetAddress.lng];
       map.fitBounds([origin, dest], { 
@@ -564,7 +602,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         animate: true 
       });
     }
-  }, [map, targetAddress, homeHall, appMode]);
+  }, [map, targetAddress, homeHall, appMode, userPanned]);
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);
@@ -1426,6 +1464,26 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             )}
           </MapContainer>
 
+          {/* Floating Re-Center Button when user pans or zooms */}
+          {userPanned && targetAddress && (
+            <button
+              onClick={() => {
+                setUserPanned(false);
+                if (map && targetCoords && STATIONS[homeHall]) {
+                  map.fitBounds([STATIONS[homeHall], targetCoords], {
+                    paddingTopLeft: [340, 80],
+                    paddingBottomRight: [400, 80],
+                    animate: true
+                  });
+                }
+              }}
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1100] bg-slate-900/95 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-4.5 py-2.5 rounded-full border border-sky-500/60 shadow-2xl flex items-center gap-2 transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-3 duration-200"
+            >
+              <span className="animate-pulse">🎯</span>
+              <span>RE-CENTER ON ROUTE</span>
+            </button>
+          )}
+
           {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
           <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
             CFR EVO APP | BUILD: {buildTime} | LICENSE: POLYFORM NONCOMMERCIAL 1.0.0
@@ -1452,10 +1510,21 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
                   </button>
                 </div>
 
-                <h3 className="font-black text-lg text-sky-400 mt-2.5 leading-tight uppercase font-sans tracking-tight">
+                {targetAddress.buildingName && (
+                  <div className="flex items-center gap-1.5 mt-2.5 bg-amber-950/70 border border-amber-700/80 px-2.5 py-1 rounded-lg text-amber-300 font-extrabold text-xs">
+                    <span>🏢</span>
+                    <span>{targetAddress.buildingName}</span>
+                  </div>
+                )}
+                <h3 className="font-black text-lg text-sky-400 mt-2 leading-tight uppercase font-sans tracking-tight">
                   {targetAddress.address}
                 </h3>
                 <p className="text-[11px] text-slate-400 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
+                {targetAddress.note && (
+                  <p className="text-[10px] text-sky-300 font-sans italic mt-1 font-semibold bg-slate-950/60 p-1.5 rounded border border-slate-800">
+                    ℹ️ {targetAddress.note}
+                  </p>
+                )}
                 
                 {nearestHydrants.length > 0 && (
                   <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col gap-1.5">

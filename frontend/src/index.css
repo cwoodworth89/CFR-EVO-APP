@@ -26,9 +26,22 @@
   border-right-color: #020617 !important;
 }
 
-/* 🗺️ Custom Leaflet DivIcon Transparency Overrides */
+/* 🗺️ Custom Leaflet DivIcon Transparency Overrides & Round Icon Styling */
 .leaflet-div-icon {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+.custom-station-user-icon,
+.custom-rr-user-icon,
+.custom-school-user-icon {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.custom-station-user-icon:hover,
+.custom-rr-user-icon:hover,
+.custom-school-user-icon:hover {
+  opacity: 1 !important;
+  transform: scale(1.08);
 }

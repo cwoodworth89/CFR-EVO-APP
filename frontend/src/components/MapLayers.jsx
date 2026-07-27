@@ -13,10 +13,10 @@ const BASE_URL = import.meta.env.BASE_URL || '/';
 
 export const createFireHallIcon = (stationId = '1') => L.divIcon({
   className: 'custom-station-user-icon',
-  html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;background:transparent;border:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+  html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;opacity:0.88;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
     <img src="${BASE_URL}icons/firehall.png" 
          onerror="if(this.src.includes('firehall.png')){this.src='${BASE_URL}icons/fire_hall.png';}else if(this.src.includes('fire_hall.png')){this.src='${BASE_URL}icons/fire_hall.svg';}else{this.onerror=null;}" 
-         style="width:38px;height:38px;max-width:38px;max-height:38px;object-fit:contain;background:transparent;border:none;display:block;" 
+         style="width:38px;height:38px;max-width:38px;max-height:38px;object-fit:cover;border-radius:50%;overflow:hidden;background:transparent;border:none;display:block;" 
          alt="Fire Hall ${stationId}" />
     <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(15,23,42,0.92);color:#fbbf24;border:1.5px solid #fbbf24;border-radius:9999px;font-size:11px;font-weight:900;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-family:monospace;box-shadow:0 2px 5px rgba(0,0,0,0.8);pointer-events:none;">${stationId}</span>
   </div>`,
@@ -456,11 +456,11 @@ export function StationsLayer() {
 
 // Custom Railroad Crossing Icon Loader (Loads custom user logo from /icons/railroad_crossing.png or /icons/railroad_crossing.svg)
 export const createRailroadCrossingIcon = () => L.divIcon({
-  className: 'custom-railroad-user-icon',
-  html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+  className: 'custom-rr-user-icon',
+  html: `<div style="display:flex;align-items:center;justify-content:center;border-radius:50%;opacity:0.88;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
     <img src="${BASE_URL}icons/railroad_crossing.png" 
          onerror="this.onerror=null; this.src='${BASE_URL}icons/railroad_crossing.svg';" 
-         style="width:34px;height:34px;max-width:34px;max-height:34px;object-fit:contain;" 
+         style="width:34px;height:34px;max-width:34px;max-height:34px;object-fit:cover;border-radius:50%;overflow:hidden;display:block;" 
          alt="Railroad Crossing" />
   </div>`,
   iconSize: [34, 34],
@@ -504,10 +504,10 @@ export function RailroadCrossingsLayer({ visible }) {
 // 🏫 Custom School Icon Loader (Loads custom user logo from /icons/school.png or /icons/school.svg)
 export const createSchoolIcon = () => L.divIcon({
   className: 'custom-school-user-icon',
-  html: `<div style="display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
+  html: `<div style="display:flex;align-items:center;justify-content:center;border-radius:50%;opacity:0.88;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
     <img src="${BASE_URL}icons/school.png" 
          onerror="this.onerror=null; this.src='${BASE_URL}icons/school.svg';" 
-         style="width:32px;height:32px;max-width:32px;max-height:32px;object-fit:contain;" 
+         style="width:32px;height:32px;max-width:32px;max-height:32px;object-fit:cover;border-radius:50%;overflow:hidden;display:block;" 
          alt="School" />
   </div>`,
   iconSize: [32, 32],

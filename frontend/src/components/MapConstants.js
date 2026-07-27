@@ -107,19 +107,19 @@ export const KNOWN_BUILDINGS = [
     name: "Grand Central 2",
     address: "2968 Glen Dr, Coquitlam",
     aliases: ["GRAND CENTRAL 2", "GRAND CENTRAL TWO", "2968 GLEN", "2968 GLEN DR"],
-    lat: 49.282500,
-    lng: -122.796200, // Exact NW Tower Footprint facing Glen Dr
-    frontEntrance: [49.282500, -122.796200], // Glen Dr Front Entrance (Prevents routing to Atlantic Ave or back alley)
-    note: "Highrise Tower (NW Block) — Main Front Entrance on Glen Dr"
+    lat: 49.282800,
+    lng: -122.796800, // Exact West Tower Footprint for 2968 Glen Dr facing Glen Dr
+    frontEntrance: [49.282800, -122.796800], // Glen Dr West Front Entrance
+    note: "Highrise Tower (West Block) — Main Front Entrance on Glen Dr"
   },
   {
     name: "Grand Central 1",
     address: "2978 Glen Dr, Coquitlam",
     aliases: ["GRAND CENTRAL 1", "GRAND CENTRAL ONE", "2978 GLEN", "2978 GLEN DR"],
-    lat: 49.282500,
-    lng: -122.794600, // Exact NE Tower Footprint facing Glen Dr / Pinetree Way
-    frontEntrance: [49.282500, -122.794600],
-    note: "Highrise Tower (NE Block) — Front Entrance on Glen Dr / Pinetree Way"
+    lat: 49.282800,
+    lng: -122.794600, // Exact East Tower Footprint facing Glen Dr / Pinetree Way
+    frontEntrance: [49.282800, -122.794600],
+    note: "Highrise Tower (East Block) — Front Entrance on Glen Dr / Pinetree Way"
   },
   {
     name: "Grand Central 3",

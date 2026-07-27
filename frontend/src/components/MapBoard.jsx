@@ -1408,10 +1408,24 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
                   <Polygon 
                     positions={targetPolygon} 
                     pathOptions={{ 
-                      color: '#ef4444', 
-                      fillColor: '#ef4444', 
-                      fillOpacity: 0.35, 
-                      weight: 4 
+                      color: targetAddress.buildingName ? '#f59e0b' : '#ef4444', 
+                      fillColor: targetAddress.buildingName ? '#f59e0b' : '#ef4444', 
+                      fillOpacity: targetAddress.buildingName ? 0.08 : 0.35, 
+                      weight: targetAddress.buildingName ? 2 : 4,
+                      dashArray: targetAddress.buildingName ? '6,6' : null
+                    }}
+                  />
+                )}
+                {targetAddress.buildingName && (
+                  <CircleMarker
+                    center={[targetAddress.lat, targetAddress.lng]}
+                    radius={22}
+                    pathOptions={{
+                      color: '#f59e0b',
+                      fillColor: '#ef4444',
+                      fillOpacity: 0.35,
+                      weight: 3.5,
+                      className: 'animate-pulse'
                     }}
                   />
                 )}

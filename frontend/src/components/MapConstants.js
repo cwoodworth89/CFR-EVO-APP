@@ -101,51 +101,69 @@ export const STATIONS_MAP = STATIONS.reduce((acc, stn) => {
 }, {});
 
 // 🏢 KNOWN BUILDING COMPLEXES & HIGH-RISE REGISTRY
-// Pre-configured building names and verified front-entrance routing access points
+// Pre-configured building names, exact tower footprints, and verified front-entrance routing access points
 export const KNOWN_BUILDINGS = [
   {
     name: "Grand Central 2",
     address: "2968 Glen Dr, Coquitlam",
     aliases: ["GRAND CENTRAL 2", "GRAND CENTRAL TWO", "2968 GLEN", "2968 GLEN DR"],
     lat: 49.282500,
-    lng: -122.796200, // Main front driveway entrance on Glen Dr (Prevents routing to back alleyway)
-    frontEntrance: [49.282500, -122.796200],
-    note: "Highrise — Main Front Entrance on Glen Dr (Do not route via back alley)"
+    lng: -122.796200, // Exact NW Tower Footprint facing Glen Dr
+    frontEntrance: [49.282500, -122.796200], // Glen Dr Front Entrance (Prevents routing to Atlantic Ave or back alley)
+    note: "Highrise Tower (NW Block) — Main Front Entrance on Glen Dr"
   },
   {
     name: "Grand Central 1",
     address: "2978 Glen Dr, Coquitlam",
-    aliases: ["GRAND CENTRAL 1", "2978 GLEN", "2978 GLEN DR"],
-    lat: 49.282188,
-    lng: -122.796949,
-    frontEntrance: [49.282200, -122.796900],
-    note: "Highrise — Front Entrance on Glen Dr"
+    aliases: ["GRAND CENTRAL 1", "GRAND CENTRAL ONE", "2978 GLEN", "2978 GLEN DR"],
+    lat: 49.282500,
+    lng: -122.794600, // Exact NE Tower Footprint facing Glen Dr / Pinetree Way
+    frontEntrance: [49.282500, -122.794600],
+    note: "Highrise Tower (NE Block) — Front Entrance on Glen Dr / Pinetree Way"
   },
   {
     name: "Grand Central 3",
-    address: "2958 Glen Dr, Coquitlam",
-    aliases: ["GRAND CENTRAL 3", "2958 GLEN", "2958 GLEN DR"],
-    lat: 49.282800,
-    lng: -122.795500,
-    frontEntrance: [49.282800, -122.795500],
-    note: "Highrise — Front Entrance on Glen Dr"
+    address: "2975 Atlantic Ave, Coquitlam",
+    aliases: ["GRAND CENTRAL 3", "GRAND CENTRAL THREE", "2975 ATLANTIC", "2975 ATLANTIC AVE"],
+    lat: 49.281300,
+    lng: -122.795600, // Exact South Tower Footprint facing Atlantic Ave
+    frontEntrance: [49.281300, -122.795600],
+    note: "Highrise Tower (South Block) — Front Entrance on Atlantic Ave"
   },
   {
     name: "Mura",
     address: "2980 Atlantic Ave, Coquitlam",
-    aliases: ["MURA", "2980 ATLANTIC"],
+    aliases: ["MURA", "2980 ATLANTIC", "2980 ATLANTIC AVE"],
     lat: 49.281297,
     lng: -122.795576,
     frontEntrance: [49.281300, -122.795600],
     note: "Highrise — Front Entrance on Atlantic Ave"
   },
   {
+    name: "Obelisk",
+    address: "1178 Pinetree Way, Coquitlam",
+    aliases: ["OBELISK", "1178 PINETREE", "1178 PINETREE WAY"],
+    lat: 49.281969,
+    lng: -122.793950,
+    frontEntrance: [49.281969, -122.793950],
+    note: "Highrise — Front Entrance on Pinetree Way"
+  },
+  {
+    name: "Celadon (Windsor Gate)",
+    address: "3102 Windsor Gate, Coquitlam",
+    aliases: ["CELADON", "WINDSOR GATE", "3102 WINDSOR GATE"],
+    lat: 49.279370,
+    lng: -122.785004,
+    frontEntrance: [49.279370, -122.785004],
+    note: "Highrise Complex — Entrance on Windsor Gate"
+  },
+  {
     name: "Coquitlam Town Centre Park",
     address: "1299 Pinetree Way, Coquitlam",
-    aliases: ["TOWN CENTRE PARK", "TC PARK"],
+    aliases: ["TOWN CENTRE PARK", "TC PARK", "1299 PINETREE"],
     lat: 49.287800,
     lng: -122.790500,
     frontEntrance: [49.287800, -122.790500],
-    note: "Park Main Entrance"
+    note: "Park Main Entrance & Plaza"
   }
 ];

@@ -1558,18 +1558,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
                   </div>
                 )}
               </div>
-
-              <div className="pt-2">
-                <a 
-                  href={`https://www.google.com/maps/dir/?api=1&origin=${STATIONS[homeHall][0]},${STATIONS[homeHall][1]}&destination=${targetAddress.lat},${targetAddress.lng}&travelmode=driving`}
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all text-center w-full shadow-lg border border-indigo-400 cursor-pointer"
-                >
-                  <span>🚙</span>
-                  <span>NAVIGATE (GPS)</span>
-                </a>
-              </div>
             </div>
 
             {/* Middle 1/3 3D Property Satellite View */}

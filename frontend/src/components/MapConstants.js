@@ -165,5 +165,14 @@ export const KNOWN_BUILDINGS = [
     lng: -122.790500,
     frontEntrance: [49.287800, -122.790500],
     note: "Park Main Entrance & Plaza"
+  },
+  {
+    name: "1386 Coast Meridian Rd",
+    address: "1386 Coast Meridian Rd, Coquitlam",
+    aliases: ["1386 COAST MERIDIAN", "1386 COAST MERIDIAN RD"],
+    lat: 49.297541,
+    lng: -122.755800, // Frontage on Coast Meridian Rd (Prevents routing to rear alley)
+    frontEntrance: [49.297541, -122.755800],
+    note: "Main Front Entrance on Coast Meridian Rd (Do not route via rear alley)"
   }
 ];

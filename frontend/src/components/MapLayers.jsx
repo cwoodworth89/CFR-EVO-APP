@@ -431,7 +431,8 @@ export function HydrantsLayer({ visible }) {
     );
 }
 
-export function StationsLayer() {
+export function StationsLayer({ visible = true }) {
+    if (!visible) return null;
     return (
         <>
             {STATIONS.map(stn => (

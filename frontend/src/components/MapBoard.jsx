@@ -291,6 +291,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
   const [showSchools, setShowSchools] = useState(false);
+  const [showFireHalls, setShowFireHalls] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
@@ -1251,6 +1252,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           activeDispatch={activeDispatch}
           setActiveDispatch={setActiveDispatch}
           loadingTraining={loadingTraining}
+          mapStyle={mapStyle}
+          setMapStyle={setMapStyle}
+          onOpenRoutingConfig={() => setShowRoutingConfigModal(true)}
           showZones={showZones}
           setShowZones={setShowZones}
           showHydrants={showHydrants}
@@ -1263,6 +1267,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setShowRailroadCrossings={setShowRailroadCrossings}
           showSchools={showSchools}
           setShowSchools={setShowSchools}
+          showFireHalls={showFireHalls}
+          setShowFireHalls={setShowFireHalls}
           addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
@@ -1342,7 +1348,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             ))}
 
             {/* HIDE STATIONS IN TRAINING MODE */}
-            {appMode !== "TRAINING_ZONES" && <StationsLayer />}
+            {appMode !== "TRAINING_ZONES" && <StationsLayer visible={showFireHalls} />}
 
             {/* AT-GRADE RAILROAD CROSSINGS LAYER */}
             <RailroadCrossingsLayer visible={showRailroadCrossings} />

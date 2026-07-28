@@ -335,6 +335,9 @@ export function LeftSidebar({
   activeDispatch,
   setActiveDispatch,
   loadingTraining,
+  mapStyle,
+  setMapStyle,
+  onOpenRoutingConfig,
   // Explore layer toggles
   showZones, 
   setShowZones, 
@@ -348,6 +351,8 @@ export function LeftSidebar({
   setShowRailroadCrossings,
   showSchools,
   setShowSchools,
+  showFireHalls,
+  setShowFireHalls,
   homeHall,
   setHomeHall,
   targetAddress,
@@ -736,6 +741,17 @@ export function LeftSidebar({
                     <div className="flex flex-col gap-2">
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">MAP LAYERS</h3>
                        <div className="flex flex-col gap-2.5 mt-1.5">
+                          {/* 🚒 FIRE HALLS OVERLAY */}
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                             <input 
+                                type="checkbox" 
+                                checked={showFireHalls !== false} 
+                                onChange={(e) => setShowFireHalls && setShowFireHalls(e.target.checked)} 
+                                className="rounded border-slate-800 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                             />
+                             <span className="flex items-center gap-1.5 font-semibold">🚒 Fire Halls</span>
+                          </label>
+
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 
                                 type="checkbox" 
@@ -857,16 +873,16 @@ export function LeftSidebar({
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono mb-1">MAP LEGEND</h3>
                        <div className="flex flex-col gap-2 font-mono text-[9px] text-slate-400">
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded-full bg-red-600 border border-white text-white flex items-center justify-center text-[9px] font-black shadow">1</div>
+                             <img src={`${import.meta.env.BASE_URL || '/'}icons/fire_hall.png`} className="w-4 h-4 rounded-full object-cover shadow" alt="Fire Hall" />
                              <span className="text-slate-300 font-sans text-xs">Coquitlam Fire Halls</span>
                           </div>
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded-full bg-blue-600/90 border border-white/80 flex items-center justify-center text-[9px] shadow">🏫</div>
+                             <img src={`${import.meta.env.BASE_URL || '/'}icons/school.svg`} className="w-4 h-4 rounded-full object-cover shadow" alt="School" />
                              <span className="text-slate-300 font-sans text-xs">Schools & Zones</span>
                           </div>
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded-full bg-amber-600/90 border border-white/80 flex items-center justify-center text-[9px] shadow">🛤️</div>
-                             <span className="text-slate-300 font-sans text-xs">Railroad Crossings</span>
+                             <img src={`${import.meta.env.BASE_URL || '/'}icons/railroad_crossing.png`} className="w-4 h-4 rounded-full object-cover shadow" alt="Railroad Crossing" />
+                             <span className="text-slate-300 font-sans text-xs">CP Rail Crossings</span>
                           </div>
                           <div className="flex items-center gap-2.5">
                              <div className="flex items-center gap-1">

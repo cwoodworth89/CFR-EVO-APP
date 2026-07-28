@@ -55,27 +55,24 @@ const getRandomElement = (arr) => {
 
 const getZoneCentroid = (zone) => {
   if (!zone || !zone.geometry || !zone.geometry.coordinates || !zone.geometry.coordinates[0]) return null;
-  try {
-    const poly = turf.polygon(zone.geometry.coordinates);
-    const center = turf.centroid(poly);
-    const [lng, lat] = center.geometry.coordinates;
-    return [lat, lng];
-  } catch (err) {
-    const coords = zone.geometry.coordinates[0];
-    let sumLat = 0, sumLng = 0;
-    coords.forEach(pt => {
-      sumLng += pt[0];
-      sumLat += pt[1];
-    });
-    return [sumLat / coords.length, sumLng / coords.length];
-  }
+  const coords = zone.geometry.coordinates[0];
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  coords.forEach(pt => {
+    const lng = pt[0];
+    const lat = pt[1];
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+  });
+  return [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
 };
 
 const createSoftZoneNumberIcon = (zoneId) => L.divIcon({
   className: 'soft-zone-number-marker',
-  html: `<div style="display:flex;align-items:center;justify-content:center;color: rgba(241, 245, 249, 0.85); font-weight: 800; font-size: 11px; font-family: ui-monospace, SFMono-Regular, monospace; pointer-events: none; user-select: none; text-shadow: 0 1px 4px rgba(15, 23, 42, 0.95), 0 0 3px rgba(15, 23, 42, 0.95); text-align: center; line-height: 1;">${zoneId}</div>`,
-  iconSize: [36, 18],
-  iconAnchor: [18, 9]
+  html: `<div style="display:inline-flex;align-items:center;justify-content:center;background:rgba(15, 23, 42, 0.88);color:#fef08a;border:1.5px solid rgba(250, 204, 21, 0.7);border-radius:9999px;font-weight:900;font-size:12px;font-family:ui-monospace, SFMono-Regular, monospace;pointer-events:none;user-select:none;padding:2px 7px;box-shadow:0 3px 8px rgba(0,0,0,0.9);white-space:nowrap;line-height:1;">${zoneId}</div>`,
+  iconSize: [38, 20],
+  iconAnchor: [19, 10]
 });
 
 // 🗺️ GeometryDecoder decodes Municipal 511 encoded coordinates sequentially
@@ -1324,8 +1321,10 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           <MapContainer 
               center={[49.28, -122.80]} 
               zoom={12} 
+              minZoom={12}
+              maxZoom={22}
               style={{ height: "100%", width: "100%" }} 
-              className="bg-slate-900" zoomControl={false} maxZoom={22} ref={setMap}
+              className="bg-slate-900" zoomControl={false} ref={setMap}
           >
             {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) at zoomed-out levels <=15 or active routing */}
             <BaseMap style={(targetAddress || currentZoom <= 15) ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
@@ -1347,8 +1346,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             
             {/* 3. LAYERS ASSIGNED TO PANES */}
             
-            {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall - OFF at zoom >= 17) */}
-            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom < 17 && zones.map((zone) => (
+            {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall - OFF at zoom >= 16) */}
+            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom < 16 && zones.map((zone) => (
               <Polygon 
                   key={zone.zone_id} 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 

@@ -1199,17 +1199,17 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     const stationName = zone.station || "";
     let color = "#475569"; // default slate gray
     
-    if (stationName.includes("Hall 1") || zone.unit_id === "E1") color = "#38bdf8";      // Soft Sky Blue for Hall 1
-    else if (stationName.includes("Hall 2") || zone.unit_id === "E2") color = "#60a5fa"; // Soft Blue for Hall 2
-    else if (stationName.includes("Hall 3") || zone.unit_id === "E3" || zone.unit_id === "Q5") color = "#34d399"; // Soft Emerald Green for Hall 3
-    else if (stationName.includes("Hall 4") || zone.unit_id === "E4") color = "#c084fc"; // Soft Purple for Hall 4
+    if (stationName.includes("Hall 1") || zone.unit_id === "E1") color = "#f43f5e";      // Soft Crimson Red for Hall 1
+    else if (stationName.includes("Hall 2") || zone.unit_id === "E2") color = "#3b82f6"; // Soft Royal Blue for Hall 2
+    else if (stationName.includes("Hall 3") || zone.unit_id === "E3" || zone.unit_id === "Q5") color = "#10b981"; // Soft Emerald Green for Hall 3
+    else if (stationName.includes("Hall 4") || zone.unit_id === "E4") color = "#a855f7"; // Soft Purple for Hall 4
     
     return {
       color: color,
       fillColor: color,
-      fillOpacity: 0.08,
-      weight: 1.5,
-      dashArray: "3 3"
+      fillOpacity: 0.10,
+      weight: 1.8,
+      dashArray: "4 4"
     };
   };
  
@@ -1321,20 +1321,24 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             
             {/* 3. LAYERS ASSIGNED TO PANES */}
             
-            {/* Soft Multi-Color Dashed Coquitlam GIS Emergency Response Zones Layer */}
-            <FireZonesLayer 
-                visible={(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && !cadastralError} 
-                pane="underlayPane" 
-            />
-            
-            {/* Vector Polygon Highlights (Only in TRAINING_ZONES mode) */}
-            {appMode === "TRAINING_ZONES" && zones.map((zone) => (
+            {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall) */}
+            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && zones.map((zone) => (
               <Polygon 
                   key={zone.zone_id} 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
                   pathOptions={getZoneStyle(zone)} 
                   pane="underlayPane" 
-              />
+              >
+                {appMode === "EXPLORE" && (
+                  <Tooltip sticky direction="center" permanent={false}>
+                    <div className="font-mono text-[10px] font-bold text-slate-200">
+                      <span className="text-amber-400 font-extrabold">ZONE {zone.zone_id}</span>
+                      <span className="mx-1 text-slate-500">|</span>
+                      <span className="text-slate-300 font-semibold">{zone.unit_id}</span>
+                    </div>
+                  </Tooltip>
+                )}
+              </Polygon>
             ))}
 
             {/* HIDE STATIONS IN TRAINING MODE */}

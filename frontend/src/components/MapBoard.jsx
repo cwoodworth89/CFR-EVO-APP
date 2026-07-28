@@ -1507,7 +1507,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           </MapContainer>
 
           {/* Discreet Development Zoom Level Indicator */}
-          <div className="absolute bottom-2 left-3 z-[1000] pointer-events-none select-none px-2 py-0.5 rounded bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono text-slate-400 backdrop-blur-xs shadow-md flex items-center gap-1.5 opacity-75">
+          <div className="absolute top-3 right-3 z-[1000] pointer-events-none select-none px-2 py-0.5 rounded bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono text-slate-400 backdrop-blur-xs shadow-md flex items-center gap-1.5 opacity-75">
             <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">ZOOM</span>
             <span className="font-extrabold text-amber-400 font-mono text-xs">{typeof currentZoom === 'number' ? currentZoom.toFixed(1) : currentZoom}</span>
           </div>

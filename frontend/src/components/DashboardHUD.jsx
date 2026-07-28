@@ -353,8 +353,6 @@ export function LeftSidebar({
   setShowSchools,
   showFireHalls,
   setShowFireHalls,
-  showCityBoundary,
-  setShowCityBoundary,
   homeHall,
   setHomeHall,
   targetAddress,
@@ -743,17 +741,6 @@ export function LeftSidebar({
                     <div className="flex flex-col gap-2">
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">MAP LAYERS</h3>
                        <div className="flex flex-col gap-2.5 mt-1.5">
-                          {/* 🏛️ CITY BOUNDARY OVERLAY */}
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
-                             <input 
-                                type="checkbox" 
-                                checked={showCityBoundary !== false} 
-                                onChange={(e) => setShowCityBoundary && setShowCityBoundary(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-sky-400 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
-                             />
-                             <span className="flex items-center gap-1.5 font-semibold">🏛️ City Boundary</span>
-                          </label>
-
                           {/* 🚒 FIRE HALLS OVERLAY */}
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 
@@ -885,10 +872,6 @@ export function LeftSidebar({
                     <div className="flex flex-col gap-2 mt-auto border-t border-slate-855 pt-4">
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono mb-1">MAP LEGEND</h3>
                        <div className="flex flex-col gap-2 font-mono text-[9px] text-slate-400">
-                          <div className="flex items-center gap-2.5">
-                             <div className="w-4 border-b-2 border-dashed border-sky-400"></div>
-                             <span className="text-slate-300 font-sans text-xs">City Boundary</span>
-                          </div>
                           <div className="flex items-center gap-2.5">
                              <img src={`${import.meta.env.BASE_URL || '/'}icons/fire_hall.png`} className="w-4 h-4 rounded-full object-cover shadow" alt="Fire Hall" />
                              <span className="text-slate-300 font-sans text-xs">Coquitlam Fire Halls</span>

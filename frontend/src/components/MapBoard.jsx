@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer, CoquitlamBoundaryLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
@@ -292,7 +292,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
   const [showSchools, setShowSchools] = useState(false);
   const [showFireHalls, setShowFireHalls] = useState(true);
-  const [showCityBoundary, setShowCityBoundary] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
@@ -1270,8 +1269,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setShowSchools={setShowSchools}
           showFireHalls={showFireHalls}
           setShowFireHalls={setShowFireHalls}
-          showCityBoundary={showCityBoundary}
-          setShowCityBoundary={setShowCityBoundary}
           addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
@@ -1307,9 +1304,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) at zoomed-out levels <=15 or active routing */}
             <BaseMap style={(targetAddress || currentZoom <= 15) ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
             
-            {/* Coquitlam Municipal Boundary GIS Layer (ON by default) */}
-            <CoquitlamBoundaryLayer visible={showCityBoundary} />
-            
             <CoquitlamOverlays 
                 visible={showLabels && !cadastralError} 
                 onLoadError={() => setCadastralError(true)} 
@@ -1327,30 +1321,20 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             
             {/* 3. LAYERS ASSIGNED TO PANES */}
             
-            {/* "Top Bun" - The Text Labels */}
+            {/* Soft Multi-Color Dashed Coquitlam GIS Emergency Response Zones Layer */}
             <FireZonesLayer 
                 visible={(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && !cadastralError} 
-                pane="labelsPane" 
+                pane="underlayPane" 
             />
             
-            {/* "Bottom Bun" - The Highlight */}
-            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && zones.map((zone) => (
+            {/* Vector Polygon Highlights (Only in TRAINING_ZONES mode) */}
+            {appMode === "TRAINING_ZONES" && zones.map((zone) => (
               <Polygon 
                   key={zone.zone_id} 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
                   pathOptions={getZoneStyle(zone)} 
                   pane="underlayPane" 
-              >
-                {appMode === "EXPLORE" && (
-                  <Tooltip sticky direction="center" permanent={false}>
-                    <div className="font-mono text-[10px] font-bold text-slate-200">
-                      <span className="text-amber-400 font-extrabold">ZONE {zone.zone_id}</span>
-                      <span className="mx-1 text-slate-500">|</span>
-                      <span className="text-slate-300 font-semibold">{zone.unit_id}</span>
-                    </div>
-                  </Tooltip>
-                )}
-              </Polygon>
+              />
             ))}
 
             {/* HIDE STATIONS IN TRAINING MODE */}

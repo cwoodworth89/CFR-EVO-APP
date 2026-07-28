@@ -1,6 +1,6 @@
 // NOTE: For live MapServer endpoints (Parcels, Roads, Zones) and fallback logic, see docs/gis_endpoints.md
 import React, { useEffect, useRef } from 'react';
-import { Marker, Tooltip, Popup, useMap } from 'react-leaflet';
+import { Marker, CircleMarker, Tooltip, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { dynamicMapLayer } from 'esri-leaflet';
 import * as turf from '@turf/turf';
@@ -177,10 +177,10 @@ export function HydrantsLayer({ visible }) {
     const lastCenterRef = React.useRef(null);
     const lastZoomRef = React.useRef(null);
     const debounceTimerRef = React.useRef(null);
-    const bbox = visible && zoom >= 17 ? map.getBounds().toBBoxString() : "";
+    const bbox = visible && zoom >= 15 ? map.getBounds().toBBoxString() : "";
 
     React.useEffect(() => {
-      if (!visible || zoom < 17 || allHydrants.length === 0 || !bbox) {
+      if (!visible || zoom < 15 || allHydrants.length === 0 || !bbox) {
         setHydrants([]);
         return;
       }
@@ -365,11 +365,13 @@ export function HydrantsLayer({ visible }) {
       });
     };
 
+    const canvasRenderer = React.useMemo(() => L.canvas({ padding: 0.5 }), []);
+
     if (!visible) return null;
 
     return (
       <>
-        {zoom >= 17 && hydrants.map((h, i) => {
+        {zoom >= 15 && hydrants.map((h, i) => {
           if (!h.geometry || h.geometry.x === undefined || h.geometry.y === undefined) return null;
           const coords = [h.geometry.y, h.geometry.x];
           const statusVal = (h.attributes.status || "").toUpperCase();
@@ -379,6 +381,32 @@ export function HydrantsLayer({ visible }) {
           let label = "OPERATING";
           if (statusVal === "PRIVATE") label = "PRIVATE";
           if (statusVal === "ABANDONED" || statusVal === "OUT_OF_SERVICE" || statusVal === "INACTIVE") label = "OUT OF SERVICE";
+
+          let borderColor = '#facc15';
+          const fc = (flowClass || "").toUpperCase();
+          if (fc === 'AA') borderColor = '#38bdf8';
+          else if (fc === 'A') borderColor = '#4ade80';
+          else if (fc === 'B') borderColor = '#fb923c';
+          else if (fc === 'C') borderColor = '#f87171';
+          if (statusVal === 'PRIVATE') borderColor = '#f59e0b';
+          if (statusVal === 'ABANDONED' || statusVal === 'OUT_OF_SERVICE' || statusVal === 'INACTIVE') borderColor = '#ef4444';
+
+          if (zoom < 17) {
+            return (
+              <CircleMarker
+                key={`canvas-${gisId}-${i}`}
+                center={coords}
+                radius={4}
+                renderer={canvasRenderer}
+                pathOptions={{
+                  color: '#0f172a',
+                  fillColor: borderColor,
+                  fillOpacity: 0.9,
+                  weight: 1
+                }}
+              />
+            );
+          }
 
           return (
             <Marker 

@@ -1346,8 +1346,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             
             {/* 3. LAYERS ASSIGNED TO PANES */}
             
-            {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall - Active whenever showZones is ON) */}
-            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && zones.map((zone) => (
+            {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall - OFF at zoom >= 16) */}
+            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom < 16 && zones.map((zone) => (
               <Polygon 
                   key={zone.zone_id} 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
@@ -1356,8 +1356,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               />
             ))}
 
-            {/* Centered Soft Black Zone Number Labels (ON from zoom 13+ when showZones is ON) */}
-            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom >= 13 && zones.map((zone) => {
+            {/* Centered Soft Black Zone Number Labels (ON at zoom 13/14/15 when showZones is ON, OFF at zoom >= 16) */}
+            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom >= 13 && currentZoom < 16 && zones.map((zone) => {
               const center = getZoneCentroid(zone);
               if (!center) return null;
               return (

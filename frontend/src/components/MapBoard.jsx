@@ -70,9 +70,9 @@ const getZoneCentroid = (zone) => {
 
 const createSoftZoneNumberIcon = (zoneId) => L.divIcon({
   className: 'soft-zone-number-marker',
-  html: `<div style="display:inline-flex;align-items:center;justify-content:center;background:rgba(15, 23, 42, 0.88);color:#fef08a;border:1.5px solid rgba(250, 204, 21, 0.7);border-radius:9999px;font-weight:900;font-size:12px;font-family:ui-monospace, SFMono-Regular, monospace;pointer-events:none;user-select:none;padding:2px 7px;box-shadow:0 3px 8px rgba(0,0,0,0.9);white-space:nowrap;line-height:1;">${zoneId}</div>`,
-  iconSize: [38, 20],
-  iconAnchor: [19, 10]
+  html: `<div style="display:flex;align-items:center;justify-content:center;color:#0f172a;font-weight:800;font-size:12px;font-family:ui-monospace, SFMono-Regular, monospace;pointer-events:none;user-select:none;opacity:0.85;white-space:nowrap;line-height:1;">${zoneId}</div>`,
+  iconSize: [32, 16],
+  iconAnchor: [16, 8]
 });
 
 // 🗺️ GeometryDecoder decodes Municipal 511 encoded coordinates sequentially

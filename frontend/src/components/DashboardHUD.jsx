@@ -87,89 +87,8 @@ export function Header({
           </div>
         </div>
 
-        {/* Right Side: Options & Alerts Panel Trigger */}
+        {/* Right Side: Alerts Panel Trigger */}
         <div className="flex gap-3 items-center">
-
-
-          {/* Kiosk Mode Button */}
-          <button 
-            onClick={() => setAppMode("KIOSK_VIEW")}
-            className="px-3 py-1.5 text-xs font-bold rounded-lg border bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Launch In-Station Kiosk Display Mode"
-          >
-            🖥️ KIOSK VIEW
-          </button>
-
-          {/* Map Options Button */}
-          <div className="relative">
-             <button 
-                onClick={() => setShowLayersMenu(!showLayersMenu)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
-                  showLayersMenu 
-                    ? "bg-slate-800 text-white border-slate-600 shadow-md animate-pulse" 
-                    : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
-                }`}
-             >
-                ⚙️ MAP OPTIONS
-             </button>
-             
-             {showLayersMenu && (
-                <>
-                  <div className="fixed inset-0 z-[1050]" onClick={() => setShowLayersMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xl z-[1200] flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-155 select-none">
-                     <div>
-                       <div className="text-[8px] text-slate-500 font-extrabold uppercase tracking-wider mb-1 font-mono">Basemap Style</div>
-                       <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-855">
-                         {['GREY', 'DARK'].map(style => (
-                             <button 
-                               key={style} 
-                               onClick={() => { setMapStyle(style); setShowLayersMenu(false); }} 
-                               className={`flex-1 py-1 text-[9px] font-black rounded transition-all ${
-                                 mapStyle === style 
-                                   ? "bg-slate-800 text-white shadow" 
-                                   : "text-slate-500 hover:text-slate-300"
-                               }`}
-                             >
-                               {style}
-                             </button>
-                         ))}
-                       </div>
-                     </div>
-                     
-                     <div className="border-t border-slate-850 pt-2">
-                       <div className="flex justify-between items-center">
-                          <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">Street Labels</span>
-                          <button 
-                             onClick={() => { setShowLabels(!showLabels); setShowLayersMenu(false); }}
-                             className={`px-2 py-0.5 rounded text-[8px] font-black border transition-all ${
-                               showLabels 
-                                 ? "bg-amber-500 text-black border-amber-600 shadow-sm" 
-                                 : "bg-slate-950 text-slate-500 border-slate-855 hover:border-slate-700 hover:text-slate-400"
-                             }`}
-                          >
-                             {showLabels ? "ON" : "OFF"}
-                          </button>
-                       </div>
-                     </div>
-
-                     {onOpenRoutingConfig && (
-                       <div className="border-t border-slate-850 pt-2">
-                         <button 
-                           onClick={() => {
-                             setShowLayersMenu(false);
-                             onOpenRoutingConfig();
-                           }}
-                           className="w-full bg-slate-950 hover:bg-slate-800 text-sky-400 hover:text-sky-300 font-extrabold py-1.5 px-2 rounded text-[9px] border border-slate-800 flex items-center justify-center gap-1 transition-all cursor-pointer"
-                         >
-                           ⚙️ ROUTING CONFIG
-                         </button>
-                       </div>
-                     )}
-                  </div>
-                </>
-             )}
-          </div>
-
           {/* Right Sidebar Hazards & Alerts Panel Toggle */}
           <button 
             onClick={() => {
@@ -484,7 +403,9 @@ export function LeftSidebar({
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data && data.features) {
-            const userSearchedUnit = /\b(UNIT|APT|SUITE|STE|#)\b|\b\d{2,4}\b/i.test(query.replace(/^\d+\s+/, ''));
+            const userSearchedUnit = /\b(UNIT|APT|SUITE|STE|BAY|BLDG|#)\s*\w+/i.test(query) ||
+              /^\d+[-/]\s*\d+/i.test(query) ||
+              /\b(AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|BOULEVARD|CRES|CRESCENT|PL|PLACE|LANE|LN|HWY|HIGHWAY)\s+#?\s*\w+/i.test(query);
 
             const rawItems = data.features.map(f => {
               const address = f.attributes.ADDRESS;
@@ -780,22 +701,34 @@ export function LeftSidebar({
                            </div>
                         )}
                      </div>
-                    {/* 1. Time Filters */}
+                    {/* 1. Basemap Style & Config */}
                     <div className="flex flex-col gap-2">
-                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">TIME FILTERS</h3>
-                       <div className="flex flex-col gap-2.5 mt-1.5">
-                          <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
-                             <input type="checkbox" checked readOnly className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" />
-                             <span>Now / Active Alerts</span>
-                          </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-500 cursor-not-allowed">
-                             <input type="checkbox" disabled className="rounded border-slate-900 bg-slate-950 text-slate-700 w-4 h-4" />
-                             <span>Next 7 Days (Planned)</span>
-                          </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-500 cursor-not-allowed">
-                             <input type="checkbox" disabled className="rounded border-slate-900 bg-slate-950 text-slate-700 w-4 h-4" />
-                             <span>Next 30 Days (Future)</span>
-                          </label>
+                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">BASEMAP STYLE & CONFIG</h3>
+                       <div className="flex flex-col gap-2 mt-1.5">
+                          <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850">
+                             {['GREY', 'DARK'].map(style => (
+                                <button 
+                                  key={style} 
+                                  onClick={() => setMapStyle && setMapStyle(style)} 
+                                  className={`flex-1 py-1.5 text-[10px] font-black rounded transition-all cursor-pointer ${
+                                    mapStyle === style 
+                                      ? "bg-slate-800 text-white shadow" 
+                                      : "text-slate-500 hover:text-slate-300"
+                                  }`}
+                                >
+                                  {style === 'GREY' ? '🗺️ GREY MAP' : '🌙 DARK MAP'}
+                                </button>
+                             ))}
+                          </div>
+
+                          {onOpenRoutingConfig && (
+                             <button 
+                               onClick={onOpenRoutingConfig}
+                               className="w-full bg-slate-950 hover:bg-slate-850 text-sky-400 hover:text-sky-300 font-black py-1.5 px-3 rounded-lg text-xs border border-slate-850 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                             >
+                               ⚙️ ROUTING & SPEED CONFIG
+                             </button>
+                          )}
                        </div>
                     </div>
 
@@ -810,7 +743,7 @@ export function LeftSidebar({
                                 onChange={(e) => setShowRoadClosures(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-rose-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">🚧 Road Closures</span>
+                             <span className="flex items-center gap-1.5 font-semibold">🚧 Road Closures</span>
                           </label>
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 
@@ -819,7 +752,7 @@ export function LeftSidebar({
                                 onChange={(e) => setShowHydrants(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">💧 Fire Hydrants</span>
+                             <span className="flex items-center gap-1.5 font-semibold">💧 Fire Hydrants</span>
                           </label>
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 
@@ -828,7 +761,7 @@ export function LeftSidebar({
                                 onChange={(e) => setShowLabels(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">🏷️ Road Names & Addresses</span>
+                             <span className="flex items-center gap-1.5 font-semibold">🏷️ Road Names & Addresses</span>
                           </label>
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                              <input 
@@ -837,7 +770,7 @@ export function LeftSidebar({
                                 onChange={(e) => setShowZones(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-sky-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">📐 Emergency Zones</span>
+                             <span className="flex items-center gap-1.5 font-semibold">📐 Emergency Zones</span>
                           </label>
                           
                           {/* 🛤️ RAILROAD CROSSINGS OVERLAY */}
@@ -848,7 +781,7 @@ export function LeftSidebar({
                                 onChange={(e) => setShowRailroadCrossings && setShowRailroadCrossings(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">🛤️ Railroad Crossings</span>
+                             <span className="flex items-center gap-1.5 font-semibold">🛤️ Railroad Crossings</span>
                           </label>
 
                           {/* 🏫 SCHOOLS OVERLAY */}
@@ -859,76 +792,98 @@ export function LeftSidebar({
                                 onChange={(e) => setShowSchools && setShowSchools(e.target.checked)} 
                                 className="rounded border-slate-800 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
-                             <span className="flex items-center gap-1.5">🏫 Schools</span>
+                             <span className="flex items-center gap-1.5 font-semibold">🏫 Schools</span>
                           </label>
                        </div>
                     </div>
 
-                    {/* 3. Access Level Filter (Enabled only when Road Closures are toggled) */}
+                    {/* 3. Road Hazards, Access Level & Closure Timeframe */}
                     <div className={`flex flex-col gap-2 transition-all duration-300 ${!showRoadClosures && 'opacity-35 pointer-events-none'}`}>
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">ROAD HAZARDS & CLOSURES</h3>
-                       <div className="flex flex-col gap-2.5 mt-1.5">
-                          <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
-                             <input 
-                                type="checkbox" 
-                                checked={filterNoAccess || filterAccessOnly} 
-                                onChange={(e) => {
-                                   setFilterNoAccess(e.target.checked);
-                                   setFilterAccessOnly(e.target.checked);
-                                }} 
-                                className="rounded border-slate-850 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
-                             />
-                             <span className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
-                                <span>Full Closures</span>
-                             </span>
-                          </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
-                             <input 
-                                type="checkbox" 
-                                checked={filterCaution} 
-                                onChange={(e) => setFilterCaution(e.target.checked)} 
-                                className="rounded border-slate-850 bg-slate-950 text-yellow-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
-                             />
-                             <span className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
-                                <span>Lane Closures</span>
-                             </span>
-                          </label>
+                       <div className="flex flex-col gap-2 mt-1.5">
+                          <div className="flex flex-col gap-1.5">
+                             <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wider">Access Severity</span>
+                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
+                                <input 
+                                   type="checkbox" 
+                                   checked={filterNoAccess || filterAccessOnly} 
+                                   onChange={(e) => {
+                                      setFilterNoAccess(e.target.checked);
+                                      setFilterAccessOnly(e.target.checked);
+                                   }} 
+                                   className="rounded border-slate-850 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                />
+                                <span className="flex items-center gap-2 font-medium">
+                                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm"></span>
+                                   <span>Full Road Closures</span>
+                                </span>
+                             </label>
+                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
+                                <input 
+                                   type="checkbox" 
+                                   checked={filterCaution} 
+                                   onChange={(e) => setFilterCaution(e.target.checked)} 
+                                   className="rounded border-slate-850 bg-slate-950 text-yellow-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                />
+                                <span className="flex items-center gap-2 font-medium">
+                                   <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block shadow-sm"></span>
+                                   <span>Lane Restrictions & Construction</span>
+                                </span>
+                             </label>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-slate-850/80">
+                             <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wider">📅 Closure Timeframe Window</span>
+                             <div className="flex flex-col gap-1.5">
+                                <label className="flex items-center gap-2 text-xs text-emerald-400 font-bold cursor-pointer">
+                                   <input type="checkbox" checked readOnly className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" />
+                                   <span>Active Now</span>
+                                </label>
+                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-not-allowed">
+                                   <input type="checkbox" disabled className="rounded border-slate-900 bg-slate-950 text-slate-700 w-3.5 h-3.5" />
+                                   <span>Next 24 Hours</span>
+                                </label>
+                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-not-allowed">
+                                   <input type="checkbox" disabled className="rounded border-slate-900 bg-slate-950 text-slate-700 w-3.5 h-3.5" />
+                                   <span>Next 7 Days (Planned)</span>
+                                </label>
+                             </div>
+                          </div>
                        </div>
                     </div>
 
-                    {/* 4. Legend Section */}
+                    {/* 4. Map Legend */}
                     <div className="flex flex-col gap-2 mt-auto border-t border-slate-855 pt-4">
-                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono mb-2">MAP LEGEND</h3>
-                       <div className="flex flex-col gap-2.5 font-mono text-[9px] text-slate-400">
+                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono mb-1">MAP LEGEND</h3>
+                       <div className="flex flex-col gap-2 font-mono text-[9px] text-slate-400">
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded bg-slate-900 border border-red-500/50 flex items-center justify-center text-[10px]">🚒</div>
-                             <span className="text-slate-300">Coquitlam Fire Halls</span>
+                             <div className="w-4 h-4 rounded-full bg-red-600 border border-white text-white flex items-center justify-center text-[9px] font-black shadow">1</div>
+                             <span className="text-slate-300 font-sans text-xs">Coquitlam Fire Halls</span>
                           </div>
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded bg-slate-900 border border-blue-500/50 flex items-center justify-center text-[10px]">🏫</div>
-                             <span className="text-slate-300">Schools & School Zones</span>
+                             <div className="w-4 h-4 rounded-full bg-blue-600/90 border border-white/80 flex items-center justify-center text-[9px] shadow">🏫</div>
+                             <span className="text-slate-300 font-sans text-xs">Schools & Zones</span>
                           </div>
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded bg-slate-900 border border-amber-500/50 flex items-center justify-center text-[10px]">🛤️</div>
-                             <span className="text-slate-300">CP Rail Crossings</span>
+                             <div className="w-4 h-4 rounded-full bg-amber-600/90 border border-white/80 flex items-center justify-center text-[9px] shadow">🛤️</div>
+                             <span className="text-slate-300 font-sans text-xs">Railroad Crossings</span>
                           </div>
                           <div className="flex items-center gap-2.5">
-                             <div className="w-4 h-4 rounded-full bg-slate-900 border border-sky-500/50 flex items-center justify-center text-[9px] font-bold text-sky-400">💧</div>
-                             <span className="text-slate-300">City Fire Hydrants</span>
+                             <div className="flex items-center gap-1">
+                               <span className="w-2.5 h-2.5 rounded-full bg-sky-400 border border-slate-900 shadow-sm" title="Class AA (1500+ GPM)"></span>
+                               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow-sm" title="Class A (1000-1499 GPM)"></span>
+                               <span className="w-2.5 h-2.5 rounded-full bg-orange-400 border border-slate-900 shadow-sm" title="Class B (500-999 GPM)"></span>
+                               <span className="w-2.5 h-2.5 rounded-full bg-red-400 border border-slate-900 shadow-sm" title="Class C (<500 GPM)"></span>
+                             </div>
+                             <span className="text-slate-300 font-sans text-xs">Hydrants (NFPA 291 Ratings)</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 mt-1 pt-1 border-t border-slate-850">
+                             <div className="w-5 border-b-2 border-dashed border-red-500"></div>
+                             <span className="text-slate-400 font-sans text-[11px]">Full Road Closure</span>
                           </div>
                           <div className="flex items-center gap-2.5">
-                             <div className="w-6 border-b-2 border-dashed border-red-500"></div>
-                             <span className="text-slate-400">Full Road Closure</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <div className="w-6 border-b-2 border-dashed border-amber-500"></div>
-                             <span className="text-slate-400">Restricted Local Access</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <div className="w-6 border-b-2 border-dashed border-yellow-500"></div>
-                             <span className="text-slate-400">Lane Closure & Construction</span>
+                             <div className="w-5 border-b-2 border-dashed border-yellow-500"></div>
+                             <span className="text-slate-400 font-sans text-[11px]">Lane Restrictions</span>
                           </div>
                        </div>
                     </div>

@@ -132,17 +132,21 @@ export function HydrantsLayer({ visible }) {
     const map = useMap();
     const [zoom, setZoom] = React.useState(map.getZoom());
     const [hydrants, setHydrants] = React.useState([]);
+    const [allHydrants, setAllHydrants] = React.useState([]);
+    const [boundsTick, setBoundsTick] = React.useState(0);
 
-    // Track map zoom and movements
+    // Track map zoom and movements (firing state update on move, moveend & zoomend)
     React.useEffect(() => {
       if (!visible) return;
 
       const handleMapChange = () => {
         setZoom(map.getZoom());
+        setBoundsTick(prev => prev + 1);
       };
 
       map.on('zoomend', handleMapChange);
       map.on('moveend', handleMapChange);
+      map.on('move', handleMapChange);
       
       // Initialize
       handleMapChange();
@@ -150,10 +154,9 @@ export function HydrantsLayer({ visible }) {
       return () => {
         map.off('zoomend', handleMapChange);
         map.off('moveend', handleMapChange);
+        map.off('move', handleMapChange);
       };
     }, [map, visible]);
-
-    const [allHydrants, setAllHydrants] = React.useState([]);
 
     // Load local cached hydrant database once when visible
     React.useEffect(() => {
@@ -173,77 +176,42 @@ export function HydrantsLayer({ visible }) {
         });
     }, [visible]);
 
-    // Zoom >= 17: Filter local hydrants in-memory based on current bounding box with spatial thresholding
-    const lastCenterRef = React.useRef(null);
-    const lastZoomRef = React.useRef(null);
-    const debounceTimerRef = React.useRef(null);
-    const bbox = visible && zoom >= 16 ? map.getBounds().toBBoxString() : "";
-
+    // Filter local hydrants in-memory with 25% viewport buffer padding
     React.useEffect(() => {
-      if (!visible || zoom < 16 || allHydrants.length === 0 || !bbox) {
+      if (!visible || zoom < 16 || allHydrants.length === 0) {
         setHydrants([]);
         return;
       }
 
-      const currentCenter = map.getCenter();
-      const currentZoom = map.getZoom();
-      const lastCenter = lastCenterRef.current;
-      const lastZoom = lastZoomRef.current;
+      const bounds = map.getBounds();
+      // Add 25% padding buffer around viewport so hydrants render seamlessly as user pans!
+      const padLat = (bounds.getNorth() - bounds.getSouth()) * 0.25;
+      const padLng = (bounds.getEast() - bounds.getWest()) * 0.25;
 
-      let shouldFilter = false;
-      if (!lastCenter || lastZoom !== currentZoom) {
-        shouldFilter = true;
-      } else {
-        const from = turf.point([lastCenter.lng, lastCenter.lat]);
-        const to = turf.point([currentCenter.lng, currentCenter.lat]);
-        const distMeters = turf.distance(from, to, { units: 'kilometers' }) * 1000;
-        if (distMeters >= 75) {
-          shouldFilter = true;
+      const minLng = bounds.getWest() - padLng;
+      const maxLng = bounds.getEast() + padLng;
+      const minLat = bounds.getSouth() - padLat;
+      const maxLat = bounds.getNorth() + padLat;
+
+      // Filter hydrants in padded viewport bounds
+      const filtered = allHydrants.filter(h => 
+        h.lng >= minLng && h.lng <= maxLng &&
+        h.lat >= minLat && h.lat <= maxLat
+      );
+
+      // Map back to format expected by rendering code: { geometry: {x,y}, attributes: {OBJECTID,gis_id,status,flow_class} }
+      const formatted = filtered.map(h => ({
+        geometry: { x: h.lng, y: h.lat },
+        attributes: {
+          OBJECTID: h.id,
+          gis_id: h.gisId,
+          status: h.status,
+          flow_class: h.flowClass
         }
-      }
+      }));
 
-      if (!shouldFilter) return;
-
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-
-      debounceTimerRef.current = setTimeout(() => {
-        lastCenterRef.current = currentCenter;
-        lastZoomRef.current = currentZoom;
-
-        const bounds = map.getBounds();
-        const minLng = bounds.getSouthWest().lng;
-        const minLat = bounds.getSouthWest().lat;
-        const maxLng = bounds.getNorthEast().lng;
-        const maxLat = bounds.getNorthEast().lat;
-
-        // Filter hydrants in current viewport bounds
-        const filtered = allHydrants.filter(h => 
-          h.lng >= minLng && h.lng <= maxLng &&
-          h.lat >= minLat && h.lat <= maxLat
-        );
-
-        // Map back to format expected by rendering code: { geometry: {x,y}, attributes: {OBJECTID,gis_id,status,flow_class} }
-        const formatted = filtered.map(h => ({
-          geometry: { x: h.lng, y: h.lat },
-          attributes: {
-            OBJECTID: h.id,
-            gis_id: h.gisId,
-            status: h.status,
-            flow_class: h.flowClass
-          }
-        }));
-
-        setHydrants(formatted);
-      }, 100); // Fast 100ms debounce since local array filtering is instant
-
-      return () => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-      };
-    }, [visible, zoom, map, bbox, allHydrants]);
+      setHydrants(formatted);
+    }, [visible, zoom, map, boundsTick, allHydrants]);
 
     // Custom Icon styling to highlight details and flow ratings in a premium dot-and-ring aesthetic
     const getHydrantIcon = (status, flowClass) => {

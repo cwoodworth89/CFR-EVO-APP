@@ -25,8 +25,8 @@ export default function StreetViewPanel({ activeCall }) {
 
   const override = STREETVIEW_OVERRIDES[cleanAddrKey];
 
-  const destLat = override ? override.lat : (activeCall?.lat ?? 49.2838);
-  const destLng = override ? override.lng : (activeCall?.lng ?? -122.7932);
+  const destLat = override ? override.lat : (activeCall?.front_lat ?? activeCall?.lat ?? 49.2838);
+  const destLng = override ? override.lng : (activeCall?.front_lng ?? activeCall?.lng ?? -122.7932);
   const heading = override ? override.heading : 0;
   const pitch = override ? override.pitch : 0;
   const fov = override ? override.fov : 90;

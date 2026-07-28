@@ -25,3 +25,59 @@ export function sanitizeAddress(rawAddr) {
 
   return addr.trim();
 }
+
+const NS_STREETS = [
+  'COAST MERIDIAN', 'PINETREE', 'MARINER', 'JOHNSON', 'WESTWOOD', 'BLUE MOUNTAIN',
+  'SCHOOLHOUSE', 'PIPELINE', 'FARROW', 'NORTH', 'GUTHE', 'GAUTHIER', 'SHESS',
+  'DESERT', 'REGAN', 'HOWIE', 'REGAN', 'SHAY', 'SOBALL', 'LANSDOWNE', 'DOUGALL'
+];
+
+/**
+ * Calculates the exact 0m front property line midpoint from parcel polygon rings.
+ */
+export function calculateParcelFrontagePoint(rings, streetName = '') {
+  if (!rings || !rings.length || !rings[0] || rings[0].length < 3) return null;
+  const pts = rings[0]; // [lng, lat]
+  
+  const avgLat = pts.reduce((sum, p) => sum + p[1], 0) / pts.length;
+  const avgLng = pts.reduce((sum, p) => sum + p[0], 0) / pts.length;
+
+  const edges = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    edges.push({
+      p1, p2,
+      midLat: (p1[1] + p2[1]) / 2,
+      midLng: (p1[0] + p2[0]) / 2
+    });
+  }
+  if (!edges.length) return { front_lat: avgLat, front_lng: avgLng };
+
+  const upperStreet = (streetName || '').toUpperCase();
+  const isNS = NS_STREETS.some(s => upperStreet.includes(s));
+
+  let frontEdge;
+  if (isNS) {
+    const minLng = Math.min(...pts.map(p => p[0]));
+    const maxLng = Math.max(...pts.map(p => p[0]));
+    if (Math.abs(maxLng - avgLng) >= Math.abs(avgLng - minLng)) {
+      frontEdge = edges.reduce((prev, curr) => (curr.midLng > prev.midLng ? curr : prev), edges[0]);
+    } else {
+      frontEdge = edges.reduce((prev, curr) => (curr.midLng < prev.midLng ? curr : prev), edges[0]);
+    }
+  } else {
+    const minLat = Math.min(...pts.map(p => p[1]));
+    const maxLat = Math.max(...pts.map(p => p[1]));
+    if (Math.abs(maxLat - avgLat) >= Math.abs(avgLat - minLat)) {
+      frontEdge = edges.reduce((prev, curr) => (curr.midLat > prev.midLat ? curr : prev), edges[0]);
+    } else {
+      frontEdge = edges.reduce((prev, curr) => (curr.midLat < prev.midLat ? curr : prev), edges[0]);
+    }
+  }
+
+  return {
+    front_lat: Number(frontEdge.midLat.toFixed(6)),
+    front_lng: Number(frontEdge.midLng.toFixed(6))
+  };
+}

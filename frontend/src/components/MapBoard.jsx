@@ -512,7 +512,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const nearestHydrants = useMemo(() => {
     if (allNearbyHydrants.length === 0 || !targetAddress) return [];
 
-    const fromPoint = turf.point([targetAddress.lng, targetAddress.lat]);
+    const targetLat = targetAddress.front_lat || targetAddress.lat;
+    const targetLng = targetAddress.front_lng || targetAddress.lng;
+    const fromPoint = turf.point([targetLng, targetLat]);
 
     // Try to construct parcel boundary components
     let parcelLine = null;
@@ -588,21 +590,23 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   }, [allNearbyHydrants, targetAddress, routeCoordinates]);
 
   const targetCoords = useMemo(() => {
-    return targetAddress ? [targetAddress.lat, targetAddress.lng] : null;
+    if (!targetAddress) return null;
+    const lat = targetAddress.front_lat || targetAddress.lat;
+    const lng = targetAddress.front_lng || targetAddress.lng;
+    return [lat, lng];
   }, [targetAddress]);
 
   // Adaptive Zooming: fit bounds to show both origin hall & destination address inside middle window (between Left 320px & Right 380px sidebars)
   useEffect(() => {
-    if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE" && !userPanned) {
+    if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE" && !userPanned && targetCoords) {
       const origin = STATIONS[homeHall];
-      const dest = [targetAddress.lat, targetAddress.lng];
-      map.fitBounds([origin, dest], { 
+      map.fitBounds([origin, targetCoords], { 
         paddingTopLeft: [340, 80], 
         paddingBottomRight: [400, 80], 
         animate: true 
       });
     }
-  }, [map, targetAddress, homeHall, appMode, userPanned]);
+  }, [map, targetAddress, homeHall, appMode, userPanned, targetCoords]);
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);

@@ -3,7 +3,7 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import { UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
-import { sanitizeAddress } from '../utils/addressUtils';
+import { sanitizeAddress, calculateParcelFrontagePoint } from '../utils/addressUtils';
 
 
 export function Header({ 
@@ -505,10 +505,21 @@ export function LeftSidebar({
                 lat = latSum / ring.length;
                 lng = lngSum / ring.length;
               }
+              let front_lat = lat;
+              let front_lng = lng;
+              if (rings) {
+                const frontage = calculateParcelFrontagePoint(rings, address);
+                if (frontage) {
+                  front_lat = frontage.front_lat;
+                  front_lng = frontage.front_lng;
+                }
+              }
               return {
                 address,
                 lat,
                 lng,
+                front_lat,
+                front_lng,
                 rings
               };
             });

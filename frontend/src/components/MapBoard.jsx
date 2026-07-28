@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer, CoquitlamBoundaryLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
@@ -292,6 +292,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
   const [showSchools, setShowSchools] = useState(false);
   const [showFireHalls, setShowFireHalls] = useState(true);
+  const [showCityBoundary, setShowCityBoundary] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
@@ -1269,6 +1270,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setShowSchools={setShowSchools}
           showFireHalls={showFireHalls}
           setShowFireHalls={setShowFireHalls}
+          showCityBoundary={showCityBoundary}
+          setShowCityBoundary={setShowCityBoundary}
           addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
@@ -1303,6 +1306,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           >
             {/* 1. BASE MAP (z-index 200) - Automatically switches to VOYAGER (with clear street labels) at zoomed-out levels <=15 or active routing */}
             <BaseMap style={(targetAddress || currentZoom <= 15) ? "VOYAGER" : mapStyle} useLabelsFallback={cadastralError} />
+            
+            {/* Coquitlam Municipal Boundary GIS Layer (ON by default) */}
+            <CoquitlamBoundaryLayer visible={showCityBoundary} />
             
             <CoquitlamOverlays 
                 visible={showLabels && !cadastralError} 

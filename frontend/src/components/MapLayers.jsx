@@ -104,6 +104,41 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
     return null;
 }
 
+// 🏛️ COQUITLAM CITY MUNICIPAL BOUNDARY LAYER
+export function CoquitlamBoundaryLayer({ visible = true }) {
+    const [boundary, setBoundary] = React.useState(null);
+
+    React.useEffect(() => {
+      if (!visible) return;
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      fetch(`${baseUrl}data/coquitlam_boundary_opt.json`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.features && data.features.length > 0) {
+            setBoundary(data.features[0].geometry.coordinates[0]);
+          }
+        })
+        .catch(err => console.warn("Failed to load Coquitlam boundary:", err));
+    }, [visible]);
+
+    if (!visible || !boundary) return null;
+
+    const positions = boundary.map(pt => [pt[1], pt[0]]);
+
+    return (
+      <Polygon 
+        positions={positions}
+        pathOptions={{
+          color: "#0284c7",
+          fillColor: "#0284c7",
+          fillOpacity: 0.03,
+          weight: 2.5,
+          dashArray: "6, 6"
+        }}
+      />
+    );
+}
+
 // 🚒 NEW: FIRE ZONES (Official GIS Layer)
 // Updated to accept a 'pane' prop
 export function FireZonesLayer({ visible, pane }) {

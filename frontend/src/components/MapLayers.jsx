@@ -1,6 +1,6 @@
 // NOTE: For live MapServer endpoints (Parcels, Roads, Zones) and fallback logic, see docs/gis_endpoints.md
 import React, { useEffect, useRef } from 'react';
-import { Marker, CircleMarker, Tooltip, Popup, useMap } from 'react-leaflet';
+import { Marker, CircleMarker, Tooltip, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { dynamicMapLayer } from 'esri-leaflet';
 import * as turf from '@turf/turf';

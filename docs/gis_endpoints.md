@@ -9,7 +9,8 @@ This document provides a guide to the local GIS datasets currently packaged with
 The frontend app runs in a local-first capacity by caching spatial databases under `frontend/public/data/`. These files are fetched relative to the application's base URL:
 
 *   **`data/hydrants.json`**: Cached municipal fire hydrants database containing flow rate classification (Class AA/A/B/C), status (Operating/Private/Out-of-Service), ID, and lat/lng coordinates.
-*   **`data/zones.json`**: Boundaries and geographic boundaries of response zones for the apparatus dispatch mappings.
+*   **`data/zones.json`**: Boundaries and geographic features of 134 emergency response zones mapped to apparatus dispatch groups (Station 1 E1, Station 2 E2, Station 3 E3/Q5, Station 4 E4). Rendered locally using vector polygons with Turf.js bounding box centroid number labels (`zoom 13-15` soft black text `#0f172a`, `zoom 16+` auto-cutoff).
+*   **`data/coquitlam_boundary_opt.json`**: High-precision 1,597-vertex vector polygon of the official City of Coquitlam Municipal Boundary, extracted directly from City of Coquitlam ArcGIS Cadastral Server Layer 14 (`City Boundary`).
 *   **`data/intersections.json`**: Street intersection coordinate mappings for driver training games.
 *   **`data/blocks.json`**: Street segment blocks and address ranges.
 

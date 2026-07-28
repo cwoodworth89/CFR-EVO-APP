@@ -109,7 +109,8 @@ sequenceDiagram
 ## 🌟 Key Features
 
 * **📡 Real-Time WebSocket Updates**: No page reloads needed. Dispatches appear instantly on map screens the moment they are broadcasted.
-* **🗺️ Interactive Driver's Aid**: Displays the quickest route from your home station, and highlights municipal fire hydrants with color-coded flow classes.
+* **🗺️ Streamlined HUD & Interactive Driver's Aid**: Features a single unified mode selector dropdown, integrated Left Control Panel with Basemap Style toggles (`GREY MAP` / `DARK MAP`), EVO routing configuration trigger, closure timeframe filters (`Active Now`, `Next 24h`, `Next 7d`), and exact resource map legends (NFPA 291 hydrants, CP Rail crossings, schools, fire halls).
+* **📐 Dynamic Response Zones & City Boundary**: Renders Coquitlam's 134 emergency zones using soft per-hall color-coded vector polygons with centered zone numbers (`zoom 13-15` soft black text `#0f172a`, `zoom 16+` auto-cutoff). Features official 1,597-vertex Coquitlam City Boundary vector dataset (`coquitlam_boundary_opt.json`).
 * **🚧 Active Hazard Warnings**: Pulls road closure and traffic event data in real-time from municipal feeds and DriveBC.
 * **🎓 Recruits Training Board**: Map-based games designed to test knowledge of Coquitlam's geography:
   - **Emergency Zones**: Practice identifying which apparatus responds to which boundary area.

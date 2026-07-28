@@ -1199,10 +1199,10 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     const stationName = zone.station || "";
     let color = "#475569"; // default slate gray
     
-    if (stationName.includes("Hall 1") || zone.unit_id === "E1") color = "#f87171";      // Red for Hall 1
-    else if (stationName.includes("Hall 2") || zone.unit_id === "E2") color = "#60a5fa"; // Blue for Hall 2
-    else if (stationName.includes("Hall 3") || zone.unit_id === "E3" || zone.unit_id === "Q5") color = "#34d399"; // Green for Hall 3
-    else if (stationName.includes("Hall 4") || zone.unit_id === "E4") color = "#c084fc"; // Purple for Hall 4
+    if (stationName.includes("Hall 1") || zone.unit_id === "E1") color = "#38bdf8";      // Soft Sky Blue for Hall 1
+    else if (stationName.includes("Hall 2") || zone.unit_id === "E2") color = "#60a5fa"; // Soft Blue for Hall 2
+    else if (stationName.includes("Hall 3") || zone.unit_id === "E3" || zone.unit_id === "Q5") color = "#34d399"; // Soft Emerald Green for Hall 3
+    else if (stationName.includes("Hall 4") || zone.unit_id === "E4") color = "#c084fc"; // Soft Purple for Hall 4
     
     return {
       color: color,
@@ -1408,23 +1408,23 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
                   <Polygon 
                     positions={targetPolygon} 
                     pathOptions={{ 
-                      color: targetAddress.buildingName ? '#f59e0b' : '#ef4444', 
-                      fillColor: targetAddress.buildingName ? '#f59e0b' : '#ef4444', 
-                      fillOpacity: targetAddress.buildingName ? 0.08 : 0.35, 
-                      weight: targetAddress.buildingName ? 2 : 4,
-                      dashArray: targetAddress.buildingName ? '6,6' : null
+                      color: targetAddress.buildingName ? '#f59e0b' : '#0284c7', 
+                      fillColor: targetAddress.buildingName ? '#f59e0b' : '#38bdf8', 
+                      fillOpacity: targetAddress.buildingName ? 0.08 : 0.15, 
+                      weight: 2,
+                      dashArray: '4,4'
                     }}
                   />
                 )}
                 {targetAddress.buildingName && (
                   <CircleMarker
                     center={[targetAddress.lat, targetAddress.lng]}
-                    radius={22}
+                    radius={20}
                     pathOptions={{
                       color: '#f59e0b',
-                      fillColor: '#ef4444',
-                      fillOpacity: 0.35,
-                      weight: 3.5,
+                      fillColor: '#38bdf8',
+                      fillOpacity: 0.25,
+                      weight: 2.5,
                       className: 'animate-pulse'
                     }}
                   />

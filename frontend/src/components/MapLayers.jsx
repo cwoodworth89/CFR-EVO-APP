@@ -177,10 +177,10 @@ export function HydrantsLayer({ visible }) {
     const lastCenterRef = React.useRef(null);
     const lastZoomRef = React.useRef(null);
     const debounceTimerRef = React.useRef(null);
-    const bbox = visible && zoom >= 15 ? map.getBounds().toBBoxString() : "";
+    const bbox = visible && zoom >= 16 ? map.getBounds().toBBoxString() : "";
 
     React.useEffect(() => {
-      if (!visible || zoom < 15 || allHydrants.length === 0 || !bbox) {
+      if (!visible || zoom < 16 || allHydrants.length === 0 || !bbox) {
         setHydrants([]);
         return;
       }
@@ -371,7 +371,7 @@ export function HydrantsLayer({ visible }) {
 
     return (
       <>
-        {zoom >= 15 && hydrants.map((h, i) => {
+        {zoom >= 16 && hydrants.map((h, i) => {
           if (!h.geometry || h.geometry.x === undefined || h.geometry.y === undefined) return null;
           const coords = [h.geometry.y, h.geometry.x];
           const statusVal = (h.attributes.status || "").toUpperCase();

@@ -289,8 +289,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showHydrants, setShowHydrants] = useState(true); 
   const [showZones, setShowZones] = useState(false); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
-  const [showRailroadCrossings, setShowRailroadCrossings] = useState(true);
-  const [showSchools, setShowSchools] = useState(true);
+  const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
+  const [showSchools, setShowSchools] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   

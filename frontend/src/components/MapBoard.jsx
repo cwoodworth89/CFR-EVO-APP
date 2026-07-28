@@ -310,7 +310,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [mapStyle, setMapStyle] = useState("GREY"); 
   const [showLabels, setShowLabels] = useState(true); 
   const [showHydrants, setShowHydrants] = useState(true); 
-  const [showZones, setShowZones] = useState(false); 
+  const [showZones, setShowZones] = useState(true); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
   const [showSchools, setShowSchools] = useState(false);
@@ -1100,7 +1100,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
       setShowLabels(mode === "TRAINING_ADDRESSES" || mode === "EXPLORE");
       
       if (mode === "EXPLORE") {
-          setShowZones(false);
+          setShowZones(true);
           setShowHydrants(true);
           setShowRoadClosures(true);
           setLeftSidebarOpen(true);

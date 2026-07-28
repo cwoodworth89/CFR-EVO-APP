@@ -49,8 +49,27 @@ import { supabase } from '../supabaseClient';
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
 const getRandomElement = (arr) => {
   if (!arr || arr.length === 0) return null;
-  return arr[Math.floor(Math.random() * arr.length)];
+  const index = Math.floor(Math.random() * arr.length);
+  return arr[index];
 };
+
+const getZoneCenter = (zone) => {
+  if (!zone || !zone.geometry || !zone.geometry.coordinates || !zone.geometry.coordinates[0]) return null;
+  const coords = zone.geometry.coordinates[0];
+  let sumLat = 0, sumLng = 0;
+  coords.forEach(pt => {
+    sumLng += pt[0];
+    sumLat += pt[1];
+  });
+  return [sumLat / coords.length, sumLng / coords.length];
+};
+
+const createSoftZoneNumberIcon = (zoneId) => L.divIcon({
+  className: 'soft-zone-number-marker',
+  html: `<div style="color: rgba(241, 245, 249, 0.75); font-weight: 800; font-size: 11px; font-family: ui-monospace, SFMono-Regular, monospace; pointer-events: none; user-select: none; text-shadow: 0 1px 4px rgba(15, 23, 42, 0.95), 0 0 2px rgba(15, 23, 42, 0.95); text-align: center; line-height: 1;">${zoneId}</div>`,
+  iconSize: [28, 14],
+  iconAnchor: [14, 7]
+});
 
 // 🗺️ GeometryDecoder decodes Municipal 511 encoded coordinates sequentially
 class GeometryDecoder {
@@ -1328,18 +1347,23 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
                   pathOptions={getZoneStyle(zone)} 
                   pane="underlayPane" 
-              >
-                {appMode === "EXPLORE" && (
-                  <Tooltip sticky direction="center" permanent={false}>
-                    <div className="font-mono text-[10px] font-bold text-slate-200">
-                      <span className="text-amber-400 font-extrabold">ZONE {zone.zone_id}</span>
-                      <span className="mx-1 text-slate-500">|</span>
-                      <span className="text-slate-300 font-semibold">{zone.unit_id}</span>
-                    </div>
-                  </Tooltip>
-                )}
-              </Polygon>
+              />
             ))}
+
+            {/* Soft Zone Number Labels (Only visible at zoomed-out levels <= 14 when zones are enabled) */}
+            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom <= 14 && zones.map((zone) => {
+              const center = getZoneCenter(zone);
+              if (!center) return null;
+              return (
+                <Marker 
+                  key={`zone-num-${zone.zone_id}`}
+                  position={center}
+                  icon={createSoftZoneNumberIcon(zone.zone_id)}
+                  interactive={false}
+                  pane="labelsPane"
+                />
+              );
+            })}
 
             {/* HIDE STATIONS IN TRAINING MODE */}
             {appMode !== "TRAINING_ZONES" && <StationsLayer visible={showFireHalls} />}

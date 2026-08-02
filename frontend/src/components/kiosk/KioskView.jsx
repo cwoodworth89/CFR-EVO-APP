@@ -77,6 +77,20 @@ export default function KioskView({ kioskState }) {
     String(activeCall.priority_code).toLowerCase() === 'emergency' ||
     String(activeCall.response_type).toLowerCase() === 'emergency';
 
+  // Parse responding units list (preserving exact order dispatched)
+  const unitList = Array.isArray(activeCall?.responding_units)
+    ? activeCall.responding_units
+    : (typeof activeCall?.responding_units === 'string' && activeCall.responding_units.length > 0)
+      ? activeCall.responding_units.split(',').map(u => u.trim())
+      : (typeof activeCall?.units === 'string' && activeCall.units.length > 0)
+        ? activeCall.units.split(',').map(u => u.trim())
+        : (typeof activeCall?.raw_units === 'string' && activeCall.raw_units.length > 0)
+          ? activeCall.raw_units.split(',').map(u => u.trim())
+          : [];
+
+  const talkGroup = activeCall?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
+  const rawMapGrid = activeCall?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
+  const formattedGrid = rawMapGrid ? (rawMapGrid.toString().toUpperCase().startsWith('GRID') ? rawMapGrid.toString().toUpperCase() : `GRID ${rawMapGrid}`) : null;
   const borderColor = isEmergency ? 'border-red-600' : 'border-emerald-500';
 
   return (
@@ -104,8 +118,8 @@ export default function KioskView({ kioskState }) {
 
       {/* Streamlined Header HUD */}
       <header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3 flex items-center justify-between shadow-xl flex-shrink-0 backdrop-blur">
-        {/* Left Side: Status Badges & System Health Stacked */}
-        <div className="flex flex-col items-center gap-1.5 text-center">
+        {/* Left Side: Priority Badge, Units, Talk Group & Verification */}
+        <div className="flex flex-col items-start gap-1.5 text-left max-w-sm">
           <div className="flex items-center gap-2">
             <div className={`px-3 py-1 rounded-lg font-black uppercase text-[11px] tracking-wider shadow ${isEmergency ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
               {isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'}
@@ -119,56 +133,73 @@ export default function KioskView({ kioskState }) {
             )}
           </div>
 
-          {/* Centered Vertically Stacked Health Badges */}
-          <div className="flex flex-col items-center gap-1 font-mono text-[9px] w-full">
-            <span className="bg-slate-950 text-sky-400 border border-slate-800 px-2.5 py-0.5 rounded flex items-center justify-center gap-1 w-44">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-              🎙️ Audio: Listening
-            </span>
+          {/* Dispatched Units Badges (In Order Dispatched) */}
+          {unitList.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+              {unitList.map((unit, idx) => (
+                <span key={idx} className="bg-slate-950 text-sky-400 border border-sky-500/40 px-2.5 py-0.5 rounded text-[11px] font-black tracking-wider font-mono shadow-sm">
+                  🚒 {unit}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+              <span className="bg-slate-950 text-sky-400 border border-sky-500/40 px-2.5 py-0.5 rounded text-[11px] font-black tracking-wider font-mono shadow-sm">
+                🚒 E1
+              </span>
+              <span className="bg-slate-950 text-sky-400 border border-sky-500/40 px-2.5 py-0.5 rounded text-[11px] font-black tracking-wider font-mono shadow-sm">
+                🚒 L1
+              </span>
+            </div>
+          )}
 
-            <span className={`border px-2.5 py-0.5 rounded flex items-center justify-center gap-1 w-44 ${
-              isOnline 
-                ? 'bg-slate-950 text-emerald-400 border-slate-800' 
-                : 'bg-amber-950/80 text-amber-300 border-amber-600 animate-pulse'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              🌐 WAN: {isOnline ? 'Connected' : 'Offline'}
-            </span>
+          {/* Talk Group & Verification Badges */}
+          <div className="flex items-center gap-2 font-mono text-[10px] mt-0.5">
+            {talkGroup && (
+              <span className="bg-slate-950 text-amber-300 border border-slate-800 px-2 py-0.5 rounded font-bold">
+                📻 {talkGroup}
+              </span>
+            )}
 
-            {!activeCall.verify_location && (
-              <span className="bg-amber-950/80 border border-amber-600/80 text-amber-300 px-2.5 py-0.5 rounded font-bold flex items-center justify-center gap-1 animate-pulse w-44">
-                ⚠️ PHASE 1 UNVERIFIED
+            {!activeCall.verify_location ? (
+              <span className="bg-amber-950/90 border border-amber-600/80 text-amber-300 px-2 py-0.5 rounded font-bold animate-pulse">
+                ⚠️ PHASE 1 VERIFICATION
+              </span>
+            ) : (
+              <span className="bg-emerald-950/90 border border-emerald-600/80 text-emerald-300 px-2 py-0.5 rounded font-bold">
+                ✓ LOCATION VERIFIED
               </span>
             )}
 
             {isRecentlyUpdated && (
-              <span className="bg-sky-600 text-white px-2.5 py-0.5 rounded font-bold flex items-center justify-center gap-1 animate-bounce w-44">
-                ⚡ CALL UPDATED
+              <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold animate-bounce">
+                ⚡ UPDATED
               </span>
             )}
           </div>
         </div>
 
-        {/* Center: Extra Large Address & Subheader */}
+        {/* Center: Extra Large Address & Centered Call Type */}
         <div className="flex flex-col items-center text-center">
           <h1 className={`font-black tracking-tight text-white uppercase font-sans ${isTvMode ? 'text-4xl' : 'text-3xl'}`}>
             {activeCall.address || 'Address Unspecified'}
+            {formattedGrid && (
+              <span className="text-amber-400 font-mono ml-2.5">({formattedGrid})</span>
+            )}
           </h1>
-          <div className="flex items-center gap-2.5 mt-0.5">
-            <span className="text-sm font-black text-amber-400 tracking-wider uppercase font-mono">
-              {activeCall.incident_type || 'EMERGENCY DISPATCH'}
-            </span>
-            {activeCall.subaddress && (
-              <span className="bg-slate-800 text-sky-300 border border-slate-700 px-2 py-0.5 rounded text-xs font-semibold">
+
+          {/* Centered Call Type (One size down from address, bright amber) */}
+          <div className={`font-black text-amber-400 tracking-wider uppercase font-mono mt-1 ${isTvMode ? 'text-3xl' : 'text-2xl'}`}>
+            {activeCall.incident_type || 'EMERGENCY DISPATCH'}
+          </div>
+
+          {activeCall.subaddress && (
+            <div className="mt-1">
+              <span className="bg-slate-800 text-sky-300 border border-slate-700 px-3 py-0.5 rounded text-xs font-bold font-mono">
                 🏢 {activeCall.subaddress}
               </span>
-            )}
-            {activeCall.intersection && (
-              <span className="bg-slate-800 text-amber-300 border border-slate-700 px-2 py-0.5 rounded text-xs font-semibold">
-                🔀 {activeCall.intersection}
-              </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Timers & Exit Controls */}

@@ -74,20 +74,25 @@ def get_best_match(live_frequencies: set, golden_fingerprints: dict, frequency_t
     Compares detected frequency peaks against golden_fingerprints.
     Returns the matched tone name and match ratio if it exceeds the match_threshold_percent.
     """
-    best_match_tone = None
-    best_match_score = -1.0
-    
+    matches = get_all_matches(live_frequencies, golden_fingerprints, frequency_tolerance_hz, match_threshold_percent)
+    if matches:
+        return matches[0][0], matches[0][1]
+    return None, None
+
+def get_all_matches(live_frequencies: set, golden_fingerprints: dict, frequency_tolerance_hz: float, match_threshold_percent: float) -> list[tuple[str, float]]:
+    """
+    Compares detected frequency peaks against golden_fingerprints.
+    Returns all matched tone names and match ratios that meet or exceed match_threshold_percent, sorted by score.
+    """
+    matched = []
     for tone_name, golden_freqs in golden_fingerprints.items():
         matches_found = sum(1 for gf in golden_freqs if any(abs(lf - gf) <= frequency_tolerance_hz for lf in live_frequencies))
         score = matches_found / len(golden_freqs) if golden_freqs else 0.0
-        
-        if score > best_match_score:
-            best_match_score = score
-            best_match_tone = tone_name
+        if score >= match_threshold_percent:
+            matched.append((tone_name, score))
             
-    if best_match_score >= match_threshold_percent:
-        return best_match_tone, best_match_score
-    return None, None
+    matched.sort(key=lambda x: x[1], reverse=True)
+    return matched
 
 def filter_known_tones(audio_data: np.ndarray, tone_name: str, sample_rate: int, golden_fingerprints: dict) -> np.ndarray:
     """

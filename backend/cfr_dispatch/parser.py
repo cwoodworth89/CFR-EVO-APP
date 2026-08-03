@@ -158,6 +158,13 @@ def sanitize_transcript(text: str) -> str:
         r'\bdo\s+we\s+need\s+from\s+bro\b': 'dewdney trunk road',
         r'\bdo\s+we\s+need\s+from\b': 'dewdney trunk road',
         
+        # Phonetic street & school access fixes
+        r'\ble\s+bleu\b': 'lebleu',
+        r'\btime\b': 'thyme',
+        r'\balvis\b': 'alvis',
+        r'\bscott\s+creek\b': 'scott creek',
+        r'\bglen\s+eagle\b': 'gleneagle',
+        
         # Coquitlam / Quitlam mishearings and collapses
         r'\bquitlam\b': 'coquitlam',
         r'\bego\s+mountain\b': 'eagle mountain',
@@ -520,8 +527,8 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
         # Clean up any leftover punctuation or noise from subaddress
         sub_val = sub_val.rstrip(',- ').lstrip(',- ')
         
-        # If the extracted subaddress contains "and" (indicating an intersection), bypass extraction
-        if re.search(r'\band\b', sub_val, re.IGNORECASE):
+        # If the extracted subaddress contains "and" or "&" (indicating an intersection), bypass extraction
+        if re.search(r'\b(and|&)\b|\s*&\s*', sub_val, re.IGNORECASE):
             return address_text, None
         
         # Clean up main address (everything up to and including the suffix)
@@ -542,8 +549,8 @@ def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
         if sub_match:
             sub_val = sub_match.group(0).strip()
             
-            # If the extracted subaddress contains "and" (indicating an intersection), bypass extraction
-            if re.search(r'\band\b', sub_val, re.IGNORECASE):
+            # If the extracted subaddress contains "and" or "&" (indicating an intersection), bypass extraction
+            if re.search(r'\b(and|&)\b|\s*&\s*', sub_val, re.IGNORECASE):
                 return address_text, None
                 
             cleaned_addr = address_text[:sub_match.start()].strip()

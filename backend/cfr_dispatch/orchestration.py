@@ -60,6 +60,7 @@ from audio_service import (
     get_rms,
     analyze_live_audio,
     get_best_match,
+    get_all_matches,
     filter_known_tones,
     capture_full_dispatch
 )
@@ -618,7 +619,12 @@ def process_and_post_payload(dispatch_id, raw_transcript, sanitized_transcript, 
         if subaddress:
             target_payload["subaddress"] = subaddress
         if tone_name:
-            target_payload["tone_name"] = tone_name
+            if isinstance(tone_name, list):
+                target_payload["captured_tones"] = tone_name
+                target_payload["tone_name"] = ", ".join(tone_name)
+            else:
+                target_payload["tone_name"] = tone_name
+                target_payload["captured_tones"] = [t.strip() for t in tone_name.split(",") if t.strip()]
         if all_candidates and all_candidates[0].intersection:
             target_payload["intersection"] = all_candidates[0].intersection
         
@@ -1661,15 +1667,18 @@ def run_dispatch_system():
                             logging.info("Analyzing captured audio for a dispatch tone...")
                             full_sample_np = np.concatenate(analysis_buffer)
                             live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD)
-                            matched_tone, score = get_best_match(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
-                            if matched_tone:
-                                if matched_tone == "PA Tone":
-                                    logging.info("TONE DETECTED: 'PA Tone' (station paging page). Disregarding and resetting listener.")
-                                    is_capturing_tone = False
-                                    baseline_rms_history.clear()
-                                    baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
-                                    continue
-                                logging.info(f"TONE CONFIRMED: '{matched_tone}' (Match: {score*100:.0f}%)")
+                            all_matches = get_all_matches(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
+                            if any(m[0] == "PA Tone" for m in all_matches):
+                                logging.info("TONE DETECTED: 'PA Tone' (station paging page). Disregarding and resetting listener.")
+                                is_capturing_tone = False
+                                baseline_rms_history.clear()
+                                baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
+                                continue
+                            elif all_matches:
+                                matched_tone_list = [m[0] for m in all_matches]
+                                matched_tone = ", ".join(matched_tone_list)
+                                scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in all_matches])
+                                logging.info(f"TONES CONFIRMED: '{matched_tone}' ({scores_str})")
                                 break
                             else:
                                 logging.info("Triggered sound was not a recognized tone, resetting.")

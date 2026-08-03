@@ -5,7 +5,7 @@ import { RoutingOverlay } from '../RoutingOverlay';
 import { CoquitlamOverlays, StationsLayer } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 
-// Custom Map Bounds Auto-Fitter
+// Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 function AutoFitBounds({ origin, destination, userPanned }) {
   const map = useMap();
 
@@ -15,7 +15,22 @@ function AutoFitBounds({ origin, destination, userPanned }) {
       [origin.lat, origin.lng],
       [destination.lat, destination.lng]
     );
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+
+    // Calculate dynamic container-aware padding percentage so route scales to fill map space
+    const containerSize = map.getSize();
+    const w = containerSize.x || 800;
+    const h = containerSize.y || 600;
+
+    const padTop = Math.max(45, Math.round(h * 0.12));
+    const padBottom = Math.max(35, Math.round(h * 0.08));
+    const padSide = Math.max(35, Math.round(w * 0.08));
+
+    map.fitBounds(bounds, {
+      paddingTopLeft: [padSide, padTop],
+      paddingBottomRight: [padSide, padBottom],
+      maxZoom: 17,
+      animate: true
+    });
   }, [map, origin, destination, userPanned]);
 
   return null;
@@ -67,7 +82,20 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         [origin.lat, origin.lng],
         [destination.lat, destination.lng]
       );
-      mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      const containerSize = mapInstance.getSize();
+      const w = containerSize.x || 800;
+      const h = containerSize.y || 600;
+
+      const padTop = Math.max(45, Math.round(h * 0.12));
+      const padBottom = Math.max(35, Math.round(h * 0.08));
+      const padSide = Math.max(35, Math.round(w * 0.08));
+
+      mapInstance.fitBounds(bounds, {
+        paddingTopLeft: [padSide, padTop],
+        paddingBottomRight: [padSide, padBottom],
+        maxZoom: 17,
+        animate: true
+      });
     }
   };
 

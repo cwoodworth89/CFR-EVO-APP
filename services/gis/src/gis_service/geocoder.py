@@ -284,11 +284,12 @@ class CoquitlamDataValidator:
                 point_wgs84 = point_gdf.to_crs("EPSG:4326").geometry.iloc[0]
                 logging.info(f"Local geocode exact match failed for '{parsed_address}'. Fell back to street centroid: Lat {point_wgs84.y:.6f}, Lng {point_wgs84.x:.6f}")
                 return {
-                    "address": f"{parsed_num} {parsed_street_raw} (Street Centroid)",
+                    "address": f"{parsed_num} {parsed_street_raw}".strip(),
                     "lat": point_wgs84.y,
                     "lng": point_wgs84.x,
                     "rings": [],
-                    "confidence": 60.0
+                    "confidence": 60.0,
+                    "is_street_centroid": True
                 }
         except Exception as e:
             logging.warning(f"Error computing fallback street centroid for '{parsed_address}': {e}")

@@ -351,7 +351,7 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
         setVerifiedIncident(selectedCall.incident_type || '');
         break;
       case 'address':
-        setVerifiedAddress(selectedCall.target?.address || selectedCall.address || '');
+        setVerifiedAddress((selectedCall.target?.address || selectedCall.address || '').replace(/\s*\(\s*Street\s+Centroid\s*\)/gi, '').replace(/\bStreet\s+Centroid\b/gi, '').trim());
         break;
       case 'subaddress':
         setVerifiedSubaddress(toTitleCase(selectedCall.target?.subaddress || ''));

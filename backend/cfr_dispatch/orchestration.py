@@ -141,6 +141,8 @@ def clean_address_string(addr: str) -> str:
     addr = re.sub(r',\s*Coquitlam\b.*', '', addr, flags=re.IGNORECASE)
     addr = re.sub(r',\s*Port Coquitlam\b.*', '', addr, flags=re.IGNORECASE)
     addr = re.sub(r',\s*Port Moody\b.*', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r'\s*\(\s*Street\s+Centroid\s*\)', '', addr, flags=re.IGNORECASE)
+    addr = re.sub(r'\bStreet\s+Centroid\b', '', addr, flags=re.IGNORECASE)
     return addr.strip()
 
 def transcribe_audio_bytes(content: bytes) -> str | None:

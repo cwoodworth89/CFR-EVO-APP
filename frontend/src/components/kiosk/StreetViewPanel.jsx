@@ -25,21 +25,38 @@ export default function StreetViewPanel({ activeCall }) {
 
   const override = STREETVIEW_OVERRIDES[cleanAddrKey];
 
-  const destLat = override ? override.lat : (activeCall?.front_lat ?? activeCall?.lat ?? 49.2838);
-  const destLng = override ? override.lng : (activeCall?.front_lng ?? activeCall?.lng ?? -122.7932);
-  const heading = override ? override.heading : 0;
-  const pitch = override ? override.pitch : 0;
-  const fov = override ? override.fov : 90;
+  const frontLat = override ? override.lat : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
+  const frontLng = override ? override.lng : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
 
-  // Google Static Street View API URL (with source=outdoor to ignore indoor photo spheres)
+  const targetLat = activeCall?.lat ?? activeCall?.target?.lat ?? frontLat;
+  const targetLng = activeCall?.lng ?? activeCall?.target?.lng ?? frontLng;
+
+  // Calculate compass bearing from frontage arrival spot facing parcel center
+  let computedHeading = override ? override.heading : 0;
+  if (!override && (frontLat !== targetLat || frontLng !== targetLng)) {
+    const dLng = (targetLng - frontLng) * (Math.PI / 180);
+    const targetLatRad = targetLat * (Math.PI / 180);
+    const frontLatRad = frontLat * (Math.PI / 180);
+
+    const y = Math.sin(dLng) * Math.cos(targetLatRad);
+    const x = Math.cos(frontLatRad) * Math.sin(targetLatRad) - Math.sin(frontLatRad) * Math.cos(targetLatRad) * Math.cos(dLng);
+    
+    const bearing = Math.atan2(y, x) * (180 / Math.PI);
+    computedHeading = Math.round((bearing + 360) % 360);
+  }
+
+  const pitch = override ? override.pitch : 5;
+  const fov = override ? override.fov : 80;
+
+  // Google Static Street View API URL (querying from frontage arrival point with computed heading)
   const staticStreetViewUrl = apiKey
-    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${destLat},${destLng}&fov=${fov}&heading=${heading}&pitch=${pitch}&source=outdoor&key=${apiKey}`
+    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${frontLat},${frontLng}&fov=${fov}&heading=${computedHeading}&pitch=${pitch}&source=outdoor&key=${apiKey}`
     : null;
 
   // Google Maps Embed API StreetView URL
   const embedStreetViewUrl = apiKey
-    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${destLat},${destLng}&heading=${heading}&pitch=${pitch}`
-    : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${destLng}!3d${destLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
+    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${computedHeading}&pitch=${pitch}`
+    : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center">

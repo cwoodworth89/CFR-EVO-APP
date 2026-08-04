@@ -25,6 +25,14 @@ services:
     volumes:
       - ./services/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
 
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    container_name: cfr_ntfy
+    restart: always
+    command: serve --listen-http ":80"
+    ports:
+      - "8080:80"
+
   api:
     build:
       context: .
@@ -35,6 +43,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-cfr_user}:${POSTGRES_PASSWORD:-cfr_password_2026}@postgres:5432/${POSTGRES_DB:-cfr_dispatch}
       MQTT_BROKER_HOST: mosquitto
       MQTT_BROKER_PORT: 1883
+      NTFY_SERVER_URL: http://ntfy:80
       JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
       RECORDINGS_DIR: /app/backend/audio_files/recordings
     ports:
@@ -44,6 +53,7 @@ services:
     depends_on:
       - postgres
       - mosquitto
+      - ntfy
 
 volumes:
   postgres_data:

@@ -39,6 +39,7 @@ export function enrichAddressWithBuilding(targetObj) {
 
 import { RoutingOverlay } from './RoutingOverlay';
 import DispatchReview from './DispatchReview';
+import DriverStationSetup from './DriverStationSetup';
 import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
 import StreetViewPanel from './kiosk/StreetViewPanel';
 import EVORoutingConfigModal from './EVORoutingConfigModal';
@@ -1623,6 +1624,12 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           onClose={() => startMode("EXPLORE")} 
           onLocateAddress={handleLocateCallOnMap}
           onSimulateCall={onSimulateCall}
+        />
+      )}
+
+      {appMode === "DRIVER_SETUP" && (
+        <DriverStationSetup 
+          onClose={() => startMode("EXPLORE")} 
         />
       )}
 

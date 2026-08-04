@@ -78,6 +78,7 @@ export function Header({
             >
               <option value="EXPLORE">🧭 Notifications / Explore</option>
               <option value="KIOSK_VIEW">🖥️ KIOSK: IN-STATION MODE</option>
+              <option value="DRIVER_SETUP">📱 MOBILE: DRIVER PUSH SETUP</option>
               <option value="TRAINING_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
               <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
               <option value="TRAINING_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
@@ -87,8 +88,16 @@ export function Header({
           </div>
         </div>
 
-        {/* Right Side: Alerts Panel Trigger */}
+        {/* Right Side: Alerts & Mobile Setup Triggers */}
         <div className="flex gap-3 items-center">
+          <button
+            onClick={() => setAppMode("DRIVER_SETUP")}
+            className="px-3 py-1.5 text-xs font-black rounded-lg border bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30 hover:border-amber-500/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+            title="Open Driver Mobile Alerts QR Setup"
+          >
+            📱 DRIVER ALERTS
+          </button>
+
           {/* Right Sidebar Hazards & Alerts Panel Toggle */}
           <button 
             onClick={() => {

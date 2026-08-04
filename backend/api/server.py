@@ -32,9 +32,7 @@ def is_allowed_network(client_ip_str: str) -> bool:
         return True
     try:
         ip = ipaddress.ip_address(client_ip_str)
-        if ip.is_loopback:
-            return True
-        if ip in TAILSCALE_SUBNET:
+        if ip.is_loopback or ip.is_private or ip in TAILSCALE_SUBNET:
             return True
     except ValueError:
         pass

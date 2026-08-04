@@ -438,7 +438,8 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       setSession(data.session);
     } catch (err) {
       console.error('Login error:', err);
-      setLoginError(err.message || String(err));
+      const errMsg = typeof err === 'string' ? err : (err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err)));
+      setLoginError(errMsg);
     } finally {
       setLoginLoading(false);
     }

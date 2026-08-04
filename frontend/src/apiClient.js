@@ -54,15 +54,26 @@ export const apiClient = {
           body: JSON.stringify({ username: username || email, password })
         });
         if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.detail || 'Login failed');
+          let msg = 'Login failed';
+          try {
+            const errData = await res.json();
+            if (typeof errData.detail === 'string') {
+              msg = errData.detail;
+            } else if (Array.isArray(errData.detail) && errData.detail[0]?.msg) {
+              msg = errData.detail[0].msg;
+            } else if (errData.detail) {
+              msg = JSON.stringify(errData.detail);
+            }
+          } catch (e) {}
+          throw new Error(msg);
         }
         const data = await res.json();
         setToken(data.access_token);
         const session = { user: data.user, access_token: data.access_token };
         return { data: { session }, error: null };
       } catch (err) {
-        return { data: { session: null }, error: err };
+        const errObj = err instanceof Error ? err : new Error(typeof err === 'string' ? err : 'Login failed');
+        return { data: { session: null }, error: errObj };
       }
     },
 

@@ -150,22 +150,41 @@ export default function DriverStationSetup({ onClose }) {
             </div>
           </div>
 
-          {/* Step 3: Server Hostname / Tailscale IP */}
+          {/* Step 3: Server Hostname / Tailscale IP / Domain */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
             <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-2 flex items-center gap-2">
               <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 text-[10px]">STEP 3</span>
-              SERVER ADDRESS / TAILSCALE HOST
+              SERVER ADDRESS / TAILSCALE HOST / DOMAIN
             </h2>
             <p className="text-[10px] text-slate-400 font-mono mb-2.5">
-              Specify your Tailscale IP or Server Hostname so phones on cellular network / VPN can reach Ntfy.
+              Specify your Tailscale IP, local LAN, or production domain for phone alerts.
             </p>
             <input
               type="text"
               value={customHost}
               onChange={(e) => setCustomHost(e.target.value)}
-              placeholder="e.g. 100.x.y.z or station-server.tailscale.net"
-              className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
+              placeholder="e.g. 100.x.y.z or dispatch.woodworthelectric.ca"
+              className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500 mb-2.5"
             />
+
+            {/* Host Presets */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setCustomHost(window.location.hostname || 'localhost')}
+                className="bg-slate-950 hover:bg-slate-850 border border-slate-800 text-[10px] font-mono text-slate-300 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+              >
+                📍 Station LAN ({window.location.hostname})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCustomHost('dispatch.woodworthelectric.ca')}
+                className="bg-purple-950/40 hover:bg-purple-900/40 border border-purple-800/50 text-[10px] font-mono text-purple-300 px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold"
+              >
+                🔒 dispatch.woodworthelectric.ca
+              </button>
+            </div>
           </div>
         </div>
 

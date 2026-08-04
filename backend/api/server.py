@@ -107,8 +107,9 @@ def publish_mqtt_event(event_type: str, record_dict: dict):
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = ""
 
 class DispatchCreateSchema(BaseModel):
     dispatch_id: str

@@ -48,10 +48,11 @@ export const apiClient = {
 
     async signInWithPassword({ username, email, password }) {
       try {
+        const userVal = username || email || '';
         const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username || email, password })
+          body: JSON.stringify({ username: userVal, email: userVal, password })
         });
         if (!res.ok) {
           let msg = 'Login failed';

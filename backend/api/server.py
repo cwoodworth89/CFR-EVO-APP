@@ -107,9 +107,8 @@ def publish_mqtt_event(event_type: str, record_dict: dict):
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):
-    username: Optional[str] = None
-    email: Optional[str] = None
-    password: Optional[str] = ""
+    username: str
+    password: str
 
 class DispatchCreateSchema(BaseModel):
     dispatch_id: str
@@ -177,22 +176,22 @@ def login(req: LoginRequest, request: Request):
             detail=f"Admin access restricted to localhost or Tailscale network. Your IP ({client_ip}) is not authorized."
         )
 
-    user_id = (req.username or req.email or "").strip()
-    user_pass = (req.password or "").strip()
+    username = (req.username or "").strip()
+    password = (req.password or "").strip()
 
     expected_user = os.environ.get("ADMIN_USERNAME", "cfradmin")
     expected_pass = os.environ.get("ADMIN_PASSWORD", "rescue")
 
-    if (user_id.lower() in [expected_user.lower(), "admin", "admin@cfr-dispatch.com"]) and user_pass == expected_pass:
+    if username.lower() == expected_user.lower() and password == expected_pass:
         token_payload = {
-            "sub": user_id,
+            "sub": username,
             "exp": datetime.now(timezone.utc) + timedelta(days=30)
         }
         token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
         return {
             "access_token": token,
             "token_type": "bearer",
-            "user": {"username": user_id, "role": "admin"}
+            "user": {"username": username, "role": "admin"}
         }
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -207,7 +206,7 @@ def get_session(request: Request, authorization: Optional[str] = None):
     token = authorization.split(" ")[1]
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return {"session": {"user": {"email": payload.get("sub"), "role": "admin"}}}
+        return {"session": {"user": {"username": payload.get("sub"), "role": "admin"}}}
     except Exception:
         return {"session": None}
 

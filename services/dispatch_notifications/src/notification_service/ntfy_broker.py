@@ -1,15 +1,53 @@
 import os
 import json
 import logging
+import hashlib
 import requests
 import urllib.parse
+from datetime import datetime, timezone
 
 MQTT_HOST = os.environ.get("MQTT_BROKER_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = "cfr/dispatches"
 
 NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
-NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "")  # Optional secret suffix for QR code security
+NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "AUTO_MONTHLY")
+NTFY_MASTER_SALT = os.environ.get("NTFY_MASTER_SALT", "cfr_master_salt_2026")
+
+def get_monthly_secret(dt: datetime = None) -> str:
+    """Computes a deterministic 6-char monthly secret salt from year+month and master salt."""
+    if dt is None:
+        dt = datetime.now(timezone.utc)
+    date_str = dt.strftime("%Y-%m")
+    raw = f"{NTFY_MASTER_SALT}-{date_str}"
+    digest = hashlib.md5(raw.encode("utf-8")).hexdigest()[:6]
+    month_code = dt.strftime("%b%Y").lower()  # e.g. aug2026
+    return f"{month_code}-{digest}"
+
+def get_active_secrets() -> list[str]:
+    """Returns list of active topic secrets (current month + previous month during 3-day grace period)."""
+    if not NTFY_TOPIC_SECRET:
+        return [""]
+    if NTFY_TOPIC_SECRET != "AUTO_MONTHLY":
+        return [NTFY_TOPIC_SECRET]
+
+    now = datetime.now(timezone.utc)
+    current_secret = get_monthly_secret(now)
+    secrets = [current_secret]
+
+    # First 3 days of the month: include previous month secret as grace period
+    if now.day <= 3:
+        # Calculate previous month
+        year = now.year
+        month = now.month - 1
+        if month == 0:
+            month = 12
+            year -= 1
+        prev_dt = datetime(year, month, 1, tzinfo=timezone.utc)
+        prev_secret = get_monthly_secret(prev_dt)
+        secrets.append(prev_secret)
+
+    return secrets
 
 def publish_mqtt_dispatch(payload: dict, event_type: str = "INSERT") -> bool:
     """Publishes dispatch payload directly to Mosquitto MQTT broker for real-time station alerts."""
@@ -29,8 +67,8 @@ def publish_mqtt_dispatch(payload: dict, event_type: str = "INSERT") -> bool:
         logging.warning(f"Failed to publish to MQTT broker ({MQTT_HOST}:{MQTT_PORT}): {e}")
         return False
 
-def format_unit_topic(unit_str: str) -> str:
-    """Normalizes unit code (e.g. 'E1' -> 'engine-1', 'L1' -> 'ladder-1', 'R1' -> 'rescue-1', 'C1' -> 'chief-1')."""
+def format_unit_topics(unit_str: str) -> list[str]:
+    """Normalizes unit code (e.g. 'E1' -> 'engine-1') and appends active monthly secret tokens."""
     clean = unit_str.strip().lower().replace(" ", "")
     base = f"unit-{clean}"
     if clean.startswith("e") or "engine" in clean:
@@ -46,13 +84,11 @@ def format_unit_topic(unit_str: str) -> str:
         num = "".join(filter(str.isdigit, clean)) or "1"
         base = f"chief-{num}"
 
-    # Append secret salt if configured
-    if NTFY_TOPIC_SECRET:
-        return f"{base}-{NTFY_TOPIC_SECRET}"
-    return base
+    secrets = get_active_secrets()
+    return [f"{base}-{s}" if s else base for s in secrets]
 
 def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
-    """Posts dispatch data to local Mosquitto MQTT AND local/remote Ntfy topics (all-dispatches + unit-specific)."""
+    """Posts dispatch data to local Mosquitto MQTT AND local/remote Ntfy topics with monthly secret rotation."""
     # 1. Publish to local Mosquitto MQTT (for Station Kiosks)
     mqtt_success = publish_mqtt_dispatch(payload)
 
@@ -97,18 +133,19 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     
     message_body = "\n".join(lines).encode('utf-8')
 
-    # General station topic (with secret salt if configured)
-    gen_topic = f"cfr-dispatches-{NTFY_TOPIC_SECRET}" if NTFY_TOPIC_SECRET else "cfr-dispatches"
-    target_topics = [gen_topic]
+    # Generate target topics using active secrets
+    secrets = get_active_secrets()
+    target_topics = []
 
-    if topic:
-        target_topics.append(f"{topic}-{NTFY_TOPIC_SECRET}" if NTFY_TOPIC_SECRET and not topic.endswith(NTFY_TOPIC_SECRET) else topic)
+    for s in secrets:
+        target_topics.append(f"cfr-dispatches-{s}" if s else "cfr-dispatches")
+        if topic:
+            target_topics.append(f"{topic}-{s}" if s else topic)
 
     if isinstance(units_list, list):
         for unit in units_list:
-            unit_topic = format_unit_topic(unit)
-            if unit_topic not in target_topics:
-                target_topics.append(unit_topic)
+            unit_topics = format_unit_topics(unit)
+            target_topics.extend(unit_topics)
 
     ntfy_success = False
     for t in set(target_topics):

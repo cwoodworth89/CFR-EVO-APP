@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import SparkMD5 from 'spark-md5';
 
 const APPARATUS_LIST = [
   { id: 'cfr-dispatches', label: 'ALL STATION CALLS', icon: '🚨', desc: 'Receive all dispatch alerts for the department', color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-300' },
@@ -19,6 +20,23 @@ const SHIFT_DURATIONS = [
   { hours: 24, label: '24 Hours (Full Tour)' },
 ];
 
+const getMonthlySecretToken = () => {
+  const customSecret = import.meta.env.VITE_NTFY_TOPIC_SECRET;
+  if (customSecret && customSecret !== 'AUTO_MONTHLY') {
+    return customSecret;
+  }
+  const masterSalt = import.meta.env.VITE_NTFY_MASTER_SALT || 'cfr_master_salt_2026';
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const monthNum = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthCode = `${monthNames[now.getUTCMonth()]}${year}`;
+  
+  const raw = `${masterSalt}-${year}-${monthNum}`;
+  const digest = SparkMD5.hash(raw).substring(0, 6);
+  return `${monthCode}-${digest}`;
+};
+
 export default function DriverStationSetup({ onClose }) {
   const [selectedUnit, setSelectedUnit] = useState('engine-1');
   const [shiftHours, setShiftHours] = useState(12);
@@ -27,7 +45,7 @@ export default function DriverStationSetup({ onClose }) {
   // Compute server hostname / IP for Ntfy server
   const hostname = window.location.hostname || 'localhost';
   const ntfyServerPort = import.meta.env.VITE_NTFY_PORT || '8080';
-  const topicSecret = import.meta.env.VITE_NTFY_TOPIC_SECRET || '';
+  const topicSecret = getMonthlySecretToken();
   
   const finalTopic = topicSecret ? `${selectedUnit}-${topicSecret}` : selectedUnit;
 

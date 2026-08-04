@@ -63,6 +63,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const [dbError, setDbError] = useState(null);
 
   // Auth session states
+  const [session, setSession] = useState(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);

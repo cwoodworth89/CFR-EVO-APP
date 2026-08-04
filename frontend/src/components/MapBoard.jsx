@@ -1051,23 +1051,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
       if(appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
   }, [appMode, zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
 
-  const handleLocateCallOnMap = useCallback((call) => {
-    setAppMode("EXPLORE");
-    setActiveDispatch(call);
-    const target = call.target || (call.address ? { address: call.address, lat: call.latitude || 49.28, lng: call.longitude || -122.80 } : null);
-    if (target) {
-      setTargetAddress(target);
-      if (map && target.lat && target.lng) {
-        const point = map.project([target.lat, target.lng], 17);
-        const offsetPoint = L.point(point.x + 30, point.y);
-        const offsetLatLng = map.unproject(offsetPoint, 17);
-        map.flyTo(offsetLatLng, 17, { animate: true });
-      }
-    }
-    setLeftSidebarOpen(true);
-    setRightSidebarOpen(false);
-  }, [map]);
-
   const startMode = useCallback((mode) => {
       clearTimeout(autoAdvanceTimer.current); // Clear any pending jumps
       if (mode === "KIOSK_VIEW") {
@@ -1622,7 +1605,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
       {appMode === "ADMIN_DISPATCHES" && (
         <DispatchReview 
           onClose={() => startMode("EXPLORE")} 
-          onLocateAddress={handleLocateCallOnMap}
           onSimulateCall={onSimulateCall}
         />
       )}

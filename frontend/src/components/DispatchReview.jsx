@@ -51,7 +51,7 @@ const toTitleCase = (str) => {
   return str.replace(/\b\w/g, c => c.toUpperCase());
 };
 
-export default function DispatchReview({ onClose, onLocateAddress, onSimulateCall }) {
+export default function DispatchReview({ onClose, onSimulateCall }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -2,10 +2,11 @@ import os
 import json
 import logging
 import time
+import ipaddress
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -14,6 +15,30 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 import paho.mqtt.client as mqtt
 import jwt
+
+# Tailscale Carrier-Grade NAT subnet (100.64.0.0/10)
+TAILSCALE_SUBNET = ipaddress.ip_network("100.64.0.0/10")
+
+def get_client_ip(request: Request) -> str:
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+def is_allowed_network(client_ip_str: str) -> bool:
+    if not client_ip_str:
+        return False
+    if client_ip_str in ["127.0.0.1", "::1", "localhost", "testclient"]:
+        return True
+    try:
+        ip = ipaddress.ip_address(client_ip_str)
+        if ip.is_loopback:
+            return True
+        if ip in TAILSCALE_SUBNET:
+            return True
+    except ValueError:
+        pass
+    return False
 
 from backend.api.database import get_db, engine, Base
 from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
@@ -144,7 +169,15 @@ def serialize_call(call: LiveCallModel) -> dict:
 
 # Auth endpoints
 @app.post("/api/auth/login")
-def login(req: LoginRequest):
+def login(req: LoginRequest, request: Request):
+    client_ip = get_client_ip(request)
+    if not is_allowed_network(client_ip):
+        logging.warning(f"Admin login attempt blocked from unauthorized IP '{client_ip}'")
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Admin access restricted to localhost or Tailscale network. Your IP ({client_ip}) is not authorized."
+        )
+
     user_id = (req.username or req.email or "").strip()
     user_pass = (req.password or "").strip()
 
@@ -165,7 +198,11 @@ def login(req: LoginRequest):
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
 @app.get("/api/auth/session")
-def get_session(authorization: Optional[str] = None):
+def get_session(request: Request, authorization: Optional[str] = None):
+    client_ip = get_client_ip(request)
+    if not is_allowed_network(client_ip):
+        return {"session": None}
+
     if not authorization or not authorization.startswith("Bearer "):
         return {"session": None}
     token = authorization.split(" ")[1]

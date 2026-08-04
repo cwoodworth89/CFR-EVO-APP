@@ -44,8 +44,9 @@ export default function DriverStationSetup({ onClose }) {
   const [shiftHours, setShiftHours] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  // Compute server hostname / IP for Ntfy server
-  const hostname = window.location.hostname || 'localhost';
+  // Compute server hostname / IP for Ntfy server with custom override
+  const defaultHostname = window.location.hostname || 'localhost';
+  const [customHost, setCustomHost] = useState(defaultHostname);
   const ntfyServerPort = import.meta.env.VITE_NTFY_PORT || '8080';
   const selectedUnitObj = APPARATUS_LIST.find(u => u.id === selectedUnit) || APPARATUS_LIST[0];
   
@@ -53,9 +54,11 @@ export default function DriverStationSetup({ onClose }) {
   const topicSecret = selectedUnitObj.isMaster ? '' : getMonthlySecretToken();
   const finalTopic = topicSecret ? `${selectedUnit}-${topicSecret}` : selectedUnit;
 
-  // Construct topic subscription URL
-  const ntfyWebUrl = `http://${hostname}:${ntfyServerPort}/${finalTopic}`;
-  const ntfyDeepLink = `ntfy://${hostname}:${ntfyServerPort}/${finalTopic}`;
+  const effectiveHost = customHost.trim() || defaultHostname;
+
+  // Construct topic subscription URLs
+  const ntfyWebUrl = `http://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
+  const ntfyDeepLink = `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(ntfyWebUrl);
@@ -145,6 +148,24 @@ export default function DriverStationSetup({ onClose }) {
                 );
               })}
             </div>
+          </div>
+
+          {/* Step 3: Server Hostname / Tailscale IP */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-2 flex items-center gap-2">
+              <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 text-[10px]">STEP 3</span>
+              SERVER ADDRESS / TAILSCALE HOST
+            </h2>
+            <p className="text-[10px] text-slate-400 font-mono mb-2.5">
+              Specify your Tailscale IP or Server Hostname so phones on cellular network / VPN can reach Ntfy.
+            </p>
+            <input
+              type="text"
+              value={customHost}
+              onChange={(e) => setCustomHost(e.target.value)}
+              placeholder="e.g. 100.x.y.z or station-server.tailscale.net"
+              className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
+            />
           </div>
         </div>
 

@@ -29,7 +29,7 @@ services:
     image: binwiederhier/ntfy:v2.11.0
     container_name: cfr_ntfy
     restart: always
-    command: serve --listen-http ":80"
+    command: serve --listen-http ":80" --web-root app
     ports:
       - "8080:80"
 

@@ -44,7 +44,7 @@ import StreetViewPanel from './kiosk/StreetViewPanel';
 import EVORoutingConfigModal from './EVORoutingConfigModal';
 import { calculateEVORouteMetrics, DEFAULT_ROUTING_CONFIG } from '../utils/EVORoutingEngine';
 import { sanitizeAddress } from '../utils/addressUtils';
-import { supabase } from '../supabaseClient';
+import { useDispatchListener } from '../hooks/useDispatchListener';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
 const getRandomElement = (arr) => {
@@ -437,63 +437,52 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     localStorage.setItem('home_hall', homeHall);
   }, [homeHall]);
 
-  // Subscribe to live dispatches from Supabase
-  useEffect(() => {
-    const channel = supabase
-      .channel('live-calls-realtime-map')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'live_calls' },
-        (payload) => {
-          console.log("Realtime Dispatch Event:", payload);
-          if (payload.eventType === 'INSERT') {
-            const newCall = payload.new;
-            if (newCall) {
-              setActiveDispatch(newCall);
-              const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.latitude || 49.28, lng: newCall.longitude || -122.80 } : null);
-              if (target) {
-                updateTargetAddress(target);
-                if (map && target.lat && target.lng) {
-                  map.flyTo([target.lat, target.lng], 17, { animate: true });
-                }
-              }
-              setLeftSidebarOpen(true);
-              setRightSidebarOpen(false);
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedCall = payload.new;
-            setActiveDispatch(curr => {
-              if (curr && curr.id === updatedCall.id) {
-                const oldTarget = curr.target;
-                const newTarget = updatedCall.target;
-                if (newTarget && (!oldTarget || oldTarget.lat !== newTarget.lat || oldTarget.lng !== newTarget.lng)) {
-                  updateTargetAddress(newTarget);
-                  if (map && newTarget.lat && newTarget.lng) {
-                    map.flyTo([newTarget.lat, newTarget.lng], 17, { animate: true });
-                  }
-                }
-                return updatedCall;
-              }
-              return curr;
-            });
-          } else if (payload.eventType === 'DELETE') {
-            const deletedCall = payload.old;
-            setActiveDispatch(curr => {
-              if (curr && curr.id === deletedCall.id) {
-                updateTargetAddress(null);
-                return null;
-              }
-              return curr;
-            });
+  // Subscribe to live dispatches via MQTT WebSockets
+  useDispatchListener({
+    enabled: true,
+    onInsert: (dispatch) => {
+      const newCall = dispatch.rawRecord || dispatch;
+      if (newCall) {
+        setActiveDispatch(newCall);
+        const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.lat || 49.28, lng: newCall.lng || -122.80 } : null);
+        if (target) {
+          updateTargetAddress(target);
+          if (map && target.lat && target.lng) {
+            map.flyTo([target.lat, target.lng], 17, { animate: true });
           }
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [map, updateTargetAddress]);
+        setLeftSidebarOpen(true);
+        setRightSidebarOpen(false);
+      }
+    },
+    onUpdate: (dispatch) => {
+      const updatedCall = dispatch.rawRecord || dispatch;
+      setActiveDispatch(curr => {
+        if (curr && (curr.id === updatedCall.id || curr.dispatch_id === updatedCall.dispatch_id)) {
+          const oldTarget = curr.target;
+          const newTarget = updatedCall.target;
+          if (newTarget && (!oldTarget || oldTarget.lat !== newTarget.lat || oldTarget.lng !== newTarget.lng)) {
+            updateTargetAddress(newTarget);
+            if (map && newTarget.lat && newTarget.lng) {
+              map.flyTo([newTarget.lat, newTarget.lng], 17, { animate: true });
+            }
+          }
+          return updatedCall;
+        }
+        return curr;
+      });
+    },
+    onDelete: (dispatch) => {
+      const deletedCall = dispatch.rawRecord || dispatch;
+      setActiveDispatch(curr => {
+        if (curr && (curr.id === deletedCall.id || curr.dispatch_id === deletedCall.dispatch_id)) {
+          updateTargetAddress(null);
+          return null;
+        }
+        return curr;
+      });
+    }
+  });
 
   // Query Nearby Hydrants on targetAddress change (using local in-memory dataset)
   useEffect(() => {

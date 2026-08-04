@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import { apiClient, API_BASE_URL } from '../apiClient';
+import { useDispatchListener } from '../hooks/useDispatchListener';
 
 // Helper to format timestamps to Pacific Time matching database and local logs
 const formatTimestampPT = (ts) => {
@@ -87,27 +88,20 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
   const [stage2Open, setStage2Open] = useState(false);
   const [stage3Open, setStage3Open] = useState(true);
 
-  // Load calls from Supabase
+  // Load calls from local FastAPI gateway
   const fetchCalls = async () => {
     setLoading(true);
     setDbStatus('checking');
     setDbError(null);
     try {
-      const { data, error } = await supabase
-        .from('live_calls')
-        .select('*')
-        .order('timestamp', { ascending: false });
-
-      if (error) throw error;
+      const data = await apiClient.dispatches.fetchAll();
       setCalls(data || []);
       
-      const { data: evalData, error: evalError } = await supabase
-        .from('evaluation_history')
-        .select('*')
-        .order('timestamp', { ascending: true });
-      
-      if (!evalError) {
+      try {
+        const evalData = await apiClient.evaluations.fetchAll();
         setEvalHistory(evalData || []);
+      } catch (e) {
+        // non-fatal
       }
       setDbStatus('connected');
     } catch (err) {
@@ -121,21 +115,23 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
 
   useEffect(() => {
     // 1. Get initial session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    apiClient.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
     // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = apiClient.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
-  // Fetch calls & subscribe to realtime updates reactively based on session
+  // Fetch calls on session load
   useEffect(() => {
     if (!session) {
       setCalls([]);
@@ -145,38 +141,25 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
     }
 
     fetchCalls();
-
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('live-calls-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'live_calls' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setCalls((prev) => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setCalls((prev) =>
-              prev.map((c) => (c.id === payload.new.id ? payload.new : c))
-            );
-            // Update selected call state if it's the one being modified
-            setSelectedCall((curr) =>
-              curr && curr.id === payload.new.id ? payload.new : curr
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setCalls((prev) => prev.filter((c) => c.id !== payload.old.id));
-            setSelectedCall((curr) =>
-              curr && curr.id === payload.old.id ? null : curr
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [session]);
+
+  // Real-time MQTT listener for dispatches across all 4 station kiosks
+  useDispatchListener({
+    enabled: !!session,
+    onInsert: (dispatch) => {
+      setCalls((prev) => [dispatch.rawRecord || dispatch, ...prev]);
+    },
+    onUpdate: (dispatch) => {
+      const updated = dispatch.rawRecord || dispatch;
+      setCalls((prev) => prev.map((c) => (c.id === updated.id || c.dispatch_id === updated.dispatch_id ? updated : c)));
+      setSelectedCall((curr) => (curr && (curr.id === updated.id || curr.dispatch_id === updated.dispatch_id) ? updated : curr));
+    },
+    onDelete: (dispatch) => {
+      const deleted = dispatch.rawRecord || dispatch;
+      setCalls((prev) => prev.filter((c) => c.id !== deleted.id && c.dispatch_id !== deleted.dispatch_id));
+      setSelectedCall((curr) => (curr && (curr.id === deleted.id || curr.dispatch_id === deleted.dispatch_id) ? null : curr));
+    }
+  });
 
   const [audioSignedUrl, setAudioSignedUrl] = useState(null);
   const prevSelectedCallIdRef = React.useRef(null);
@@ -267,7 +250,7 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
         setSuccessMsg('');
       }
       
-      // Securely fetch signed URL for private audio bucket ONLY if the audio URL changed
+      // Resolve audio URL directly from local FastAPI static server
       const getSignedAudio = async () => {
         if (!selectedCall.audio_url) {
           setAudioSignedUrl(null);
@@ -275,30 +258,11 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
           return;
         }
         
-        const path = selectedCall.audio_url;
-        if (prevAudioUrlRef.current === path) {
-          return;
+        let path = selectedCall.audio_url;
+        if (!path.startsWith('http')) {
+          path = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
         }
-        prevAudioUrlRef.current = path;
-        
-        if (path.includes('/storage/v1/object/')) {
-          try {
-            const parts = path.split('/');
-            const filename = parts[parts.length - 1];
-            
-            const { data, error } = await supabase.storage
-              .from('dispatch-audio')
-              .createSignedUrl(filename, 300); // 5 minutes validity
-              
-            if (error) throw error;
-            setAudioSignedUrl(data.signedUrl);
-          } catch (err) {
-            console.error('Error generating signed URL:', err);
-            setAudioSignedUrl(path);
-          }
-        } else {
-          setAudioSignedUrl(path);
-        }
+        setAudioSignedUrl(path);
       };
       
       getSignedAudio();
@@ -414,26 +378,7 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
         review_notes: reviewNotes || null
       };
 
-      const { error } = await supabase
-        .from('live_calls')
-        .update({
-          verified_transcript: verifiedTranscript,
-          verified_address: verifiedAddress,
-          verified_incident: verifiedIncident,
-          verified_units: unitsArray,
-          feedback_submitted: true,
-          verify_location: false,
-          quality_rating: qualityRating,
-          model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
-          target: updatedTarget
-        })
-        .eq('id', selectedCall.id);
-
-      if (error) throw error;
-      setSuccessMsg('Review and corrections submitted successfully!');
-      
-      const newCallData = {
-        ...selectedCall,
+      const updatedCall = await apiClient.dispatches.update(selectedCall.dispatch_id || selectedCall.id, {
         verified_transcript: verifiedTranscript,
         verified_address: verifiedAddress,
         verified_incident: verifiedIncident,
@@ -443,9 +388,11 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
         quality_rating: qualityRating,
         model_updated: selectedCall.feedback_submitted ? selectedCall.model_updated : false,
         target: updatedTarget
-      };
-      setCalls(prev => prev.map(c => c.id === selectedCall.id ? newCallData : c));
-      setSelectedCall(newCallData);
+      });
+
+      setSuccessMsg('Review and corrections submitted successfully!');
+      setCalls(prev => prev.map(c => c.id === selectedCall.id || c.dispatch_id === selectedCall.dispatch_id ? updatedCall : c));
+      setSelectedCall(updatedCall);
     } catch (err) {
       console.error('Error updating call:', err);
       alert('Failed to submit corrections.');
@@ -459,14 +406,9 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
       return;
     }
     try {
-      const { error } = await supabase
-        .from('live_calls')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setCalls((prev) => prev.filter((c) => c.id !== id));
-      if (selectedCall?.id === id) {
+      await apiClient.dispatches.delete(dispatchId || id);
+      setCalls((prev) => prev.filter((c) => c.id !== id && c.dispatch_id !== dispatchId));
+      if (selectedCall?.id === id || selectedCall?.dispatch_id === dispatchId) {
         setSelectedCall(null);
       }
     } catch (err) {
@@ -496,7 +438,7 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
     setLoginLoading(true);
     setLoginError(null);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await apiClient.auth.signInWithPassword({
         email: email.trim(),
         password: password
       });
@@ -708,7 +650,8 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
           <button
             type="button"
             onClick={async () => {
-              await supabase.auth.signOut();
+              await apiClient.auth.signOut();
+              setSession(null);
             }}
             className="bg-rose-950/45 border border-rose-900/40 hover:border-rose-500 hover:text-white text-rose-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
           >

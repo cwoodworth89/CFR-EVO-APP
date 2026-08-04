@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfr_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cfr_dispatch}
+      POSTGRES_USER: ${POSTGRES_USER:-cfr_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cfr_password_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/api/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: cfr_mosquitto
+    restart: always
+    ports:
+      - "1883:1883"   # Native MQTT TCP port
+      - "9001:9001"   # MQTT over WebSockets port
+    volumes:
+      - ./services/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/api/Dockerfile
+    container_name: cfr_api
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cfr_user}:${POSTGRES_PASSWORD:-cfr_password_2026}@postgres:5432/${POSTGRES_DB:-cfr_dispatch}
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
+      RECORDINGS_DIR: /app/backend/audio_files/recordings
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/audio_files/recordings:/app/backend/audio_files/recordings
+    depends_on:
+      - postgres
+      - mosquitto
+
+volumes:
+  postgres_data:

@@ -1,12 +1,38 @@
+import os
 import json
 import logging
 import requests
 
-def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
-    """Posts dispatch data to a private Ntfy channel to wake up Android devices."""
-    if not topic or topic.strip() == "" or "your-private-ntfy-topic" in topic:
-        logging.info("Ntfy topic not configured or using default placeholder. Skipping push.")
+MQTT_HOST = os.environ.get("MQTT_BROKER_HOST", "localhost")
+MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
+MQTT_TOPIC = "cfr/dispatches"
+
+def publish_mqtt_dispatch(payload: dict, event_type: str = "INSERT") -> bool:
+    """Publishes dispatch payload directly to Mosquitto MQTT broker for real-time station alerts."""
+    try:
+        import paho.mqtt.publish as publish
+        
+        msg_payload = json.dumps({
+            "eventType": event_type,
+            "new": payload
+        }, default=str)
+        
+        logging.info(f"Publishing dispatch alert to MQTT broker {MQTT_HOST}:{MQTT_PORT} on topic '{MQTT_TOPIC}'...")
+        publish.single(MQTT_TOPIC, msg_payload, hostname=MQTT_HOST, port=MQTT_PORT, qos=1)
+        logging.info("Successfully published dispatch to local MQTT broker.")
+        return True
+    except Exception as e:
+        logging.warning(f"Failed to publish to MQTT broker ({MQTT_HOST}:{MQTT_PORT}): {e}")
         return False
+
+def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
+    """Posts dispatch data to local MQTT broker, and optionally ntfy.sh if configured."""
+    # 1. Publish to local Mosquitto MQTT
+    mqtt_success = publish_mqtt_dispatch(payload)
+
+    # 2. Public ntfy.sh (optional legacy fallback)
+    if not topic or topic.strip() == "" or "your-private-ntfy-topic" in topic:
+        return mqtt_success
         
     endpoint = f"https://ntfy.sh/{topic}"
     headers = {}
@@ -14,35 +40,21 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None
         headers["Authorization"] = f"Bearer {token}"
         
     try:
-        # Determine Title
         if title:
             headers["Title"] = title
         else:
             headers["Title"] = f"Dispatch: {payload.get('incident_type', 'Structure Fire')}"
             
         headers["Priority"] = priority
-        
-        # Determine Tags
-        if tags:
-            headers["Tags"] = tags
-        else:
-            headers["Tags"] = "fire_engine,rotating_light"
+        headers["Tags"] = tags or "fire_engine,rotating_light"
             
-        # Use address for direct tap-to-navigate action (falls back to lat/lng coordinates)
         import urllib.parse
-        address = payload.get("address")
-        if not address:
-            target = payload.get("target", {})
-            address = target.get("address")
+        target = payload.get("target", {})
+        address = payload.get("address") or target.get("address") or "Unknown Location"
+        lat = payload.get("lat") or target.get("lat")
+        lng = payload.get("lng") or target.get("lng")
 
-        lat = payload.get("lat")
-        lng = payload.get("lng")
-        if not lat or not lng:
-            target = payload.get("target", {})
-            lat = target.get("lat")
-            lng = target.get("lng")
-
-        if address and address.strip() != "" and address != "Unknown Location":
+        if address and address != "Unknown Location":
             query_str = address
             if "Coquitlam" not in query_str and "BC" not in query_str:
                 query_str += ", Coquitlam, BC"
@@ -50,39 +62,12 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None
             headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={encoded_query}"
         elif lat and lng:
             headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
-            
-        # Format a clean, human-readable body message instead of raw JSON
-        address = payload.get("address")
-        if not address:
-            target = payload.get("target", {})
-            address = target.get("address")
-        if not address:
-            address = "Unknown Location"
 
         units_list = payload.get("responding_units", [])
-        if isinstance(units_list, list):
-            units_str = ", ".join(units_list) if units_list else "None assigned"
-        else:
-            units_str = str(units_list)
+        units_str = ", ".join(units_list) if isinstance(units_list, list) and units_list else str(units_list)
+        transcript = payload.get("verified_transcript") or payload.get("sanitized_transcript") or payload.get("raw_transcript") or "No transcript available"
+        transcript_clean = transcript[:150] + "..." if len(transcript) > 150 else transcript
 
-        transcript = payload.get("verified_transcript") or payload.get("sanitized_transcript") or payload.get("raw_transcript") or ""
-        
-        # Fallback if no transcript is present (e.g. for simple correction events)
-        if not transcript:
-            is_correction = title and "CORRECTION" in title
-            if is_correction:
-                transcript = "Location/units updated in Phase 2 processing."
-            else:
-                transcript = "No transcript available"
-
-        if transcript.startswith("[") and transcript.endswith("]"):
-            transcript_clean = transcript
-        else:
-            transcript_clean = transcript[:150] + "..." if len(transcript) > 150 else transcript
-
-        duration = payload.get("audio_duration")
-        duration_str = f" ({duration:.1f}s)" if duration else ""
-        
         map_grid = payload.get("map_grid") or target.get("map_grid")
         radio_channel = payload.get("radio_channel") or target.get("radio_channel")
 
@@ -94,16 +79,12 @@ def post_to_ntfy(payload: dict, topic: str, token: str = None, title: str = None
             lines.append(f"🗺️ Map Grid: {map_grid}")
         if radio_channel:
             lines.append(f"📻 Channel: {radio_channel}")
-            
-        lines.append(f"📝 Transcript: {transcript_clean}{duration_str}")
+        lines.append(f"📝 Transcript: {transcript_clean}")
         
-        message_body = "\n".join(lines)
-            
         logging.info(f"Posting formatted dispatch payload to ntfy.sh topic '{topic}'...")
-        response = requests.post(endpoint, headers=headers, data=message_body.encode('utf-8'), timeout=10)
+        response = requests.post(endpoint, headers=headers, data="\n".join(lines).encode('utf-8'), timeout=10)
         response.raise_for_status()
-        logging.info("Successfully posted to Ntfy.")
         return True
     except Exception as e:
-        logging.warning(f"Failed to post to Ntfy: {e} (Please verify your NTFY_TOPIC and NTFY_TOKEN credentials.)")
-        return False
+        logging.warning(f"Failed to post to Ntfy: {e}")
+        return mqtt_success

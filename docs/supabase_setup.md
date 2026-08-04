@@ -1,6 +1,10 @@
-# Supabase Setup Guide: CFR Dispatch Integration
+# Supabase Setup Guide (Legacy Cloud Reference)
 
-This document outlines the database schema, security policies, and real-time settings required to connect the **Raspberry Pi Locution Dispatch Agent** (Python backend) and the **CFR EVO Client** (React/Vite frontend) using **Supabase**.
+> [!NOTE]
+> **V2.0 ARCHITECTURE UPDATE**:
+> CFR EVO has migrated from cloud Supabase to a containerized local stack (**PostgreSQL + FastAPI + Mosquitto MQTT**).
+> For the current local stack setup guide, please refer to [**docs/local_database_setup.md**](./local_database_setup.md).
+> This document remains as a historical reference for legacy cloud setups or dual-push cloud backups.
 
 ---
 

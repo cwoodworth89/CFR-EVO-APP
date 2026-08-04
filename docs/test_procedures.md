@@ -11,20 +11,21 @@ graph TD
     subgraph Test Ingestion
         A[🎙️ Live Mic Feed] -.->|Tones & Speech| E[🐍 Python Agent]
         B[🔊 Local WAV File] -->|feed_recorded_call.py| E
-        C[☁️ Supabase UI Simulation] -->|Polled Event| E
+        C[🖥️ Web Dashboard Simulation] -->|POST /api/dispatches| E
     end
     
     subgraph Processing Pipeline
         E -->|1. Sanitize & Filter| F[DSP & Tone Filter]
-        F -->|2. Transcribe| G[Speech-to-Text Engine]
+        F -->|2. Transcribe| G[Whisper STT Engine]
         G -->|3. Address Parser| H[Intelligent Regex Engine]
         H -->|4. Geocoder| I[Local GIS Shapefiles]
     end
     
-    subgraph Integration Pushes
-        I -->|5. Post Payload| J[(Supabase live_calls)]
-        I -->|6. Push Notify| K[ntfy.sh Topic]
-        J -->|7. Real-Time Sync| L[💻 React Frontend Map]
+    subgraph Local Container Stack
+        I -->|5. POST /api/dispatches| J[FastAPI Gateway]
+        J -->|6. SQL Insert| K[(PostgreSQL 16 DB)]
+        J -->|7. Publish Alert| L[Mosquitto MQTT Broker]
+        L -->|8. WebSocket Port 9001| M[💻 Halls 1-4 React Kiosks]
     end
 ```
 

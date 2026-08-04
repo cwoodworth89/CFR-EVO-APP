@@ -59,14 +59,22 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Official Coquitlam City Boundary**: Generated high-precision 1,597-vertex vector polygon (`coquitlam_boundary_opt.json`) from Coquitlam ArcGIS Cadastral Server Layer 14 (`City Boundary`).
 *   **Emergency Response Zones Optimization**: Replaced heavy ArcGIS raster tiles with local vector polygons color-coded by Fire Hall group (Station 1 Crimson `#f43f5e`, Station 2 Royal Blue `#3b82f6`, Station 3 Emerald `#10b981`, Station 4 Purple `#a855f7`). Centered zone numbers using bounding box midpoints (`[(minLat + maxLat)/2, (minLng + maxLng)/2]`) in clean soft charcoal black text (`#0f172a`, `opacity: 0.85`), with automatic `zoom 16` cutoff, `minZoom={12}` constraint, and default-ON startup state.
 
+### 🖥️ Milestone 9: Containerized Local Stack & Multi-Kiosk Sync (v2.0 Major Revision)
+*   **PostgreSQL 16 & FastAPI Gateway**: Replaced cloud Supabase with local containerized PostgreSQL 16 and a FastAPI REST API (`backend/api`), preserving JSONB schema, `live_calls`, `evaluation_history`, and `dispatch_uploads` tables with zero monthly cloud dependencies.
+*   **Mosquitto MQTT Real-Time WebSockets**: Replaced cloud Supabase Realtime & `ntfy.sh` with a local Mosquitto MQTT broker (`services/mosquitto`), broadcasting `cfr/dispatches` alerts over TCP `1883` and WebSockets `9001` to all station kiosks simultaneously with sub-millisecond latency.
+*   **Master-Slave Multi-Kiosk Topography**: Hall 1 acts as the single Master Server. Kiosks in Halls 2, 3, and 4 connect directly over the station network using IP-agnostic dynamic resolution (`http://${window.location.hostname}:8000` and `ws://${window.location.hostname}:9001`).
+*   **Smart Local Audio Sync & Migration**: Created `migrate_supabase_to_local.py` script that scans local `backend/audio_files/recordings/` first, downloads missing audio from Supabase Storage, and rewrites audio URLs to local static paths (`/api/audio/{dispatch_id}.wav`).
+*   **Dual-Push Safety Net**: Configured `supabase_sync.py` to push dispatches to local FastAPI first, with optional background cloud backup (`ENABLE_SUPABASE_BACKUP`) for zero-risk cutover.
+
 ---
 
 ## 🗓️ Future Milestones
 
-### 📺 Milestone 9: Hall Kiosk Touchscreen Mounts
+### 📺 Milestone 10: Hall Kiosk Hardware Mounts
 *   **Objective**: Deploy permanent station monitors.
 *   **Implementation**: Package the React client into a localized Electron kiosk container running on wall-mounted touchscreen displays inside hall bays, powered by dedicated Raspberry Pi 5 boards.
 
-### 📲 Milestone 10: Shift-Based Apparatus Subscriptions
+### 📲 Milestone 11: Shift-Based Apparatus Subscriptions
 *   **Objective**: Filter push notifications dynamically.
 *   **Implementation**: Build a mobile-friendly onboarding interface where firefighters can subscribe their devices to a specific apparatus (e.g., E1, L1, or R1) on shift startup, receiving alerts only when their assigned vehicle is dispatched.
+

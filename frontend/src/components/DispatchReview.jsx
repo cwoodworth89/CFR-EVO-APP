@@ -276,13 +276,6 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
     setSelectedCall(call);
   };
 
-  const handleViewOnMap = () => {
-    if (!selectedCall) return;
-    if (typeof onLocateAddress === 'function') {
-      onLocateAddress(selectedCall);
-    }
-  };
-
   const handleQuickRate = (rating) => {
     setQualityRating(rating);
   };
@@ -853,24 +846,10 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
                               {typeof onSimulateCall === 'function' && (
                                 <button
                                   onClick={() => onSimulateCall(call)}
-                                  className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer shadow"
+                                  className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-3 py-1 rounded-lg text-[10px] border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer shadow"
                                   title="Simulate this registered dispatch in Kiosk Mode"
                                 >
                                   🚀 SIMULATE
-                                </button>
-                              )}
-
-                              {call.target?.lat && call.target?.lng && (
-                                <button
-                                  onClick={() => {
-                                    if (typeof onLocateAddress === 'function') {
-                                      onLocateAddress(call);
-                                    }
-                                  }}
-                                  className="bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold px-2 py-1 rounded text-[10px] border border-indigo-600/30 transition-all flex items-center gap-0.5 cursor-pointer shadow"
-                                  title="Display Route & Hydrants on Map"
-                                >
-                                  🗺️ MAP
                                 </button>
                               )}
 
@@ -920,13 +899,14 @@ export default function DispatchReview({ onClose, onLocateAddress, onSimulateCal
                     </span>
                   </div>
                 </div>
-                {selectedCall.target?.lat && selectedCall.target?.lng && (
+                {typeof onSimulateCall === 'function' && (
                   <button
                     type="button"
-                    onClick={handleViewOnMap}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 shadow border border-indigo-500 cursor-pointer"
+                    onClick={() => onSimulateCall(selectedCall)}
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 shadow border border-amber-500/40 cursor-pointer"
+                    title="Simulate this dispatch call in Kiosk Mode"
                   >
-                    🗺️ VIEW ON MAP
+                    🚀 SIMULATE CALL
                   </button>
                 )}
               </div>

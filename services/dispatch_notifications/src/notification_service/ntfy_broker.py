@@ -9,6 +9,7 @@ MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = "cfr/dispatches"
 
 NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
+NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "")  # Optional secret suffix for QR code security
 
 def publish_mqtt_dispatch(payload: dict, event_type: str = "INSERT") -> bool:
     """Publishes dispatch payload directly to Mosquitto MQTT broker for real-time station alerts."""
@@ -31,19 +32,24 @@ def publish_mqtt_dispatch(payload: dict, event_type: str = "INSERT") -> bool:
 def format_unit_topic(unit_str: str) -> str:
     """Normalizes unit code (e.g. 'E1' -> 'engine-1', 'L1' -> 'ladder-1', 'R1' -> 'rescue-1', 'C1' -> 'chief-1')."""
     clean = unit_str.strip().lower().replace(" ", "")
+    base = f"unit-{clean}"
     if clean.startswith("e") or "engine" in clean:
         num = "".join(filter(str.isdigit, clean)) or "1"
-        return f"engine-{num}"
-    if clean.startswith("l") or "ladder" in clean:
+        base = f"engine-{num}"
+    elif clean.startswith("l") or "ladder" in clean:
         num = "".join(filter(str.isdigit, clean)) or "1"
-        return f"ladder-{num}"
-    if clean.startswith("r") or "rescue" in clean or "medic" in clean:
+        base = f"ladder-{num}"
+    elif clean.startswith("r") or "rescue" in clean or "medic" in clean:
         num = "".join(filter(str.isdigit, clean)) or "1"
-        return f"rescue-{num}"
-    if clean.startswith("c") or "car" in clean or "chief" in clean:
+        base = f"rescue-{num}"
+    elif clean.startswith("c") or "car" in clean or "chief" in clean:
         num = "".join(filter(str.isdigit, clean)) or "1"
-        return f"chief-{num}"
-    return f"unit-{clean}"
+        base = f"chief-{num}"
+
+    # Append secret salt if configured
+    if NTFY_TOPIC_SECRET:
+        return f"{base}-{NTFY_TOPIC_SECRET}"
+    return base
 
 def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
     """Posts dispatch data to local Mosquitto MQTT AND local/remote Ntfy topics (all-dispatches + unit-specific)."""
@@ -91,10 +97,12 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     
     message_body = "\n".join(lines).encode('utf-8')
 
-    # Determine Ntfy target topics (General topic + Unit specific topics)
-    target_topics = ["cfr-dispatches"]
+    # General station topic (with secret salt if configured)
+    gen_topic = f"cfr-dispatches-{NTFY_TOPIC_SECRET}" if NTFY_TOPIC_SECRET else "cfr-dispatches"
+    target_topics = [gen_topic]
+
     if topic:
-        target_topics.append(topic)
+        target_topics.append(f"{topic}-{NTFY_TOPIC_SECRET}" if NTFY_TOPIC_SECRET and not topic.endswith(NTFY_TOPIC_SECRET) else topic)
 
     if isinstance(units_list, list):
         for unit in units_list:

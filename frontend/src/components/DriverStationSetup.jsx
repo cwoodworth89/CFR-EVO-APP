@@ -26,11 +26,14 @@ export default function DriverStationSetup({ onClose }) {
 
   // Compute server hostname / IP for Ntfy server
   const hostname = window.location.hostname || 'localhost';
-  const ntfyServerPort = '8080';
+  const ntfyServerPort = import.meta.env.VITE_NTFY_PORT || '8080';
+  const topicSecret = import.meta.env.VITE_NTFY_TOPIC_SECRET || '';
   
+  const finalTopic = topicSecret ? `${selectedUnit}-${topicSecret}` : selectedUnit;
+
   // Construct topic subscription URL
-  const ntfyWebUrl = `http://${hostname}:${ntfyServerPort}/${selectedUnit}`;
-  const ntfyDeepLink = `ntfy://${hostname}:${ntfyServerPort}/${selectedUnit}`;
+  const ntfyWebUrl = `http://${hostname}:${ntfyServerPort}/${finalTopic}`;
+  const ntfyDeepLink = `ntfy://${hostname}:${ntfyServerPort}/${finalTopic}`;
 
   const selectedUnitObj = APPARATUS_LIST.find(u => u.id === selectedUnit) || APPARATUS_LIST[0];
 

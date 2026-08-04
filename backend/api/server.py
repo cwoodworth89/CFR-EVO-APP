@@ -145,20 +145,24 @@ def serialize_call(call: LiveCallModel) -> dict:
 # Auth endpoints
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
-    # Station Admin Credentials check (permissive local LAN authentication)
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@cfr-dispatch.com")
-    user_email = req.email.strip() if req.email else admin_email
-    
-    token_payload = {
-        "sub": user_email,
-        "exp": datetime.now(timezone.utc) + timedelta(days=30)
-    }
-    token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"email": user_email, "role": "admin"}
-    }
+    user_id = (req.username or req.email or "").strip()
+    user_pass = (req.password or "").strip()
+
+    expected_user = os.environ.get("ADMIN_USERNAME", "cfradmin")
+    expected_pass = os.environ.get("ADMIN_PASSWORD", "rescue")
+
+    if (user_id.lower() in [expected_user.lower(), "admin", "admin@cfr-dispatch.com"]) and user_pass == expected_pass:
+        token_payload = {
+            "sub": user_id,
+            "exp": datetime.now(timezone.utc) + timedelta(days=30)
+        }
+        token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {"username": user_id, "role": "admin"}
+        }
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 @app.get("/api/auth/session")
 def get_session(authorization: Optional[str] = None):

@@ -46,12 +46,12 @@ export const apiClient = {
       }
     },
 
-    async signInWithPassword({ email, password }) {
+    async signInWithPassword({ username, email, password }) {
       try {
         const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ username: username || email, password })
         });
         if (!res.ok) {
           const errData = await res.json();

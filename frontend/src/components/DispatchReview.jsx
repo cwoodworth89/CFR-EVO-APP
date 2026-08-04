@@ -62,9 +62,9 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const [dbStatus, setDbStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
   const [dbError, setDbError] = useState(null);
 
-  // Supabase Auth session states
-  const [email, setEmail] = useState('admin@cfr-dispatch.com');
-  const [password, setPassword] = useState('cfr2026');
+  // Auth session states
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
 
@@ -429,11 +429,9 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     setLoginLoading(true);
     setLoginError(null);
     try {
-      const targetEmail = email.trim() || 'admin@cfr-dispatch.com';
-      const targetPass = password || 'cfr2026';
       const { data, error } = await apiClient.auth.signInWithPassword({
-        email: targetEmail,
-        password: targetPass
+        username: username.trim(),
+        password: password
       });
       if (error) throw error;
       setSession(data.session);
@@ -463,7 +461,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
           </div>
           
           <p className="text-[11px] text-slate-400 leading-relaxed font-mono">
-            This dashboard displays sensitive live dispatch data. Please enter your administrator credentials to access.
+            Please enter your administrator username and password to access live dispatch data.
           </p>
 
           {loginError && (
@@ -475,22 +473,22 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
           <form onSubmit={handleLogin} className="flex flex-col gap-4 mt-2">
             <div className="flex flex-col gap-1.5">
               <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                Admin Email Address
+                Username
               </label>
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 disabled={loginLoading}
-                className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-500"
-                placeholder="admin@cfr-dispatch.com"
+                className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-600 font-mono"
+                placeholder="cfradmin"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                Security Password
+                Password
               </label>
               <input
                 type="password"
@@ -498,7 +496,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loginLoading}
-                className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-500"
+                className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-600 font-mono"
                 placeholder="••••••••"
               />
             </div>

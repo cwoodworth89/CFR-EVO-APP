@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import SparkMD5 from 'spark-md5';
 
 const APPARATUS_LIST = [
+  { id: 'chief-master', label: '👑 CHIEF / ADMIN MASTER FEED', isMaster: true, icon: '👑', desc: 'Permanent feed (No Expiry) - All calls + Tap-to-listen audio', color: 'from-purple-600/30 to-indigo-600/20 border-purple-400 text-purple-200' },
   { id: 'cfr-dispatches', label: 'ALL STATION CALLS', icon: '🚨', desc: 'Receive all dispatch alerts for the department', color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-300' },
   { id: 'engine-1', label: 'ENGINE 1', icon: '🚒', desc: 'Station 1 Apparatus', color: 'from-rose-500/20 to-red-500/10 border-rose-500/40 text-rose-300' },
   { id: 'engine-2', label: 'ENGINE 2', icon: '🚒', desc: 'Station 2 Apparatus', color: 'from-sky-500/20 to-blue-500/10 border-sky-500/40 text-sky-300' },
@@ -18,6 +19,7 @@ const SHIFT_DURATIONS = [
   { hours: 8, label: '8 Hours (Day Shift)' },
   { hours: 12, label: '12 Hours (Standard Shift)' },
   { hours: 24, label: '24 Hours (Full Tour)' },
+  { hours: 0, label: '♾️ Permanent (No Expiry)' },
 ];
 
 const getMonthlySecretToken = () => {
@@ -38,22 +40,22 @@ const getMonthlySecretToken = () => {
 };
 
 export default function DriverStationSetup({ onClose }) {
-  const [selectedUnit, setSelectedUnit] = useState('engine-1');
-  const [shiftHours, setShiftHours] = useState(12);
+  const [selectedUnit, setSelectedUnit] = useState('chief-master');
+  const [shiftHours, setShiftHours] = useState(0);
   const [copied, setCopied] = useState(false);
 
   // Compute server hostname / IP for Ntfy server
   const hostname = window.location.hostname || 'localhost';
   const ntfyServerPort = import.meta.env.VITE_NTFY_PORT || '8080';
-  const topicSecret = getMonthlySecretToken();
+  const selectedUnitObj = APPARATUS_LIST.find(u => u.id === selectedUnit) || APPARATUS_LIST[0];
   
+  // Permanent master topic bypasses monthly secret rotation
+  const topicSecret = selectedUnitObj.isMaster ? '' : getMonthlySecretToken();
   const finalTopic = topicSecret ? `${selectedUnit}-${topicSecret}` : selectedUnit;
 
   // Construct topic subscription URL
   const ntfyWebUrl = `http://${hostname}:${ntfyServerPort}/${finalTopic}`;
   const ntfyDeepLink = `ntfy://${hostname}:${ntfyServerPort}/${finalTopic}`;
-
-  const selectedUnitObj = APPARATUS_LIST.find(u => u.id === selectedUnit) || APPARATUS_LIST[0];
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(ntfyWebUrl);

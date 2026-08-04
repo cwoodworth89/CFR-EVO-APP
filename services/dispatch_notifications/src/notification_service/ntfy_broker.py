@@ -13,6 +13,8 @@ MQTT_TOPIC = "cfr/dispatches"
 NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
 NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "AUTO_MONTHLY")
 NTFY_MASTER_SALT = os.environ.get("NTFY_MASTER_SALT", "cfr_master_salt_2026")
+CHIEF_MASTER_TOPIC = os.environ.get("CHIEF_MASTER_TOPIC", "chief-master")  # Permanent, non-expiring master feed for Chiefs/Admin
+API_BASE_URL = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
 
 def get_monthly_secret(dt: datetime = None) -> str:
     """Computes a deterministic 6-char monthly secret salt from year+month and master salt."""
@@ -37,7 +39,6 @@ def get_active_secrets() -> list[str]:
 
     # First 3 days of the month: include previous month secret as grace period
     if now.day <= 3:
-        # Calculate previous month
         year = now.year
         month = now.month - 1
         if month == 0:
@@ -88,7 +89,7 @@ def format_unit_topics(unit_str: str) -> list[str]:
     return [f"{base}-{s}" if s else base for s in secrets]
 
 def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
-    """Posts dispatch data to local Mosquitto MQTT AND local/remote Ntfy topics with monthly secret rotation."""
+    """Posts dispatch data to local Mosquitto MQTT AND local/remote Ntfy topics with audio attachments & master feed."""
     # 1. Publish to local Mosquitto MQTT (for Station Kiosks)
     mqtt_success = publish_mqtt_dispatch(payload)
 
@@ -104,14 +105,40 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         "Tags": tags or "fire_engine,rotating_light,warning"
     }
 
+    # Resolve audio stream URL if present
+    raw_audio = payload.get("audio_url")
+    audio_full_url = None
+    if raw_audio:
+        if raw_audio.startswith("http"):
+            audio_full_url = raw_audio
+        else:
+            audio_full_url = f"{API_BASE_URL}{'' if raw_audio.startswith('/') else '/'}{raw_audio}"
+            
+        headers["Attach"] = audio_full_url
+
+    # Resolve Google Maps click URL
+    click_url = None
     if address and address != "Unknown Location":
         query_str = address
         if "Coquitlam" not in query_str and "BC" not in query_str:
             query_str += ", Coquitlam, BC"
         encoded_query = urllib.parse.quote_plus(query_str)
-        headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={encoded_query}"
+        click_url = f"https://www.google.com/maps/search/?api=1&query={encoded_query}"
     elif lat and lng:
-        headers["Click"] = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+        click_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+
+    if click_url:
+        headers["Click"] = click_url
+
+    # Format Tap-to-Listen and Open Map Lock-screen Action Buttons
+    actions = []
+    if audio_full_url:
+        actions.append(f"view, 🎧 Listen to Call Audio, {audio_full_url}")
+    if click_url:
+        actions.append(f"view, 🗺️ Open Map Navigation, {click_url}")
+        
+    if actions:
+        headers["Actions"] = "; ".join(actions)
 
     units_list = payload.get("responding_units", [])
     units_str = ", ".join(units_list) if isinstance(units_list, list) and units_list else str(units_list or "None assigned")
@@ -133,10 +160,12 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     
     message_body = "\n".join(lines).encode('utf-8')
 
-    # Generate target topics using active secrets
-    secrets = get_active_secrets()
-    target_topics = []
+    # Generate target topics:
+    # A) Permanent Chief/Admin Master Feed (no expiry)
+    target_topics = [CHIEF_MASTER_TOPIC]
 
+    # B) Active monthly secret topics for general station & apparatus feeds
+    secrets = get_active_secrets()
     for s in secrets:
         target_topics.append(f"cfr-dispatches-{s}" if s else "cfr-dispatches")
         if topic:

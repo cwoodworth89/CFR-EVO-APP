@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -49,7 +47,6 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app/backend
       - ./backend/audio_files/recordings:/app/backend/audio_files/recordings
     depends_on:
       - postgres

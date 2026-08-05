@@ -62,6 +62,10 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const [dbStatus, setDbStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
   const [dbError, setDbError] = useState(null);
 
+  // RF Listener status state
+  const [listenerStatus, setListenerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
+  const [listenerDetails, setListenerDetails] = useState(null);
+
   // Auth session states
   const [session, setSession] = useState(null);
   const [username, setUsername] = useState('');
@@ -130,7 +134,18 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     };
   }, []);
 
-  // Fetch calls on session load
+  const checkListenerStatus = async () => {
+    try {
+      const data = await apiClient.listener.fetchStatus();
+      setListenerStatus(data.status === 'online' ? 'online' : 'offline');
+      setListenerDetails(data);
+    } catch (e) {
+      setListenerStatus('offline');
+      setListenerDetails({ message: e.message || 'Listener status unreachable' });
+    }
+  };
+
+  // Fetch calls & poll listener status on session load
   useEffect(() => {
     if (!session) {
       setCalls([]);
@@ -140,6 +155,13 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     }
 
     fetchCalls();
+    checkListenerStatus();
+
+    const interval = setInterval(() => {
+      checkListenerStatus();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [session]);
 
   // Real-time MQTT listener for dispatches across all 4 station kiosks
@@ -625,6 +647,31 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
               <span className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300" title={dbError || ''}>
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
                 DB Error
+              </span>
+            )}
+            {/* Listener Status Badge */}
+            {listenerStatus === 'online' && (
+              <span 
+                className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250 cursor-help"
+                title={`RF Listener Online | Device: ${listenerDetails?.device || 'Default'} | Engine: ${listenerDetails?.stt_engine || 'Whisper'}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                📡 LISTENER ONLINE
+              </span>
+            )}
+            {listenerStatus === 'checking' && (
+              <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                📡 CHECKING LISTENER...
+              </span>
+            )}
+            {listenerStatus === 'offline' && (
+              <span 
+                className="text-[10px] text-rose-400 bg-rose-500/15 border border-rose-500/40 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300 shadow-sm cursor-help"
+                title={listenerDetails?.message || 'RF Listener offline or process died!'}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                ⚠️ LISTENER OFFLINE
               </span>
             )}
           </h1>

@@ -1400,6 +1400,23 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
         except Exception as e:
             logging.error(f"Error in background worker processing task: {e}", exc_info=True)
 
+def update_listener_heartbeat():
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        status_file = os.path.join(base_dir, "data", "listener_status.json")
+        os.makedirs(os.path.dirname(status_file), exist_ok=True)
+        payload = {
+            "status": "online",
+            "device": DEVICE_ID,
+            "stt_engine": STT_ENGINE,
+            "last_heartbeat": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "pid": os.getpid()
+        }
+        with open(status_file, "w") as f:
+            json.dump(payload, f)
+    except Exception:
+        pass
+
 def run_dispatch_system():
     """Main program entrypoint. Initiates audio stream and tone triggers."""
     setup_logging()
@@ -1439,6 +1456,7 @@ def run_dispatch_system():
                 logging.warning(f"Could not query audio device name: {e}")
             time.sleep(1.0)
             
+            last_hb_time = 0
             while True:
                 logging.info("STATE: LISTENING_FOR_TONE")
                 loudness_history = deque(maxlen=SUSTAINED_LOUDNESS_WINDOW)
@@ -1450,6 +1468,10 @@ def run_dispatch_system():
                 baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
 
                 while True:
+                    current_time = time.time()
+                    if current_time - last_hb_time >= 5.0:
+                        update_listener_heartbeat()
+                        last_hb_time = current_time
                     if is_capturing_tone:
                         pcm, _ = stream.read(blocksize)
                         analysis_buffer.append(pcm)

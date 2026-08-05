@@ -174,5 +174,13 @@ export const apiClient = {
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();
     }
+  },
+
+  listener: {
+    async fetchStatus() {
+      const res = await fetch(`${API_BASE_URL}/api/listener/status`, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    }
   }
 };

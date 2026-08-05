@@ -211,6 +211,43 @@ def get_session(request: Request, authorization: Optional[str] = None):
     except Exception:
         return {"session": None}
 
+@app.get("/api/listener/status")
+def get_listener_status():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    status_file = os.path.join(base_dir, "data", "listener_status.json")
+    if not os.path.exists(status_file):
+        return {
+            "status": "offline",
+            "message": "RF Listener process not detected (No heartbeat file)",
+            "last_heartbeat": None
+        }
+    try:
+        with open(status_file, "r") as f:
+            data = json.load(f)
+        last_hb_str = data.get("last_heartbeat")
+        if last_hb_str:
+            last_hb_dt = datetime.fromisoformat(last_hb_str)
+            age_seconds = (datetime.now(timezone.utc) - last_hb_dt).total_seconds()
+            if age_seconds <= 30:
+                return {
+                    "status": "online",
+                    "message": "RF Audio Listener Active",
+                    "device": data.get("device"),
+                    "stt_engine": data.get("stt_engine"),
+                    "age_seconds": round(age_seconds, 1),
+                    "last_heartbeat": last_hb_str
+                }
+            else:
+                return {
+                    "status": "offline",
+                    "message": f"RF Listener unresponsive (Heartbeat {round(age_seconds)}s ago)",
+                    "age_seconds": round(age_seconds, 1),
+                    "last_heartbeat": last_hb_str
+                }
+    except Exception as e:
+        return {"status": "offline", "message": f"Error checking heartbeat: {e}", "last_heartbeat": None}
+    return {"status": "offline", "message": "RF Listener status unknown", "last_heartbeat": None}
+
 # Dispatch REST Endpoints
 @app.get("/api/dispatches")
 def get_dispatches(db: Session = Depends(get_db)):

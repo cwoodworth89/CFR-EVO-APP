@@ -77,8 +77,11 @@ from cfr_dispatch.parser import (
 from cfr_dispatch.offline_sync import start_offline_sync_poller, queue_offline_dispatch
 from gis_service import CoquitlamDataValidator
 from notification_service import (
-    post_to_supabase,
+    save_dispatch_record,
     post_to_ntfy,
+    update_dispatch_record,
+    save_audio_recording,
+    post_to_supabase,
     update_supabase_record,
     upload_to_supabase_storage
 )

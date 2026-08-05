@@ -10,6 +10,14 @@ from sqlalchemy.orm import Session
 from backend.api.database import SessionLocal, engine, Base
 from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
 
+import sys
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
+from cfr_dispatch.parser import split_rounds
+from cfr_dispatch.config import UNITS_VOCABULARY
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Ensure database tables exist locally
@@ -96,13 +104,20 @@ def migrate_live_calls(db: Session, calls: List[Dict[str, Any]]):
             except Exception:
                 ts_val = raw_ts
 
+        raw_sanitized = call_data.get("sanitized_transcript") or call_data.get("raw_transcript") or ""
+        if raw_sanitized:
+            rounds = split_rounds(raw_sanitized, UNITS_VOCABULARY)
+            sanitized_clean = rounds[0].strip() if rounds else raw_sanitized
+        else:
+            sanitized_clean = ""
+
         fields = {
             "dispatch_id": dispatch_id,
             "incident_type": call_data.get("incident_type") or "Unknown Incident",
             "responding_units": call_data.get("responding_units") or [],
             "target": call_data.get("target") or {},
             "raw_transcript": call_data.get("raw_transcript"),
-            "sanitized_transcript": call_data.get("sanitized_transcript"),
+            "sanitized_transcript": sanitized_clean,
             "confidence_score": call_data.get("confidence_score") or 0.0,
             "verify_location": call_data.get("verify_location") or False,
             "origins": call_data.get("origins") or [],

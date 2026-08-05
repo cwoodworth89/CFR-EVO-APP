@@ -102,7 +102,8 @@ for wav_path in wav_files:
             "peak_frequencies_hz": freq_list
         })
     except Exception as ex:
-        pass
+        if len(results) < 3:
+            print(f"Error reading {fname}: {ex}")
 
 print(f"\nSuccessfully backtested {len(results)} audio files.\n")
 print("=== FREQUENCY CLUSTER SUMMARY (Top Frequency Peaks in Hz) ===")

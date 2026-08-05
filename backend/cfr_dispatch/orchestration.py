@@ -1501,6 +1501,7 @@ def run_dispatch_system():
             time.sleep(1.0)
             
             last_hb_time = 0
+            pa_cooldown_until = 0
             while True:
                 logging.info("STATE: LISTENING_FOR_TONE")
                 loudness_history = deque(maxlen=SUSTAINED_LOUDNESS_WINDOW)
@@ -1525,22 +1526,37 @@ def run_dispatch_system():
                             live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD)
                             all_matches = get_all_matches(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
                             
+                            pa_cooldown_active = current_time < pa_cooldown_until
                             is_only_pa = all_matches and all(m[0] == "PA Tone" for m in all_matches)
-                            if is_only_pa:
-                                logging.info("TONE DETECTED: 'PA Tone' (station paging page). Disregarding and resetting listener.")
+                            
+                            if is_only_pa or "PA Tone" in [m[0] for m in all_matches]:
+                                logging.info("TONE DETECTED: 'PA Tone' (station paging page). Setting 20s PA cooldown and resetting listener.")
                                 log_tone_spectral_history(None, ["PA Tone"], live_frequencies, is_pa_page=True)
+                                pa_cooldown_until = time.time() + 20.0
                                 is_capturing_tone = False
                                 baseline_rms_history.clear()
                                 baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
                                 continue
                             
-                            # Liberal direct line-in mode: if matches found OR strong signal, trigger call recording
-                            matched_tone_list = [m[0] for m in all_matches] if all_matches else ["LineIn Dispatch"]
-                            matched_tone = ", ".join(matched_tone_list)
-                            scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in all_matches]) if all_matches else "100%"
-                            logging.info(f"TONES CONFIRMED: '{matched_tone}' ({scores_str}) | Freqs: {sorted(list(live_frequencies))[:5]}")
-                            log_tone_spectral_history(None, matched_tone_list, live_frequencies, is_pa_page=False)
-                            break
+                            if pa_cooldown_active:
+                                logging.info("Audio received during 20s PA announcement cooldown. Disregarding PA voice and resetting listener.")
+                                is_capturing_tone = False
+                                continue
+                            
+                            apparatus_matches = [m for m in all_matches if m[0] != "PA Tone"]
+                            if apparatus_matches:
+                                matched_tone_list = [m[0] for m in apparatus_matches]
+                                matched_tone = ", ".join(matched_tone_list)
+                                scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in apparatus_matches])
+                                logging.info(f"TONES CONFIRMED: '{matched_tone}' ({scores_str}) | Freqs: {sorted(list(live_frequencies))[:5]}")
+                                log_tone_spectral_history(None, matched_tone_list, live_frequencies, is_pa_page=False)
+                                break
+                            else:
+                                logging.info("Triggered sound did not match apparatus call fingerprints. Resetting listener.")
+                                is_capturing_tone = False
+                                baseline_rms_history.clear()
+                                baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
+                                continue
                         else:
                             continue
 

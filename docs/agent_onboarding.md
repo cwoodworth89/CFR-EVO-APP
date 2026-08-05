@@ -63,6 +63,7 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Project Overview** | [README.md](../README.md) | High-level system structure, mermaid workflow schemas, and 2-phase pipelines. |
 | **Local DB Setup** | [docs/local_database_setup.md](./local_database_setup.md) | Containerized PostgreSQL 16 schema, FastAPI gateway REST routes, and Mosquitto MQTT sync. |
 | **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./ntfy_server_access_and_qr_spec.md) | Ntfy push server access, HTTP vs HTTPS rules, monthly salt spec, and QR deep link payloads. |
+| **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./public_domain_and_ssl_migration.md) | Blueprint for Nginx SSL reverse proxy, Let's Encrypt certificates, and public domain routing. |
 | **Call Structure** | [docs/call_structure.md](./call_structure.md) | Dispatch speech templates, regex parsing splits, and phonetic correction matrices. |
 | **Supabase Setup** | [docs/supabase_setup.md](./supabase_setup.md) | Legacy cloud database contracts and migration fallback procedures. |
 | **GIS Endpoints** | [docs/gis_endpoints.md](./gis_endpoints.md) | Coquitlam ArcGIS MapServer layers list, and local Dynamic Viewport mock blueprints. |

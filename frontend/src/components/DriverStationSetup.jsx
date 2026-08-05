@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import SparkMD5 from 'spark-md5';
 
@@ -22,6 +22,14 @@ const SHIFT_DURATIONS = [
   { hours: 0, label: '♾️ Permanent (No Expiry)' },
 ];
 
+const cleanHost = (hostStr) => {
+  if (!hostStr) return '';
+  return hostStr
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '');
+};
+
 const getMonthlySecretToken = () => {
   const customSecret = import.meta.env.VITE_NTFY_TOPIC_SECRET;
   if (customSecret && customSecret !== 'AUTO_MONTHLY') {
@@ -43,22 +51,30 @@ export default function DriverStationSetup({ onClose }) {
   const [selectedUnit, setSelectedUnit] = useState('chief-master');
   const [shiftHours, setShiftHours] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [qrFormat, setQrFormat] = useState('app'); // 'app' (ntfy://) or 'web' (http://)
 
-  // Compute server hostname / IP for Ntfy server with custom override
-  const defaultHostname = window.location.hostname || 'localhost';
-  const [customHost, setCustomHost] = useState(defaultHostname);
+  // Default to Tailscale IP 100.95.146.94 if available or current hostname
+  const initialHost = window.location.hostname && window.location.hostname !== 'localhost' 
+    ? window.location.hostname 
+    : '100.95.146.94';
+  const [customHostInput, setCustomHostInput] = useState(initialHost);
   const ntfyServerPort = import.meta.env.VITE_NTFY_PORT || '8080';
+  
   const selectedUnitObj = APPARATUS_LIST.find(u => u.id === selectedUnit) || APPARATUS_LIST[0];
   
   // Permanent master topic bypasses monthly secret rotation
   const topicSecret = selectedUnitObj.isMaster ? '' : getMonthlySecretToken();
   const finalTopic = topicSecret ? `${selectedUnit}-${topicSecret}` : selectedUnit;
 
-  const effectiveHost = customHost.trim() || defaultHostname;
+  const effectiveHost = cleanHost(customHostInput) || '100.95.146.94';
 
-  // Construct topic subscription URLs
+  // Construct topic subscription URLs per spec
   const ntfyWebUrl = `http://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
   const ntfyDeepLink = `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
+  const ntfyWsUrl = `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
+
+  // QR Code payload based on user selection
+  const qrPayload = qrFormat === 'app' ? ntfyDeepLink : ntfyWebUrl;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(ntfyWebUrl);
@@ -157,13 +173,13 @@ export default function DriverStationSetup({ onClose }) {
               SERVER ADDRESS / TAILSCALE HOST
             </h2>
             <p className="text-[10px] text-slate-400 font-mono mb-2.5">
-              Specify your Tailscale IP or Server Hostname so phones on cellular network / VPN can reach Ntfy.
+              Specify your Tailscale IP or Hostname (e.g. <span className="text-amber-300 font-bold">100.95.146.94</span>). Prefixes like http:// will be automatically stripped.
             </p>
             <input
               type="text"
-              value={customHost}
-              onChange={(e) => setCustomHost(e.target.value)}
-              placeholder="e.g. 100.x.y.z or station-server.tailscale.net"
+              value={customHostInput}
+              onChange={(e) => setCustomHostInput(e.target.value)}
+              placeholder="e.g. 100.95.146.94 or station-server.tailscale.net"
               className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
             />
           </div>
@@ -173,16 +189,42 @@ export default function DriverStationSetup({ onClose }) {
         <div className="md:col-span-5 flex flex-col gap-5">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col items-center text-center">
             <h2 className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono mb-1">
-              📱 SCAN TO SUBSCRIBE PHONE
+              📱 SCAN TO PAIR DRIVER PHONE
             </h2>
-            <p className="text-[11px] text-slate-400 font-mono mb-4">
-              Open the Ntfy app or camera on your phone to scan and pair instantly.
+            <p className="text-[11px] text-slate-400 font-mono mb-3">
+              Scan with phone camera or Ntfy app to subscribe in 1 tap.
             </p>
+
+            {/* QR Format Selector */}
+            <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-3.5 w-full">
+              <button
+                type="button"
+                onClick={() => setQrFormat('app')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                  qrFormat === 'app'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                📲 Ntfy App (ntfy://)
+              </button>
+              <button
+                type="button"
+                onClick={() => setQrFormat('web')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                  qrFormat === 'web'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🌐 Browser (http://)
+              </button>
+            </div>
 
             {/* QR Code Container */}
             <div className="bg-white p-3.5 rounded-2xl shadow-xl mb-4 border-2 border-amber-400/40">
               <QRCodeSVG
-                value={ntfyWebUrl}
+                value={qrPayload}
                 size={180}
                 bgColor={"#FFFFFF"}
                 fgColor={"#020617"}
@@ -192,7 +234,7 @@ export default function DriverStationSetup({ onClose }) {
             </div>
 
             <div className="text-xs font-mono font-bold text-slate-200 mb-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 w-full truncate">
-              {selectedUnitObj.label} ({shiftHours}h Shift)
+              {selectedUnitObj.label} ({shiftHours === 0 ? 'Permanent' : `${shiftHours}h Shift`})
             </div>
 
             {/* Copy / Action Buttons */}
@@ -220,8 +262,9 @@ export default function DriverStationSetup({ onClose }) {
               <div className="font-extrabold text-amber-400 uppercase">⚡ 30-Second Setup Guide:</div>
               <div>1. Install free <span className="text-white font-bold">Ntfy</span> app from App Store / Play Store.</div>
               <div>2. Tap <span className="text-white font-bold">+ Subscribe to topic</span>.</div>
-              <div>3. Enter server: <span className="text-sky-300 font-bold">{ntfyWebUrl}</span></div>
-              <div>4. <span className="text-emerald-400 font-bold">Done!</span> Loud siren alerts will ring even when silent mode is ON.</div>
+              <div>3. Server URL: <span className="text-sky-300 font-bold">{ntfyWebUrl}</span> (HTTP, Port 8080).</div>
+              <div>4. Protocol: Select <span className="text-purple-300 font-bold">WebSockets</span> (<span className="text-slate-300">{ntfyWsUrl}</span>) for low-latency alerts.</div>
+              <div>5. <span className="text-emerald-400 font-bold">Done!</span> Loud siren alerts will ring even when silent mode is ON.</div>
             </div>
           </div>
         </div>

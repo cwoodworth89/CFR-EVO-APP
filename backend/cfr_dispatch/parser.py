@@ -317,7 +317,9 @@ def abbreviate_units(units_str: str) -> List[str]:
         raw_unit_name = f"{unit_type.strip()} {unit_num.strip()}".lower()
         if raw_unit_name in valid_units_set:
             abbr = get_unit_abbreviation(unit_type)
-            found_units.append(f"{abbr}{unit_num.upper()}")
+            u_code = f"{abbr}{unit_num.upper()}"
+            if u_code not in found_units:
+                found_units.append(u_code)
         else:
             logging.warning(f"Parsed unit '{raw_unit_name}' is not in ground-truth UNITS_VOCAB_RAW. Rejecting.")
             

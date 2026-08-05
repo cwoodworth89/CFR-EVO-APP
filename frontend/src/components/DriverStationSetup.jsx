@@ -52,7 +52,8 @@ export default function DriverStationSetup({ onClose }) {
   const [shiftHours, setShiftHours] = useState(0);
   const [copiedTopic, setCopiedTopic] = useState(false);
   const [copiedServer, setCopiedServer] = useState(false);
-  const [qrFormat, setQrFormat] = useState('web'); // Default to plain 'http://' to avoid TLS app default
+  const [serverMode, setServerMode] = useState('cloud'); // 'cloud' (https://ntfy.sh) or 'local' (http://100.95.146.94:8080)
+  const [qrFormat, setQrFormat] = useState('app'); // 'app' (ntfy://) or 'web' (https://)
 
   // Default to Tailscale IP 100.95.146.94 if available or current hostname
   const initialHost = window.location.hostname && window.location.hostname !== 'localhost' 
@@ -69,14 +70,15 @@ export default function DriverStationSetup({ onClose }) {
 
   const effectiveHost = cleanHost(customHostInput) || '100.95.146.94';
 
-  // Construct topic subscription URLs per spec
-  const ntfyBaseServerUrl = `http://${effectiveHost}:${ntfyServerPort}`;
+  // Construct topic subscription URLs based on Server Mode
+  const isCloud = serverMode === 'cloud';
+  const ntfyBaseServerUrl = isCloud ? 'https://ntfy.sh' : `http://${effectiveHost}:${ntfyServerPort}`;
   const ntfyWebUrl = `${ntfyBaseServerUrl}/${finalTopic}`;
-  const ntfyDeepLink = `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
-  const ntfyWsUrl = `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
+  const ntfyDeepLink = isCloud ? `ntfy://ntfy.sh/${finalTopic}` : `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
+  const ntfyWsUrl = isCloud ? `wss://ntfy.sh/${finalTopic}/ws` : `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
 
   // QR Code payload based on user selection
-  const qrPayload = qrFormat === 'web' ? ntfyWebUrl : ntfyDeepLink;
+  const qrPayload = qrFormat === 'app' ? ntfyDeepLink : ntfyWebUrl;
 
   const handleCopyTopic = () => {
     navigator.clipboard.writeText(ntfyWebUrl);
@@ -174,22 +176,58 @@ export default function DriverStationSetup({ onClose }) {
             </div>
           </div>
 
-          {/* Step 3: Server Address / Tailscale Host */}
+          {/* Step 3: Notification Relay Server Mode */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-2 flex items-center gap-2">
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-2.5 flex items-center gap-2">
               <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 text-[10px]">STEP 3</span>
-              SERVER ADDRESS / TAILSCALE HOST
+              SELECT NOTIFICATION SERVER
             </h2>
-            <p className="text-[10px] text-slate-400 font-mono mb-2.5">
-              Specify your Tailscale IP or Hostname (e.g. <span className="text-amber-300 font-bold">100.95.146.94</span>). Prefixes like http:// will be automatically stripped.
-            </p>
-            <input
-              type="text"
-              value={customHostInput}
-              onChange={(e) => setCustomHostInput(e.target.value)}
-              placeholder="e.g. 100.95.146.94 or station-server.tailscale.net"
-              className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
-            />
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setServerMode('cloud')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  serverMode === 'cloud'
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 ring-1 ring-emerald-400/40'
+                    : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
+                  <span>☁️ Public SSL (ntfy.sh)</span>
+                </div>
+                <div className="text-[9px] text-slate-400 font-mono mt-1">Recommended for phones. Trusted SSL/TLS certificate — zero TLS errors.</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setServerMode('local')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  serverMode === 'local'
+                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300 ring-1 ring-purple-400/40'
+                    : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
+                  <span>🏠 Station Kiosk (Local IP)</span>
+                </div>
+                <div className="text-[9px] text-slate-400 font-mono mt-1">Offline station network (http://{effectiveHost}:8080). Requires HTTP toggle in Ntfy.</div>
+              </button>
+            </div>
+
+            {serverMode === 'local' && (
+              <div>
+                <p className="text-[10px] text-slate-400 font-mono mb-2">
+                  Station Hostname or Tailscale IP:
+                </p>
+                <input
+                  type="text"
+                  value={customHostInput}
+                  onChange={(e) => setCustomHostInput(e.target.value)}
+                  placeholder="e.g. 100.95.146.94"
+                  className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            )}
           </div>
         </div>
 

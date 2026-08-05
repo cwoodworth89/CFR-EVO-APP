@@ -185,13 +185,18 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
 
     ntfy_success = False
     for t in set(target_topics):
-        endpoint = f"{NTFY_SERVER_URL}/{t}"
-        try:
-            logging.info(f"Posting dispatch notification to Ntfy endpoint ({endpoint})...")
-            res = requests.post(endpoint, headers=headers, data=message_body, timeout=8)
-            if res.status_code == 200:
-                ntfy_success = True
-        except Exception as e:
-            logging.warning(f"Could not post Ntfy alert to topic '{t}' at {endpoint}: {e}")
+        endpoints = [f"{NTFY_SERVER_URL}/{t}"]
+        # Also publish to public ntfy.sh relay for mobile devices requiring trusted HTTPS/SSL
+        if not NTFY_SERVER_URL.startswith("https://ntfy.sh"):
+            endpoints.append(f"https://ntfy.sh/{t}")
+
+        for endpoint in endpoints:
+            try:
+                logging.info(f"Posting dispatch notification to Ntfy endpoint ({endpoint})...")
+                res = requests.post(endpoint, headers=headers, data=message_body, timeout=8)
+                if res.status_code == 200:
+                    ntfy_success = True
+            except Exception as e:
+                logging.warning(f"Could not post Ntfy alert to topic '{t}' at {endpoint}: {e}")
 
     return mqtt_success or ntfy_success

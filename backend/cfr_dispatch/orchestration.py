@@ -7,6 +7,7 @@ import re
 import time
 import uuid
 import datetime
+import json
 import logging
 import wavio
 import requests
@@ -1417,8 +1418,8 @@ def update_listener_heartbeat():
         with open(tmp_file, "w") as f:
             json.dump(payload, f)
         os.replace(tmp_file, status_file)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning(f"Could not update listener heartbeat: {e}")
 
 def run_dispatch_system():
     """Main program entrypoint. Initiates audio stream and tone triggers."""

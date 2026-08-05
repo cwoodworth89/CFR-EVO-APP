@@ -190,10 +190,12 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         if not NTFY_SERVER_URL.startswith("https://ntfy.sh"):
             endpoints.append(f"https://ntfy.sh/{t}")
 
+        safe_headers = {k: (v.encode("utf-8").decode("latin-1") if isinstance(v, str) else v) for k, v in headers.items()}
+
         for endpoint in endpoints:
             try:
                 logging.info(f"Posting dispatch notification to Ntfy endpoint ({endpoint})...")
-                res = requests.post(endpoint, headers=headers, data=message_body, timeout=8)
+                res = requests.post(endpoint, headers=safe_headers, data=message_body.encode("utf-8"), timeout=8)
                 if res.status_code == 200:
                     ntfy_success = True
             except Exception as e:

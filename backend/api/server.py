@@ -215,10 +215,10 @@ def get_session(request: Request, authorization: Optional[str] = None):
 def get_listener_status():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     status_file = os.path.join(base_dir, "data", "listener_status.json")
-    if not os.path.exists(status_file):
+    if not os.path.exists(status_file) or os.path.getsize(status_file) == 0:
         return {
             "status": "offline",
-            "message": "RF Listener process not detected (No heartbeat file)",
+            "message": "RF Listener process inactive (No heartbeat detected)",
             "last_heartbeat": None
         }
     try:
@@ -244,8 +244,8 @@ def get_listener_status():
                     "age_seconds": round(age_seconds, 1),
                     "last_heartbeat": last_hb_str
                 }
-    except Exception as e:
-        return {"status": "offline", "message": f"Error checking heartbeat: {e}", "last_heartbeat": None}
+    except Exception:
+        return {"status": "offline", "message": "RF Listener status temporarily unavailable", "last_heartbeat": None}
     return {"status": "offline", "message": "RF Listener status unknown", "last_heartbeat": None}
 
 # Dispatch REST Endpoints

@@ -1403,8 +1403,10 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
 def update_listener_heartbeat():
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        status_file = os.path.join(base_dir, "data", "listener_status.json")
-        os.makedirs(os.path.dirname(status_file), exist_ok=True)
+        status_dir = os.path.join(base_dir, "data")
+        os.makedirs(status_dir, exist_ok=True)
+        status_file = os.path.join(status_dir, "listener_status.json")
+        tmp_file = os.path.join(status_dir, "listener_status.json.tmp")
         payload = {
             "status": "online",
             "device": DEVICE_ID,
@@ -1412,8 +1414,9 @@ def update_listener_heartbeat():
             "last_heartbeat": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "pid": os.getpid()
         }
-        with open(status_file, "w") as f:
+        with open(tmp_file, "w") as f:
             json.dump(payload, f)
+        os.replace(tmp_file, status_file)
     except Exception:
         pass
 

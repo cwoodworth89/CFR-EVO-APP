@@ -35,6 +35,7 @@ from cfr_dispatch.config import (
     END_OF_DISPATCH_RMS_THRESHOLD,
     POST_EVENT_RESET_SILENCE_S,
     PHASE_1_CHECK_INTERVAL_S,
+    MIN_PHASE_1_DURATION_S,
     DEVICE_ID,
     resolve_audio_device,
     UNITS_VOCABULARY,

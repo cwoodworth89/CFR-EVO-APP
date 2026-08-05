@@ -50,8 +50,9 @@ const getMonthlySecretToken = () => {
 export default function DriverStationSetup({ onClose }) {
   const [selectedUnit, setSelectedUnit] = useState('chief-master');
   const [shiftHours, setShiftHours] = useState(0);
-  const [copied, setCopied] = useState(false);
-  const [qrFormat, setQrFormat] = useState('app'); // 'app' (ntfy://) or 'web' (http://)
+  const [copiedTopic, setCopiedTopic] = useState(false);
+  const [copiedServer, setCopiedServer] = useState(false);
+  const [qrFormat, setQrFormat] = useState('web'); // Default to plain 'http://' to avoid TLS app default
 
   // Default to Tailscale IP 100.95.146.94 if available or current hostname
   const initialHost = window.location.hostname && window.location.hostname !== 'localhost' 
@@ -69,17 +70,24 @@ export default function DriverStationSetup({ onClose }) {
   const effectiveHost = cleanHost(customHostInput) || '100.95.146.94';
 
   // Construct topic subscription URLs per spec
-  const ntfyWebUrl = `http://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
+  const ntfyBaseServerUrl = `http://${effectiveHost}:${ntfyServerPort}`;
+  const ntfyWebUrl = `${ntfyBaseServerUrl}/${finalTopic}`;
   const ntfyDeepLink = `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
   const ntfyWsUrl = `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
 
   // QR Code payload based on user selection
-  const qrPayload = qrFormat === 'app' ? ntfyDeepLink : ntfyWebUrl;
+  const qrPayload = qrFormat === 'web' ? ntfyWebUrl : ntfyDeepLink;
 
-  const handleCopyLink = () => {
+  const handleCopyTopic = () => {
     navigator.clipboard.writeText(ntfyWebUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    setCopiedTopic(true);
+    setTimeout(() => setCopiedTopic(false), 2500);
+  };
+
+  const handleCopyServer = () => {
+    navigator.clipboard.writeText(ntfyBaseServerUrl);
+    setCopiedServer(true);
+    setTimeout(() => setCopiedServer(false), 2500);
   };
 
   return (
@@ -239,21 +247,20 @@ export default function DriverStationSetup({ onClose }) {
 
             {/* Copy / Action Buttons */}
             <div className="flex flex-col gap-2 w-full">
-              <a
-                href={ntfyDeepLink}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={handleCopyTopic}
                 className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>📲 OPEN IN NTFY APP</span>
-              </a>
+                <span>{copiedTopic ? '✓ TOPIC URL COPIED!' : '📋 COPY TOPIC URL (http://...)'}</span>
+              </button>
 
               <button
                 type="button"
-                onClick={handleCopyLink}
+                onClick={handleCopyServer}
                 className="bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 py-2 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                {copied ? '✓ COPIED LINK!' : '📋 COPY TOPIC URL (http://)'}
+                {copiedServer ? '✓ SERVER URL COPIED!' : '📋 COPY SERVER BASE URL (http://...:8080)'}
               </button>
             </div>
 

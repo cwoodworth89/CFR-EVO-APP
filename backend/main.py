@@ -17,8 +17,9 @@ from cfr_dispatch.orchestration import run_dispatch_system
 
 def start_api_server():
     try:
-        import uvicorn
+        import os
         import sys
+        import uvicorn
         base_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(base_dir)
         if parent_dir not in sys.path:

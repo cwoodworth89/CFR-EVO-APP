@@ -52,7 +52,7 @@ export default function DriverStationSetup({ onClose }) {
   const [shiftHours, setShiftHours] = useState(0);
   const [copiedTopic, setCopiedTopic] = useState(false);
   const [copiedServer, setCopiedServer] = useState(false);
-  const [serverMode, setServerMode] = useState('cloud'); // 'cloud' (https://ntfy.sh) or 'local' (http://100.95.146.94:8080)
+  const [serverMode, setServerMode] = useState('tailscale_ssl'); // 'tailscale_ssl' (https://cfr-mapping-tcfh.otter-sailfin.ts.net), 'cloud' (https://ntfy.sh), or 'local' (http://100.95.146.94:8080)
   const [qrFormat, setQrFormat] = useState('app'); // 'app' (ntfy://) or 'web' (https://)
 
   // Default to Tailscale IP 100.95.146.94 if available or current hostname
@@ -72,10 +72,27 @@ export default function DriverStationSetup({ onClose }) {
 
   // Construct topic subscription URLs based on Server Mode
   const isCloud = serverMode === 'cloud';
-  const ntfyBaseServerUrl = isCloud ? 'https://ntfy.sh' : `http://${effectiveHost}:${ntfyServerPort}`;
+  const isTailscaleSSL = serverMode === 'tailscale_ssl';
+  
+  const tailscaleSslHost = 'cfr-mapping-tcfh.otter-sailfin.ts.net';
+  const ntfyBaseServerUrl = isCloud 
+    ? 'https://ntfy.sh' 
+    : isTailscaleSSL 
+      ? `https://${tailscaleSslHost}` 
+      : `http://${effectiveHost}:${ntfyServerPort}`;
+      
   const ntfyWebUrl = `${ntfyBaseServerUrl}/${finalTopic}`;
-  const ntfyDeepLink = isCloud ? `ntfy://ntfy.sh/${finalTopic}` : `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
-  const ntfyWsUrl = isCloud ? `wss://ntfy.sh/${finalTopic}/ws` : `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
+  const ntfyDeepLink = isCloud 
+    ? `ntfy://ntfy.sh/${finalTopic}` 
+    : isTailscaleSSL 
+      ? `ntfy://${tailscaleSslHost}/${finalTopic}` 
+      : `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
+      
+  const ntfyWsUrl = isCloud 
+    ? `wss://ntfy.sh/${finalTopic}/ws` 
+    : isTailscaleSSL 
+      ? `wss://${tailscaleSslHost}/${finalTopic}/ws` 
+      : `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
 
   // QR Code payload based on user selection
   const qrPayload = qrFormat === 'app' ? ntfyDeepLink : ntfyWebUrl;
@@ -182,7 +199,22 @@ export default function DriverStationSetup({ onClose }) {
               <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 text-[10px]">STEP 3</span>
               SELECT NOTIFICATION SERVER
             </h2>
-            <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setServerMode('tailscale_ssl')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  serverMode === 'tailscale_ssl'
+                    ? 'bg-sky-500/20 border-sky-500/50 text-sky-300 ring-1 ring-sky-400/40'
+                    : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
+                  <span>🔒 Tailscale SSL (https://...)</span>
+                </div>
+                <div className="text-[9px] text-slate-400 font-mono mt-1">Valid HTTPS certificate via Tailscale Serve. WebSockets & 0 TLS errors!</div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setServerMode('cloud')}
@@ -195,7 +227,7 @@ export default function DriverStationSetup({ onClose }) {
                 <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
                   <span>☁️ Public SSL (ntfy.sh)</span>
                 </div>
-                <div className="text-[9px] text-slate-400 font-mono mt-1">Recommended for phones. Trusted SSL/TLS certificate — zero TLS errors.</div>
+                <div className="text-[9px] text-slate-400 font-mono mt-1">Public ntfy.sh relay. Trusted SSL certificate for mobile networks.</div>
               </button>
 
               <button
@@ -208,9 +240,9 @@ export default function DriverStationSetup({ onClose }) {
                 }`}
               >
                 <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
-                  <span>🏠 Station Kiosk (Local IP)</span>
+                  <span>🏠 Station Local (http://...)</span>
                 </div>
-                <div className="text-[9px] text-slate-400 font-mono mt-1">Offline station network (http://{effectiveHost}:8080). Requires HTTP toggle in Ntfy.</div>
+                <div className="text-[9px] text-slate-400 font-mono mt-1">Direct unencrypted HTTP port 8080. Requires HTTP toggle in Ntfy app.</div>
               </button>
             </div>
 

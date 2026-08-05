@@ -18,6 +18,13 @@ from cfr_dispatch.orchestration import run_dispatch_system
 def start_api_server():
     try:
         import uvicorn
+        import sys
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(base_dir)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+        if base_dir not in sys.path:
+            sys.path.insert(0, base_dir)
         logging.info("Starting local FastAPI API gateway on port 8000...")
         uvicorn.run("api.server:app", host="0.0.0.0", port=8000, log_level="info")
     except Exception as e:

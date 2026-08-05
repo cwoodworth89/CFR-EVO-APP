@@ -4,7 +4,7 @@ import logging
 import requests
 
 LOCAL_API_URL = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
-ENABLE_SUPABASE_BACKUP = os.environ.get("ENABLE_SUPABASE_BACKUP", "false").lower() == "true"
+ENABLE_SUPABASE_BACKUP = os.environ.get("ENABLE_SUPABASE_BACKUP", "true").lower() == "true"
 
 def save_dispatch_record(payload: dict, url: str = None, key: str = None) -> bool:
     """Posts dispatch payload to local FastAPI gateway (/api/dispatches) and optional cloud backup."""

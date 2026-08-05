@@ -38,8 +38,12 @@ def is_allowed_network(client_ip_str: str) -> bool:
         pass
     return False
 
-from backend.api.database import get_db, engine, Base
-from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
+try:
+    from backend.api.database import get_db, engine, Base
+    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
+except ModuleNotFoundError:
+    from api.database import get_db, engine, Base
+    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
 
 # Ensure database tables exist
 Base.metadata.create_all(bind=engine)

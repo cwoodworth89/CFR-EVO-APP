@@ -253,16 +253,21 @@ export default function DriverStationSetup({ onClose }) {
                 onClick={handleCopyLink}
                 className="bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 py-2 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                {copied ? '✓ COPIED LINK!' : '📋 COPY SUBSCRIBER LINK'}
+                {copied ? '✓ COPIED LINK!' : '📋 COPY TOPIC URL (http://)'}
               </button>
             </div>
 
+            {/* TLS Warning Alert */}
+            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-[10px] text-amber-200 font-mono leading-relaxed w-full">
+              <span className="font-extrabold text-amber-400">⚠️ TLS / UNENCRYPTED HTTP:</span> The local Ntfy push server runs strictly on <span className="text-emerald-400 font-bold font-mono">http://</span> (Port 8080). Do <span className="text-rose-400 font-bold underline">NOT</span> use <span className="font-bold">https://</span> or HTTPS proxies, as SSL handshakes will fail with TLS packet errors.
+            </div>
+
             {/* Quick Setup Instructions */}
-            <div className="mt-4 p-3 bg-slate-950/80 border border-slate-850 rounded-xl text-left text-[10px] text-slate-400 font-mono leading-relaxed space-y-1.5 w-full">
+            <div className="mt-3 p-3 bg-slate-950/80 border border-slate-850 rounded-xl text-left text-[10px] text-slate-400 font-mono leading-relaxed space-y-1.5 w-full">
               <div className="font-extrabold text-amber-400 uppercase">⚡ 30-Second Setup Guide:</div>
               <div>1. Install free <span className="text-white font-bold">Ntfy</span> app from App Store / Play Store.</div>
               <div>2. Tap <span className="text-white font-bold">+ Subscribe to topic</span>.</div>
-              <div>3. Server URL: <span className="text-sky-300 font-bold">{ntfyWebUrl}</span> (HTTP, Port 8080).</div>
+              <div>3. Server URL: <span className="text-sky-300 font-bold">{ntfyWebUrl}</span> (<span className="text-amber-400 font-bold">http://</span> plain text, Port 8080).</div>
               <div>4. Protocol: Select <span className="text-purple-300 font-bold">WebSockets</span> (<span className="text-slate-300">{ntfyWsUrl}</span>) for low-latency alerts.</div>
               <div>5. <span className="text-emerald-400 font-bold">Done!</span> Loud siren alerts will ring even when silent mode is ON.</div>
             </div>

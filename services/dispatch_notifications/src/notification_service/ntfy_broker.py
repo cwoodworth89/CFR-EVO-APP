@@ -11,10 +11,16 @@ MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = "cfr/dispatches"
 
 NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
+if NTFY_SERVER_URL.startswith("https://"):
+    NTFY_SERVER_URL = NTFY_SERVER_URL.replace("https://", "http://", 1)
+
 NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "AUTO_MONTHLY")
 NTFY_MASTER_SALT = os.environ.get("NTFY_MASTER_SALT", "cfr_master_salt_2026")
 CHIEF_MASTER_TOPIC = os.environ.get("CHIEF_MASTER_TOPIC", "chief-master")  # Permanent, non-expiring master feed for Chiefs/Admin
+
 API_BASE_URL = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
+if API_BASE_URL.startswith("https://"):
+    API_BASE_URL = API_BASE_URL.replace("https://", "http://", 1)
 
 def get_monthly_secret(dt: datetime = None) -> str:
     """Computes a deterministic 6-char monthly secret salt from year+month and master salt."""

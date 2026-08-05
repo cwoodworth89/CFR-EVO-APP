@@ -104,8 +104,11 @@ def send_it_alert_if_unhealthy(audit: Dict[str, Any], ntfy_topic: str = None, nt
     if audit["overall_status"] == "HEALTHY":
         return
 
-    topic = ntfy_topic or os.environ.get("NTFY_TOPIC", "cfr-dispatch-alerts")
-    url = f"https://ntfy.sh/{topic}"
+    topic = ntfy_topic or os.environ.get("NTFY_TOPIC", "chief-master")
+    ntfy_server = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
+    if ntfy_server.startswith("https://"):
+        ntfy_server = ntfy_server.replace("https://", "http://", 1)
+    url = f"{ntfy_server}/{topic}"
     
     title = f"⚠️ IT HEALTH ALERT: Kiosk {audit['overall_status']}"
     body = (

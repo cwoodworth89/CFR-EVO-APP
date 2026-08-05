@@ -26,7 +26,7 @@ TONE_ZSCORE_THRESHOLD = 15.0    # Liberal Z-score for clean line-in audio
 
 GOLDEN_FINGERPRINTS = {
     "PA Tone":     [595.00, 647.00],
-    "Chief Tone":  [437.50, 656.25],
-    "Engine Tone": [601.56, 1351.56],
-    "Rescue Tone": [726.56, 890.62]
+    "Chief Tone":  [437.50, 440.00, 656.25, 660.00, 1320.00],
+    "Engine Tone": [600.00, 601.56, 1350.00, 1351.56, 1800.00, 4050.00],
+    "Rescue Tone": [725.00, 726.56, 890.00, 890.62, 2180.00, 2675.00]
 }

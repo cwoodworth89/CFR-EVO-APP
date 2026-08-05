@@ -753,17 +753,19 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str) -> tup
         except Exception as e:
             logging.warning(f"Could not save audio locally to backend/audio_files/recordings: {e}")
             
-        # 2. Upload to Supabase Storage
+        # Use local HTTP API gateway audio path for offline station reliability
+        local_api_audio_url = f"/api/audio/{dispatch_id}.wav"
+        
+        # Optional: Upload to Supabase Storage if configured (background backup)
         supabase_url = os.environ.get("SUPABASE_URL")
         supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
-        
-        public_url = None
         if supabase_url and supabase_key:
-            public_url = upload_to_supabase_storage(audio_bytes, f"{dispatch_id}.wav", supabase_url, supabase_key)
+            try:
+                upload_to_supabase_storage(audio_bytes, f"{dispatch_id}.wav", supabase_url, supabase_key)
+            except Exception as e:
+                logging.warning(f"Supabase storage upload fallback skipped: {e}")
             
-        # If upload succeeded, return the Supabase public URL. Otherwise, return the local fallback path.
-        audio_url = public_url if public_url else local_url_path
-        return audio_url, duration_seconds
+        return local_api_audio_url, duration_seconds
         
     except Exception as e:
         logging.error(f"Error in save_and_upload_audio: {e}", exc_info=True)

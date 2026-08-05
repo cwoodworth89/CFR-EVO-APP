@@ -111,14 +111,15 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         "Tags": tags or "fire_engine,rotating_light,warning"
     }
 
-    # Resolve audio stream URL if present
+    # Resolve audio stream URL if present (force http:// for unencrypted local Ntfy broker)
     raw_audio = payload.get("audio_url")
     audio_full_url = None
     if raw_audio:
-        if raw_audio.startswith("http"):
-            audio_full_url = raw_audio
+        if raw_audio.startswith("http://") or raw_audio.startswith("https://"):
+            audio_full_url = raw_audio.replace("https://", "http://", 1)
         else:
             audio_full_url = f"{API_BASE_URL}{'' if raw_audio.startswith('/') else '/'}{raw_audio}"
+            audio_full_url = audio_full_url.replace("https://", "http://", 1)
             
         headers["Attach"] = audio_full_url
 

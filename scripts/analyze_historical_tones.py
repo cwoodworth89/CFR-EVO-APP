@@ -64,7 +64,7 @@ for wav_path in wav_files:
         if len(samples_3s) < int(1.0 * sr):
             continue
             
-        freqs_set = analyze_live_audio(samples_3s.tobytes(), sr, num_peaks=10, z_threshold=15.0)
+        freqs_set = analyze_live_audio(samples_3s.tobytes(), sr, num_peaks=10, zscore_threshold=15.0)
         freq_list = sorted([round(f, 1) for f in freqs_set])
         
         matches = get_all_matches(freqs_set, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)

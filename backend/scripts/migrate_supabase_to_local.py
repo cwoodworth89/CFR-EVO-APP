@@ -4,6 +4,7 @@ import logging
 import requests
 from pathlib import Path
 from typing import Dict, Any, List
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 from backend.api.database import SessionLocal, engine, Base
@@ -87,6 +88,14 @@ def migrate_live_calls(db: Session, calls: List[Dict[str, Any]]):
         # Format audio_url to relative path
         relative_audio = f"/api/audio/{dispatch_id}.wav" if (RECORDINGS_DIR / f"{dispatch_id}.wav").exists() else call_data.get("audio_url")
         
+        raw_ts = call_data.get("timestamp") or call_data.get("created_at")
+        ts_val = None
+        if raw_ts:
+            try:
+                ts_val = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+            except Exception:
+                ts_val = raw_ts
+
         fields = {
             "dispatch_id": dispatch_id,
             "incident_type": call_data.get("incident_type") or "Unknown Incident",
@@ -108,6 +117,8 @@ def migrate_live_calls(db: Session, calls: List[Dict[str, Any]]):
             "model_updated": call_data.get("model_updated") or False,
             "review_notes": call_data.get("review_notes") or call_data.get("target", {}).get("review_notes")
         }
+        if ts_val:
+            fields["timestamp"] = ts_val
         
         if existing:
             for k, v in fields.items():

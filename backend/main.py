@@ -13,13 +13,13 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 import threading
 import logging
-import uvicorn
 from cfr_dispatch.orchestration import run_dispatch_system
 
 def start_api_server():
     try:
+        import uvicorn
         logging.info("Starting local FastAPI API gateway on port 8000...")
-        uvicorn.run("backend.api.server:app", host="0.0.0.0", port=8000, log_level="info")
+        uvicorn.run("api.server:app", host="0.0.0.0", port=8000, log_level="info")
     except Exception as e:
         logging.warning(f"Could not bind API server in main thread: {e}")
 

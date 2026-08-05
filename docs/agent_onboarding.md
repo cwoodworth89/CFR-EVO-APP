@@ -42,6 +42,8 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 
 | Command | Location | Purpose |
 | :--- | :--- | :--- |
+| `docker compose up -d` | `./` | Start the local containerized stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI). |
+| `python -m backend.scripts.migrate_supabase_to_local` | `./` | Migrate historical calls, transcripts, and audio from Supabase to local PostgreSQL. |
 | `python main.py` | `backend/` | Launch the continuous audio listener background runner. |
 | `python tests/run_test_suite.py` | `backend/` | Execute the QA verification test suite (transcription accuracy and geocoder matching checks). |
 | `python scripts/feed_recorded_call.py <wav_path> [tone]` | `backend/` | Simulate an incoming radio dispatch feed by streaming a WAV file to the listener. |
@@ -59,8 +61,9 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | Document | Target Location | Scope |
 | :--- | :--- | :--- |
 | **Project Overview** | [README.md](../README.md) | High-level system structure, mermaid workflow schemas, and 2-phase pipelines. |
+| **Local DB Setup** | [docs/local_database_setup.md](./local_database_setup.md) | Containerized PostgreSQL 16 schema, FastAPI gateway REST routes, and Mosquitto MQTT sync. |
 | **Call Structure** | [docs/call_structure.md](./call_structure.md) | Dispatch speech templates, regex parsing splits, and phonetic correction matrices. |
-| **Supabase Setup** | [docs/supabase_setup.md](./supabase_setup.md) | PostgreSQL table contracts, RLS policies, and realtime WebSocket config script. |
+| **Supabase Setup** | [docs/supabase_setup.md](./supabase_setup.md) | Legacy cloud database contracts and migration fallback procedures. |
 | **GIS Endpoints** | [docs/gis_endpoints.md](./gis_endpoints.md) | Coquitlam ArcGIS MapServer layers list, and local Dynamic Viewport mock blueprints. |
 | **Test Matrix** | [docs/test_procedures.md](./test_procedures.md) | Step-by-step diagnostic workflows for tone SPOT tests, database inserts, and mic levels. |
 | **Hardware Spec** | [docs/hardware_specification.md](./hardware_specification.md) | Physical setup configs (Pi soundcards, Nginx server blocks, and x86 laptop kiosks). |

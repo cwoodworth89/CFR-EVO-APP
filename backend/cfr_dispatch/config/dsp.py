@@ -1,10 +1,9 @@
 # NOTE: For calibration of audio thresholds, device selection, and test procedures, see:
 #   - docs/hardware_specification.md
 #   - docs/test_procedures.md
-# DSP settings and thresholds
-# Lowered significantly for high-sensitivity testing (baseline is ~22 RMS)
-NOISE_AMPLITUDE_THRESHOLD = 150
-NOISE_AMPLITUDE_THRESHOLD_MIN = 100
+# DSP settings and thresholds for direct line-in audio
+NOISE_AMPLITUDE_THRESHOLD = 100
+NOISE_AMPLITUDE_THRESHOLD_MIN = 80
 SUSTAINED_LOUDNESS_WINDOW = 5
 SUSTAINED_LOUDNESS_CHUNKS_REQUIRED = 5
 TONE_ANALYSIS_DURATION_SECONDS = 3.5
@@ -19,11 +18,11 @@ POST_EVENT_RESET_SILENCE_S = 3.0
 PHASE_1_CHECK_INTERVAL_S = 3.0
 MIN_PHASE_1_DURATION_S = 10.0
 
-# Pager Tones matching thresholds & fingerprints
-MATCH_THRESHOLD_PERCENT = 0.85
-FREQUENCY_TOLERANCE_HZ = 10
+# Pager Tones matching thresholds & fingerprints (Liberal Direct Line-In Mode)
+MATCH_THRESHOLD_PERCENT = 0.45  # 45% threshold so 1-tone match (50%) passes
+FREQUENCY_TOLERANCE_HZ = 25     # Broadened frequency window for line-in drift
 NUM_PEAKS_TO_FIND = 10
-TONE_ZSCORE_THRESHOLD = 40.0
+TONE_ZSCORE_THRESHOLD = 15.0    # Liberal Z-score for clean line-in audio
 
 GOLDEN_FINGERPRINTS = {
     "PA Tone":     [595.00, 647.00],

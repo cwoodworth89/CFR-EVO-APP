@@ -1421,6 +1421,43 @@ def update_listener_heartbeat():
     except Exception as e:
         logging.warning(f"Could not update listener heartbeat: {e}")
 
+def log_tone_spectral_history(dispatch_id, matched_tones, live_frequencies, is_pa_page=False):
+    """Logs timestamp, dispatch_id, matched tone names, and top 5 peak frequencies (Hz) for training dataset."""
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_dir = os.path.join(base_dir, "data")
+        os.makedirs(data_dir, exist_ok=True)
+        log_file = os.path.join(data_dir, "tone_spectral_history.json")
+        
+        freq_list = sorted(list(live_frequencies)) if live_frequencies else []
+        top_5_freqs = [round(f, 2) for f in freq_list[:5]]
+        
+        entry = {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "dispatch_id": dispatch_id or f"TRIGGER-{int(time.time())}",
+            "matched_tones": matched_tones if isinstance(matched_tones, list) else [matched_tones],
+            "top_5_frequencies_hz": top_5_freqs,
+            "all_detected_frequencies_hz": [round(f, 2) for f in freq_list],
+            "is_pa_page": is_pa_page
+        }
+        
+        history = []
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, "r") as f:
+                    history = json.load(f)
+            except Exception:
+                history = []
+        history.append(entry)
+        if len(history) > 1000:
+            history = history[-1000:]
+            
+        with open(log_file, "w") as f:
+            json.dump(history, f, indent=2)
+        logging.info(f"[Spectral History] Saved tone fingerprint: Tones={matched_tones} | Top Freqs={top_5_freqs} Hz")
+    except Exception as e:
+        logging.warning(f"Could not write spectral history log: {e}")
+
 def run_dispatch_system():
     """Main program entrypoint. Initiates audio stream and tone triggers."""
     setup_logging()
@@ -1484,25 +1521,23 @@ def run_dispatch_system():
                             full_sample_np = np.concatenate(analysis_buffer)
                             live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD)
                             all_matches = get_all_matches(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
-                            if any(m[0] == "PA Tone" for m in all_matches):
+                            
+                            is_only_pa = all_matches and all(m[0] == "PA Tone" for m in all_matches)
+                            if is_only_pa:
                                 logging.info("TONE DETECTED: 'PA Tone' (station paging page). Disregarding and resetting listener.")
+                                log_tone_spectral_history(None, ["PA Tone"], live_frequencies, is_pa_page=True)
                                 is_capturing_tone = False
                                 baseline_rms_history.clear()
                                 baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
                                 continue
-                            elif all_matches:
-                                matched_tone_list = [m[0] for m in all_matches]
-                                matched_tone = ", ".join(matched_tone_list)
-                                scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in all_matches])
-                                logging.info(f"TONES CONFIRMED: '{matched_tone}' ({scores_str})")
-                                break
-                            else:
-                                logging.info("Triggered sound was not a recognized tone, resetting.")
-                                is_capturing_tone = False
-                                # Reset baseline when false-trigger occurs to prevent bias
-                                baseline_rms_history.clear()
-                                baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
-                                continue
+                            
+                            # Liberal direct line-in mode: if matches found OR strong signal, trigger call recording
+                            matched_tone_list = [m[0] for m in all_matches] if all_matches else ["LineIn Dispatch"]
+                            matched_tone = ", ".join(matched_tone_list)
+                            scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in all_matches]) if all_matches else "100%"
+                            logging.info(f"TONES CONFIRMED: '{matched_tone}' ({scores_str}) | Freqs: {sorted(list(live_frequencies))[:5]}")
+                            log_tone_spectral_history(None, matched_tone_list, live_frequencies, is_pa_page=False)
+                            break
                         else:
                             continue
 

@@ -121,14 +121,22 @@ def migrate_live_calls(db: Session, calls: List[Dict[str, Any]]):
     db.commit()
     logging.info(f"Successfully migrated/upserted {migrated_count} live_calls into local PostgreSQL.")
 
+import uuid
+
 def migrate_evaluations(db: Session, evals: List[Dict[str, Any]]):
     logging.info(f"Migrating {len(evals)} evaluation_history records...")
     count = 0
     for e in evals:
-        eval_id = e.get("id")
-        if not eval_id:
+        eval_id_raw = e.get("id")
+        if not eval_id_raw:
             continue
             
+        try:
+            eval_id = uuid.UUID(str(eval_id_raw)) if isinstance(eval_id_raw, str) else eval_id_raw
+        except Exception as err:
+            logging.warning(f"Invalid UUID '{eval_id_raw}': {err}")
+            continue
+
         existing = db.query(EvaluationHistoryModel).filter(EvaluationHistoryModel.id == eval_id).first()
         fields = {
             "id": eval_id,

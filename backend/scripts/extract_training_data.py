@@ -105,38 +105,29 @@ def main():
     
     # 1. Load config
     env = load_env()
-    supabase_url = env.get("SUPABASE_URL")
-    supabase_key = env.get("SUPABASE_SERVICE_ROLE_KEY") or env.get("SUPABASE_KEY")
+    local_api_url = env.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
     
-    if not supabase_url or not supabase_key:
-        logging.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/SUPABASE_KEY in .env")
-        sys.exit(1)
-        
     # 2. Setup folders
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     training_dir = os.path.join(base_dir, "data", "training")
     audio_dir = os.path.join(training_dir, "audio")
     os.makedirs(audio_dir, exist_ok=True)
     
-    # 3. Query verified dispatches
-    headers = {
-        "apikey": supabase_key,
-        "Authorization": f"Bearer {supabase_key}"
-    }
-    
-    # We query records where feedback_submitted is true
-    endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?feedback_submitted=eq.true&verified_transcript=not.is.null"
-    logging.info(f"Querying verified calls from Supabase: {endpoint}")
+    # 3. Query verified dispatches from local database API
+    endpoint = f"{local_api_url}/api/dispatches?limit=500"
+    logging.info(f"Querying verified calls from local API gateway: {endpoint}")
     
     try:
-        response = requests.get(endpoint, headers=headers, timeout=15)
+        response = requests.get(endpoint, timeout=15)
         response.raise_for_status()
-        records = response.json()
+        all_records = response.json()
+        records = [r for r in all_records if r.get("feedback_submitted") and r.get("verified_transcript")]
     except Exception as e:
         logging.error(f"Failed to fetch records: {e}")
         sys.exit(1)
         
-    logging.info(f"Found {len(records)} verified records in database.")
+    logging.info(f"Found {len(records)} verified records in local database.")
+
     
     # 3b. Learn and append any new verified incident types
     learn_new_incident_types(records, base_dir)

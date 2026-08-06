@@ -836,8 +836,9 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                 <span className="text-3xl mb-2">⚠️</span>
                 <h3 className="font-extrabold text-rose-455 uppercase text-xs tracking-wider">Database Connection Failed</h3>
                 <p className="text-xs text-slate-400 mt-2 max-w-md font-mono leading-relaxed">
-                  Could not load dispatches from Supabase. Ensure your client environment variables are correctly set in `frontend/.env.local` and your Supabase database has matching schema.
+                  Could not load dispatches from Local Database API. Ensure your local FastAPI Gateway is running on port 8000 and PostgreSQL container is healthy.
                 </p>
+
                 {dbError && (
                   <div className="mt-4 p-3 bg-slate-950/80 border border-slate-850 text-[10px] text-rose-400 font-mono rounded-lg max-w-lg overflow-x-auto text-left select-text">
                     Error Details: {dbError}

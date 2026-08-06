@@ -4,6 +4,6 @@ from notification_service.dispatch_persistence import (
     save_dispatch_record as post_to_supabase,
     update_dispatch_record as update_supabase_record,
     save_audio_recording as upload_to_supabase_storage,
-    ENABLE_SUPABASE_BACKUP,
     LOCAL_API_URL
 )
+

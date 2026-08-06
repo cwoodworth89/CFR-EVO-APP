@@ -285,27 +285,21 @@ def get_hitl_verified_streets() -> list[str]:
         return _cached_hitl_streets
 
     try:
-        supabase_url = os.environ.get("SUPABASE_URL")
-        supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
-        if not supabase_url or not supabase_key:
-            return []
-            
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}"
-        }
-        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address,target,timestamp&feedback_submitted=eq.true&verified_address=not.is.null"
-        response = requests.get(endpoint, headers=headers, timeout=3)
+        local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
+        endpoint = f"{local_api_url}/api/dispatches?limit=200"
+        response = requests.get(endpoint, timeout=3)
         response.raise_for_status()
         records = response.json()
         
         from collections import defaultdict
         tally = defaultdict(int)
-        latest_ts = {}
         
         for r in records:
+            if not r.get("feedback_submitted"):
+                continue
             verified_addr = r.get("verified_address")
             system_addr = r.get("address") or (r.get("target", {}).get("address") if r.get("target") else None)
+
                 
             if not verified_addr:
                 continue
@@ -1372,15 +1366,10 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
             logging.error(f"Failed to pre-load Whisper model: {e}. Will load on demand.", exc_info=True)
 
 
-    # Start offline queue sync poller thread
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
-    if supabase_url and supabase_key:
-        start_offline_sync_poller(supabase_url, supabase_key, interval_seconds=60)
-
     triggered_phase_1_ids = set()
     phase_1_trigger_lengths = {}
     phase_1_candidates = {}
+
 
     while True:
         try:

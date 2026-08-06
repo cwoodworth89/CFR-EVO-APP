@@ -419,35 +419,26 @@ def main():
     except Exception as e:
         logging.warning(f"Failed to log evaluation history: {e}")
 
-    # 6. Post history to Supabase evaluation_history
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
-    if supabase_url and supabase_key:
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal"
-        }
-        db_payload = {
-            "model_version": f"{STT_ENGINE}-boost-classes",
-            "total_samples": int(total),
-            "wer": float(round(new_avg_wer * 100, 2)),
-            "cer": float(round(new_avg_cer * 100, 2)),
-            "perfect_percent": float(round(perfect_p, 2)),
-            "operational_percent": float(round(operational_p, 2)),
-            "failed_percent": float(round(failed_p, 2))
-        }
-        endpoint = f"{supabase_url.rstrip('/')}/rest/v1/evaluation_history"
-        logging.info(f"Posting evaluation metrics to Supabase: {endpoint}")
-        try:
-            db_response = requests.post(endpoint, headers=headers, json=db_payload, timeout=10)
-            db_response.raise_for_status()
-            logging.info("Successfully posted metrics to Supabase evaluation_history.")
-        except Exception as e:
-            logging.warning(f"Failed to post evaluation metrics to Supabase: {e}")
-    else:
-        logging.warning("Missing SUPABASE_URL or SUPABASE_KEY. Skipping Supabase metrics upload.")
+    # 6. Post history to local API Gateway evaluations endpoint
+    local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
+    endpoint = f"{local_api_url}/api/evaluations"
+    db_payload = {
+        "model_version": f"{STT_ENGINE}-boost-classes",
+        "total_samples": int(total),
+        "wer": float(round(new_avg_wer * 100, 2)),
+        "cer": float(round(new_avg_cer * 100, 2)),
+        "perfect_percent": float(round(perfect_p, 2)),
+        "operational_percent": float(round(operational_p, 2)),
+        "failed_percent": float(round(failed_p, 2))
+    }
+    logging.info(f"Posting evaluation metrics to local API Gateway: {endpoint}")
+    try:
+        db_response = requests.post(endpoint, json=db_payload, timeout=10)
+        db_response.raise_for_status()
+        logging.info("Successfully posted metrics to local evaluations database.")
+    except Exception as e:
+        logging.warning(f"Failed to post evaluation metrics to local API gateway: {e}")
+
 
 
 

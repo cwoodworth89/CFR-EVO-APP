@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiClient, API_BASE_URL } from '../apiClient';
 import { useDispatchListener } from '../hooks/useDispatchListener';
+import SystemMetricsPanel from './admin/SystemMetricsPanel';
 
 // Helper to format timestamps to Pacific Time matching database and local logs
 const formatTimestampPT = (ts) => {
@@ -65,6 +66,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   // RF Listener status state
   const [listenerStatus, setListenerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
   const [listenerDetails, setListenerDetails] = useState(null);
+  const [activeTab, setActiveTab] = useState('review'); // 'review' | 'metrics'
 
   // Auth session states
   const [session, setSession] = useState(null);
@@ -751,14 +753,45 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="flex-grow flex gap-5 min-h-0 w-full overflow-hidden">
-        {/* Left Column: Dispatches Table List */}
-        <div className="flex-grow flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden">
-          <div className="flex justify-between items-center gap-4 mb-4 flex-shrink-0">
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-300">
-              Captured Dispatches ({filteredCalls.length})
-            </h2>
+      {/* Sub-Navigation Tab Bar */}
+      <div className="flex gap-2 mb-4 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('review')}
+          className={`px-4 py-2.5 text-xs font-mono font-extrabold rounded-xl transition-all duration-150 cursor-pointer flex items-center gap-2 ${
+            activeTab === 'review'
+              ? 'bg-sky-500 text-black shadow-lg shadow-sky-500/20'
+              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850'
+          }`}
+        >
+          📋 CALL REVIEW PANEL ({filteredCalls.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('metrics')}
+          className={`px-4 py-2.5 text-xs font-mono font-extrabold rounded-xl transition-all duration-150 cursor-pointer flex items-center gap-2 ${
+            activeTab === 'metrics'
+              ? 'bg-sky-500 text-black shadow-lg shadow-sky-500/20'
+              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850'
+          }`}
+        >
+          📊 SYSTEM & STT METRICS
+        </button>
+      </div>
+
+      {activeTab === 'metrics' ? (
+        <div className="flex-grow overflow-y-auto w-full">
+          <SystemMetricsPanel dispatches={calls} evaluations={evalHistory} />
+        </div>
+      ) : (
+        /* Main Grid */
+        <div className="flex-grow flex gap-5 min-h-0 w-full overflow-hidden">
+          {/* Left Column: Dispatches Table List */}
+          <div className="flex-grow flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden">
+            <div className="flex justify-between items-center gap-4 mb-4 flex-shrink-0">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-300">
+                Captured Dispatches ({filteredCalls.length})
+              </h2>
             <input
               type="text"
               placeholder="Search by ID, Address, Incident..."
@@ -1606,6 +1639,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
           )}
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }

@@ -332,6 +332,10 @@ def build_stt_bias_words(validator, units_vocabulary=None) -> tuple[str, str]:
         "use talk group", "map grid", "medical aid", "overdose", "lift assist", 
         "structure fire", "alarm activated"
     ]
+    # Inject valid 1..134 map grid phrases into hotword biasing
+    grid_words = [f"map grid {i}" for i in range(1, 135)]
+    base_words.extend(grid_words)
+
     if units_vocabulary and isinstance(units_vocabulary, (list, set)):
         base_words.extend([str(u).title() for u in units_vocabulary])
     
@@ -350,10 +354,11 @@ def build_stt_bias_words(validator, units_vocabulary=None) -> tuple[str, str]:
             logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
             
     all_terms = list(dict.fromkeys(base_words + hitl_streets + streets))
-    all_terms = all_terms[:45]
+    all_terms = all_terms[:50]
     
     hotwords_str = ", ".join(all_terms)
-    initial_prompt_str = ", ".join(all_terms)
+    # Always ensure Coquitlam is the opening anchor in initial_prompt
+    initial_prompt_str = "Coquitlam, " + ", ".join([t for t in all_terms if t.lower() != "coquitlam"])
     return initial_prompt_str, hotwords_str
 
 def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None:
@@ -829,26 +834,27 @@ def is_round_1_complete_check(dispatch_list: List[DispatchData], raw_transcript:
     has_call_type = candidate.call_type is not None and candidate.call_type != "Unknown Incident"
     
     if has_units and has_call_type:
-        # Primary Trigger: "Map Grid < 200"
-        has_grid_less_than_200 = False
+        # Primary Trigger: "Map Grid 1..134"
+        has_valid_grid = False
         if candidate.map_grid:
             try:
                 # Remove non-digits
-                clean_grid = "".join(filter(str.isdigit, candidate.map_grid))
+                clean_grid = "".join(filter(str.isdigit, str(candidate.map_grid)))
                 if clean_grid:
                     grid_num = int(clean_grid)
-                    if grid_num < 200:
-                        has_grid_less_than_200 = True
+                    if 1 <= grid_num <= 134:
+                        has_valid_grid = True
             except ValueError:
                 pass
         
-        # Fallback check raw_transcript for "grid" and some digits
-        if not has_grid_less_than_200:
+        # Fallback check raw_transcript for "grid" and valid digits 1..134
+        if not has_valid_grid:
             grid_matches = re.findall(r'\b(?:grid|grade)\s*(\d{1,3})\b', raw_transcript.lower())
             for gm in grid_matches:
                 try:
-                    if int(gm) < 200:
-                        has_grid_less_than_200 = True
+                    g_val = int(gm)
+                    if 1 <= g_val <= 134:
+                        has_valid_grid = True
                         break
                 except ValueError:
                     pass
@@ -863,7 +869,7 @@ def is_round_1_complete_check(dispatch_list: List[DispatchData], raw_transcript:
             if any(count >= 2 for count in counts.values()):
                 has_unit_repetition = True
                 
-        if has_grid_less_than_200 or has_unit_repetition:
+        if has_valid_grid or has_unit_repetition:
             return True
             
     return False

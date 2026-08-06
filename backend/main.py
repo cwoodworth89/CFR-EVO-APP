@@ -19,6 +19,16 @@ def start_api_server():
     try:
         import os
         import sys
+        import requests
+        # Check if local API Gateway is already running via Docker container
+        try:
+            res = requests.get("http://localhost:8000/api/dispatches", timeout=2)
+            if res.status_code == 200:
+                logging.info("Local FastAPI API Gateway is already running on port 8000 (Docker container mode). Skipping duplicate thread.")
+                return
+        except Exception:
+            pass
+
         import uvicorn
         base_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(base_dir)
@@ -30,6 +40,7 @@ def start_api_server():
         uvicorn.run("api.server:app", host="0.0.0.0", port=8000, log_level="info")
     except Exception as e:
         logging.warning(f"Could not bind API server in main thread: {e}")
+
 
 if __name__ == "__main__":
     api_thread = threading.Thread(target=start_api_server, daemon=True)

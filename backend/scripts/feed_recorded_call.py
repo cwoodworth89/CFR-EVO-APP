@@ -24,7 +24,8 @@ import wavio
 import numpy as np
 import logging
 
-from cfr_dispatch.gis import CoquitlamDataValidator
+import cfr_dispatch
+from gis_service import CoquitlamDataValidator
 from cfr_dispatch.orchestration import process_full_dispatch, setup_logging
 from cfr_dispatch.config import (
     UNITS_VOCABULARY,

@@ -71,20 +71,43 @@ for wav_path in wav_files:
         matched_names = [m[0] for m in matches] if matches else ["Unmatched"]
         
         disp_meta = api_map.get(dispatch_id, {})
-        units = disp_meta.get("responding_units") or []
-        inc_type = disp_meta.get("incident_type") or "Unknown"
+        # Enforce HITL ground-truth filtering criteria:
+        # Only use dispatches that are HITL verified with confirmed units and tone indicators
+        if not disp_meta.get("feedback_submitted"):
+            continue
+            
+        units = disp_meta.get("verified_units") or disp_meta.get("responding_units") or []
+        if not units:
+            continue
+            
+        target_meta = disp_meta.get("target") or {}
+        tone_indicator = target_meta.get("tone_name") if isinstance(target_meta, dict) else None
         
-        # Categorize into apparatus groups
+        inc_type = disp_meta.get("verified_incident") or disp_meta.get("incident_type") or "Unknown"
+        
+        # Categorize into apparatus groups based on HITL verified units/tone tags
         cat = "All"
         units_str = " ".join(units).upper() if isinstance(units, list) else str(units).upper()
-        if "E1" in units_str or "E2" in units_str or "E3" in units_str or "E4" in units_str:
-            cat = "Engine"
-        elif "R2" in units_str or "R1" in units_str:
-            cat = "Rescue"
-        elif "C6" in units_str or "C1" in units_str or "C9" in units_str:
-            cat = "Chief"
-        elif "L1" in units_str:
-            cat = "Ladder"
+        if tone_indicator:
+            if "Engine" in tone_indicator:
+                cat = "Engine"
+            elif "Rescue" in tone_indicator:
+                cat = "Rescue"
+            elif "Chief" in tone_indicator:
+                cat = "Chief"
+            elif "PA" in tone_indicator:
+                cat = "PA"
+        
+        if cat == "All":
+            if "E1" in units_str or "E2" in units_str or "E3" in units_str or "E4" in units_str:
+                cat = "Engine"
+            elif "R2" in units_str or "R1" in units_str:
+                cat = "Rescue"
+            elif "C6" in units_str or "C1" in units_str or "C9" in units_str:
+                cat = "Chief"
+            elif "L1" in units_str:
+                cat = "Ladder"
+
             
         for f in freq_list:
             # Round frequency to nearest 5 Hz bucket for clustering

@@ -271,13 +271,19 @@ def get_shared_validator():
             logging.warning(f"Failed to load shared validator for STT hotwords: {e}")
     return _cached_validator
 
+_cached_hitl_streets = []
+_last_hitl_fetch_time = 0.0
+
 def get_hitl_verified_streets() -> list[str]:
     """
     Fetches the most frequently misheard street names that required HITL correction.
-    Prioritizes streets by the number of times they were corrected (tally),
-    falling back to the most recent timestamp for ties. Only streets where the 
-    user-verified address differed from the system-geocoded address are indexed.
+    Cached in memory for 10 minutes to prevent blocking network requests during transcription.
     """
+    global _cached_hitl_streets, _last_hitl_fetch_time
+    now = time.time()
+    if _cached_hitl_streets and (now - _last_hitl_fetch_time < 600.0):
+        return _cached_hitl_streets
+
     try:
         supabase_url = os.environ.get("SUPABASE_URL")
         supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
@@ -288,9 +294,8 @@ def get_hitl_verified_streets() -> list[str]:
             "apikey": supabase_key,
             "Authorization": f"Bearer {supabase_key}"
         }
-        # Query verified address, target geocoded details, and timestamp (address column does not exist separately)
         endpoint = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?select=verified_address,target,timestamp&feedback_submitted=eq.true&verified_address=not.is.null"
-        response = requests.get(endpoint, headers=headers, timeout=5)
+        response = requests.get(endpoint, headers=headers, timeout=3)
         response.raise_for_status()
         records = response.json()
         
@@ -300,18 +305,14 @@ def get_hitl_verified_streets() -> list[str]:
         
         for r in records:
             verified_addr = r.get("verified_address")
-            system_addr = r.get("address")
-            if not system_addr and r.get("target"):
-                system_addr = r.get("target", {}).get("address")
+            system_addr = r.get("address") or (r.get("target", {}).get("address") if r.get("target") else None)
                 
             if not verified_addr:
                 continue
                 
-            # Helper to extract normalized street name
             def clean_street(addr_str):
                 if not addr_str:
                     return ""
-                # Strip leading house numbers
                 match = re.search(r'^\d+\s+(?P<street>.*)', addr_str.split(',')[0].strip())
                 if match:
                     return match.group('street').strip().title()
@@ -320,37 +321,25 @@ def get_hitl_verified_streets() -> list[str]:
             v_street = clean_street(verified_addr)
             sys_street = clean_street(system_addr)
             
-            if v_street:
-                ts_str = r.get("timestamp", "")
-                ts_val = 0
-                if ts_str:
-                    try:
-                        ts_val = datetime.datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
-                    except Exception:
-                        pass
+            if v_street and sys_street and v_street != sys_street:
+                tally[v_street] += 1
                 
-                # Check if it was a MISHEARD street (user corrected the system's address)
-                if sys_street and v_street != sys_street:
-                    tally[v_street] += 1
-                    latest_ts[v_street] = max(latest_ts.get(v_street, 0), ts_val)
-                    
-        # Sort streets descending by tally count (frequency of corrections), then by timestamp recency
-        sorted_streets = sorted(
-            tally.keys(),
-            key=lambda s: (tally[s], latest_ts.get(s, 0)),
-            reverse=True
-        )
+        sorted_streets = sorted(tally.keys(), key=lambda s: tally[s], reverse=True)
+        _cached_hitl_streets = sorted_streets
+        _last_hitl_fetch_time = now
         return sorted_streets
     except Exception as e:
         logging.warning(f"Failed to fetch HITL verified streets for STT hotwords: {e}")
-        return []
+        return _cached_hitl_streets
 
-def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
+def build_stt_bias_words(validator, units_vocabulary=None) -> tuple[str, str]:
     base_words = [
         "Coquitlam", "respond", "routine", "emergency", "Combined Response Coquitlam",
         "use talk group", "map grid", "medical aid", "overdose", "lift assist", 
         "structure fire", "alarm activated"
     ]
+    if units_vocabulary and isinstance(units_vocabulary, (list, set)):
+        base_words.extend([str(u).title() for u in units_vocabulary])
     
     # Fetch HITL verified streets to bias Whisper dynamically toward corrected addresses
     hitl_streets = get_hitl_verified_streets()
@@ -360,15 +349,12 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
         try:
             if hasattr(validator, 'addresses_gdf') and validator.addresses_gdf is not None:
                 col = validator.street_name_col
-                # Extract the top 30 most frequent street names (increased capacity since units are removed)
                 street_counts = validator.addresses_gdf[col].dropna().value_counts()
                 top_streets = street_counts.head(30).index.tolist()
                 streets = [str(s).title() for s in top_streets if len(str(s).strip()) > 1]
         except Exception as e:
             logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
             
-    # Combine terms, removing duplicates and capping to a safe limit of 45 terms (HITL streets prioritized)
-    # This prevents the Whisper decoder from throwing a positional embedding RuntimeError (token count > 448)
     all_terms = list(dict.fromkeys(base_words + hitl_streets + streets))
     all_terms = all_terms[:45]
     
@@ -379,30 +365,42 @@ def build_stt_bias_words(validator, units_vocabulary) -> tuple[str, str]:
 def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None:
     """
     Transcribes audio (NumPy array or file path) locally using a pre-loaded/cached
-    faster-whisper or openai-whisper model with street/unit phrase biasing.
+    faster-whisper model with street/unit phrase biasing and VAD filtering.
     """
     try:
         if model is None:
-            # On-demand fallback
             from faster_whisper import WhisperModel
             logging.info(f"Loading local faster-whisper model '{WHISPER_MODEL}' on demand...")
             model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
 
         is_faster_whisper = hasattr(model, 'transcribe') and not hasattr(model, 'load_model')
         
-        # Resolve validator dynamically if not supplied
         if validator is None:
             validator = get_shared_validator()
             
         initial_prompt, hotwords_str = build_stt_bias_words(validator, UNITS_VOCABULARY)
         
         if is_faster_whisper:
-            logging.info("Transcribing using cached faster-whisper model with vocabulary boosting...")
+            logging.info("Transcribing using cached faster-whisper model with vocabulary boosting and VAD...")
             try:
-                segments, info = model.transcribe(audio_data, beam_size=2, language="en", initial_prompt=initial_prompt, hotwords=hotwords_str)
+                segments, info = model.transcribe(
+                    audio_data, 
+                    beam_size=2, 
+                    language="en", 
+                    initial_prompt=initial_prompt, 
+                    hotwords=hotwords_str,
+                    vad_filter=True,
+                    condition_on_previous_text=False
+                )
             except TypeError:
-                # Fallback if hotwords parameter is not supported by ctranslate2 version
-                segments, info = model.transcribe(audio_data, beam_size=2, language="en", initial_prompt=initial_prompt)
+                segments, info = model.transcribe(
+                    audio_data, 
+                    beam_size=2, 
+                    language="en", 
+                    initial_prompt=initial_prompt,
+                    vad_filter=True,
+                    condition_on_previous_text=False
+                )
             text = " ".join([segment.text for segment in segments])
             return text.strip() or None
         else:
@@ -416,6 +414,7 @@ def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None
     except Exception as e:
         logging.error(f"Local transcription error: {e}", exc_info=True)
         return None
+
 
 def transcribe_audio_file_local(file_path: str, model=None) -> str | None:
     """Transcribes local audio file path using Whisper (backwards compatibility)."""
@@ -1525,28 +1524,30 @@ def run_dispatch_system():
                             full_sample_np = np.concatenate(analysis_buffer)
                             live_frequencies = analyze_live_audio(full_sample_np.tobytes(), AUDIO_SAMPLE_RATE, NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD)
                             all_matches = get_all_matches(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
-                            
-                            all_matches = get_all_matches(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
-                            if any(m[0] == "PA Tone" for m in all_matches) and not any(m[0] != "PA Tone" for m in all_matches):
+                            pa_matches = [m for m in all_matches if m[0] == "PA Tone"]
+                            apparatus_matches = [m for m in all_matches if m[0] in ("Chief Tone", "Engine Tone", "Rescue Tone")]
+
+                            if pa_matches and not apparatus_matches:
                                 logging.info("TONE DETECTED: 'PA Tone' (station paging page). Disregarding and resetting listener.")
                                 log_tone_spectral_history(None, ["PA Tone"], live_frequencies, is_pa_page=True)
                                 is_capturing_tone = False
                                 baseline_rms_history.clear()
                                 baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
                                 continue
-                            elif all_matches:
-                                matched_tone_list = [m[0] for m in all_matches]
+                            elif apparatus_matches:
+                                matched_tone_list = [m[0] for m in apparatus_matches]
                                 matched_tone = ", ".join(matched_tone_list)
-                                scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in all_matches])
+                                scores_str = ", ".join([f"{m[0]}: {m[1]*100:.0f}%" for m in apparatus_matches])
                                 logging.info(f"TONES CONFIRMED: '{matched_tone}' ({scores_str})")
                                 log_tone_spectral_history(None, matched_tone_list, live_frequencies, is_pa_page=False)
                                 break
                             else:
-                                logging.info("Triggered sound was not a recognized tone, resetting.")
+                                logging.info("Triggered sound was not a recognized apparatus tone, resetting.")
                                 is_capturing_tone = False
                                 baseline_rms_history.clear()
                                 baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
                                 continue
+
                         else:
                             continue
 

@@ -6,7 +6,8 @@ import os
 from cfr_dispatch.config.paths import SHAPES_DIR
 
 # Integration settings
-STT_ENGINE = os.environ.get("STT_ENGINE", "whisper")  # Options: "google", "whisper"
+STT_ENGINE = "whisper"                                    # Locked offline model: "whisper"
+
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")                                # Options: "tiny", "base", "small", or custom path
 INTEGRATION_PAYLOAD_OPTION = 2                        # 1: Lightweight, 2: Full parcel rings
 ENABLE_GOOGLE_MAPS_FALLBACK = os.environ.get("GOOGLE_API_KEY") is not None

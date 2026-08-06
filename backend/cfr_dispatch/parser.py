@@ -785,8 +785,9 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             try:
                 cleaned_number = str(w2n.word_to_num(number_phrase))
                 logging.debug(f"Successfully parsed number phrase '{number_phrase}' with word2number -> {cleaned_number}")
-            except ValueError:
+            except (ValueError, AttributeError, TypeError, KeyError):
                 digits_only = "".join(filter(str.isdigit, number_phrase))
+
                 if digits_only:
                     cleaned_number = digits_only
                     logging.debug(f"word2number failed for '{number_phrase}', fell back to digit joining -> {cleaned_number}")

@@ -10,11 +10,12 @@ const getMqttBrokerUrl = () => {
   try {
     const url = new URL(API_BASE_URL);
     const hostname = url.hostname || 'localhost';
-    const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${hostname}:9001`;
+    const isSsl = url.protocol === 'https:';
+    return isSsl ? `wss://${hostname}/mqtt` : `ws://${hostname}:9001`;
   } catch (e) {
     const hostname = window.location.hostname || 'localhost';
-    return `ws://${hostname}:9001`;
+    const isSsl = window.location.protocol === 'https:';
+    return isSsl ? `wss://${hostname}/mqtt` : `ws://${hostname}:9001`;
   }
 };
 
@@ -24,6 +25,12 @@ const getMqttBrokerUrl = () => {
  */
 export function useMqttListener({ onInsert, onUpdate, onDelete, enabled = true }) {
   const clientRef = useRef(null);
+  const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
+
+  // Update callbacks ref on each render without triggering reconnects
+  useEffect(() => {
+    callbacksRef.current = { onInsert, onUpdate, onDelete };
+  });
 
   useEffect(() => {
     if (!enabled) return;
@@ -63,13 +70,14 @@ export function useMqttListener({ onInsert, onUpdate, onDelete, enabled = true }
           const record = payload.new || payload;
 
           console.log(`MQTT Received Event [${eventType}]:`, record);
+          const { onInsert: handleInsert, onUpdate: handleUpdate, onDelete: handleDelete } = callbacksRef.current;
 
-          if (eventType === 'INSERT' && typeof onInsert === 'function') {
-            onInsert(formatDispatchPayload(record));
-          } else if (eventType === 'UPDATE' && typeof onUpdate === 'function') {
-            onUpdate(formatDispatchPayload(record));
-          } else if (eventType === 'DELETE' && typeof onDelete === 'function') {
-            onDelete(formatDispatchPayload(record));
+          if (eventType === 'INSERT' && typeof handleInsert === 'function') {
+            handleInsert(formatDispatchPayload(record));
+          } else if (eventType === 'UPDATE' && typeof handleUpdate === 'function') {
+            handleUpdate(formatDispatchPayload(record));
+          } else if (eventType === 'DELETE' && typeof handleDelete === 'function') {
+            handleDelete(formatDispatchPayload(record));
           }
         } catch (err) {
           console.error('Failed to parse MQTT message payload:', err);
@@ -89,7 +97,8 @@ export function useMqttListener({ onInsert, onUpdate, onDelete, enabled = true }
         client.end(true);
       }
     };
-  }, [onInsert, onUpdate, onDelete, enabled]);
+  }, [enabled]);
+
 }
 
 // Standardize raw dispatch payload structure for components

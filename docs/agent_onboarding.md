@@ -74,6 +74,8 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Privacy Compliance** | [docs/privacy.md](./privacy.md) | Voice monitoring rules, local RAM buffering specs, and FOI compliant data policies. |
 | **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Structural refactoring details of decoupling the monolith into microservices. |
 | **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant overlay integration and NFPA 291 vector markers mapping. |
+| **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | Full migration audit, PostgreSQL index tuning, Ntfy container setup, and DSP tone spotter calibration. |
+
 
 ---
 

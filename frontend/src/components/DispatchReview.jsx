@@ -278,7 +278,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       }
       
       // Resolve audio URL directly from local FastAPI static server
-      const getSignedAudio = async () => {
+      const getSignedAudio = () => {
         if (!selectedCall.audio_url) {
           setAudioSignedUrl(null);
           prevAudioUrlRef.current = null;
@@ -289,7 +289,10 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
         if (!path.startsWith('http')) {
           path = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
         }
-        setAudioSignedUrl(path);
+        if (prevAudioUrlRef.current !== path) {
+          prevAudioUrlRef.current = path;
+          setAudioSignedUrl(path);
+        }
       };
       
       getSignedAudio();
@@ -298,7 +301,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       prevAudioUrlRef.current = null;
       prevSelectedCallIdRef.current = null;
     }
-  }, [selectedCall]);
+  }, [selectedCall?.id, selectedCall?.audio_url]);
 
   const handleSelectCall = (call) => {
     setSelectedCall(call);
@@ -1116,16 +1119,21 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                           ref={audioRef}
                           src={audioSignedUrl}
                           controls
+                          preload="auto"
                           className="w-full focus:outline-none animate-in fade-in duration-200"
                         />
                         <button
                           type="button"
                           onClick={() => {
                             if (audioRef.current) {
-                              audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 5);
+                              const newTime = Math.max(0, audioRef.current.currentTime - 5);
+                              audioRef.current.currentTime = newTime;
+                              if (audioRef.current.paused) {
+                                audioRef.current.play().catch(() => {});
+                              }
                             }
                           }}
-                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-mono font-bold whitespace-nowrap transition-all cursor-pointer shadow-sm"
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-mono font-extrabold whitespace-nowrap transition-all cursor-pointer shadow-md active:scale-95"
                           title="Skip back 5 seconds"
                         >
                           ⏪ -5s

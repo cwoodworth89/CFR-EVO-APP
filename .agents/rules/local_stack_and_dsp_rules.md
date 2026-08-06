@@ -61,4 +61,14 @@ This rule file specifies domain constraints, DSP tone spotter thresholds, STT co
 - **Git-Ignored File Server Management**: Files in `.gitignore` (such as `backend/.env`, `frontend/.env.local`, offline model caches in `backend/models/`, GIS shapefiles in `backend/data/`, and credentials JSON files) are **NOT** synced via `git pull`. Any configuration changes to these ignored files must be manually transferred via `scp` or updated directly on the remote server.
 - **Daemon Restart**: Restart audio listener daemon via `sudo systemctl restart cfr-agent`.
 
+---
+
+## 8. System Metrics, Latency Waterfall & CAD Boundary Slicing Rules
+- **`"Coquitlam"` Anchor Locking**: Always inject `initial_prompt="Coquitlam, "` into `WhisperModel.transcribe()` to anchor opening apparatus names. Use 1st spoken `"Coquitlam"` post-tone burst to lock `t_speech_start`.
+- **`"map grid [N]"` Boundary Rule**: Slice Phase 1 preliminary audio immediately when `"map grid [N]"` is recognized in rolling text. Enforce strict range validation `1 <= N <= 134` (Coquitlam Emergency Response Zones).
+- **Do NOT Search for 2nd `"Coquitlam"`**: Talkgroup names contain `"Coquitlam"` mid-call (`"talk group 5 Coquitlam"`). Rely strictly on `"map grid [N]"` or `1.2s VAD pause` for Round 1 boundary detection.
+- **Waterfall Telemetry Schema**: Store latency waterfall timestamps (`t0_tone_detected`, `t1_capture_started`, `t2_anchor_coquitlam`, `t3_map_grid_spotted`, `t4_phase1_stt`, `t5_gis_lookup`, `t6_ntfy_push`) inside `live_calls.target['telemetry']` in PostgreSQL.
+- **Dedicated Admin Tab Navigation**: Keep `DispatchReview.jsx` de-cluttered for call review ergonomics; display latency waterfall charts, STT WER trends, and Docker container health inside `frontend/src/components/admin/SystemMetricsPanel.jsx`.
+
+
 

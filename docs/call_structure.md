@@ -205,6 +205,39 @@ Updates pushed via Supabase Realtime use a standardized json object layout for t
           "lng": -122.791240,
           "map_grid": "42",
           "radio_channel": "10",
-          "tone_name": "Engine Tone"
+          "tone_name": "Engine Tone",
+          "telemetry": {
+            "phase1_alert_latency_s": 12.4,
+            "phase2_total_latency_s": 47.2,
+            "stt_inference_time_s": 1.82,
+            "gis_lookup_time_ms": 6.3
+          }
         }
         ```
+
+---
+
+## ⚡ 6. Dynamic CAD Boundary Slicing & Latency Profiling
+
+### Opening Anchor: `"Coquitlam"`
+The automated CAD voice synthesizer **ALWAYS speaks `"Coquitlam"` as the very first word** after apparatus tone bursts complete.
+* `t_speech_start` is locked at the millisecond `"Coquitlam"` is spoken post-tones.
+* This ignores multi-tone paging burst lengths (e.g. Chief + Engine + Rescue tones, ~9.5s).
+* Whisper is guided using `initial_prompt="Coquitlam, "` to anchor opening apparatus names (e.g. "Engine 1").
+
+### Round 1 Closing Boundary: `"map grid [N]"` (`1 <= N <= 134`)
+Because the inter-round pause in digital TTS is razor-thin (~300ms inter-word gap) and talkgroup names contain `"Coquitlam"` mid-call (e.g. `"talk group 5 Coquitlam"`), searching for a 2nd `"Coquitlam"` is unreliable.
+* The system streams rolling audio and checks for the CAD template closing phrase: **`"map grid [N]"`** (or `"grid [N]"`).
+* Grid numbers are strictly validated against **`1 <= N <= 134`** (Coquitlam's 134 Emergency Response Zones), rejecting false matches like `0` or `> 134`.
+* As soon as `"map grid [N]"` is recognized, Phase 1 STT fires **IMMEDIATELY**, pushing preliminary phone alerts in **~12–20s total** from tones.
+
+### Second-by-Second Latency Waterfall
+Pipeline latency timestamps are logged to PostgreSQL `live_calls.target['telemetry']` and visualized on the **System Metrics & Performance Dashboard** (`SystemMetricsPanel.jsx`):
+1. `t_tone_sequence`: Time spent playing tones (2.5s–9.5s).
+2. `t_speech_start`: 1st `"Coquitlam"` spoken anchor.
+3. `t_round1_speech`: Spoken Round 1 announcement duration.
+4. `t_map_grid_spotted`: `"map grid [N]"` boundary trigger.
+5. `t_phase1_stt`: faster-whisper CPU inference time (~1.8s).
+6. `t_gis_lookup`: 69,708 parcel shapefile spatial search time (~6.3ms).
+7. `t_ntfy_push`: Ntfy phone alert delivery (~0.3s).
+

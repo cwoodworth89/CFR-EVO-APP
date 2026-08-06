@@ -134,15 +134,24 @@ class DispatchCreateSchema(BaseModel):
     feedback_submitted: Optional[bool] = False
 
 class DispatchUpdateSchema(BaseModel):
+    incident_type: Optional[str] = None
+    responding_units: Optional[List[str]] = None
+    target: Optional[Dict[str, Any]] = None
+    raw_transcript: Optional[str] = None
+    sanitized_transcript: Optional[str] = None
+    confidence_score: Optional[float] = None
+    verify_location: Optional[bool] = None
+    origins: Optional[List[str]] = None
+    audio_url: Optional[str] = None
+    audio_duration: Optional[float] = None
     verified_transcript: Optional[str] = None
     verified_address: Optional[str] = None
     verified_incident: Optional[str] = None
     verified_units: Optional[List[str]] = None
     feedback_submitted: Optional[bool] = None
-    verify_location: Optional[bool] = None
     quality_rating: Optional[str] = None
     model_updated: Optional[bool] = None
-    target: Optional[Dict[str, Any]] = None
+    review_notes: Optional[str] = None
 
 def serialize_call(call: LiveCallModel) -> dict:
     return {

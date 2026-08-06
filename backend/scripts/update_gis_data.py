@@ -253,16 +253,17 @@ def update_hydrant_data():
         logging.info(f"  ... and {len(modified) - 10} more.")
     logging.info("================================\n")
     
-    # 6. Save updated file
+    # 6. Save updated file using compact serialization
     os.makedirs(output_dir, exist_ok=True)
     try:
         with open(output_path, "w") as out_f:
-            json.dump(new_hydrants_list, out_f, indent=2)
-        logging.info(f"Successfully updated cached hydrant database at: {output_path}")
+            json.dump(new_hydrants_list, out_f, separators=(',', ':'))
+        logging.info(f"Successfully updated cached hydrant database (compact format) at: {output_path}")
         return True
     except Exception as e:
         logging.error(f"Failed to write updated hydrants file: {e}")
         return False
+
 
 def main():
     logging.info("=== Starting Coquitlam GIS Database Weekly Update ===")

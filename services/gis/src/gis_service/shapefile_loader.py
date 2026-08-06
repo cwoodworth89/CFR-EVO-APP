@@ -15,14 +15,16 @@ def load_addresses(address_shp_path: str, house_num_col: str, street_name_col: s
         # Build fast in-memory lookup index
         logging.info("Indexing address points into fast lookup dictionary...")
         house_number_index = {}
-        for _, row in addresses_gdf.iterrows():
-            house_num = row[house_num_col]
+        records = addresses_gdf[[house_num_col, street_name_col, street_type_col, 'geometry']].to_dict('records')
+        for rec in records:
+            house_num = rec[house_num_col]
             if house_num not in house_number_index:
                 house_number_index[house_num] = []
-            house_number_index[house_num].append(row)
+            house_number_index[house_num].append(rec)
             
         logging.info(f"Successfully loaded and indexed {len(addresses_gdf)} Coquitlam addresses.")
         return addresses_gdf, house_number_index
+
     except Exception as e:
         logging.error(f"FATAL: Could not load or process Coquitlam address Shapefile: {e}", exc_info=True)
         return None, {}

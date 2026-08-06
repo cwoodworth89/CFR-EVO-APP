@@ -254,9 +254,10 @@ def get_listener_status():
 
 # Dispatch REST Endpoints
 @app.get("/api/dispatches")
-def get_dispatches(limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+def get_dispatches(limit: int = Query(500, ge=1, le=5000), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     calls = db.query(LiveCallModel).order_by(desc(LiveCallModel.timestamp)).offset(offset).limit(limit).all()
     return [serialize_call(c) for c in calls]
+
 
 
 @app.post("/api/dispatches")

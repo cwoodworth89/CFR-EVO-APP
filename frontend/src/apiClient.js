@@ -132,11 +132,12 @@ export const apiClient = {
 
   // Dispatch REST query builder
   dispatches: {
-    async fetchAll() {
-      const res = await fetch(`${API_BASE_URL}/api/dispatches`, { headers: getHeaders() });
+    async fetchAll(limit = 500) {
+      const res = await fetch(`${API_BASE_URL}/api/dispatches?limit=${limit}`, { headers: getHeaders() });
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();
     },
+
 
     async create(payload) {
       const res = await fetch(`${API_BASE_URL}/api/dispatches`, {

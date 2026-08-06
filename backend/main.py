@@ -20,14 +20,14 @@ def start_api_server():
         import os
         import sys
         import requests
-        import socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1.0)
-        is_open = sock.connect_ex(('127.0.0.1', 8000)) == 0
-        sock.close()
-        if is_open:
-            logging.info("Local FastAPI API Gateway is already running on port 8000 (Docker container mode). Skipping duplicate thread.")
-            return
+        # Check if local API Gateway is already running via Docker container
+        try:
+            res = requests.get("http://localhost:8000/api/dispatches", timeout=2)
+            if res.status_code == 200:
+                logging.info("Local FastAPI API Gateway is already running on port 8000 (Docker container mode). Skipping duplicate thread.")
+                return
+        except Exception:
+            pass
 
         import uvicorn
         base_dir = os.path.dirname(os.path.abspath(__file__))

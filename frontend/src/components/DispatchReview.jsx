@@ -91,7 +91,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [stage1Open, setStage1Open] = useState(false);
   const [stage2Open, setStage2Open] = useState(false);
-  const [stage3Open, setStage3Open] = useState(true);
+  const [stage3Open, setStage3Open] = useState(false);
 
   // Load calls from local FastAPI gateway
   const fetchCalls = async () => {
@@ -1304,6 +1304,35 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                   </div>
                 </div>
 
+                {/* Verified Ground-Truth Transcript (Positioned directly under Pipeline Execution Flow) */}
+                <div className="flex flex-col gap-1.5 bg-slate-950/60 p-3 border border-slate-850 rounded-xl">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-sky-400 font-extrabold uppercase font-mono tracking-wider">
+                      📝 Verified Ground-Truth Transcript
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handlePrefillDefaults}
+                      className="text-[9px] font-bold text-sky-400 hover:text-sky-300 bg-sky-950/40 border border-sky-900/30 px-2 py-0.5 rounded cursor-pointer transition-all hover:bg-sky-900/30"
+                      title="Prefill transcript, address, incident type, and units using system-extracted data"
+                    >
+                      📋 Prefill All Fields
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder={selectedCall.sanitized_transcript || selectedCall.raw_transcript || "Enter confirmed transcript... (Ctrl+Space to prefill)"}
+                    value={verifiedTranscript}
+                    onChange={(e) => setVerifiedTranscript(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
+                      handleInputKeyDown(e, 'transcript');
+                    }}
+                    onDoubleClick={() => prefillField('transcript')}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono resize-none leading-relaxed"
+                  />
+                </div>
+
                 {/* 1. Captured Dispatch Tone (HITL Verification & Backfill) */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
@@ -1518,36 +1547,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                     />
                   </div>
                 </div>
-
-                {/* 7. Verified Ground-Truth Transcript */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Ground-Truth Transcript
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handlePrefillDefaults}
-                      className="text-[9px] font-bold text-sky-400 hover:text-sky-300 bg-sky-950/40 border border-sky-900/30 px-2 py-0.5 rounded cursor-pointer transition-all hover:bg-sky-900/30"
-                      title="Prefill transcript, address, incident type, and units using system-extracted data"
-                    >
-                      📋 Prefill All Fields
-                    </button>
-                  </div>
-                  <textarea
-                    rows={3}
-                    placeholder={selectedCall.sanitized_transcript || selectedCall.raw_transcript || "Enter confirmed transcript... (Ctrl+Space to prefill)"}
-                    value={verifiedTranscript}
-                    onChange={(e) => setVerifiedTranscript(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                      handleInputKeyDown(e, 'transcript');
-                    }}
-                    onDoubleClick={() => prefillField('transcript')}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono resize-none leading-relaxed"
-                  />
-                </div>
-
 
                 {/* 1. HITL Quality Rating Selector */}
                 <div className="flex flex-col gap-1.5 bg-slate-950 p-3 border border-slate-850 rounded-xl flex-shrink-0 mt-1.5">

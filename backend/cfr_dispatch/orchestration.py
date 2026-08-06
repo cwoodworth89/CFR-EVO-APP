@@ -1173,17 +1173,16 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         else:
                             update_payload["target"] = target_payload
                             
-                        # Update Supabase
-                        if supabase_url and supabase_key:
-                            success = update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
-                            if not success:
-                                local_wav_path = None
-                                try:
-                                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                                    local_wav_path = os.path.join(base_dir, "frontend", "public", "recordings", f"{dispatch_id}.wav")
-                                except Exception:
-                                    pass
-                                queue_offline_dispatch(dispatch_id, "update", update_payload, local_wav_path)
+                        # Update Local Database API (and optional Supabase cloud backup)
+                        success = update_dispatch_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                        if not success:
+                            local_wav_path = None
+                            try:
+                                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                                local_wav_path = os.path.join(base_dir, "frontend", "public", "recordings", f"{dispatch_id}.wav")
+                            except Exception:
+                                pass
+                            queue_offline_dispatch(dispatch_id, "update", update_payload, local_wav_path)
                             
                         # Send correction push notification
                         if ENABLE_NTFY_PUSH:
@@ -1209,7 +1208,7 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                                 except Exception as n_err:
                                     logging.error(f"Failed to post correction to Ntfy: {n_err}")
                     else:
-                        # Geocoding failed for Phase 2 as well, keep Phase 1 but mark as verify_location=True
+                        # Geocoding failed for Phase 2 as well, keep Phase 1 data but flag verify_location=True
                         logging.warning("Phase 2 geocoding failed. Keeping Phase 1 data but flagging verify_location=True.")
                         
                         p1_units = p1_candidate.units if p1_candidate else None
@@ -1241,17 +1240,16 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                             except Exception as r_err:
                                 logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
                                 
-                        if supabase_url and supabase_key:
-                            update_payload = {
-                                "verify_location": True,
-                                "audio_url": audio_url,
-                                "audio_duration": audio_duration,
-                                "raw_transcript": full_raw,
-                                "sanitized_transcript": reconstructed_transcript,
-                                "incident_type": p2_incident_type,
-                                "responding_units": p2_responding_units
-                            }
-                            update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                        update_payload = {
+                            "verify_location": True,
+                            "audio_url": audio_url,
+                            "audio_duration": audio_duration,
+                            "raw_transcript": full_raw,
+                            "sanitized_transcript": reconstructed_transcript,
+                            "incident_type": p2_incident_type,
+                            "responding_units": p2_responding_units
+                        }
+                        update_dispatch_record(dispatch_id, update_payload, supabase_url, supabase_key)
                 else:
                     # No Phase 2 candidate found (e.g. dispatcher override, noise, cutoff)
                     # Gracefully fallback: keep Phase 1 data, mark as verified=True
@@ -1283,17 +1281,17 @@ def process_phase_2_finalize(task: dict, validator: CoquitlamDataValidator, stt_
                         except Exception as r_err:
                             logging.warning(f"Failed to reconstruct Phase 2 template transcript: {r_err}")
                             
-                    if supabase_url and supabase_key:
-                        update_payload = {
-                            "verify_location": False,
-                            "audio_url": audio_url,
-                            "audio_duration": audio_duration,
-                            "raw_transcript": full_raw,
-                            "sanitized_transcript": reconstructed_transcript,
-                            "incident_type": p2_incident_type,
-                            "responding_units": p2_responding_units
-                        }
-                        update_supabase_record(dispatch_id, update_payload, supabase_url, supabase_key)
+                    update_payload = {
+                        "verify_location": False,
+                        "audio_url": audio_url,
+                        "audio_duration": audio_duration,
+                        "raw_transcript": full_raw,
+                        "sanitized_transcript": reconstructed_transcript,
+                        "incident_type": p2_incident_type,
+                        "responding_units": p2_responding_units
+                    }
+                    update_dispatch_record(dispatch_id, update_payload, supabase_url, supabase_key)
+
                         
     except Exception as e:
         logging.error(f"Error in process_phase_2_finalize for ID {dispatch_id}: {e}", exc_info=True)
@@ -1360,14 +1358,19 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
             logging.info(f"Pre-loading local STT engine '{WHISPER_MODEL}' on {device} ({compute_type})...")
             try:
                 from faster_whisper import WhisperModel
-                stt_model = WhisperModel(WHISPER_MODEL, device=device, compute_type=compute_type)
+                try:
+                    stt_model = WhisperModel(WHISPER_MODEL, device=device, compute_type=compute_type)
+                except Exception as model_err:
+                    logging.warning(f"Could not load specified model '{WHISPER_MODEL}': {model_err}. Falling back to standard 'base' faster-whisper model...")
+                    stt_model = WhisperModel("base", device=device, compute_type=compute_type)
                 logging.info("faster-whisper model pre-loaded successfully.")
             except ImportError:
                 import whisper
-                stt_model = whisper.load_model(WHISPER_MODEL, device=device)
+                stt_model = whisper.load_model(WHISPER_MODEL if not os.path.isdir(WHISPER_MODEL) else "base", device=device)
                 logging.info("standard whisper model pre-loaded successfully.")
         except Exception as e:
             logging.error(f"Failed to pre-load Whisper model: {e}. Will load on demand.", exc_info=True)
+
 
     # Start offline queue sync poller thread
     supabase_url = os.environ.get("SUPABASE_URL")

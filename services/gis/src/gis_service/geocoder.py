@@ -140,7 +140,8 @@ class CoquitlamDataValidator:
                     "address": best_l_match["address"],
                     "lat": best_l_match["lat"],
                     "lng": best_l_match["lng"],
-                    "rings": []
+                    "rings": [],
+                    "confidence": float(best_l_score)
                 }
 
         # Manual geocoding override for 3080 Gordon Ave

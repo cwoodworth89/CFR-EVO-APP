@@ -97,14 +97,15 @@ def build_dispatch_payload(
             logging.debug(f"[{dispatch_id}] Attempting Local Geocode for Candidate #{i+1}: '{candidate_address}'")
             res = validator.local_geocode(candidate_address) if validator else None
             if res:
-                logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}' (Score: {res['confidence']}%)")
+                conf = res.get("confidence", 85.0)
+                logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}' (Score: {conf}%)")
                 local_geocode_result = {
                     "address": res["address"],
                     "lat": res["lat"],
                     "lng": res["lng"],
                     "rings": res.get("rings", [])
                 }
-                confidence_score = float(res.get("confidence", 80.0))
+                confidence_score = float(conf)
                 break
         
         if not local_geocode_result:

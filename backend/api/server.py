@@ -477,7 +477,8 @@ def get_road_closures():
             else:
                 continue
 
-            if not any(49.20 <= pt[1] <= 49.38 and -122.92 <= pt[0] <= -122.68 for pt in pts):
+            # Bounding box filter strictly for Coquitlam / Tri-Cities (lat 49.23 to 49.38)
+            if not any(49.23 <= pt[1] <= 49.38 and -122.92 <= pt[0] <= -122.68 for pt in pts):
                 continue
 
             lat = 49.28
@@ -526,92 +527,100 @@ def get_road_closures():
     except Exception as e:
         logging.warning(f"Error fetching DriveBC events: {e}")
 
-    # 2. Municipal 511 API
+    # 2. Municipal 511 API (Scan all dynamic data chunks for full Coquitlam coverage)
     try:
-        req_page = urllib.request.Request("https://bc.municipal511.ca/", headers=headers)
+        req_page = urllib.request.Request("https://bc.municipal511.ca/?municipality=coquitlam", headers=headers)
         with urllib.request.urlopen(req_page, timeout=5) as resp:
             html = resp.read().decode('utf-8')
-        match = re.search(r'"jsonData0\.txt"\s*:\s*"([^"]+)"', html)
-        filename = match.group(1) if match else "jsonData0.txt"
+        
+        matches = re.findall(r'"(jsonData\d*\.txt)"\s*:\s*"([^"]+)"', html)
+        if not matches:
+            matches = [("jsonData0.txt", "jsonData0.txt")]
 
-        req_data = urllib.request.Request(f"https://bc.municipal511.ca/Dynamic/{filename}", headers=headers)
-        with urllib.request.urlopen(req_data, timeout=5) as resp:
-            muni_data = json.loads(resp.read().decode('utf-8'))
+        for _, filename in matches:
+            try:
+                req_data = urllib.request.Request(f"https://bc.municipal511.ca/Dynamic/{filename}", headers=headers)
+                with urllib.request.urlopen(req_data, timeout=5) as resp:
+                    muni_data = json.loads(resp.read().decode('utf-8'))
 
-        issues = muni_data.get('Issues', [])
-        decoder = PythonGeometryDecoder(muni_data.get('CoordsEncoded', ''))
+                issues = muni_data.get('Issues', [])
+                decoder = PythonGeometryDecoder(muni_data.get('CoordsEncoded', ''))
 
-        for issue in issues:
-            geoms = issue.get('Geometry', [])
-            for geom_idx, geom in enumerate(geoms):
-                num_points = geom.get('NumPoints', 0)
-                path_pts = decoder.get_n_points(num_points)
+                for issue in issues:
+                    geoms = issue.get('Geometry', [])
+                    for geom_idx, geom in enumerate(geoms):
+                        num_points = geom.get('NumPoints', 0)
+                        path_pts = decoder.get_n_points(num_points)
 
-                if not any(49.20 <= pt[0] <= 49.38 and -122.92 <= pt[1] <= -122.68 for pt in path_pts):
-                    continue
+                        # Strict Coquitlam bounding box check (lat 49.23 to 49.38)
+                        if not any(49.23 <= pt[0] <= 49.38 and -122.92 <= pt[1] <= -122.68 for pt in path_pts):
+                            continue
 
-                lat = 49.28
-                lng = -122.80
-                polyline = []
-                if len(path_pts) == 1:
-                    lat, lng = path_pts[0][0], path_pts[0][1]
-                elif len(path_pts) > 1:
-                    polyline = path_pts
-                    mid = len(path_pts) // 2
-                    lat, lng = path_pts[mid][0], path_pts[mid][1]
-                else:
-                    continue
+                        lat = 49.28
+                        lng = -122.80
+                        polyline = []
+                        if len(path_pts) == 1:
+                            lat, lng = path_pts[0][0], path_pts[0][1]
+                        elif len(path_pts) > 1:
+                            polyline = path_pts
+                            mid = len(path_pts) // 2
+                            lat, lng = path_pts[mid][0], path_pts[mid][1]
+                        else:
+                            continue
 
-                rct = geom.get('MarkerInfo', {}).get('RoadClosureType', 0)
-                highest_bit = 0
-                if rct > 0:
-                    import math
-                    highest_bit = 1 << int(math.log2(rct))
+                        rct = geom.get('MarkerInfo', {}).get('RoadClosureType', 0)
+                        highest_bit = 0
+                        if rct > 0:
+                            import math
+                            highest_bit = 1 << int(math.log2(rct))
 
-                desc = issue.get('Description', {})
-                desc_lower = (desc.get('BaseDescription') or "").lower()
-                headline_lower = (desc.get('Headline') or "").lower()
-                is_closed = "road closed" in desc_lower or "full closure" in desc_lower or "road closed" in headline_lower or "full closure" in headline_lower
+                        desc = issue.get('Description', {})
+                        desc_lower = (desc.get('BaseDescription') or "").lower()
+                        headline_lower = (desc.get('Headline') or "").lower()
+                        is_closed = "road closed" in desc_lower or "full closure" in desc_lower or "road closed" in headline_lower or "full closure" in headline_lower
 
-                emergency_access = "CAUTION"
-                severity = "MINOR"
-                if highest_bit == 262144:
-                    emergency_access = "NO_ACCESS"
-                    severity = "MAJOR"
-                elif highest_bit in (65536, 32768, 16384) or is_closed:
-                    emergency_access = "ACCESS_ONLY"
-                    severity = "MODERATE"
+                        emergency_access = "CAUTION"
+                        severity = "MINOR"
+                        if highest_bit == 262144:
+                            emergency_access = "NO_ACCESS"
+                            severity = "MAJOR"
+                        elif highest_bit in (65536, 32768, 16384) or is_closed:
+                            emergency_access = "ACCESS_ONLY"
+                            severity = "MODERATE"
 
-                start_date = None
-                end_date = None
-                if desc.get('ProposedStartTimeUtcEpochMillis'):
-                    start_date = datetime.fromtimestamp(desc['ProposedStartTimeUtcEpochMillis'] / 1000, tz=timezone.utc).isoformat()
-                if desc.get('ProposedEndTimeUtcEpochMillis'):
-                    end_date = datetime.fromtimestamp(desc['ProposedEndTimeUtcEpochMillis'] / 1000, tz=timezone.utc).isoformat()
+                        start_date = None
+                        end_date = None
+                        if desc.get('ProposedStartTimeUtcEpochMillis'):
+                            start_date = datetime.fromtimestamp(desc['ProposedStartTimeUtcEpochMillis'] / 1000, tz=timezone.utc).isoformat()
+                        if desc.get('ProposedEndTimeUtcEpochMillis'):
+                            end_date = datetime.fromtimestamp(desc['ProposedEndTimeUtcEpochMillis'] / 1000, tz=timezone.utc).isoformat()
 
-                loc_name = geom.get('MarkerInfo', {}).get('LocationName') or issue.get('TableViewInfo', {}).get('Location') or desc.get('BaseLocationDescription') or "Local Road"
-                headline_text = desc.get('Headline') or loc_name
-                desc_text = (desc.get('BaseDescription') or "").strip() or "Local road construction or restriction."
+                        loc_name = geom.get('MarkerInfo', {}).get('LocationName') or issue.get('TableViewInfo', {}).get('Location') or desc.get('BaseLocationDescription') or "Local Road"
+                        headline_text = desc.get('Headline') or loc_name
+                        desc_text = (desc.get('BaseDescription') or "").strip() or "Local road construction or restriction."
 
-                combined_events.append({
-                    "id": f"muni_{issue.get('IssueId')}_{geom_idx}",
-                    "headline": headline_text,
-                    "street": loc_name,
-                    "severity": severity,
-                    "emergencyAccess": emergency_access,
-                    "description": desc_text,
-                    "coordinates": [lat, lng],
-                    "polyline": polyline,
-                    "source": issue.get('Source') or "City of Coquitlam",
-                    "startDate": start_date,
-                    "endDate": end_date
-                })
+                        combined_events.append({
+                            "id": f"muni_{issue.get('IssueId')}_{geom_idx}",
+                            "headline": headline_text,
+                            "street": loc_name,
+                            "severity": severity,
+                            "emergencyAccess": emergency_access,
+                            "description": desc_text,
+                            "coordinates": [lat, lng],
+                            "polyline": polyline,
+                            "source": issue.get('Source') or "City of Coquitlam",
+                            "startDate": start_date,
+                            "endDate": end_date
+                        })
+            except Exception as chunk_err:
+                logging.warning(f"Error parsing chunk {filename}: {chunk_err}")
     except Exception as e:
         logging.warning(f"Error fetching Municipal 511 events: {e}")
 
     ROAD_CLOSURES_CACHE["timestamp"] = now_ts
     ROAD_CLOSURES_CACHE["data"] = combined_events
     return combined_events
+
 
 if __name__ == "__main__":
     import uvicorn

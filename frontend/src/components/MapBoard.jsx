@@ -624,8 +624,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
 
   // ROAD ACCESS FILTER STATES
   const [filterNoAccess, setFilterNoAccess] = useState(true);
-  const [filterAccessOnly, setFilterAccessOnly] = useState(false);
-  const [filterCaution, setFilterCaution] = useState(false);
+  const [filterAccessOnly, setFilterAccessOnly] = useState(true);
+  const [filterCaution, setFilterCaution] = useState(true);
 
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
@@ -648,251 +648,69 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES
+  // LOAD ROAD CLOSURES (Primary: Local Gateway API, Fallback: Direct DriveBC Open511)
   useEffect(() => {
-    // 1. Fetch DriveBC live API
-    const fetchDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
+    const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+    const fetchFromGateway = fetch(`${backendUrl}/api/road-closures`)
+      .then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK"))
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+        return Promise.reject("Empty gateway payload");
+      });
+
+    const fetchDirectDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
       .then(r => r.ok ? r.json() : { events: [] })
-      .catch(err => {
-        console.warn("Failed to fetch DriveBC Open511 events:", err);
-        return { events: [] };
-      });
-
-    // 2. Fetch Municipal 511 API via proxy (Dynamic versioned filename parser to bypass caching)
-    const fetchMuni511 = fetch("https://api.codetabs.com/v1/proxy?quest=https://bc.municipal511.ca/")
-      .then(r => r.ok ? r.text() : Promise.reject("Primary HTML proxy failed"))
-      .then(html => {
-        const match = html.match(/"jsonData0\.txt"\s*:\s*"([^"]+)"/);
-        const hashedFilename = match ? match[1] : "jsonData0.txt";
-        return fetch(`https://api.codetabs.com/v1/proxy?quest=https://bc.municipal511.ca/Dynamic/${hashedFilename}`)
-          .then(r => r.ok ? r.json() : Promise.reject("Primary Data proxy failed"));
-      })
-      .catch(err => {
-        console.warn("Primary CORS proxy failed, trying fallback...", err);
-        return fetch("https://api.allorigins.win/raw?url=https://bc.municipal511.ca/")
-          .then(r => r.ok ? r.text() : Promise.reject("Fallback HTML proxy failed"))
-          .then(html => {
-            const match = html.match(/"jsonData0\.txt"\s*:\s*"([^"]+)"/);
-            const hashedFilename = match ? match[1] : "jsonData0.txt";
-            return fetch(`https://api.allorigins.win/raw?url=https://bc.municipal511.ca/Dynamic/${hashedFilename}`)
-              .then(r => r.ok ? r.json() : Promise.reject("Fallback Data proxy failed"));
-          });
-      })
-      .catch(err => {
-        console.warn("All CORS proxies failed to fetch Municipal 511:", err);
-        return { Issues: [], CoordsEncoded: "" };
-      });
-
-    Promise.all([fetchDriveBC, fetchMuni511])
-      .then(([dbData, muniData]) => {
-        const combinedEvents = [];
-        const now = new Date();
-
-        // --- Process DriveBC Events ---
-        const dbEvents = (dbData.events || [])
+      .then(dbData => {
+        const events = (dbData.events || [])
           .filter(evt => {
             if (!evt.geography || !evt.geography.coordinates) return false;
-            let coords = [];
-            if (evt.geography.type === "Point") {
-              coords = [evt.geography.coordinates];
-            } else if (evt.geography.type === "LineString") {
-              coords = evt.geography.coordinates;
-            } else {
-              return false;
-            }
-            return coords.some(([lng, lat]) => 
-              lat >= 49.20 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68
-            );
+            let coords = evt.geography.type === "Point" ? [evt.geography.coordinates] : (evt.geography.type === "LineString" ? evt.geography.coordinates : []);
+            return coords.some(([lng, lat]) => lat >= 49.20 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68);
           })
           .map(evt => {
-            let lat = 49.28;
-            let lng = -122.80;
-            let polyline = [];
+            let lat = 49.28, lng = -122.80, polyline = [];
             if (evt.geography.type === "Point") {
               lng = evt.geography.coordinates[0];
               lat = evt.geography.coordinates[1];
             } else if (evt.geography.type === "LineString") {
               polyline = evt.geography.coordinates.map(pt => [pt[1], pt[0]]);
-              const middleIndex = Math.floor(evt.geography.coordinates.length / 2);
-              lng = evt.geography.coordinates[middleIndex][0];
-              lat = evt.geography.coordinates[middleIndex][1];
+              const mid = Math.floor(evt.geography.coordinates.length / 2);
+              lng = evt.geography.coordinates[mid][0];
+              lat = evt.geography.coordinates[mid][1];
             }
-
-            const severityVal = (evt.severity || "MINOR").toUpperCase();
-            let emergencyAccess = "CAUTION";
-            if (severityVal === "MAJOR") {
-              emergencyAccess = "NO_ACCESS";
-            }
-
-            let startDate = null;
-            let endDate = null;
-            if (evt.schedule && Array.isArray(evt.schedule.intervals) && evt.schedule.intervals.length > 0) {
-              const parts = evt.schedule.intervals[0].split('/');
-              if (parts.length === 2) {
-                const s = new Date(parts[0]);
-                const e = new Date(parts[1]);
-                if (!isNaN(s.getTime())) startDate = s.toISOString();
-                if (!isNaN(e.getTime())) endDate = e.toISOString();
-              }
-            }
-            if (!startDate && evt.created) {
-              const c = new Date(evt.created);
-              if (!isNaN(c.getTime())) startDate = c.toISOString();
-            }
-
+            const sev = (evt.severity || "MINOR").toUpperCase();
             return {
               id: evt.id || Math.random().toString(),
               headline: evt.headline || "TRAFFIC ALERT",
               street: evt.road_name || "Regional Road",
-              severity: severityVal,
-              emergencyAccess: emergencyAccess,
+              severity: sev,
+              emergencyAccess: sev === "MAJOR" ? "NO_ACCESS" : "CAUTION",
               description: evt.description || "Active traffic event.",
               coordinates: [lat, lng],
               polyline: polyline,
               source: "DriveBC Open511",
-              startDate: startDate,
-              endDate: endDate
+              startDate: evt.created || null,
+              endDate: null
             };
           });
+        return events;
+      });
 
-        combinedEvents.push(...dbEvents);
-
-        // --- Process Municipal 511 Events ---
-        const muniIssues = muniData.Issues || [];
-        const coordsEncoded = muniData.CoordsEncoded || "";
-        const decoder = new GeometryDecoder(coordsEncoded);
-
-        muniIssues.forEach(issue => {
-          const geoms = issue.Geometry || [];
-          geoms.forEach((geom, geomIdx) => {
-            const numPoints = geom.NumPoints || 0;
-            const pathPoints = decoder.getNPoints(numPoints); // Array of [lat, lng]
-
-            // Check if any point falls inside Coquitlam bounding box
-            const inCoquitlam = pathPoints.some(([lat, lng]) => 
-              lat >= 49.20 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68
-            );
-
-            if (!inCoquitlam) return;
-
-            // Determine midpoint coordinates for pin placement
-            let lat = 49.28;
-            let lng = -122.80;
-            let polyline = [];
-
-            if (pathPoints.length === 1) {
-              lat = pathPoints[0][0];
-              lng = pathPoints[0][1];
-            } else if (pathPoints.length > 1) {
-              polyline = pathPoints;
-              const middleIndex = Math.floor(pathPoints.length / 2);
-              lat = pathPoints[middleIndex][0];
-              lng = pathPoints[middleIndex][1];
-            } else {
-              return; // Empty geometry, skip
-            }
-
-            // Map RoadClosureType flags to emergencyAccess level
-            const rct = geom.MarkerInfo?.RoadClosureType || 0;
-            let highestBit = 0;
-            if (rct > 0) {
-              highestBit = 1 << Math.floor(Math.log2(rct));
-            }
-
-            const desc = issue.Description || {};
-            const descLower = (desc.BaseDescription || "").toLowerCase();
-            const headlineLower = (desc.Headline || "").toLowerCase();
-            const isRoadClosedText = descLower.includes("road closed") || 
-                                     descLower.includes("full closure") || 
-                                     headlineLower.includes("road closed") || 
-                                     headlineLower.includes("full closure");
-
-            let emergencyAccess = "CAUTION";
-            let severity = "MINOR";
-
-            if (highestBit === 262144) {
-              emergencyAccess = "NO_ACCESS";
-              severity = "MAJOR";
-            } else if (highestBit === 65536 || highestBit === 32768 || highestBit === 16384) {
-              emergencyAccess = "ACCESS_ONLY";
-              severity = "MODERATE";
-            } else if (isRoadClosedText) {
-              emergencyAccess = "ACCESS_ONLY";
-              severity = "MODERATE";
-            } else if (issue.Priority >= 4) {
-              severity = "MAJOR";
-            } else if (issue.Priority === 3) {
-              severity = "MODERATE";
-            }
-
-            // Dates conversion
-            let startDate = null;
-            let endDate = null;
-            if (desc.ProposedStartTimeUtcEpochMillis) {
-              startDate = new Date(desc.ProposedStartTimeUtcEpochMillis).toISOString();
-            }
-            if (desc.ProposedEndTimeUtcEpochMillis) {
-              endDate = new Date(desc.ProposedEndTimeUtcEpochMillis).toISOString();
-            }
-            if (!startDate && desc.UpdateTimeUtcEpochMillis) {
-              startDate = new Date(desc.UpdateTimeUtcEpochMillis).toISOString();
-            }
-
-            // Headline, street and description
-            const locationName = geom.MarkerInfo?.LocationName || "";
-            const streetName = locationName || issue.TableViewInfo?.Location || desc.BaseLocationDescription || "Local Road";
-            
-            let categoryName = "Traffic Alert";
-            const iconClass = geom.MarkerInfo?.IconClass || issue.TableViewInfo?.IconClass || "";
-            if (iconClass.toLowerCase().includes("construction")) {
-              categoryName = "Construction";
-            } else if (iconClass.toLowerCase().includes("event")) {
-              categoryName = "Special Event";
-            } else if (iconClass.toLowerCase().includes("debris")) {
-              categoryName = "Caution";
-            } else if (iconClass.toLowerCase().includes("slippery")) {
-              categoryName = "Weather Alert";
-            }
-
-            const closureTypeName = getClosureTypeName(highestBit);
-            let headlineText = desc.Headline || "";
-            if (!headlineText) {
-              headlineText = closureTypeName ? `${categoryName}: ${closureTypeName}` : categoryName;
-            }
-
-            let descriptionText = desc.BaseDescription ? desc.BaseDescription.trim() : "";
-            if (!descriptionText) {
-              descriptionText = closureTypeName ? `Local activity/road work. Status: ${closureTypeName}.` : "Local construction or road activity.";
-            }
-
-            const item = {
-              id: `${issue.IssueId}_${geomIdx}`,
-              headline: headlineText,
-              street: streetName,
-              severity: severity,
-              emergencyAccess: emergencyAccess,
-              description: descriptionText,
-              coordinates: [lat, lng],
-              polyline: polyline,
-              source: issue.Source || "City of Coquitlam",
-              startDate: startDate,
-              endDate: endDate
-            };
-
-            combinedEvents.push(item);
-          });
-        });
-
-        // --- Post-process: Expiry, deduplication and sorting preparation ---
-        const processed = combinedEvents.map(evt => {
+    fetchFromGateway
+      .catch(err => {
+        console.warn("FastAPI Gateway /api/road-closures unavailable, falling back to direct DriveBC API:", err);
+        return fetchDirectDriveBC;
+      })
+      .then(rawEvents => {
+        const now = new Date();
+        const processed = rawEvents.map(evt => {
           const start = evt.startDate ? new Date(evt.startDate) : null;
           const end = evt.endDate ? new Date(evt.endDate) : null;
 
-          let isActive = false;
-          let isFuture = false;
-          let isExpired = false;
-          let durationMs = Infinity;
-
+          let isActive = false, isFuture = false, isExpired = false;
           if (start && now < start) {
             isFuture = true;
           } else if (end && now > end) {
@@ -900,103 +718,21 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           } else {
             isActive = true;
           }
-
-          if (start && end) {
-            durationMs = end.getTime() - start.getTime();
-          }
-
           return {
             ...evt,
             start,
             end,
             isActive,
             isFuture,
-            isExpired,
-            durationMs
+            isExpired
           };
         });
 
-        // Filter out expired ones
         const unexpired = processed.filter(evt => !evt.isExpired);
-
-        // Group & merge events at the same location (rounded to 4 decimal places)
-        const groups = {};
-        unexpired.forEach(evt => {
-          const latKey = evt.coordinates[0].toFixed(4);
-          const lngKey = evt.coordinates[1].toFixed(4);
-          const key = `${latKey}_${lngKey}`;
-
-          if (!groups[key]) {
-            groups[key] = [];
-          }
-          groups[key].push(evt);
-        });
-
-        const deduplicated = Object.values(groups).map(group => {
-          if (group.length === 1) return group[0];
-
-          const first = group[0];
-
-          // Merge severity and emergencyAccess
-          const severityOrder = { "MAJOR": 3, "MODERATE": 2, "MINOR": 1 };
-          let highestSeverity = "MINOR";
-          let maxSeverityVal = 0;
-
-          const accessOrder = { "NO_ACCESS": 3, "ACCESS_ONLY": 2, "CAUTION": 1 };
-          let mostRestrictiveAccess = "CAUTION";
-          let maxAccessVal = 0;
-
-          group.forEach(evt => {
-            const sVal = severityOrder[evt.severity] || 0;
-            if (sVal > maxSeverityVal) {
-              maxSeverityVal = sVal;
-              highestSeverity = evt.severity;
-            }
-
-            const aVal = accessOrder[evt.emergencyAccess] || 0;
-            if (aVal > maxAccessVal) {
-              maxAccessVal = aVal;
-              mostRestrictiveAccess = evt.emergencyAccess;
-            }
-          });
-
-          const uniqueDescriptions = [...new Set(group.map(evt => evt.description.trim()))];
-          const combinedDescription = uniqueDescriptions.length > 1
-            ? uniqueDescriptions.map(desc => `• ${desc}`).join('\n')
-            : uniqueDescriptions[0];
-
-          let earliestStart = null;
-          let latestEnd = null;
-          group.forEach(evt => {
-            if (evt.start) {
-              if (!earliestStart || evt.start < earliestStart) earliestStart = evt.start;
-            }
-            if (evt.end) {
-              if (!latestEnd || evt.end > latestEnd) latestEnd = evt.end;
-            }
-          });
-
-          const anyActive = group.some(evt => evt.isActive);
-
-          return {
-            ...first,
-            severity: highestSeverity,
-            emergencyAccess: mostRestrictiveAccess,
-            description: combinedDescription,
-            startDate: earliestStart ? earliestStart.toISOString() : null,
-            endDate: latestEnd ? latestEnd.toISOString() : null,
-            start: earliestStart,
-            end: latestEnd,
-            isActive: anyActive,
-            isFuture: !anyActive && group.some(evt => evt.isFuture),
-            durationMs: earliestStart && latestEnd ? latestEnd.getTime() - earliestStart.getTime() : Infinity
-          };
-        });
-
-        setRoadClosures(deduplicated);
+        setRoadClosures(unexpired);
       })
-      .catch((err) => {
-        console.error("Critical error in road closures loading workflow:", err);
+      .catch(err => {
+        console.error("Error loading road closures:", err);
       });
   }, []);
 

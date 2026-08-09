@@ -31,10 +31,10 @@ try:
         )
         logging.info("Connected to containerized PostgreSQL database.")
 except Exception as db_err:
-    logging.warning(f"PostgreSQL connection failed ({db_err}). Falling back to local SQLite database for development.")
     db_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
     os.makedirs(db_dir, exist_ok=True)
-    sqlite_url = f"sqlite:///{os.path.join(db_dir, 'cfr_dispatch.db').replace('\\', '/')}"
+    db_path = os.path.join(db_dir, 'cfr_dispatch.db').replace('\\', '/')
+    sqlite_url = f"sqlite:///{db_path}"
     engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 

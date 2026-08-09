@@ -6,17 +6,13 @@ import requests
 import urllib.parse
 from datetime import datetime, timezone
 
-MQTT_HOST = os.environ.get("MQTT_BROKER_HOST", "localhost")
-MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
-MQTT_TOPIC = "cfr/dispatches"
-
 NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
 if NTFY_SERVER_URL.startswith("https://"):
     NTFY_SERVER_URL = NTFY_SERVER_URL.replace("https://", "http://", 1)
 
 NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "AUTO_MONTHLY")
 NTFY_MASTER_SALT = os.environ.get("NTFY_MASTER_SALT", "cfr_master_salt_2026")
-CHIEF_MASTER_TOPIC = os.environ.get("CHIEF_MASTER_TOPIC", "chief-master")  # Permanent, non-expiring master feed for Chiefs/Admin
+CHIEF_MASTER_TOPIC = os.environ.get("CHIEF_MASTER_TOPIC", "chief-master")
 
 API_BASE_URL = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
 if API_BASE_URL.startswith("https://"):
@@ -43,7 +39,6 @@ def get_active_secrets() -> list[str]:
     current_secret = get_monthly_secret(now)
     secrets = [current_secret]
 
-    # First 3 days of the month: include previous month secret as grace period
     if now.day <= 3:
         year = now.year
         month = now.month - 1
@@ -55,24 +50,6 @@ def get_active_secrets() -> list[str]:
         secrets.append(prev_secret)
 
     return secrets
-
-def publish_mqtt_dispatch(payload: dict, event_type: str = "INSERT") -> bool:
-    """Publishes dispatch payload directly to Mosquitto MQTT broker for real-time station alerts."""
-    try:
-        import paho.mqtt.publish as publish
-        
-        msg_payload = json.dumps({
-            "eventType": event_type,
-            "new": payload
-        }, default=str)
-        
-        logging.info(f"Publishing dispatch alert to MQTT broker {MQTT_HOST}:{MQTT_PORT} on topic '{MQTT_TOPIC}'...")
-        publish.single(MQTT_TOPIC, msg_payload, hostname=MQTT_HOST, port=MQTT_PORT, qos=1)
-        logging.info("Successfully published dispatch to local MQTT broker.")
-        return True
-    except Exception as e:
-        logging.warning(f"Failed to publish to MQTT broker ({MQTT_HOST}:{MQTT_PORT}): {e}")
-        return False
 
 def format_unit_topics(unit_str: str) -> list[str]:
     """Normalizes unit code (e.g. 'E1' -> 'engine-1') and appends active monthly secret tokens."""
@@ -95,11 +72,8 @@ def format_unit_topics(unit_str: str) -> list[str]:
     return [f"{base}-{s}" if s else base for s in secrets]
 
 def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
-    """Posts dispatch data to local Mosquitto MQTT AND local/remote Ntfy topics with audio attachments & master feed."""
-    # 1. Publish to local Mosquitto MQTT (for Station Kiosks)
-    mqtt_success = publish_mqtt_dispatch(payload)
-
-    # 2. Format Ntfy notification payload
+    """Posts dispatch alert to local/remote Ntfy push notification topics with audio attachments."""
+    # 1. Format Ntfy notification payload
     target = payload.get("target", {})
     address = payload.get("address") or target.get("address") or "Unknown Location"
     lat = payload.get("lat") or target.get("lat")
@@ -111,7 +85,6 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         "Tags": tags or "fire_engine,rotating_light,warning"
     }
 
-    # Resolve audio stream URL if present (force http:// for unencrypted local Ntfy broker)
     raw_audio = payload.get("audio_url")
     audio_full_url = None
     if raw_audio:
@@ -123,7 +96,6 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
             
         headers["Attach"] = audio_full_url
 
-    # Resolve Google Maps click URL
     click_url = None
     if address and address != "Unknown Location":
         query_str = address
@@ -137,7 +109,6 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     if click_url:
         headers["Click"] = click_url
 
-    # Format Tap-to-Listen and Open Map Lock-screen Action Buttons
     actions = []
     if audio_full_url:
         actions.append(f"view, 🎧 Listen to Call Audio, {audio_full_url}")
@@ -167,11 +138,7 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     
     message_body = "\n".join(lines).encode('utf-8')
 
-    # Generate target topics:
-    # A) Permanent Chief/Admin Master Feed (no expiry)
     target_topics = [CHIEF_MASTER_TOPIC]
-
-    # B) Active monthly secret topics for general station & apparatus feeds
     secrets = get_active_secrets()
     for s in secrets:
         target_topics.append(f"cfr-dispatches-{s}" if s else "cfr-dispatches")
@@ -186,7 +153,6 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     ntfy_success = False
     for t in set(target_topics):
         endpoints = [f"{NTFY_SERVER_URL}/{t}"]
-        # Also publish to public ntfy.sh relay for mobile devices requiring trusted HTTPS/SSL
         if not NTFY_SERVER_URL.startswith("https://ntfy.sh"):
             endpoints.append(f"https://ntfy.sh/{t}")
 
@@ -208,4 +174,23 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
             except Exception as e:
                 logging.warning(f"Could not post Ntfy alert to topic '{t}' at {endpoint}: {e}")
 
-    return mqtt_success or ntfy_success
+    return ntfy_success
+
+def notify_it_alert(audit: dict, ntfy_topic: str = None, ntfy_token: str = None) -> bool:
+    """Sends IT infrastructure health alert to administrative Ntfy channel."""
+    topic = ntfy_topic or os.environ.get("NTFY_TOPIC", CHIEF_MASTER_TOPIC)
+    url = f"{NTFY_SERVER_URL}/{topic}"
+    headers = {
+        "Title": f"⚠️ CFR EVO IT Health Alert: {audit.get('status', 'Warning')}",
+        "Priority": "4",
+        "Tags": "warning,computer"
+    }
+    if ntfy_token:
+        headers["Authorization"] = f"Bearer {ntfy_token}"
+    body = json.dumps(audit, indent=2)
+    try:
+        res = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=5)
+        return res.status_code == 200
+    except Exception as e:
+        logging.warning(f"Could not send IT alert to Ntfy: {e}")
+        return False

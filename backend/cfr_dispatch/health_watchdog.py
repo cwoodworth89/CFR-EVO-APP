@@ -101,31 +101,15 @@ def run_full_health_audit() -> Dict[str, Any]:
 
 def send_it_alert_if_unhealthy(audit: Dict[str, Any], ntfy_topic: str = None, ntfy_token: str = None):
     """Sends an automated IT notification if health checks fail."""
-    if audit["overall_status"] == "HEALTHY":
+    if audit.get("overall_status") == "HEALTHY":
         return
-
-    topic = ntfy_topic or os.environ.get("NTFY_TOPIC", "chief-master")
-    ntfy_server = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
-    if ntfy_server.startswith("https://"):
-        ntfy_server = ntfy_server.replace("https://", "http://", 1)
-    url = f"{ntfy_server}/{topic}"
-    
-    title = f"⚠️ IT HEALTH ALERT: Kiosk {audit['overall_status']}"
-    body = (
-        f"Kiosk System Status: {audit['overall_status']}\n"
-        f"🎙️ Audio Interface: {audit['audio']['status']} ({audit['audio'].get('device_name', 'N/A')})\n"
-        f"💾 Disk Space: {audit['disk']['status']} ({audit['disk'].get('free_gb', 0)} GB free)\n"
-        f"🌐 Network WAN: {audit['network']['status']} ({audit['network'].get('latency_ms', 'N/A')} ms)"
-    )
-    
     try:
-        headers = {"Title": title, "Tags": "warning,computer"}
-        if ntfy_token:
-            headers["Authorization"] = f"Bearer {ntfy_token}"
-        requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=5)
+        from notification_service import notify_it_alert
+        notify_it_alert(audit, ntfy_topic=ntfy_topic, ntfy_token=ntfy_token)
         logging.info("Automated IT Health Alert posted successfully.")
     except Exception as e:
         logging.error(f"Failed to post IT health alert: {e}")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

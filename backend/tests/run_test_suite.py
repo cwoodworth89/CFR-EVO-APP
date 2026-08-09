@@ -15,24 +15,10 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-try:
-    from agent.cfr_dispatch.orchestration import transcribe_audio_file
-    from agent.cfr_dispatch.parser import sanitize_transcript, parse_dispatch_announcement, abbreviate_units
-    from agent.cfr_dispatch.config import (
-        UNITS_VOCABULARY, ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH,
-        ADDRESS_HOUSE_NUM_COLUMN, ADDRESS_STREET_NAME_COLUMN, ADDRESS_STREET_TYPE_COLUMN,
-        ADDRESS_FULL_ADDR_COLUMN, STREET_NAME_CONFIDENCE_THRESHOLD, ZONES_MAP_NAME_COLUMN
-    )
-    from gis_service import CoquitlamDataValidator
-except ImportError:
-    from cfr_dispatch.orchestration import transcribe_audio_file
-    from cfr_dispatch.parser import sanitize_transcript, parse_dispatch_announcement, abbreviate_units
-    from cfr_dispatch.config import (
-        UNITS_VOCABULARY, ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH,
-        ADDRESS_HOUSE_NUM_COLUMN, ADDRESS_STREET_NAME_COLUMN, ADDRESS_STREET_TYPE_COLUMN,
-        ADDRESS_FULL_ADDR_COLUMN, STREET_NAME_CONFIDENCE_THRESHOLD, ZONES_MAP_NAME_COLUMN
-    )
-    from gis_service import CoquitlamDataValidator
+from cfr_dispatch.stt import transcribe_audio_file_local as transcribe_audio_file
+from cfr_dispatch.parser import sanitize_transcript, parse_dispatch_announcement, abbreviate_units
+from cfr_dispatch.config.vocab import UNITS_VOCABULARY
+from cfr_dispatch.worker import get_shared_validator
 
 # ANSI Color Codes for Windows terminal output
 COLOR_GREEN = "\033[92m"
@@ -117,16 +103,7 @@ def run_diagnostics():
         
     print(f"Found {len(wav_files)} test audio samples. Initializing GIS shapefiles...")
     try:
-        validator = CoquitlamDataValidator(
-            os.path.join(parent_dir, ADDRESS_SHAPEFILE_PATH),
-            os.path.join(parent_dir, ZONES_SHAPEFILE_PATH),
-            house_num_col=ADDRESS_HOUSE_NUM_COLUMN,
-            street_name_col=ADDRESS_STREET_NAME_COLUMN,
-            street_type_col=ADDRESS_STREET_TYPE_COLUMN,
-            full_addr_col=ADDRESS_FULL_ADDR_COLUMN,
-            zone_map_name_col=ZONES_MAP_NAME_COLUMN,
-            street_confidence_threshold=STREET_NAME_CONFIDENCE_THRESHOLD
-        )
+        validator = get_shared_validator()
         print("GIS Database initialized successfully.")
     except Exception as e:
         print(f"{COLOR_RED}Warning: Failed to load GIS shapefiles ({e}). Geocoding checks will be skipped.{COLOR_RESET}")

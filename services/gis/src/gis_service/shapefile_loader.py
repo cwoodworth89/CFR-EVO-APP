@@ -1,8 +1,14 @@
-# NOTE: For information about the source shapefile downloads, paths, and metadata, see docs/gis_endpoints.md
 import geopandas as gpd
 import logging
 
-def load_addresses(address_shp_path: str, house_num_col: str, street_name_col: str, street_type_col: str) -> tuple[gpd.GeoDataFrame | None, dict]:
+# GIS Domain Default Column Names
+DEFAULT_ADDRESS_COLUMN = "ADDRESS"
+DEFAULT_HOUSE_NUM_COLUMN = "HOUSE"
+DEFAULT_STREET_NAME_COLUMN = "STREET"
+DEFAULT_STREET_TYPE_COLUMN = "STREETTYPE"
+DEFAULT_ZONE_MAP_NAME_COLUMN = "MAP_NAME"
+
+def load_addresses(address_shp_path: str, house_num_col: str = DEFAULT_HOUSE_NUM_COLUMN, street_name_col: str = DEFAULT_STREET_NAME_COLUMN, street_type_col: str = DEFAULT_STREET_TYPE_COLUMN) -> tuple[gpd.GeoDataFrame | None, dict]:
     try:
         logging.info(f"Loading Coquitlam address data from: {address_shp_path} (using pyogrio engine)")
         addresses_gdf = gpd.read_file(address_shp_path, engine="pyogrio")

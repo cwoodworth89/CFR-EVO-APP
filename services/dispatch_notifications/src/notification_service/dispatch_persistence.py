@@ -50,8 +50,3 @@ def save_audio_recording(file_bytes: bytes, file_name: str, url: str = None, key
 
     return local_url
 
-# Backward Compatibility Aliases for Legacy Imports
-post_to_supabase = save_dispatch_record
-update_supabase_record = update_dispatch_record
-upload_to_supabase_storage = save_audio_recording
-

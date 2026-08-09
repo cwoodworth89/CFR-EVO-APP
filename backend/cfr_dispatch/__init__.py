@@ -50,3 +50,17 @@ for service_name in ["gis", "audio_analysis", "dispatch_notifications"]:
     if os.path.exists(pkg_src) and pkg_src not in sys.path:
         sys.path.append(pkg_src)
 
+from cfr_dispatch.orchestration import run_dispatch_system, setup_logging
+from cfr_dispatch.stt import transcribe_audio_local, transcribe_audio_file_local
+from cfr_dispatch.pipeline import Phase1Result, Phase2Result, build_dispatch_payload
+
+__all__ = [
+    'run_dispatch_system',
+    'setup_logging',
+    'transcribe_audio_local',
+    'transcribe_audio_file_local',
+    'Phase1Result',
+    'Phase2Result',
+    'build_dispatch_payload'
+]
+

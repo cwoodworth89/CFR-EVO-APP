@@ -13,16 +13,30 @@ DATABASE_URL = os.environ.get(
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-logging.info(f"Connecting to database: {DATABASE_URL.split('@')[-1]}")
+try:
+    if "sqlite" in DATABASE_URL:
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    else:
+        # Test PostgreSQL connection with quick timeout
+        test_engine = create_engine(DATABASE_URL, pool_timeout=2, connect_args={"connect_timeout": 2})
+        with test_engine.connect():
+            pass
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+            pool_recycle=1800,
+            pool_timeout=30
+        )
+        logging.info("Connected to containerized PostgreSQL database.")
+except Exception as db_err:
+    logging.warning(f"PostgreSQL connection failed ({db_err}). Falling back to local SQLite database for development.")
+    db_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    os.makedirs(db_dir, exist_ok=True)
+    sqlite_url = f"sqlite:///{os.path.join(db_dir, 'cfr_dispatch.db').replace('\\', '/')}"
+    engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-    pool_recycle=1800,
-    pool_timeout=30
-)
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

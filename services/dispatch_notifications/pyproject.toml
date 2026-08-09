@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notification-service"
+version = "0.1.0"
+description = "CFR EVO Notification and Real-Time Station Dispatch Service"
+authors = [{ name = "CFR Team" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+    "paho-mqtt>=2.0.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

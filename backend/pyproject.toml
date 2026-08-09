@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfr-dispatch"
+version = "0.1.0"
+description = "CFR EVO Core Dispatch Orchestrator and Audio Ingestion Engine"
+authors = [{ name = "CFR Team" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "gis-service",
+    "audio-service",
+    "notification-service",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "faster-whisper>=1.0.0",
+    "sounddevice>=0.4.6",
+    "requests>=2.31.0",
+    "psutil>=5.9.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cfr_dispatch*", "api*"]

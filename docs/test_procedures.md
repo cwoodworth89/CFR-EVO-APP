@@ -33,37 +33,41 @@ graph TD
 
 ## 🛠️ Environment Prerequisites
 
-Before running any diagnostics or tests, ensure you are in the agent directory and have the virtual environment activated.
+Before running any diagnostics or tests, ensure you have the Python virtual environment activated:
 
 ```powershell
-# Navigate to agent directory
-cd agent
+# Navigate to project root
+cd c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP
 
 # Activate Virtual Environment (Windows PowerShell)
-..\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 ```
 
-Confirm that the required credentials and settings are defined in the backend environment file (`agent/.env`):
-* `SUPABASE_URL` & `SUPABASE_SERVICE_ROLE_KEY`
-* `STT_ENGINE` (set to `google` or `whisper`)
-* `GOOGLE_APPLICATION_CREDENTIALS` (if using Google STT)
+Confirm that the local container stack is running:
+```powershell
+docker compose ps
+```
+The stack runs:
+* **PostgreSQL 16**: Port `5432` (`POSTGRES_DB=cfr_dispatch`)
+* **FastAPI Gateway**: Port `8000` (`http://localhost:8000/api/dispatches`)
+* **Mosquitto MQTT**: Ports `1883` (TCP) and `9001` (WebSockets)
+* **Ntfy Server**: Port `8080` (HTTP)
 
-### ☁️ Cloud Synced Dashboard Testing (Recommended Setup)
+### 🖥️ Local Container Stack Testing Setup
 
-Since the Supabase backend is hosted in the cloud, you **do not need to run a local React server** (Vite client) on your computer during testing. 
-
-* **Local Component**: You only need to run the local Python script (`main.py` or `feed_recorded_call.py`) in your IDE terminal. This listens to your microphone (or feeds a WAV file), performs processing, and posts the results directly to the cloud Supabase database.
-* **Cloud Dashboard**: You can monitor the results live on your hosted **GitHub Pages** app. Because the GitHub Pages site listens to the cloud database via a WebSocket channel, it will instantly update the map, draw routes, and fetch nearest hydrants as soon as the local Python agent posts a new call.
+All dispatches and audio recordings persist 100% locally on your machine or station server:
+* **Backend Component**: Run the local Python listener (`backend/main.py`) or feeder script (`backend/scripts/feed_recorded_call.py`).
+* **Frontend Kiosk HUD**: Start the React dashboard (`cd frontend && npm run dev`) to inspect live map rendering, Turf.js hydrant filters, and route overlays.
 
 ---
 
 ## 🧪 Procedure 1: Automated QA & Diagnostics Test Suite
 
-The QA test suite scans for local audio recordings in `agent/test_calls/`, runs them through transcription and parsing, geocodes the resulting locations, and verifies outputs against ground-truth files.
+The QA test suite scans for local audio recordings in `backend/tests/test_calls/`, runs them through transcription and parsing, geocodes the resulting locations, and verifies outputs against ground-truth files.
 
 ### 🏃 Running the Suite
 ```powershell
-python run_test_suite.py
+python backend/tests/run_test_suite.py
 ```
 
 ### 📋 What it Validates:
@@ -72,18 +76,18 @@ python run_test_suite.py
    - Responding apparatuses (e.g., `['E1', 'L1']`).
    - Incident type (e.g., `Structure Fire`, `Medical Aid`).
    - Map grid zones (e.g., `Grid 12`).
-3. **Local Geocoder Integrity**: Tests shapefile boundaries in `data/Property_Information/` to verify coordinates and parcel rings are found offline.
+3. **Local Geocoder Integrity**: Tests shapefile boundaries in `backend/data/Property_Information/` to verify coordinates and parcel rings are found offline.
 4. **Grid Bound Envelopes**: Verifies that the geocoded coordinate point falls within the spatial envelope of the parsed map grid.
 
 ---
 
-## 🧪 Procedure 2: Supabase Integration & Schema Contract Verification
+## 🧪 Procedure 2: Local PostgreSQL & FastAPI Gateway Contract Verification
 
-This test verifies the data contract between the Python agent and the Supabase PostgreSQL schema. It runs a series of mock transcripts through the entire processing pipeline (without requiring live audio) and checks if the generated payloads match the expected JSON structure.
+This test verifies the data contract between the Python backend and the local PostgreSQL database schema via the FastAPI Gateway. It runs a series of mock transcripts through the entire processing pipeline (without requiring live audio) and checks if the generated payloads match the expected JSON structure.
 
 ### 🏃 Running the Test
 ```powershell
-python test_supabase_integration.py
+python backend/tests/test_supabase_integration.py
 ```
 
 ### 📋 What it Validates:
@@ -102,21 +106,20 @@ Run the sounddevice query utility to list all recording interfaces detected by t
 ```powershell
 python -c "import sounddevice as sd; print(sd.query_devices())"
 ```
-*Note the ID number or unique query name string of your microphone array or virtual cable (e.g., `1` or `alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input`). Set this value as `AUDIO_DEVICE_ID=...` in your `backend/.env` if you want to lock the agent to a specific device. A stable name string is highly recommended to survive reboot index shifts.*
+*Note the ID number or unique query name string of your microphone array or virtual cable (e.g., `1` or `alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input`). Set this value as `AUDIO_DEVICE_ID=...` in your `backend/.env` if you want to lock the agent to a specific device.*
 
 ### 2. Live Volume Meter Calibration
 Listen to a microphone and display live signal levels to check if sound is registering:
 ```powershell
-python debug_audio.py
+python backend/scripts/debug_audio.py
 ```
 *   **Standby/Silence Level**: Should register near `0.00` to `200.00` RMS.
 *   **Loud Sound / Tone Spike**: Should easily exceed your configured `NOISE_AMPLITUDE_THRESHOLD` (default: `1500` RMS).
-*   *If the RMS level remains under `1.0` while making noise, double-check that your microphone is unmuted in Windows Control Panel / Settings.*
 
 ### 3. Tone Verification & Interactive Calibration
 To calibrate the DSP threshold so the agent doesn't false-trigger on background noise, run the interactive validator:
 ```powershell
-python calibrate_audio_interactive.py
+python backend/scripts/calibrate_audio_interactive.py
 ```
 This utility records loud sound events, matches them against the golden frequency profiles for `Chief Tone`, `Engine Tone`, and `Rescue Tone`, and prompts you to log correct matches or false positives.
 
@@ -124,22 +127,22 @@ This utility records loud sound events, matches them against the golden frequenc
 
 ## 🧪 Procedure 4: End-to-End Pipeline Feeding (WAV Simulation)
 
-You can feed a pre-recorded WAV file directly into the listening pipeline to simulate hearing a call over the radio. This tests the transcription, geocoding, audio upload, and Supabase transmission in a single run.
+You can feed a pre-recorded WAV file directly into the listening pipeline to simulate hearing a call over the radio. This tests transcription, geocoding, audio upload, and local API gateway persistence in a single run.
 
 ### 🏃 Running the Simulation
 ```powershell
 # Feed the default dispatch sample
-python feed_recorded_call.py test_dispatch.wav
+python backend/scripts/feed_recorded_call.py backend/tests/test_dispatch.wav
 
 # Feed a custom sample and specify the target trigger tone
-python feed_recorded_call.py custom_call.wav "Engine Tone"
+python backend/scripts/feed_recorded_call.py backend/audio_files/custom_call.wav "Engine Tone"
 ```
 
 ### 📋 Verification Checkpoints:
-1. **Local Filesystem**: A clean copy of the filtered audio should be saved to `frontend/public/recordings/[DISP-ID].wav` and `backend/audio_files/recordings/`.
-2. **Supabase Storage**: The WAV file should upload to the `dispatch-audio` storage bucket.
-3. **Database Insertion**: A new row should appear in the `live_calls` table with a public URL to the audio file.
-4. **WebSocket Push**: The web client dashboard (either local `http://localhost:5173/CFR-EVO-APP/` or your live GitHub Pages URL) should instantly center the map on the geocoded address, draw a route line from the station, and highlight the three closest fire hydrants.
+1. **Local Filesystem**: A clean copy of the filtered audio is saved to `backend/audio_files/recordings/[DISP-ID].wav`.
+2. **FastAPI Gateway**: `POST /api/dispatches` persists the call to the local PostgreSQL `live_calls` table.
+3. **MQTT Broadcast**: An `INSERT` event is published to `cfr/dispatches` over Mosquitto MQTT.
+4. **WebSocket Push**: The web client dashboard (`http://localhost:5173/`) instantly centers the map on the geocoded address, draws a route line from the station, and highlights the three closest fire hydrants.
 
 ---
 

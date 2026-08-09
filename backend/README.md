@@ -1,6 +1,6 @@
 # CFR EVO Backend Listening Agent
 
-The backend handles the continuous DSP listening, audio tone detection, speech-to-text (STT) transcription, parsing, geocoding, and syncing with Supabase and NTFY notifications.
+The backend handles continuous DSP listening, audio tone detection, speech-to-text (STT) transcription, parsing, geocoding, PostgreSQL persistence via FastAPI, and real-time broadcasting via Mosquitto MQTT and Ntfy push notifications.
 
 ## ⚡ System Prerequisites
 
@@ -10,6 +10,7 @@ The backend handles the continuous DSP listening, audio tone detection, speech-t
   * *Linux*: `sudo apt-get install libportaudio2`
   * *macOS*: `brew install portaudio`
 * **FFmpeg** (required for audio slicing and Whisper transcription)
+* **Docker Compose** (PostgreSQL 16, Mosquitto MQTT, Ntfy, and FastAPI Gateway)
 
 ---
 
@@ -24,19 +25,19 @@ The backend handles the continuous DSP listening, audio tone detection, speech-t
    source .venv/bin/activate
    ```
 
-2. **Install Dependencies**:
+2. **Install Sibling Packages in Editable Mode**:
    ```bash
-   pip install -r requirements.txt
+   # Windows PowerShell
+   powershell -File scripts/install_dev_packages.ps1
+   # Linux/macOS
+   bash scripts/install_dev_packages.sh
    ```
 
 3. **Configure Environment Variables**:
-   Copy `.env.example` to `.env` and fill in the required fields:
+   Copy `.env.example` to `.env` and configure local stack endpoints (`LOCAL_API_URL`, `MQTT_BROKER_HOST`, `NTFY_SERVER_URL`):
    ```bash
    cp .env.example .env
    ```
-   * Set `STT_ENGINE` (`google` or `whisper`).
-   * Add Google Cloud Credentials JSON path to `GOOGLE_APPLICATION_CREDENTIALS` (if using GCP).
-   * Fill in Supabase and NTFY endpoints/credentials.
 
 ---
 

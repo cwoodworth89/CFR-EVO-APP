@@ -61,3 +61,37 @@ def capture_full_dispatch(
             
     logging.info(f"MAX DURATION ({max_duration_s}s) REACHED.")
     return audio_buffer
+
+def resolve_audio_device(setting=None) -> tuple[int | None, str]:
+    """
+    Dynamically resolves audio input device index and device name.
+    Supports integer indexes, string substring matches (e.g., 'USB Audio CODEC'),
+    and falls back to system default input device.
+    """
+    try:
+        import sounddevice as sd
+        devices = sd.query_devices()
+    except Exception as e:
+        return None, f"SoundDevice Query Failed ({e})"
+
+    if isinstance(setting, int):
+        if 0 <= setting < len(devices):
+            dev = devices[setting]
+            if dev.get('max_input_channels', 0) > 0:
+                return setting, dev.get('name', f'Device {setting}')
+
+    if isinstance(setting, str) and setting.strip():
+        search_term = setting.strip().lower()
+        for idx, dev in enumerate(devices):
+            if dev.get('max_input_channels', 0) > 0 and search_term in dev.get('name', '').lower():
+                return idx, dev.get('name')
+
+    try:
+        import sounddevice as sd
+        default_idx = sd.default.device[0]
+        if default_idx is not None and 0 <= default_idx < len(devices):
+            return default_idx, devices[default_idx].get('name', f'Default ({default_idx})')
+    except Exception:
+        pass
+
+    return None, "Default Input Device"

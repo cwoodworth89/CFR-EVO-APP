@@ -197,7 +197,7 @@ backend/data/Emergency_Response_Zones/
 scratch/
 temp_dispatch_*.wav
 temp_dispatch_full.wav
-*.log
+*.log*
 agent/*.json
 backend/*.json
 agent/test_calls/
@@ -215,3 +215,5 @@ frontend/public/recordings/
 *.flac
 *.m4a
 *.aup3
+*.db
+*.sqlite

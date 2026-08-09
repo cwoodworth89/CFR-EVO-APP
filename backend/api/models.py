@@ -67,3 +67,26 @@ class DispatchUploadModel(Base):
     result = Column(SafeJSON, nullable=True)
     error_message = Column(Text, nullable=True)
 
+
+class RoadClosureModel(Base):
+    __tablename__ = "road_closures"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    closure_id = Column(String, unique=True, index=True, nullable=False)
+    street_name = Column(String, nullable=False)
+    source = Column(String, nullable=False)
+    closure_type = Column(String, default="FULL_CLOSURE")
+    emergency_access = Column(String, nullable=False)
+    headline = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    geometry = Column(SafeJSON, nullable=False)
+    coordinates = Column(SafeArray, nullable=False)
+    zone_id = Column(String(16), index=True, nullable=True)
+    first_due_hall = Column(String(64), index=True, nullable=True)
+    start_time = Column(DateTime(timezone=True), nullable=True)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+

@@ -40,13 +40,16 @@ def is_allowed_network(client_ip_str: str) -> bool:
 
 try:
     from backend.api.database import get_db, engine, Base
-    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
+    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
+    from backend.api.road_closure_service import sync_road_closures_to_db
 except ModuleNotFoundError:
     from api.database import get_db, engine, Base
-    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel
+    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
+    from api.road_closure_service import sync_road_closures_to_db
 
 # Ensure database tables exist
 Base.metadata.create_all(bind=engine)
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -445,181 +448,49 @@ class PythonGeometryDecoder:
         self.index += n
         return pts
 
-ROAD_CLOSURES_CACHE = {"timestamp": 0, "data": []}
-
-import urllib.request
-import re
+ROAD_CLOSURES_CACHE = {"timestamp": 0}
 
 @app.get("/api/road-closures")
-def get_road_closures():
+def get_road_closures(db: Session = Depends(get_db)):
     now_ts = time.time()
-    if ROAD_CLOSURES_CACHE["data"] and (now_ts - ROAD_CLOSURES_CACHE["timestamp"] < 120):
-        return ROAD_CLOSURES_CACHE["data"]
+    # Trigger spatial ingestion sync if cache is older than 5 minutes or DB is empty
+    db_count = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).count()
+    if db_count == 0 or (now_ts - ROAD_CLOSURES_CACHE["timestamp"] > 300):
+        try:
+            sync_road_closures_to_db(db)
+            ROAD_CLOSURES_CACHE["timestamp"] = now_ts
+        except Exception as sync_err:
+            logging.warning(f"Failed to sync road closures to DB: {sync_err}")
 
-    combined_events = []
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    # Query active notices from PostgreSQL database
+    records = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).order_by(desc(RoadClosureModel.updated_at)).all()
+    
+    results = []
+    for r in records:
+        geom = r.geometry or {}
+        coords = r.coordinates or [49.28, -122.80]
+        polyline = []
+        if geom.get("type") == "LineString":
+            polyline = geom.get("coordinates", [])
 
-    # 1. DriveBC Open511 API
-    try:
-        req = urllib.request.Request("https://api.open511.gov.bc.ca/events?format=json&limit=100", headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            db_data = json.loads(resp.read().decode('utf-8'))
-        
-        events = db_data.get('events', [])
-        for evt in events:
-            geog = evt.get('geography', {})
-            coords = geog.get('coordinates', [])
-            t = geog.get('type')
-            if t == 'Point':
-                pts = [coords]
-            elif t == 'LineString':
-                pts = coords
-            else:
-                continue
+        results.append({
+            "id": r.closure_id,
+            "headline": r.headline or r.street_name,
+            "street": r.street_name,
+            "severity": r.closure_type or "FULL_CLOSURE",
+            "emergencyAccess": r.emergency_access,
+            "description": r.description or "Active traffic event.",
+            "coordinates": coords,
+            "polyline": polyline,
+            "source": r.source,
+            "zoneId": r.zone_id,
+            "firstDueHall": r.first_due_hall,
+            "startDate": r.start_time.isoformat() if r.start_time else None,
+            "endDate": r.end_time.isoformat() if r.end_time else None
+        })
 
-            # Bounding box filter strictly for Coquitlam / Tri-Cities (lat 49.23 to 49.38)
-            if not any(49.23 <= pt[1] <= 49.38 and -122.92 <= pt[0] <= -122.68 for pt in pts):
-                continue
+    return results
 
-            lat = 49.28
-            lng = -122.80
-            polyline = []
-            if t == 'Point':
-                lng, lat = coords[0], coords[1]
-            elif t == 'LineString':
-                polyline = [[pt[1], pt[0]] for pt in coords]
-                mid = len(coords) // 2
-                lng, lat = coords[mid][0], coords[mid][1]
-
-            sev = (evt.get('severity') or 'MINOR').upper()
-            emergency_access = 'NO_ACCESS' if sev == 'MAJOR' else 'CAUTION'
-
-            start_date = None
-            end_date = None
-            sched = evt.get('schedule', {})
-            if sched and isinstance(sched.get('intervals'), list) and len(sched['intervals']) > 0:
-                parts = sched['intervals'][0].split('/')
-                if len(parts) == 2:
-                    start_date, end_date = parts[0], parts[1]
-            elif sched and isinstance(sched.get('recurring_schedules'), list) and len(sched['recurring_schedules']) > 0:
-                rs = sched['recurring_schedules'][0]
-                if rs.get('start_date'):
-                    start_date = f"{rs['start_date']}T{rs.get('daily_start_time', '00:00')}:00Z"
-                if rs.get('end_date'):
-                    end_date = f"{rs['end_date']}T{rs.get('daily_end_time', '23:59')}:59Z"
-
-            if not start_date and evt.get('created'):
-                start_date = evt['created']
-
-            combined_events.append({
-                "id": str(evt.get('id', f"db_{len(combined_events)}")),
-                "headline": evt.get('headline') or "TRAFFIC ALERT",
-                "street": evt.get('road_name') or "Regional Corridor",
-                "severity": sev,
-                "emergencyAccess": emergency_access,
-                "description": evt.get('description') or "Active traffic event.",
-                "coordinates": [lat, lng],
-                "polyline": polyline,
-                "source": "DriveBC Open511",
-                "startDate": start_date,
-                "endDate": end_date
-            })
-    except Exception as e:
-        logging.warning(f"Error fetching DriveBC events: {e}")
-
-    # 2. Municipal 511 API (Scan all dynamic data chunks for full Coquitlam coverage)
-    try:
-        req_page = urllib.request.Request("https://bc.municipal511.ca/?municipality=coquitlam", headers=headers)
-        with urllib.request.urlopen(req_page, timeout=5) as resp:
-            html = resp.read().decode('utf-8')
-        
-        matches = re.findall(r'"(jsonData\d*\.txt)"\s*:\s*"([^"]+)"', html)
-        if not matches:
-            matches = [("jsonData0.txt", "jsonData0.txt")]
-
-        for _, filename in matches:
-            try:
-                req_data = urllib.request.Request(f"https://bc.municipal511.ca/Dynamic/{filename}", headers=headers)
-                with urllib.request.urlopen(req_data, timeout=5) as resp:
-                    muni_data = json.loads(resp.read().decode('utf-8'))
-
-                issues = muni_data.get('Issues', [])
-                decoder = PythonGeometryDecoder(muni_data.get('CoordsEncoded', ''))
-
-                for issue in issues:
-                    geoms = issue.get('Geometry', [])
-                    for geom_idx, geom in enumerate(geoms):
-                        num_points = geom.get('NumPoints', 0)
-                        path_pts = decoder.get_n_points(num_points)
-
-                        # Strict Coquitlam bounding box check (lat 49.23 to 49.38)
-                        if not any(49.23 <= pt[0] <= 49.38 and -122.92 <= pt[1] <= -122.68 for pt in path_pts):
-                            continue
-
-                        lat = 49.28
-                        lng = -122.80
-                        polyline = []
-                        if len(path_pts) == 1:
-                            lat, lng = path_pts[0][0], path_pts[0][1]
-                        elif len(path_pts) > 1:
-                            polyline = path_pts
-                            mid = len(path_pts) // 2
-                            lat, lng = path_pts[mid][0], path_pts[mid][1]
-                        else:
-                            continue
-
-                        rct = geom.get('MarkerInfo', {}).get('RoadClosureType', 0)
-                        highest_bit = 0
-                        if rct > 0:
-                            import math
-                            highest_bit = 1 << int(math.log2(rct))
-
-                        desc = issue.get('Description', {})
-                        desc_lower = (desc.get('BaseDescription') or "").lower()
-                        headline_lower = (desc.get('Headline') or "").lower()
-                        is_closed = "road closed" in desc_lower or "full closure" in desc_lower or "road closed" in headline_lower or "full closure" in headline_lower
-
-                        emergency_access = "CAUTION"
-                        severity = "MINOR"
-                        if highest_bit == 262144:
-                            emergency_access = "NO_ACCESS"
-                            severity = "MAJOR"
-                        elif highest_bit in (65536, 32768, 16384) or is_closed:
-                            emergency_access = "ACCESS_ONLY"
-                            severity = "MODERATE"
-
-                        start_date = None
-                        end_date = None
-                        if desc.get('ProposedStartTimeUtcEpochMillis'):
-                            start_date = datetime.fromtimestamp(desc['ProposedStartTimeUtcEpochMillis'] / 1000, tz=timezone.utc).isoformat()
-                        if desc.get('ProposedEndTimeUtcEpochMillis'):
-                            end_date = datetime.fromtimestamp(desc['ProposedEndTimeUtcEpochMillis'] / 1000, tz=timezone.utc).isoformat()
-
-                        loc_name = geom.get('MarkerInfo', {}).get('LocationName') or issue.get('TableViewInfo', {}).get('Location') or desc.get('BaseLocationDescription') or "Local Road"
-                        headline_text = desc.get('Headline') or loc_name
-                        desc_text = (desc.get('BaseDescription') or "").strip() or "Local road construction or restriction."
-
-                        combined_events.append({
-                            "id": f"muni_{issue.get('IssueId')}_{geom_idx}",
-                            "headline": headline_text,
-                            "street": loc_name,
-                            "severity": severity,
-                            "emergencyAccess": emergency_access,
-                            "description": desc_text,
-                            "coordinates": [lat, lng],
-                            "polyline": polyline,
-                            "source": issue.get('Source') or "City of Coquitlam",
-                            "startDate": start_date,
-                            "endDate": end_date
-                        })
-            except Exception as chunk_err:
-                logging.warning(f"Error parsing chunk {filename}: {chunk_err}")
-    except Exception as e:
-        logging.warning(f"Error fetching Municipal 511 events: {e}")
-
-    ROAD_CLOSURES_CACHE["timestamp"] = now_ts
-    ROAD_CLOSURES_CACHE["data"] = combined_events
-    return combined_events
 
 
 if __name__ == "__main__":

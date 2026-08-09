@@ -221,6 +221,12 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
             </div>
             <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
             <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
+            {closure.firstDueHall && (
+              <div className="mt-1.5 pt-1 border-t border-slate-900 flex justify-between items-center text-[9px] font-mono">
+                <span className="text-emerald-400 font-bold">🏢 {closure.firstDueHall}</span>
+                {closure.zoneId && <span className="bg-slate-800 text-sky-300 px-1 py-0.5 rounded font-black">Zone {closure.zoneId}</span>}
+              </div>
+            )}
             {closure.startDate && (
               <p className="text-[9px] text-sky-400/90 font-mono mt-1 flex items-center gap-1 font-bold">
                 📅 {closure.endDate ? (
@@ -233,6 +239,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
             <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent" style={{ whiteSpace: 'pre-line', maxHeight: '200px' }}>{closure.description}</p>
           </div>
         </Popup>
+
       </Marker>
     </React.Fragment>
   );

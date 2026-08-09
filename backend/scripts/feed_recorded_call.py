@@ -56,6 +56,20 @@ def main():
         help="Omit sending Ntfy push notifications to phones"
     )
     parser.add_argument(
+        "--omit-db", "--no-db",
+        dest="save_db",
+        action="store_false",
+        default=True,
+        help="Omit saving dispatch record into the database table (prevents polluting live dispatch history)"
+    )
+    parser.add_argument(
+        "--save-audio",
+        dest="save_audio",
+        action="store_true",
+        default=False,
+        help="Re-save audio to public recordings folder (default False to avoid re-recording duplicate files)"
+    )
+    parser.add_argument(
         "--production",
         dest="is_test",
         action="store_false",
@@ -101,7 +115,7 @@ def main():
     print("Initializing Coquitlam Data Validator...")
     validator = get_shared_validator()
     
-    mode_desc = f"Full System Test (MQTT: {'ON' if args.send_mqtt else 'OFF'}, Phones Ntfy: {'ON' if args.send_ntfy else 'OFF'}, *TEST* Prefix: {'ON' if args.is_test else 'OFF (PRODUCTION)'})"
+    mode_desc = f"Full System Test (MQTT: {'ON' if args.send_mqtt else 'OFF'}, Phones Ntfy: {'ON' if args.send_ntfy else 'OFF'}, DB: {'ON' if args.save_db else 'OFF'}, Audio Re-record: {'ON' if args.save_audio else 'OFF'}, *TEST* Prefix: {'ON' if args.is_test else 'OFF (PRODUCTION)'})"
     print(f"Feeding audio array ({len(audio_data)} samples) into pipeline | Mode: {mode_desc}...")
     
     # Wrap in a list so np.concatenate works as expected inside process_full_dispatch
@@ -112,7 +126,9 @@ def main():
         units_vocab=UNITS_VOCABULARY,
         send_mqtt=args.send_mqtt,
         send_ntfy=args.send_ntfy,
-        is_test=args.is_test
+        is_test=args.is_test,
+        save_db=args.save_db,
+        save_audio=args.save_audio
     )
     print("Finished feeding call to pipeline.")
 

@@ -32,8 +32,8 @@ from notification_service import (
     post_to_ntfy
 )
 
-def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None) -> Tuple[str | None, float]:
-    """Saves completed audio buffer locally via notification_service and returns relative URL route and duration."""
+def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None, save_to_disk: bool = True) -> Tuple[str | None, float]:
+    """Computes duration and conditionally saves audio buffer locally via notification_service."""
     try:
         if not buffer:
             return None, 0.0
@@ -41,6 +41,10 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None)
         full_audio = np.concatenate(buffer)
         duration_seconds = len(full_audio) / AUDIO_SAMPLE_RATE
         
+        if not save_to_disk:
+            logging.debug(f"[{dispatch_id}] Audio re-recording skipped (save_to_disk=False).")
+            return None, duration_seconds
+
         wav_io = io.BytesIO()
         wavio.write(wav_io, full_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
         audio_bytes = wav_io.getvalue()
@@ -381,7 +385,9 @@ def process_full_dispatch(
     stt_model: Any = None,
     send_mqtt: bool = True,
     send_ntfy: bool = True,
-    is_test: bool = False
+    is_test: bool = False,
+    save_db: bool = True,
+    save_audio: bool = False
 ) -> dict:
     """Processes a full dispatch audio buffer synchronously (single-phase / simulation mode)."""
     import uuid
@@ -390,8 +396,8 @@ def process_full_dispatch(
     units_vocab = units_vocab or UNITS_VOCABULARY
     logging.info(f"--- STARTING SIMULATED / FULL DISPATCH PROCESSING (ID: {dispatch_id}, is_test={is_test}) ---")
     
-    # 1. Save and upload audio
-    audio_url, audio_duration = save_and_upload_audio(dispatch_id, buffer, tone_name)
+    # 1. Save and upload audio (skipped by default for test calls to avoid re-recording)
+    audio_url, audio_duration = save_and_upload_audio(dispatch_id, buffer, tone_name, save_to_disk=save_audio)
     
     # 2. Combine & filter audio
     full_audio = np.concatenate(buffer)
@@ -431,7 +437,11 @@ def process_full_dispatch(
         is_test=is_test
     )
     
-    save_dispatch_record(db_payload)
+    if save_db:
+        save_dispatch_record(db_payload)
+    else:
+        logging.info(f"[{dispatch_id}] Targeted testing mode: Omitted database persistence.")
+        
     if send_mqtt:
         publish_mqtt_dispatch(db_payload, event_type="INSERT", is_test=is_test)
     else:

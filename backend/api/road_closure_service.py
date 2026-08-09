@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 try:
-    from api.models import RoadClosureModel
-except ModuleNotFoundError:
     from backend.api.models import RoadClosureModel
+except ModuleNotFoundError:
+    from api.models import RoadClosureModel
 
 logger = logging.getLogger(__name__)
 

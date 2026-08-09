@@ -468,10 +468,16 @@ def get_road_closures(db: Session = Depends(get_db)):
     results = []
     for r in records:
         geom = r.geometry or {}
-        coords = r.coordinates or [49.28, -122.80]
+        raw_coords = r.coordinates or [49.28, -122.80]
+        try:
+            parsed_coords = [float(c) for c in raw_coords]
+        except (ValueError, TypeError):
+            parsed_coords = [49.28, -122.80]
+
         polyline = []
         if geom.get("type") == "LineString":
-            polyline = geom.get("coordinates", [])
+            raw_poly = geom.get("coordinates", [])
+            polyline = [[float(pt[0]), float(pt[1])] for pt in raw_poly if isinstance(pt, (list, tuple)) and len(pt) >= 2]
 
         results.append({
             "id": r.closure_id,
@@ -480,7 +486,7 @@ def get_road_closures(db: Session = Depends(get_db)):
             "severity": r.closure_type or "FULL_CLOSURE",
             "emergencyAccess": r.emergency_access,
             "description": r.description or "Active traffic event.",
-            "coordinates": coords,
+            "coordinates": parsed_coords,
             "polyline": polyline,
             "source": r.source,
             "zoneId": r.zone_id,

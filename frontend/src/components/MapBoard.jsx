@@ -180,11 +180,19 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
   if (closure.emergencyAccess === "ACCESS_ONLY") color = "#f59e0b"; // ACCESS_ONLY
   if (closure.emergencyAccess === "CAUTION") color = "#eab308"; // CAUTION
 
+  const markerPos = Array.isArray(closure.coordinates) && closure.coordinates.length >= 2 
+    ? [parseFloat(closure.coordinates[0]), parseFloat(closure.coordinates[1])] 
+    : [49.28, -122.80];
+
+  const polylinePos = Array.isArray(closure.polyline) && closure.polyline.length > 0
+    ? closure.polyline.map(pt => [parseFloat(pt[0]), parseFloat(pt[1])])
+    : [];
+
   return (
     <React.Fragment>
-      {closure.polyline && closure.polyline.length > 0 && (
+      {polylinePos.length > 0 && (
         <Polyline 
-          positions={closure.polyline} 
+          positions={polylinePos} 
           pathOptions={{ 
             color: color, 
             weight: 6, 
@@ -195,7 +203,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
       )}
       <Marker 
         ref={markerRef}
-        position={closure.coordinates} 
+        position={markerPos} 
         icon={closureIcon}
         eventHandlers={{
           click: () => {
@@ -660,12 +668,14 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES (Primary: FastAPI Gateway on localhost:8000, Fallback: Direct DriveBC with Coquitlam bounds)
+  // LOAD ROAD CLOSURES (Primary: Relative /api/road-closures via nginx proxy, Fallback: VITE_API_URL / window.location.hostname:8000)
   useEffect(() => {
-    const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    const defaultHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
+    const backendUrl = import.meta.env.VITE_API_URL || `http://${defaultHost}:8000`;
 
-    const fetchFromGateway = fetch(`${backendUrl}/api/road-closures`)
-      .then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK"))
+    const fetchFromGateway = fetch("/api/road-closures")
+      .then(r => (r.ok && r.headers.get("content-type")?.includes("application/json")) ? r.json() : Promise.reject("Relative /api response not JSON"))
+      .catch(() => fetch(`${backendUrl}/api/road-closures`).then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK")))
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           return data;

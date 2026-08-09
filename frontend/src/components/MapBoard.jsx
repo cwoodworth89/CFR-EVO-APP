@@ -660,7 +660,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES (Primary: Local Gateway API, Fallback: Direct DriveBC Open511)
   // LOAD ROAD CLOSURES (Primary: Local Gateway API relative/env, Fallback: Direct DriveBC with Coquitlam bounds)
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -687,7 +686,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             const inCoqBounds = coords.some(([lng, lat]) => lat >= 49.231 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68);
             if (!inCoqBounds) return false;
 
-            const text = `${evt.headline || ''} ${evt.description || ''} ${evt.road_name || ''}`.lowerCase ? text.toLowerCase() : String(text).toLowerCase();
+            const text = `${evt.headline || ''} ${evt.description || ''} ${evt.road_name || ''}`.toLowerCase();
             if (["surrey", "delta", "langley", "richmond", "pattullo"].some(c => text.includes(c))) {
               return false;
             }

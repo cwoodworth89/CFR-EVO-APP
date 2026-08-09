@@ -82,11 +82,12 @@ class RoadClosureModel(Base):
     geometry = Column(SafeJSON, nullable=False)
     coordinates = Column(SafeArray, nullable=False)
     zone_id = Column(String(16), index=True, nullable=True)
-    first_due_hall = Column(String(64), index=True, nullable=True)
+    affected_zones = Column(SafeArray, nullable=True)
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)
     active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
 
 

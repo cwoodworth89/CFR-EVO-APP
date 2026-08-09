@@ -221,12 +221,17 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
             </div>
             <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
             <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
-            {closure.firstDueHall && (
+            {(closure.affectedZones?.length > 0 || closure.zoneId) && (
               <div className="mt-1.5 pt-1 border-t border-slate-900 flex justify-between items-center text-[9px] font-mono">
-                <span className="text-emerald-400 font-bold">🏢 {closure.firstDueHall}</span>
-                {closure.zoneId && <span className="bg-slate-800 text-sky-300 px-1 py-0.5 rounded font-black">Zone {closure.zoneId}</span>}
+                <span className="text-slate-400 font-medium">📍 Impacted Zones</span>
+                <span className="bg-sky-950 text-sky-300 border border-sky-800/80 px-1.5 py-0.5 rounded font-black">
+                  {closure.affectedZones?.length > 0 
+                    ? `Zone ${closure.affectedZones.join(", ")}` 
+                    : `Zone ${closure.zoneId}`}
+                </span>
               </div>
             )}
+
             {closure.startDate && (
               <p className="text-[9px] text-sky-400/90 font-mono mt-1 flex items-center gap-1 font-bold">
                 📅 {closure.endDate ? (

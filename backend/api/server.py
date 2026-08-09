@@ -484,12 +484,13 @@ def get_road_closures(db: Session = Depends(get_db)):
             "polyline": polyline,
             "source": r.source,
             "zoneId": r.zone_id,
-            "firstDueHall": r.first_due_hall,
+            "affectedZones": r.affected_zones or ([r.zone_id] if r.zone_id else []),
             "startDate": r.start_time.isoformat() if r.start_time else None,
             "endDate": r.end_time.isoformat() if r.end_time else None
         })
 
     return results
+
 
 
 

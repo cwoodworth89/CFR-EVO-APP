@@ -62,21 +62,27 @@ def point_in_polygon(lng: float, lat: float, polygon_coords: list) -> bool:
         p1x, p1y = p2x, p2y
     return inside
 
-def resolve_emergency_zone(lng: float, lat: float):
+def resolve_affected_zones(pts: list) -> list:
     """
-    Tests (lng, lat) against 134 Emergency Zones.
-    Returns dict {"zone_id": str, "first_due_hall": str, "unit_id": str} if matched, else None.
+    Given a list of points (each [lat, lng] or [lng, lat]) for a point or polyline hazard,
+    returns a sorted list of unique zone_id strings touched by the hazard geometry.
     """
     zones = _load_emergency_zones()
-    for z in zones:
-        coords = z.get("geometry", {}).get("coordinates", [])
-        if coords and point_in_polygon(lng, lat, coords[0]):
-            return {
-                "zone_id": str(z.get("zone_id")),
-                "first_due_hall": z.get("station", "Coquitlam Fire Rescue"),
-                "unit_id": z.get("unit_id")
-            }
-    return None
+    affected = set()
+    for pt in pts:
+        val1, val2 = pt[0], pt[1]
+        # If val1 is latitude (~49) and val2 is longitude (~-122)
+        if 40 <= val1 <= 60 and -130 <= val2 <= -110:
+            lat, lng = val1, val2
+        else:
+            lng, lat = val1, val2
+
+        for z in zones:
+            coords = z.get("geometry", {}).get("coordinates", [])
+            if coords and point_in_polygon(lng, lat, coords[0]):
+                affected.add(str(z.get("zone_id")))
+
+    return sorted(list(affected), key=lambda x: int(x) if x.isdigit() else x)
 
 class PythonGeometryDecoder:
     def __init__(self, encoded: str):
@@ -127,7 +133,7 @@ def sync_road_closures_to_db(db: Session):
     """
     Fetches DriveBC and Municipal 511 feeds server-side,
     applies spatial Ray-Casting PIP to verify Emergency Zone containment,
-    enriches with zone_id and first_due_hall, and upserts into PostgreSQL road_closures table.
+    enriches with zone_id and affected_zones array, and upserts into PostgreSQL road_closures table.
     """
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     now_utc = datetime.now(timezone.utc)
@@ -160,11 +166,13 @@ def sync_road_closures_to_db(db: Session):
                 mid = len(coords) // 2
                 lng, lat = coords[mid][0], coords[mid][1]
 
-            # Perform PIP check against 134 Emergency Zones
-            zone_info = resolve_emergency_zone(lng, lat)
-            if not zone_info:
+            # Perform PIP check across all vertices
+            all_pts = polyline if polyline else [[lat, lng]]
+            affected_zones = resolve_affected_zones(all_pts)
+            if not affected_zones:
                 continue  # Skip items outside Coquitlam emergency zones!
 
+            primary_zone = affected_zones[0]
             sev = (evt.get('severity') or 'MINOR').upper()
             emergency_access = 'NO_ACCESS' if sev == 'MAJOR' else 'CAUTION'
 
@@ -208,8 +216,8 @@ def sync_road_closures_to_db(db: Session):
                 "description": (evt.get('description') or "Active traffic event.").strip(),
                 "geometry": geog,
                 "coordinates": [lat, lng],
-                "zone_id": zone_info["zone_id"],
-                "first_due_hall": zone_info["first_due_hall"],
+                "zone_id": primary_zone,
+                "affected_zones": affected_zones,
                 "start_time": start_dt,
                 "end_time": end_dt
             })
@@ -252,11 +260,13 @@ def sync_road_closures_to_db(db: Session):
                         else:
                             continue
 
-                        # Perform PIP check against 134 Emergency Zones
-                        zone_info = resolve_emergency_zone(lng, lat)
-                        if not zone_info:
+                        # Perform PIP check across all vertices
+                        all_pts = polyline if polyline else [[lat, lng]]
+                        affected_zones = resolve_affected_zones(all_pts)
+                        if not affected_zones:
                             continue  # Skip items outside Coquitlam emergency zones!
 
+                        primary_zone = affected_zones[0]
                         rct = geom.get('MarkerInfo', {}).get('RoadClosureType', 0)
                         highest_bit = 0
                         if rct > 0:
@@ -302,8 +312,8 @@ def sync_road_closures_to_db(db: Session):
                             "description": desc_text.strip(),
                             "geometry": geom_json,
                             "coordinates": [lat, lng],
-                            "zone_id": zone_info["zone_id"],
-                            "first_due_hall": zone_info["first_due_hall"],
+                            "zone_id": primary_zone,
+                            "affected_zones": affected_zones,
                             "start_time": start_dt,
                             "end_time": end_dt
                         })
@@ -338,7 +348,7 @@ def sync_road_closures_to_db(db: Session):
             existing.geometry = item["geometry"]
             existing.coordinates = item["coordinates"]
             existing.zone_id = item["zone_id"]
-            existing.first_due_hall = item["first_due_hall"]
+            existing.affected_zones = item["affected_zones"]
             existing.start_time = item["start_time"]
             existing.end_time = end_time
             existing.active = is_active
@@ -355,13 +365,12 @@ def sync_road_closures_to_db(db: Session):
                 geometry=item["geometry"],
                 coordinates=item["coordinates"],
                 zone_id=item["zone_id"],
-                first_due_hall=item["first_due_hall"],
+                affected_zones=item["affected_zones"],
                 start_time=item["start_time"],
                 end_time=end_time,
                 active=is_active
             )
             db.add(new_record)
-
 
     # Deactivate records no longer present in live feeds
     db.query(RoadClosureModel).filter(
@@ -372,3 +381,4 @@ def sync_road_closures_to_db(db: Session):
     db.commit()
     logger.info(f"Successfully synced {len(active_closure_ids)} active road closures to database.")
     return len(active_closure_ids)
+

@@ -660,13 +660,12 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES (Primary: Local Gateway API relative/env, Fallback: Direct DriveBC with Coquitlam bounds)
+  // LOAD ROAD CLOSURES (Primary: FastAPI Gateway on localhost:8000, Fallback: Direct DriveBC with Coquitlam bounds)
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-    const fetchFromGateway = fetch("/api/road-closures")
-      .then(r => r.ok ? r.json() : Promise.reject("Relative /api/road-closures not OK"))
-      .catch(() => fetch(`${backendUrl}/api/road-closures`).then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK")))
+    const fetchFromGateway = fetch(`${backendUrl}/api/road-closures`)
+      .then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK"))
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           return data;

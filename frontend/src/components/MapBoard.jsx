@@ -661,11 +661,13 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
   // LOAD ROAD CLOSURES (Primary: Local Gateway API, Fallback: Direct DriveBC Open511)
+  // LOAD ROAD CLOSURES (Primary: Local Gateway API relative/env, Fallback: Direct DriveBC with Coquitlam bounds)
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-    const fetchFromGateway = fetch(`${backendUrl}/api/road-closures`)
-      .then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK"))
+    const fetchFromGateway = fetch("/api/road-closures")
+      .then(r => r.ok ? r.json() : Promise.reject("Relative /api/road-closures not OK"))
+      .catch(() => fetch(`${backendUrl}/api/road-closures`).then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK")))
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           return data;
@@ -680,7 +682,16 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           .filter(evt => {
             if (!evt.geography || !evt.geography.coordinates) return false;
             let coords = evt.geography.type === "Point" ? [evt.geography.coordinates] : (evt.geography.type === "LineString" ? evt.geography.coordinates : []);
-            return coords.some(([lng, lat]) => lat >= 49.20 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68);
+            
+            // Strict latitude filter (>= 49.231 to exclude Surrey/New West)
+            const inCoqBounds = coords.some(([lng, lat]) => lat >= 49.231 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68);
+            if (!inCoqBounds) return false;
+
+            const text = `${evt.headline || ''} ${evt.description || ''} ${evt.road_name || ''}`.lowerCase ? text.toLowerCase() : String(text).toLowerCase();
+            if (["surrey", "delta", "langley", "richmond", "pattullo"].some(c => text.includes(c))) {
+              return false;
+            }
+            return true;
           })
           .map(evt => {
             let lat = 49.28, lng = -122.80, polyline = [];
@@ -697,7 +708,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             return {
               id: evt.id || Math.random().toString(),
               headline: evt.headline || "TRAFFIC ALERT",
-              street: evt.road_name || "Regional Road",
+              street: evt.road_name || "Regional Corridor",
               severity: sev,
               emergencyAccess: sev === "MAJOR" ? "NO_ACCESS" : "CAUTION",
               description: evt.description || "Active traffic event.",
@@ -747,6 +758,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         console.error("Error loading road closures:", err);
       });
   }, []);
+
 
   // LAZY LOAD TRAINING DATA
   const loadTrainingData = useCallback(() => {

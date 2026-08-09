@@ -133,6 +133,7 @@ export function formatDispatchPayload(record) {
     audio_url: audioUrl,
     raw_transcript: record.raw_transcript || '',
     sanitized_transcript: record.sanitized_transcript || '',
+    is_test: Boolean(record.is_test ?? payloadObj.is_test ?? false),
     rawRecord: record,
   };
 }

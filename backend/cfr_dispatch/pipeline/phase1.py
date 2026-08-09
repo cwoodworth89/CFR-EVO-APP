@@ -78,6 +78,9 @@ def process_phase_1_check(
     buffer = task["buffer"]
     tone_name = task["tone_name"]
     units_vocab = task.get("units_vocab", UNITS_VOCABULARY)
+    send_mqtt = task.get("send_mqtt", True)
+    send_ntfy = task.get("send_ntfy", True)
+    is_test = task.get("is_test", False)
     
     if session_manager.is_phase_1_triggered(dispatch_id):
         return None
@@ -117,7 +120,7 @@ def process_phase_1_check(
             with PipelineTimer("payload_building") as t_gis:
                 db_payload, responding_units = build_dispatch_payload(
                     dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab,
-                    verify_location_override=False, tone_name=tone_name
+                    verify_location_override=False, tone_name=tone_name, is_test=is_test
                 )
             metrics["gis_ms"] = t_gis.elapsed_ms
 
@@ -125,9 +128,10 @@ def process_phase_1_check(
                 # 5. Broadcast to local FastAPI & Mosquitto MQTT & Ntfy
                 with PipelineTimer("broadcast") as t_bcast:
                     save_dispatch_record(db_payload)
-                    publish_mqtt_dispatch(db_payload, event_type="INSERT")
-                    if ENABLE_NTFY_PUSH:
-                        post_to_ntfy(db_payload)
+                    if send_mqtt:
+                        publish_mqtt_dispatch(db_payload, event_type="INSERT", is_test=is_test)
+                    if send_ntfy and ENABLE_NTFY_PUSH:
+                        post_to_ntfy(db_payload, is_test=is_test)
                 metrics["bcast_ms"] = t_bcast.elapsed_ms
 
                 total_tta_s = (metrics["dsp_ms"] + metrics["stt_ms"] + metrics["gis_ms"] + metrics["bcast_ms"]) / 1000.0

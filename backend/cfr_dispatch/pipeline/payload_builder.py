@@ -35,7 +35,8 @@ def build_dispatch_payload(
     audio_url: str = None,
     audio_duration: float = None,
     verified_transcript: str = None,
-    tone_name: str | list = None
+    tone_name: str | list = None,
+    is_test: bool = False
 ) -> Tuple[dict, list]:
     """
     Unified constructor for dispatch payloads conforming to local database and MQTT contracts.
@@ -207,7 +208,8 @@ def build_dispatch_payload(
         "raw_transcript": raw_transcript,
         "sanitized_transcript": reconstructed_transcript,
         "confidence_score": confidence_score,
-        "verify_location": verify_location
+        "verify_location": verify_location,
+        "is_test": is_test
     }
     
     if audio_url is not None:

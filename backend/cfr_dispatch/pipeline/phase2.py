@@ -75,6 +75,10 @@ def process_phase_2_finalize(
     buffer = task["buffer"]
     tone_name = task["tone_name"]
     units_vocab = task.get("units_vocab", UNITS_VOCABULARY)
+    send_mqtt = task.get("send_mqtt", True)
+    send_ntfy = task.get("send_ntfy", True)
+    is_test = task.get("is_test", False)
+    
     metrics = {}
     
     try:
@@ -216,7 +220,8 @@ def process_phase_2_finalize(
                     update_payload["target"] = target_payload
 
                 update_dispatch_record(dispatch_id, update_payload)
-                publish_mqtt_dispatch(update_payload, event_type="UPDATE")
+                if send_mqtt:
+                    publish_mqtt_dispatch(update_payload, event_type="UPDATE", is_test=is_test)
                 
                 final_addr = p1_address
                 final_lat = p1_target.get("lat")
@@ -289,7 +294,8 @@ def process_phase_2_finalize(
                             "raw_transcript": raw_transcript,
                             "sanitized_transcript": reconstructed_transcript,
                             "incident_type": p2_incident_type,
-                            "responding_units": p2_responding_units
+                            "responding_units": p2_responding_units,
+                            "is_test": is_test
                         }
                         if INTEGRATION_PAYLOAD_OPTION == 1:
                             update_payload["address"] = res["address"]
@@ -297,18 +303,20 @@ def process_phase_2_finalize(
                             update_payload["target"] = target_payload
 
                         update_dispatch_record(dispatch_id, update_payload)
-                        publish_mqtt_dispatch(update_payload, event_type="UPDATE")
+                        if send_mqtt:
+                            publish_mqtt_dispatch(update_payload, event_type="UPDATE", is_test=is_test)
                         
-                        if ENABLE_NTFY_PUSH:
+                        if send_ntfy and ENABLE_NTFY_PUSH:
                             corr_payload = {
                                 "dispatch_id": dispatch_id,
                                 "incident_type": p2_incident_type,
                                 "responding_units": p2_responding_units,
                                 "lat": res["lat"],
                                 "lng": res["lng"],
-                                "target": target_payload
+                                "target": target_payload,
+                                "is_test": is_test
                             }
-                            post_to_ntfy(corr_payload, title=f"CORRECTION: Dispatch {dispatch_id}", tags="warning,rotating_light")
+                            post_to_ntfy(corr_payload, title=f"CORRECTION: Dispatch {dispatch_id}", tags="warning,rotating_light", is_test=is_test)
 
                         final_addr = res["address"]
                         final_lat = res["lat"]
@@ -322,10 +330,12 @@ def process_phase_2_finalize(
                             "audio_url": audio_url,
                             "audio_duration": audio_duration,
                             "raw_transcript": raw_transcript,
-                            "sanitized_transcript": transcript
+                            "sanitized_transcript": transcript,
+                            "is_test": is_test
                         }
                         update_dispatch_record(dispatch_id, update_payload)
-                        publish_mqtt_dispatch(update_payload, event_type="UPDATE")
+                        if send_mqtt:
+                            publish_mqtt_dispatch(update_payload, event_type="UPDATE", is_test=is_test)
                         final_addr = p1_target.get("address", "Unknown Location")
                 else:
                     # No Phase 2 candidate found, keep Phase 1 data as verified
@@ -335,10 +345,12 @@ def process_phase_2_finalize(
                         "audio_url": audio_url,
                         "audio_duration": audio_duration,
                         "raw_transcript": raw_transcript,
-                        "sanitized_transcript": transcript
+                        "sanitized_transcript": transcript,
+                        "is_test": is_test
                     }
                     update_dispatch_record(dispatch_id, update_payload)
-                    publish_mqtt_dispatch(update_payload, event_type="UPDATE")
+                    if send_mqtt:
+                        publish_mqtt_dispatch(update_payload, event_type="UPDATE", is_test=is_test)
                     final_addr = p1_target.get("address", "Unknown Location")
 
         logging.info(f"[METRICS] [{dispatch_id}] Phase 2 Finalized | Match={is_match} | Corrected={was_corrected} | Addr='{final_addr}' | Audio={audio_duration:.1f}s")
@@ -361,13 +373,22 @@ def process_phase_2_finalize(
     finally:
         session_manager.cleanup_session(dispatch_id)
 
-def process_full_dispatch(buffer: list, validator: Any, tone_name: str = None, units_vocab: list = None, stt_model: Any = None) -> dict:
+def process_full_dispatch(
+    buffer: list,
+    validator: Any,
+    tone_name: str = None,
+    units_vocab: list = None,
+    stt_model: Any = None,
+    send_mqtt: bool = True,
+    send_ntfy: bool = True,
+    is_test: bool = False
+) -> dict:
     """Processes a full dispatch audio buffer synchronously (single-phase / simulation mode)."""
     import uuid
     import time
     dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
     units_vocab = units_vocab or UNITS_VOCABULARY
-    logging.info(f"--- STARTING SIMULATED / FULL DISPATCH PROCESSING (ID: {dispatch_id}) ---")
+    logging.info(f"--- STARTING SIMULATED / FULL DISPATCH PROCESSING (ID: {dispatch_id}, is_test={is_test}) ---")
     
     # 1. Save and upload audio
     audio_url, audio_duration = save_and_upload_audio(dispatch_id, buffer, tone_name)
@@ -406,13 +427,20 @@ def process_full_dispatch(buffer: list, validator: Any, tone_name: str = None, u
         units_vocabulary=units_vocab,
         audio_url=audio_url,
         audio_duration=audio_duration,
-        tone_name=tone_name
+        tone_name=tone_name,
+        is_test=is_test
     )
     
     save_dispatch_record(db_payload)
-    publish_mqtt_dispatch(db_payload, event_type="INSERT")
-    if ENABLE_NTFY_PUSH:
-        post_to_ntfy(db_payload)
+    if send_mqtt:
+        publish_mqtt_dispatch(db_payload, event_type="INSERT", is_test=is_test)
+    else:
+        logging.info(f"[{dispatch_id}] Targeted testing mode: Omitted MQTT broadcast.")
+        
+    if send_ntfy and ENABLE_NTFY_PUSH:
+        post_to_ntfy(db_payload, is_test=is_test)
+    elif not send_ntfy:
+        logging.info(f"[{dispatch_id}] Targeted testing mode: Omitted Ntfy push.")
         
     best_addr = db_payload.get("address") or db_payload.get("target", {}).get("address")
     logging.info(f"[METRICS] [{dispatch_id}] Full Dispatch Processed | Units: {responding_units} | Addr: '{best_addr}'")

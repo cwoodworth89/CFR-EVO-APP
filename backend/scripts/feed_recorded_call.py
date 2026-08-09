@@ -11,6 +11,7 @@
 
 import sys
 import os
+import argparse
 
 # Ensure working directory is the backend folder so relative data paths and imports resolve correctly
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,12 +35,37 @@ def main():
     # Setup console logging
     setup_logging()
     
-    if len(sys.argv) < 2:
-        print("Usage: python feed_recorded_call.py <path_to_wav_file> [tone_name]")
-        sys.exit(1)
-        
-    wav_path = sys.argv[1]
-    tone_name = sys.argv[2] if len(sys.argv) > 2 else None
+    parser = argparse.ArgumentParser(
+        description="Feed a recorded WAV dispatch call into the CFR EVO audio pipeline.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("wav_path", help="Path to .wav audio file")
+    parser.add_argument("tone_name", nargs="?", default=None, help="Optional tone name identifier")
+    parser.add_argument(
+        "--omit-mqtt", "--no-mqtt",
+        dest="send_mqtt",
+        action="store_false",
+        default=True,
+        help="Omit publishing to Mosquitto MQTT broker (useful for targeted/isolated testing)"
+    )
+    parser.add_argument(
+        "--omit-ntfy", "--no-ntfy",
+        dest="send_ntfy",
+        action="store_false",
+        default=True,
+        help="Omit sending Ntfy push notifications to phones"
+    )
+    parser.add_argument(
+        "--production",
+        dest="is_test",
+        action="store_false",
+        default=True,
+        help="Treat as a live production dispatch (omits the *TEST* warning prefix)"
+    )
+    
+    args = parser.parse_args()
+    wav_path = args.wav_path
+    tone_name = args.tone_name
     
     if not os.path.exists(wav_path):
         print(f"Error: File not found: '{wav_path}'")
@@ -75,9 +101,19 @@ def main():
     print("Initializing Coquitlam Data Validator...")
     validator = get_shared_validator()
     
-    print(f"Feeding audio array ({len(audio_data)} samples) into pipeline...")
+    mode_desc = f"Full System Test (MQTT: {'ON' if args.send_mqtt else 'OFF'}, Phones Ntfy: {'ON' if args.send_ntfy else 'OFF'}, *TEST* Prefix: {'ON' if args.is_test else 'OFF (PRODUCTION)'})"
+    print(f"Feeding audio array ({len(audio_data)} samples) into pipeline | Mode: {mode_desc}...")
+    
     # Wrap in a list so np.concatenate works as expected inside process_full_dispatch
-    process_full_dispatch([audio_data], validator, tone_name, UNITS_VOCABULARY)
+    process_full_dispatch(
+        buffer=[audio_data],
+        validator=validator,
+        tone_name=tone_name,
+        units_vocab=UNITS_VOCABULARY,
+        send_mqtt=args.send_mqtt,
+        send_ntfy=args.send_ntfy,
+        is_test=args.is_test
+    )
     print("Finished feeding call to pipeline.")
 
 if __name__ == "__main__":

@@ -71,18 +71,35 @@ def format_unit_topics(unit_str: str) -> list[str]:
     secrets = get_active_secrets()
     return [f"{base}-{s}" if s else base for s in secrets]
 
-def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None) -> bool:
+def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None, is_test: bool = None) -> bool:
     """Posts dispatch alert to local/remote Ntfy push notification topics with audio attachments."""
+    if is_test is None:
+        is_test = bool(payload.get("is_test", False))
+
     # 1. Format Ntfy notification payload
     target = payload.get("target", {})
     address = payload.get("address") or target.get("address") or "Unknown Location"
     lat = payload.get("lat") or target.get("lat")
     lng = payload.get("lng") or target.get("lng")
+    incident_type = payload.get("incident_type", "Emergency Call")
+
+    if is_test:
+        if not title:
+            title = f"🚨 *TEST* DISPATCH: {incident_type}"
+        elif "*TEST*" not in title:
+            title = f"*TEST* {title}"
+        if not tags:
+            tags = "test,warning,fire_engine,rotating_light"
+    else:
+        if not title:
+            title = f"🚨 DISPATCH: {incident_type}"
+        if not tags:
+            tags = "fire_engine,rotating_light,warning"
 
     headers = {
-        "Title": title or f"🚨 DISPATCH: {payload.get('incident_type', 'Emergency Call')}",
+        "Title": title,
         "Priority": priority,
-        "Tags": tags or "fire_engine,rotating_light,warning"
+        "Tags": tags
     }
 
     raw_audio = payload.get("audio_url")
@@ -126,15 +143,18 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     map_grid = payload.get("map_grid") or target.get("map_grid")
     radio_channel = payload.get("radio_channel") or target.get("radio_channel")
 
-    lines = [
-        f"📍 Location: {address}",
-        f"🚒 Units: {units_str}"
-    ]
+    lines = []
+    if is_test:
+        lines.append("⚠️ *** THIS IS A SYSTEM TEST - NOT A REAL EMERGENCY *** ⚠️\n")
+    lines.append(f"📍 Location: {'*TEST* ' if is_test else ''}{address}")
+    lines.append(f"🚒 Units: {units_str}")
     if map_grid:
         lines.append(f"🗺️ Map Grid: {map_grid}")
     if radio_channel:
         lines.append(f"📻 Radio Channel: {radio_channel}")
     lines.append(f"📝 Transcript: {transcript_clean}")
+    if is_test:
+        lines.append("\n⚠️ *** THIS IS A SYSTEM TEST - NOT A REAL EMERGENCY *** ⚠️")
     
     message_body = "\n".join(lines).encode('utf-8')
 

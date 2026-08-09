@@ -189,9 +189,21 @@ export default function KioskView({ kioskState }) {
           </h1>
 
           {/* Centered Call Type (One size down from address, bright amber) */}
-          <div className={`font-black text-amber-400 tracking-wider uppercase font-mono mt-1 ${isTvMode ? 'text-3xl' : 'text-2xl'}`}>
-            {activeCall.incident_type || 'EMERGENCY DISPATCH'}
+          <div className={`font-black tracking-wider uppercase font-mono mt-1 ${
+            activeCall.is_test ? 'text-orange-400' : 'text-amber-400'
+          } ${isTvMode ? 'text-3xl' : 'text-2xl'}`}>
+            {activeCall.is_test && !(activeCall.incident_type || '').includes('*TEST*')
+              ? `*TEST* ${activeCall.incident_type || 'EMERGENCY DISPATCH'}`
+              : (activeCall.incident_type || 'EMERGENCY DISPATCH')}
           </div>
+
+          {activeCall.is_test && (
+            <div className="mt-1">
+              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-0.5 rounded-full text-[11px] font-black font-mono tracking-wider animate-pulse">
+                ⚠️ SYSTEM TEST / DRILL — NOT A LIVE 911 CALL ⚠️
+              </span>
+            </div>
+          )}
 
           {activeCall.subaddress && (
             <div className="mt-1">

@@ -185,9 +185,17 @@ function ActiveDispatchPanel({ activeDispatch, setActiveDispatch, nearestHydrant
   return (
     <div className="flex flex-col h-full bg-slate-905 text-slate-100 overflow-y-auto w-full select-none">
       {/* Active Alert Banner */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-600 p-4 text-center border-b border-red-700 animate-pulse flex flex-col gap-0.5 shadow-md flex-shrink-0">
-        <span className="text-[10px] text-white/95 font-black uppercase tracking-widest font-mono">🚨 DISPATCH OVERRIDE ACTIVE 🚨</span>
-        <span className="text-xs text-white/80 font-bold tracking-wider font-mono">STATION KIOSK ALERT</span>
+      <div className={`p-4 text-center border-b animate-pulse flex flex-col gap-0.5 shadow-md flex-shrink-0 ${
+        activeDispatch.is_test 
+          ? "bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 border-amber-500"
+          : "bg-gradient-to-r from-red-600 to-orange-600 border-red-700"
+      }`}>
+        <span className="text-[10px] text-white/95 font-black uppercase tracking-widest font-mono">
+          {activeDispatch.is_test ? "⚠️ *TEST* DISPATCH SIMULATION ACTIVE ⚠️" : "🚨 DISPATCH OVERRIDE ACTIVE 🚨"}
+        </span>
+        <span className="text-xs text-white/80 font-bold tracking-wider font-mono">
+          {activeDispatch.is_test ? "SYSTEM QA / TRAINING DRILL" : "STATION KIOSK ALERT"}
+        </span>
       </div>
 
       <div className="p-5 flex-grow flex flex-col gap-6 overflow-y-auto">
@@ -197,7 +205,9 @@ function ActiveDispatchPanel({ activeDispatch, setActiveDispatch, nearestHydrant
           <h2 className="text-xl text-white font-black leading-tight tracking-wide uppercase select-text">{address}</h2>
           <div className="border-t border-slate-900 mt-2.5 pt-2 flex flex-col gap-0.5 text-left">
             <span className="text-[8px] text-slate-500 font-extrabold uppercase font-mono">CALL TYPE</span>
-            <div className="text-sm text-amber-500 font-black tracking-wide uppercase">{incidentType}</div>
+            <div className="text-sm text-amber-500 font-black tracking-wide uppercase">
+              {activeDispatch.is_test && !incidentType.includes("*TEST*") ? `*TEST* ${incidentType}` : incidentType}
+            </div>
           </div>
         </div>
 

@@ -48,6 +48,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/audio_files/recordings:/app/backend/audio_files/recordings
+      - ./frontend/public/data:/app/frontend/public/data:ro
     depends_on:
       - postgres
       - mosquitto

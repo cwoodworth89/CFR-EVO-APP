@@ -23,9 +23,12 @@ Sibling microservices in `/services/*/src` (`gis_service`, `audio_service`, `not
 ## 3. Git & Remote Kiosk Deployment Protocol
 The station kiosk is accessible over Tailscale SSH (`tcfire@100.95.146.94`, hostname `cfr-mapping-tcfh`).
 1. **Local Edits First**: Make all code, config, and doc changes in the local Git repository first. **Never edit production code directly on the remote kiosk.**
-2. **Commit & Pull**: Commit and push changes locally, then run `git pull` on the remote kiosk.
-3. **Frontend Rebuild**: Because `frontend/dist` is `.gitignore`d, always rebuild frontend assets on the kiosk after pulling:
+2. **Local Scope Restriction**: Local command execution is reserved strictly for pre-development mini-scripts, scratch isolation tests, or standalone unit checks.
+3. **Mandatory Remote Full-Stack Testing**: Once a fix or feature is implemented, you MUST commit and push to Git, pull changes on the remote kiosk, rebuild assets, and verify on the physical remote full stack before declaring completion.
+4. **Commit, Pull & Rebuild Execution**:
    ```bash
-   ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/frontend && npm run build"
+   git add . && git commit -m "..." && git push origin main
+   ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend && npm run build"
    ```
-4. **Git-Ignored Files**: Files in `.gitignore` (e.g. `backend/.env`, `frontend/.env.local`, model caches in `backend/models/`, shapefiles in `backend/data/`) are not synced via git and must be transferred manually via `scp` when updated.
+5. **Git-Ignored Files**: Files in `.gitignore` (e.g. `backend/.env`, `frontend/.env.local`, model caches in `backend/models/`, shapefiles in `backend/data/`) are not synced via git and must be transferred manually via `scp` when updated.
+

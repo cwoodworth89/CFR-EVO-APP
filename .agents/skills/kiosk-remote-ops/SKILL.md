@@ -53,3 +53,21 @@ Rebuild frontend production assets (since `frontend/dist` is `.gitignore`d):
 ```bash
 ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/frontend && npm install && npm run build"
 ```
+
+---
+
+## 4. Full-Stack Remote Verification Workflow
+
+Whenever a bug fix or feature edit is completed:
+1. Stage, commit, and push changes locally:
+   ```bash
+   git add .
+   git commit -m "fix/feat: description"
+   git push origin main
+   ```
+2. Pull updates and rebuild frontend assets on the remote kiosk:
+   ```bash
+   ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend && npm run build"
+   ```
+3. Verify services and test clean full-stack execution on the remote kiosk host before concluding the task.
+

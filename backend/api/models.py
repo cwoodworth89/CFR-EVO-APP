@@ -13,6 +13,7 @@ SafeUUID = String(36).with_variant(UUID(as_uuid=True), "postgresql")
 
 class LiveCallModel(Base):
     __tablename__ = "live_calls"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     dispatch_id = Column(String, unique=True, index=True, nullable=False)
@@ -44,6 +45,7 @@ class LiveCallModel(Base):
 
 class EvaluationHistoryModel(Base):
     __tablename__ = "evaluation_history"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(SafeUUID, primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -58,6 +60,7 @@ class EvaluationHistoryModel(Base):
 
 class DispatchUploadModel(Base):
     __tablename__ = "dispatch_uploads"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(SafeUUID, primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -70,6 +73,7 @@ class DispatchUploadModel(Base):
 
 class RoadClosureModel(Base):
     __tablename__ = "road_closures"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     closure_id = Column(String, unique=True, index=True, nullable=False)

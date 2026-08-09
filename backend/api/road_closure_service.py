@@ -166,13 +166,22 @@ def sync_road_closures_to_db(db: Session):
                 mid = len(coords) // 2
                 lng, lat = coords[mid][0], coords[mid][1]
 
-            # Perform PIP check across all vertices
+            # Strict geographic checks: Exclude events south of Fraser River (lat < 49.231) or referencing neighboring cities
             all_pts = polyline if polyline else [[lat, lng]]
+            if any(pt[0] < 49.231 for pt in all_pts):
+                continue
+
+            text_content = f"{evt.get('headline', '')} {evt.get('description', '')} {evt.get('road_name', '')}".lower()
+            if any(city in text_content for city in ["surrey", "delta", "langley", "richmond", "pattullo"]):
+                continue
+
+            # Perform PIP check across all vertices
             affected_zones = resolve_affected_zones(all_pts)
             if not affected_zones:
                 continue  # Skip items outside Coquitlam emergency zones!
 
             primary_zone = affected_zones[0]
+
             sev = (evt.get('severity') or 'MINOR').upper()
             emergency_access = 'NO_ACCESS' if sev == 'MAJOR' else 'CAUTION'
 

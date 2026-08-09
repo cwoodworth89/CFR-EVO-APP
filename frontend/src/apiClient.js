@@ -183,5 +183,13 @@ export const apiClient = {
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();
     }
+  },
+
+  roadClosures: {
+    async fetchAll() {
+      const res = await fetch(`${API_BASE_URL}/api/road-closures`, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    }
   }
 };

@@ -11,6 +11,7 @@ import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLaye
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
+import { apiClient } from '../apiClient';
 
 export function enrichAddressWithBuilding(targetObj) {
   if (!targetObj) return null;
@@ -668,14 +669,11 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES (Primary: Relative /api/road-closures via nginx proxy, Fallback: VITE_API_URL / window.location.hostname:8000)
+  // LOAD ROAD CLOSURES (Primary: Relative /api/road-closures via Nginx, Fallback: Central apiClient IP-agnostic gateway, Fallback: Direct DriveBC)
   useEffect(() => {
-    const defaultHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
-    const backendUrl = import.meta.env.VITE_API_URL || `http://${defaultHost}:8000`;
-
     const fetchFromGateway = fetch("/api/road-closures")
       .then(r => (r.ok && r.headers.get("content-type")?.includes("application/json")) ? r.json() : Promise.reject("Relative /api response not JSON"))
-      .catch(() => fetch(`${backendUrl}/api/road-closures`).then(r => r.ok ? r.json() : Promise.reject("Gateway response not OK")))
+      .catch(() => apiClient.roadClosures.fetchAll())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           return data;

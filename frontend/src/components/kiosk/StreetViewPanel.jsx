@@ -23,7 +23,14 @@ export default function StreetViewPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
-  const [viewMode, setViewMode] = useState('photo'); // 'photo' | 'embed'
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('cfr_streetview_mode') || 'embed';
+  });
+
+  const handleSetViewMode = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('cfr_streetview_mode', mode);
+  };
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
@@ -219,18 +226,18 @@ export default function StreetViewPanel({ activeCall }) {
           {/* Mode Switcher Toggle */}
           <div className="flex items-center bg-slate-950 rounded border border-slate-800 p-0.5 text-[9px] font-mono">
             <button
-              onClick={() => setViewMode('photo')}
-              className={`px-1.5 py-0.5 rounded transition ${viewMode === 'photo' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              onClick={() => handleSetViewMode('embed')}
+              className={`px-2 py-0.5 rounded transition ${viewMode === 'embed' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              title="Interactive 360° Live Embed"
+            >
+              Interactive 360°
+            </button>
+            <button
+              onClick={() => handleSetViewMode('photo')}
+              className={`px-2 py-0.5 rounded transition ${viewMode === 'photo' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
               title="High-Resolution Street View Photo"
             >
               Photo
-            </button>
-            <button
-              onClick={() => setViewMode('embed')}
-              className={`px-1.5 py-0.5 rounded transition ${viewMode === 'embed' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-              title="Interactive 360° Embed Mode"
-            >
-              Interactive 360°
             </button>
           </div>
 

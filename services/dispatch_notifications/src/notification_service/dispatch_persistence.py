@@ -33,10 +33,13 @@ def update_dispatch_record(dispatch_id: str, payload: dict, url: str = None, key
 
 def save_audio_recording(file_bytes: bytes, file_name: str, url: str = None, key: str = None) -> str:
     """Saves audio file locally to recordings directory and returns relative URL route."""
-    recordings_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-        "backend", "audio_files", "recordings"
-    )
+    recordings_dir = os.environ.get("RECORDINGS_DIR")
+    if not recordings_dir:
+        # Step up 5 directory levels from dispatch_persistence.py to reach project root (CFR-EVO-APP)
+        current = os.path.abspath(__file__)
+        for _ in range(5):
+            current = os.path.dirname(current)
+        recordings_dir = os.path.join(current, "backend", "audio_files", "recordings")
     os.makedirs(recordings_dir, exist_ok=True)
     local_path = os.path.join(recordings_dir, file_name)
     local_url = f"/api/audio/{file_name}"

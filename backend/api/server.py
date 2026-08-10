@@ -475,7 +475,7 @@ def get_road_closures(background_tasks: BackgroundTasks, db: Session = Depends(g
             ROAD_CLOSURES_CACHE["timestamp"] = now_ts
         except Exception as sync_err:
             logging.warning(f"Initial startup sync failed: {sync_err}")
-    elif now_ts - ROAD_CLOSURES_CACHE["timestamp"] > 300:
+    elif now_ts - ROAD_CLOSURES_CACHE["timestamp"] > 86400:
         ROAD_CLOSURES_CACHE["timestamp"] = now_ts
         background_tasks.add_task(run_road_closure_sync)
 

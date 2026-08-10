@@ -2,7 +2,7 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
-import { UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
+import { UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, STATIONS as STATIONS_LIST } from './MapConstants';
 import { sanitizeAddress, calculateParcelFrontagePoint } from '../utils/addressUtils';
 
 
@@ -39,8 +39,13 @@ export function Header({
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold tracking-wider flex items-center gap-1.5 select-none uppercase">
               CFR <span className="text-emerald-500 font-extrabold">DISPATCH</span>
-              <span className="text-slate-500 font-normal text-[10px] uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2">
-                {homeHall ? `HALL ${homeHall}` : "HALL 1"}
+              <span className="text-slate-500 font-normal text-[10px] uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2 font-mono">
+                {(() => {
+                  const defaultHallId = import.meta.env.VITE_DEFAULT_HALL || "1";
+                  const configStn = STATIONS_LIST.find(s => s.id === defaultHallId) || STATIONS_LIST[0];
+                  const configStnName = configStn ? configStn.name.split(" Fire Hall")[0] : `HALL ${defaultHallId}`;
+                  return `${configStnName} (Hall ${defaultHallId})`;
+                })()}
               </span>
             </h1>
             

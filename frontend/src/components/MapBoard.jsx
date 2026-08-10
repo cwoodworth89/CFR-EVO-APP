@@ -1364,6 +1364,8 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             filterCaution={filterCaution}
             map={map}
             onSelectClosure={setSelectedClosure}
+            zones={zones}
+            homeHall={homeHall}
           />
         )}
       </div>

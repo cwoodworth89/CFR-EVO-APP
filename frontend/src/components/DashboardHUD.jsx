@@ -1070,18 +1070,23 @@ export function RightSidebar({
   filterAccessOnly,
   filterCaution,
   map,
-  onSelectClosure
+  onSelectClosure,
+  zones = [],
+  homeHall = "1"
 }) {
-  // Process and sort closures:
-  // 1. Parse start and end dates.
-  // 2. Identify if ACTIVE, FUTURE or EXPIRED (based on new Date()).
-  // 3. Exclude expired closures to keep map and list clean.
-  // 4. Sort: ACTIVE closures first (ordered by duration ascending, i.e., shortest duration first),
-  //    then FUTURE closures (ordered by start date ascending, i.e., starting soonest first).
-  const processedClosures = React.useMemo(() => {
+  const groupDefs = {
+    E1: { label: "Engine 1 (Hall 1)", color: "border-rose-500/80 text-rose-400 bg-rose-950/40" },
+    E2: { label: "Engine 2 (Hall 2)", color: "border-blue-500/80 text-blue-400 bg-blue-950/40" },
+    E3: { label: "Engine 3 (Hall 3)", color: "border-emerald-500/80 text-emerald-400 bg-emerald-950/40" },
+    Q5: { label: "Quint 5 (Hall 3)", color: "border-teal-500/80 text-teal-400 bg-teal-950/40" },
+    E4: { label: "Engine 4 (Hall 4)", color: "border-purple-500/80 text-purple-400 bg-purple-950/40" },
+    OTHER: { label: "Regional Corridors / Other", color: "border-slate-600 text-slate-400 bg-slate-800/30" }
+  };
+
+  const groupedClosures = React.useMemo(() => {
     const now = new Date();
 
-    return roadClosures
+    const filtered = roadClosures
       .map(closure => {
         const start = closure.startDate ? new Date(closure.startDate) : null;
         const end = closure.endDate ? new Date(closure.endDate) : null;
@@ -1089,7 +1094,6 @@ export function RightSidebar({
         let isActive = false;
         let isFuture = false;
         let isExpired = false;
-        let durationMs = Infinity;
 
         if (start && now < start) {
           isFuture = true;
@@ -1099,56 +1103,56 @@ export function RightSidebar({
           isActive = true;
         }
 
-        if (start && end) {
-          durationMs = end.getTime() - start.getTime();
-        }
-
         return {
           ...closure,
           start,
           end,
           isActive,
           isFuture,
-          isExpired,
-          durationMs
+          isExpired
         };
       })
       .filter(closure => {
-        // Hide expired closures
         if (closure.isExpired) return false;
-
-        // Apply emergencyAccess filters
         if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
         if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
         if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
         return true;
-      })
-      .sort((a, b) => {
-        // Active closures first, then future
-        if (a.isActive && !b.isActive) return -1;
-        if (!a.isActive && b.isActive) return 1;
-
-        if (a.isActive && b.isActive) {
-          // Sort active closures by duration ascending (shortest first)
-          if (a.durationMs !== b.durationMs) {
-            return a.durationMs - b.durationMs;
-          }
-          // Fallback: sort by start date ascending
-          const aTime = a.start ? a.start.getTime() : 0;
-          const bTime = b.start ? b.start.getTime() : 0;
-          return aTime - bTime;
-        }
-
-        if (a.isFuture && b.isFuture) {
-          // Sort future closures by start date ascending (soonest first)
-          const aTime = a.start ? a.start.getTime() : 0;
-          const bTime = b.start ? b.start.getTime() : 0;
-          return aTime - bTime;
-        }
-
-        return 0;
       });
-  }, [roadClosures, filterNoAccess, filterAccessOnly, filterCaution]);
+
+    const groups = { E1: [], E2: [], E3: [], Q5: [], E4: [], OTHER: [] };
+    filtered.forEach(closure => {
+      const zoneMatch = zones.find(z => String(z.zone_id) === String(closure.zoneId));
+      const unit = zoneMatch ? zoneMatch.unit_id : "OTHER";
+      if (groups[unit]) {
+        groups[unit].push(closure);
+      } else {
+        groups["OTHER"].push(closure);
+      }
+    });
+
+    Object.keys(groups).forEach(key => {
+      groups[key].sort((a, b) => {
+        const aTime = a.start ? a.start.getTime() : 0;
+        const bTime = b.start ? b.start.getTime() : 0;
+        return bTime - aTime; // Newest first
+      });
+    });
+
+    let order = ["E1", "E2", "E3", "Q5", "E4", "OTHER"];
+    if (homeHall === "1") order = ["E1", "E2", "E3", "Q5", "E4", "OTHER"];
+    else if (homeHall === "2") order = ["E2", "E1", "E3", "Q5", "E4", "OTHER"];
+    else if (homeHall === "3") order = ["E3", "Q5", "E1", "E2", "E4", "OTHER"];
+    else if (homeHall === "4") order = ["E4", "E1", "E2", "E3", "Q5", "OTHER"];
+
+    return order
+      .map(unitKey => ({
+        unit: unitKey,
+        closures: groups[unitKey],
+        ...groupDefs[unitKey]
+      }))
+      .filter(g => g.closures.length > 0);
+  }, [roadClosures, zones, homeHall, filterNoAccess, filterAccessOnly, filterCaution]);
 
   const isExplore = appMode === "EXPLORE";
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode
@@ -1185,65 +1189,77 @@ export function RightSidebar({
              {/* Alerts Card List */}
              <div className="p-4 flex-grow overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 {showRoadClosures ? (
-                    <div className="flex flex-col gap-2.5 pr-1">
-                        <div className="text-slate-400 text-[10px] font-semibold mb-1 uppercase font-mono tracking-wider">Filtered Alerts ({processedClosures.length})</div>
-                        {processedClosures.length > 0 ? (
-                            processedClosures.map((closure) => (
-                                <div 
-                                  key={closure.id} 
-                                  onClick={() => {
-                                    if (map) {
-                                      map.flyTo(closure.coordinates, 16, { animate: true });
-                                    }
-                                    if (onSelectClosure) {
-                                      onSelectClosure(closure);
-                                    }
-                                  }}
-                                  className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden flex-shrink-0"
-                                >
-                                     {/* Street Name (Prominent & Color-coded) & Source */}
-                                     <div className="flex justify-between items-center gap-1.5">
-                                         <span className={`text-xs font-black uppercase tracking-wide truncate ${
-                                           closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-500' :
-                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'text-amber-500' :
-                                           'text-yellow-500'
-                                         }`}>
-                                            {closure.street}
-                                         </span>
-                                         <span className="text-[8px] text-slate-500 font-mono font-medium flex-shrink-0">{closure.source}</span>
-                                     </div>
-                                     
-                                     {/* Headline & Warning Type Pill */}
-                                     <div className="flex justify-between items-center text-[9px] font-mono font-bold text-slate-400">
-                                        <span className="truncate pr-1">{closure.headline}</span>
-                                        <span className={`text-[7px] px-1 py-0.2 rounded font-black tracking-wider flex-shrink-0 ${
-                                          closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                                          closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                          'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                                        }`}>
-                                          {closure.emergencyAccess === 'NO_ACCESS' ? 'FULL CLOSURE' :
-                                           closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
-                                           'LANE CLOSURE'}
-                                        </span>
-                                     </div>
+                    <div className="flex flex-col gap-4 pr-1">
+                        {groupedClosures.length > 0 ? (
+                            groupedClosures.map((group) => (
+                                <div key={group.unit} className="flex flex-col gap-2">
+                                    {/* Group Title Header */}
+                                    <div className={`text-[10px] font-black uppercase font-mono px-2 py-1 border-l-2 rounded-r-md flex justify-between items-center shadow-sm ${group.color}`}>
+                                        <span>📍 {group.label}</span>
+                                        <span className="opacity-75 font-mono">{group.closures.length}</span>
+                                    </div>
+                                    
+                                    {/* Group Closures */}
+                                    <div className="flex flex-col gap-2 pl-1 border-l border-slate-800/40">
+                                        {group.closures.map((closure) => (
+                                            <div 
+                                              key={closure.id} 
+                                              onClick={() => {
+                                                if (map) {
+                                                  map.flyTo(closure.coordinates, 16, { animate: true });
+                                                }
+                                                if (onSelectClosure) {
+                                                  onSelectClosure(closure);
+                                                }
+                                              }}
+                                              className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden flex-shrink-0"
+                                            >
+                                                 {/* Street Name (Prominent & Color-coded) & Source */}
+                                                 <div className="flex justify-between items-center gap-1.5">
+                                                     <span className={`text-xs font-black uppercase tracking-wide truncate ${
+                                                       closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-500' :
+                                                       closure.emergencyAccess === 'ACCESS_ONLY' ? 'text-amber-500' :
+                                                       'text-yellow-500'
+                                                     }`}>
+                                                        {closure.street}
+                                                     </span>
+                                                     <span className="text-[8px] text-slate-500 font-mono font-medium flex-shrink-0">{closure.source}</span>
+                                                 </div>
+                                                 
+                                                 {/* Headline & Warning Type Pill */}
+                                                 <div className="flex justify-between items-center text-[9px] font-mono font-bold text-slate-400">
+                                                    <span className="truncate pr-1">{closure.headline}</span>
+                                                    <span className={`text-[7px] px-1 py-0.2 rounded font-black tracking-wider flex-shrink-0 ${
+                                                      closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                                      closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                      'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                                    }`}>
+                                                      {closure.emergencyAccess === 'NO_ACCESS' ? 'FULL CLOSURE' :
+                                                       closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
+                                                       'LANE CLOSURE'}
+                                                    </span>
+                                                 </div>
 
-                                     {/* Date Range & Status Pill */}
-                                     <div className="flex justify-between items-center text-[9px] font-mono border-t border-slate-900/50 pt-1.5 mt-0.5">
-                                        <span className="text-slate-400 flex items-center gap-1">
-                                          📅 {formatDateRange(closure.start, closure.end)}
-                                        </span>
-                                        {closure.isActive ? (
-                                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-                                            ACTIVE
-                                          </span>
-                                        ) : (
-                                          <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
-                                            FUTURE
-                                          </span>
-                                        )}
-                                     </div>
+                                                 {/* Date Range & Status Pill */}
+                                                 <div className="flex justify-between items-center text-[9px] font-mono border-t border-slate-900/50 pt-1.5 mt-0.5">
+                                                    <span className="text-slate-400 flex items-center gap-1">
+                                                      📅 {formatDateRange(closure.start, closure.end)}
+                                                    </span>
+                                                    {closure.isActive ? (
+                                                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                                                        ACTIVE
+                                                      </span>
+                                                    ) : (
+                                                      <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
+                                                        FUTURE
+                                                      </span>
+                                                    )}
+                                                 </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             ))
                         ) : (

@@ -30,6 +30,15 @@ if [ ! -f ".env" ]; then
     echo "Creating default frontend .env file..."
     cp .env.example .env
 fi
+# Copy/create kiosk station .env.local if not present
+if [ ! -f ".env.local" ]; then
+    echo "Creating default frontend .env.local file..."
+    cat <<EOF > .env.local
+# CFR DISPATCH STATION HALL IDENTIFIER
+# Set this to the station hall representing the physical display hardware: 1, 2, 3, or 4
+VITE_DEFAULT_HALL=1
+EOF
+fi
 npm install
 npm run build
 cd "${PROJECT_DIR}"
@@ -168,5 +177,6 @@ echo "======================================================================"
 echo "To complete setup:"
 echo "1. Run Tailscale authentication: 'sudo tailscale up --ssh'"
 echo "2. Edit your environment config: 'nano ${PROJECT_DIR}/backend/.env'"
-echo "3. Restart the agent after editing .env: 'sudo systemctl restart cfr-agent'"
+echo "3. Set the default kiosk station hall in: 'nano ${PROJECT_DIR}/frontend/.env.local' (e.g. VITE_DEFAULT_HALL=1)"
+echo "4. Restart the agent and rebuild the UI: 'sudo systemctl restart cfr-agent && cd ${PROJECT_DIR}/frontend && npm run build'"
 echo "======================================================================"

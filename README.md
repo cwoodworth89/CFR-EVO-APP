@@ -156,11 +156,20 @@ python backend/scripts/migrate_supabase_to_local.py
 ```
 
 ### 3. Launch Frontend Kiosks (Halls 1 to 4)
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Before building or running the frontend, configure the specific hall identifier for this kiosk display:
+1. Create or edit a local environment file `frontend/.env.local` (which is git-ignored and device-specific).
+2. Set the default station hall (1, 2, 3, or 4):
+   ```env
+   VITE_DEFAULT_HALL=1
+   ```
+3. Run or compile the frontend:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev   # for local development
+   # OR
+   npm run build # for production kiosk hardware setups
+   ```
 
 ---
 

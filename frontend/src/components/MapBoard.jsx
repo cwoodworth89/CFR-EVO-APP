@@ -246,7 +246,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
                 📅 {closure.endDate ? (
                   `${new Date(closure.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${new Date(closure.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                 ) : (
-                  `Started ${new Date(closure.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  `Started ${new Date(closure.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (Until Further Notice)`
                 )}
               </p>
             )}

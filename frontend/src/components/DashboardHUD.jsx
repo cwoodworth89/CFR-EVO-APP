@@ -1203,13 +1203,13 @@ export function RightSidebar({
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode
 
   const formatDateRange = (start, end) => {
-    if (!start) return "Ongoing";
+    if (!start) return "Ongoing (Until Further Notice)";
     
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
     const startStr = start.toLocaleDateString('en-US', options);
     
     if (!end) {
-      return `Started ${startStr}`;
+      return `Started ${startStr} (Until Further Notice)`;
     }
     
     const endStr = end.toLocaleDateString('en-US', options);

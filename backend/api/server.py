@@ -140,6 +140,7 @@ class DispatchCreateSchema(BaseModel):
     dispatch_id: str
     incident_type: Optional[str] = "Unknown Incident"
     responding_units: Optional[List[str]] = []
+    routing_metrics: Optional[List[Dict[str, Any]]] = []
     target: Optional[Dict[str, Any]] = {}
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
@@ -157,6 +158,7 @@ class DispatchCreateSchema(BaseModel):
 class DispatchUpdateSchema(BaseModel):
     incident_type: Optional[str] = None
     responding_units: Optional[List[str]] = None
+    routing_metrics: Optional[List[Dict[str, Any]]] = None
     target: Optional[Dict[str, Any]] = None
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
@@ -175,6 +177,12 @@ class DispatchUpdateSchema(BaseModel):
     review_notes: Optional[str] = None
 
 def serialize_call(call: LiveCallModel) -> dict:
+    metrics = getattr(call, "routing_metrics", None)
+    if not metrics and isinstance(call.target, dict):
+        metrics = call.target.get("routing_metrics", [])
+    if not metrics:
+        metrics = []
+
     return {
         "id": call.id,
         "dispatch_id": call.dispatch_id,
@@ -182,6 +190,7 @@ def serialize_call(call: LiveCallModel) -> dict:
         "created_at": call.timestamp.isoformat() if call.timestamp else None,
         "incident_type": call.incident_type,
         "responding_units": call.responding_units or [],
+        "routing_metrics": metrics,
         "target": call.target or {},
         "raw_transcript": call.raw_transcript,
         "sanitized_transcript": call.sanitized_transcript,

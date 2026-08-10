@@ -148,13 +148,23 @@ export default function KioskView({ kioskState }) {
     ? rawUnits.split(',').map((u) => u.trim()).filter(Boolean)
     : [];
 
-  const destLat = activeCall?.lat ?? 49.2838;
-  const destLng = activeCall?.lng ?? -122.7932;
+  const destLat = activeCall?.lat ?? activeCall?.target?.lat ?? 49.2838;
+  const destLng = activeCall?.lng ?? activeCall?.target?.lng ?? -122.7932;
 
-  const unitEtas = unitList.map((unit) => calculateUnitEta(unit, destLat, destLng));
+  const persistedMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics;
+  const unitEtas = (persistedMetrics && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
+    ? persistedMetrics.map((m) => ({
+        unit: m.unit,
+        hall: `Hall ${m.origin_hall || (m.unit.match(/\d+/) ? m.unit.match(/\d+/)[0] : '1')}`,
+        etaMin: m.eta_minutes,
+        etaStr: `~${m.eta_minutes} min`,
+        distStr: `${m.road_distance_km || m.distance_km} km`,
+        icon: getUnitIcon(m.unit),
+      }))
+    : unitList.map((unit) => calculateUnitEta(unit, destLat, destLng));
 
-  const talkGroup = activeCall?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
-  const rawMapGrid = activeCall?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
+  const talkGroup = activeCall?.radio_channel || activeCall?.target?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
+  const rawMapGrid = activeCall?.map_grid || activeCall?.target?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
   const formattedGrid = rawMapGrid ? (rawMapGrid.toString().toUpperCase().startsWith('GRID') ? rawMapGrid.toString().toUpperCase() : `GRID ${rawMapGrid}`) : null;
   const borderColor = isEmergency ? 'border-red-600' : 'border-emerald-500';
 

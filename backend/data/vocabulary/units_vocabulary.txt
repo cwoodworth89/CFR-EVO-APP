@@ -5,12 +5,36 @@ Engine 4
 Engine 5
 Engine 10
 Engine 11
-Quint 5
 Ladder 1
-Medic 1
 Ladder 2
+Ladder 3
+Ladder 4
+Medic 1
+Medic 2
+Medic 3
+Medic 4
 Rescue 1
 Rescue 2
+Rescue 3
+Rescue 4
+Quint 5
+Squad 1
+Squad 2
+Squad 3
+Squad 4
+Tender 1
+Tender 2
+Tender 4
+Water Tender 1
+Water Tender 2
+Water Tender 4
+Hazmat 3
+Hazmat Tender 3
+Light Attack Vehicle 4
+Battalion 1
+Battalion 2
+Chief 1
+Chief 2
 Car 1
 Car 2
 Car 3
@@ -20,9 +44,3 @@ Car 6
 Car 7
 Car 8
 Car 9
-Hazmat 3
-Hazmat Tender 3
-Squad 1
-Squad 3
-Tender 4
-Light Attack Vehicle 4

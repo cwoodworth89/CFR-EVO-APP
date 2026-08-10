@@ -21,6 +21,7 @@ class LiveCallModel(Base):
     
     incident_type = Column(String, default="Unknown Incident", nullable=False)
     responding_units = Column(SafeArray, default=[], nullable=False)
+    routing_metrics = Column(SafeJSON, default=[], nullable=True)
     target = Column(SafeJSON, default={}, nullable=False)
     
     raw_transcript = Column(Text, nullable=True)

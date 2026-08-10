@@ -1174,6 +1174,27 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                               </div>
                             )}
 
+                            {/* Calculated Response ETAs & Road Distances */}
+                            {selectedCall.routing_metrics && selectedCall.routing_metrics.length > 0 && (
+                              <div className="col-span-full flex flex-col gap-1.5 mt-2 bg-slate-950/90 border border-slate-800 p-2.5 rounded-xl">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
+                                  <span>⏱️</span>
+                                  <span>Calculated Emergency Vehicle Response ETAs (Home Hall Origins)</span>
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedCall.routing_metrics.map((m, mIdx) => (
+                                    <div key={mIdx} className="flex items-center gap-2 bg-slate-900 border border-sky-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono shadow-sm">
+                                      <span className="text-white font-bold">{m.unit}</span>
+                                      <span className="text-slate-400">({m.hall_name || `Hall ${m.origin_hall}`})</span>
+                                      <span className="text-sky-300 font-bold bg-sky-950 px-1.5 py-0.5 rounded border border-sky-800/60">
+                                        ⏱️ ~{m.eta_minutes} min ({m.road_distance_km || m.distance_km} km)
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Talk Group Badge */}
                             <div className="flex flex-col gap-0.5">
                               <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Talk Group</span>

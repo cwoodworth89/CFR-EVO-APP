@@ -159,6 +159,17 @@ def build_dispatch_payload(
     if verify_location_override is not None:
         verify_location = verify_location_override
         
+    # Calculate per-unit routing metrics from home hall origins
+    routing_metrics = []
+    if lat is not None and lng is not None and responding_units:
+        try:
+            from gis_service.routing_engine import EVORoutingEngine
+            router = EVORoutingEngine()
+            routing_metrics = router.calculate_units_routing(responding_units, lat, lng)
+            logging.info(f"[{dispatch_id}] Computed routing metrics for {len(routing_metrics)} responding units.")
+        except Exception as route_err:
+            logging.warning(f"[{dispatch_id}] Could not compute routing metrics: {route_err}")
+
     subaddress = next((d.subaddress for d in all_candidates if d.subaddress), None)
     target_payload = {
         "address": best_address,
@@ -166,7 +177,8 @@ def build_dispatch_payload(
         "lng": lng,
         "rings": rings,
         "map_grid": map_grid,
-        "radio_channel": radio_channel
+        "radio_channel": radio_channel,
+        "routing_metrics": routing_metrics
     }
     if subaddress:
         target_payload["subaddress"] = subaddress
@@ -204,6 +216,7 @@ def build_dispatch_payload(
         "dispatch_id": dispatch_id,
         "incident_type": incident_type,
         "responding_units": responding_units,
+        "routing_metrics": routing_metrics,
         "timestamp": timestamp,
         "raw_transcript": raw_transcript,
         "sanitized_transcript": reconstructed_transcript,

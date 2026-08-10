@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.live_calls (
     
     incident_type TEXT NOT NULL DEFAULT 'Unknown Incident',
     responding_units TEXT[] NOT NULL DEFAULT '{}',
+    routing_metrics JSONB NOT NULL DEFAULT '[]'::jsonb,
     
     target JSONB NOT NULL DEFAULT '{
         "address": "Unknown Location",
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.live_calls (
 -- Indices for live_calls performance
 CREATE INDEX IF NOT EXISTS idx_live_calls_timestamp ON public.live_calls (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_live_calls_target_gin ON public.live_calls USING gin (target jsonb_path_ops);
+CREATE INDEX IF NOT EXISTS idx_live_calls_routing_metrics_gin ON public.live_calls USING gin (routing_metrics jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS idx_live_calls_feedback_verified ON public.live_calls (timestamp DESC) WHERE feedback_submitted = TRUE AND verified_address IS NOT NULL;
 -- Note: dispatch_id automatically has a unique B-tree index via UNIQUE constraint
 

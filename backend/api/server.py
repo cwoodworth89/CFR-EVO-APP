@@ -524,6 +524,9 @@ def trigger_road_closure_sync(db: Session = Depends(get_db)):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
+        logging.error(f"Manual road closure sync failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 class StreetViewOverrideSchema(BaseModel):
     clean_address: str
     front_lat: float

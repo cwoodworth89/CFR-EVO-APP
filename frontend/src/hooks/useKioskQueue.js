@@ -118,9 +118,9 @@ export function useKioskQueue() {
     };
   }, [activeCall]);
 
-  // 5-Minute Auto-Dismiss Countdown
+  // 5-Minute Auto-Dismiss Countdown (Disabled during Review/Simulation Mode)
   useEffect(() => {
-    if (!activeCall || isTimerPaused) return;
+    if (!activeCall || isTimerPaused || isSimulationMode || activeCall?.isSimulated) return;
 
     timeoutTimerRef.current = setInterval(() => {
       setTimeoutSecondsLeft((prev) => {
@@ -136,7 +136,7 @@ export function useKioskQueue() {
     return () => {
       if (timeoutTimerRef.current) clearInterval(timeoutTimerRef.current);
     };
-  }, [activeCall, isTimerPaused]);
+  }, [activeCall, isTimerPaused, isSimulationMode]);
 
   // Advance to next call in queue
   const advanceToNextCall = useCallback(() => {

@@ -191,5 +191,34 @@ export const apiClient = {
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();
     }
+  },
+
+  streetView: {
+    async fetchAll() {
+      const res = await fetch(`${API_BASE_URL}/api/streetview-overrides`, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    },
+
+    async fetchOverride(address) {
+      if (!address) return null;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/streetview-overrides/${encodeURIComponent(address)}`, { headers: getHeaders() });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    },
+
+    async saveOverride(payload) {
+      const res = await fetch(`${API_BASE_URL}/api/streetview-overrides`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    }
   }
 };

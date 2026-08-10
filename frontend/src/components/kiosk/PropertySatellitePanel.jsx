@@ -1,66 +1,129 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+
+function AutoCenterAndResize({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !center) return;
+    map.setView([center.lat, center.lng], 18);
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [map, center]);
+  return null;
+}
+
+const targetIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 export default function PropertySatellitePanel({ activeCall }) {
   const isOnline = useOnlineStatus();
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
+  const center = { lat: destLat, lng: destLng };
 
-  // High-Resolution ESRI World Imagery Bounding Box Export URL centered on property
-  // Widened delta span (~200m) for comfortable aerial context of entire building complex & access roads
-  const deltaLat = 0.0018;
-  const deltaLng = 0.0028;
-  const minLng = destLng - deltaLng;
-  const maxLng = destLng + deltaLng;
-  const minLat = destLat - deltaLat;
-  const maxLat = destLat + deltaLat;
+  const polygonCoords = activeCall?.rings && activeCall.rings.length > 0
+    ? activeCall.rings[0].map(([lng, lat]) => [lat, lng])
+    : null;
 
-  const satelliteExportUrl = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox=${minLng},${minLat},${maxLng},${maxLat}&bboxSR=4326&imageSR=4326&size=800,400&f=image`;
+  const renderMapContent = () => (
+    <MapContainer
+      center={[destLat, destLng]}
+      zoom={18}
+      maxZoom={20}
+      className="w-full h-full z-0"
+      zoomControl={true}
+    >
+      <TileLayer
+        attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={19}
+        maxZoom={20}
+      />
+
+      {polygonCoords && (
+        <Polygon positions={polygonCoords} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />
+      )}
+
+      <Marker position={[destLat, destLng]} icon={targetIcon}>
+        <Popup>📍 Destination: {activeCall?.address || 'Target Location'}</Popup>
+      </Marker>
+
+      <AutoCenterAndResize center={center} />
+    </MapContainer>
+  );
 
   return (
-    <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center">
-      {/* Header Badge */}
-      <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
-        <span>🛰️</span>
-        <span>3D Property Satellite View</span>
-        {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">WAN Failsafe Mode</span>}
-      </div>
+    <>
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
+        {/* Header Controls */}
+        <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
+          <span>🛰️</span>
+          <span>Property Satellite View</span>
+          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
+        </div>
 
-      {isOnline ? (
-        <div className="w-full h-full relative">
-          <img
-            src={satelliteExportUrl}
-            alt="Property Satellite View"
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
+        <button
+          onClick={() => setIsExpanded(true)}
+          className="absolute top-2 right-2 z-[1000] bg-slate-900/90 hover:bg-amber-600 text-amber-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow"
+          title="Pop Out Full Screen View"
+        >
+          <span>⤢</span>
+          <span className="hidden sm:inline">Expand</span>
+        </button>
 
-          {/* Static Target Location Pin Overlay (Clean non-bouncing CAD pin) */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="flex flex-col items-center">
-              <div className="bg-slate-950/90 text-amber-300 text-[10px] font-black px-2 py-1 rounded-lg shadow-xl border border-amber-500/60 uppercase tracking-wider font-mono flex items-center gap-1">
-                <span>📍</span>
-                <span>{activeCall?.address || 'Target Property'}</span>
-              </div>
-              <div className="w-0.5 h-2.5 bg-amber-400 shadow-md" />
-              <div className="w-2.5 h-2.5 rounded-full border-2 border-amber-300 bg-amber-500 shadow-md" />
+        {isOnline ? (
+          <div className="w-full h-full relative z-0">
+            {renderMapContent()}
+            <div className="absolute bottom-2 left-2 text-[10px] text-slate-300 font-mono bg-slate-900/90 px-2 py-0.5 rounded border border-slate-800 z-[1000] pointer-events-none">
+              WGS84: {destLat.toFixed(5)}, {destLng.toFixed(5)}
             </div>
           </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
+            <span className="text-2xl">🗺️</span>
+            <p className="text-xs font-semibold">Offline Satellite Standby</p>
+            <span className="text-[10px] text-slate-500">WAN Offline</span>
+          </div>
+        )}
+      </div>
 
-          <div className="absolute bottom-2 left-2 text-[10px] text-slate-300 font-mono bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800 z-20">
-            WGS84: {destLat.toFixed(4)}, {destLng.toFixed(4)}
+      {/* Popout Full-Screen Modal */}
+      {isExpanded && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-md p-4 sm:p-8 flex flex-col animate-in fade-in duration-200">
+          <div className="flex items-center justify-between mb-3 bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🛰️</span>
+              <div>
+                <h3 className="text-base font-bold text-white uppercase tracking-wide">Property High-Res Satellite Inspection</h3>
+                <p className="text-xs text-amber-400 font-mono">📍 {activeCall?.address || 'Target Property'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5"
+            >
+              <span>✕</span>
+              <span>CLOSE</span>
+            </button>
+          </div>
+
+          <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-amber-500/50 shadow-2xl relative">
+            {renderMapContent()}
           </div>
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5">
-          <span className="text-2xl">🗺️</span>
-          <p className="text-xs font-semibold">2D Vector CAD Failsafe View</p>
-          <span className="text-[10px] text-slate-500">Local Shapefile Boundaries Cached</span>
-        </div>
       )}
-    </div>
+    </>
   );
 }

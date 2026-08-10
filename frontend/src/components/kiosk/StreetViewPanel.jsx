@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { sanitizeAddress } from '../../utils/addressUtils';
+import { apiClient } from '../../apiClient';
 
-// Verified Street View Frontage & Heading Overrides for Large Complexes
+// Fallback hardcoded overrides table
 export const STREETVIEW_OVERRIDES = {
   "3000 RIVERBEND DR": { lat: 49.2552, lng: -122.7840, heading: 180, fov: 90, pitch: 0 },
   "3100 OZADA AVE": { lat: 49.3015, lng: -122.7758, heading: 170, fov: 90, pitch: 5 },
@@ -18,90 +19,232 @@ export const STREETVIEW_OVERRIDES = {
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-  const [imageError, setImageError] = useState(false);
 
-  // Universal clean address key to check override table (e.g. "3000 RIVERBEND DR UNIT 105" -> "3000 RIVERBEND DR")
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
+  const [dbOverride, setDbOverride] = useState(null);
+
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
+  const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
 
-  const override = STREETVIEW_OVERRIDES[cleanAddrKey];
+  // Fetch DB override on mount or when address changes
+  useEffect(() => {
+    let isMounted = true;
+    if (activeCall?.address) {
+      apiClient.streetView.fetchOverride(activeCall.address).then((data) => {
+        if (isMounted && data) {
+          setDbOverride(data);
+        }
+      });
+    }
+    return () => { isMounted = false; };
+  }, [activeCall?.address]);
 
-  const frontLat = override ? override.lat : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
-  const frontLng = override ? override.lng : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
+  // Priority: 1. DB Override -> 2. Hardcoded fallback -> 3. Computed frontage angle
+  const activeOverride = dbOverride || fallbackOverride;
+
+  const frontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
+  const frontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
 
   const targetLat = activeCall?.lat ?? activeCall?.target?.lat ?? frontLat;
   const targetLng = activeCall?.lng ?? activeCall?.target?.lng ?? frontLng;
 
-  // Calculate compass bearing from frontage arrival spot facing parcel center
-  let computedHeading = override ? override.heading : 0;
-  if (!override && (frontLat !== targetLat || frontLng !== targetLng)) {
+  let initialHeading = activeOverride ? activeOverride.heading : 0;
+  if (!activeOverride && (frontLat !== targetLat || frontLng !== targetLng)) {
     const dLng = (targetLng - frontLng) * (Math.PI / 180);
     const targetLatRad = targetLat * (Math.PI / 180);
     const frontLatRad = frontLat * (Math.PI / 180);
-
     const y = Math.sin(dLng) * Math.cos(targetLatRad);
     const x = Math.cos(frontLatRad) * Math.sin(targetLatRad) - Math.sin(frontLatRad) * Math.cos(targetLatRad) * Math.cos(dLng);
-    
     const bearing = Math.atan2(y, x) * (180 / Math.PI);
-    computedHeading = Math.round((bearing + 360) % 360);
+    initialHeading = Math.round((bearing + 360) % 360);
   }
 
-  const pitch = override ? override.pitch : 5;
-  const fov = override ? override.fov : 80;
+  const [heading, setHeading] = useState(initialHeading);
+  const [pitch, setPitch] = useState(activeOverride ? activeOverride.pitch : 5);
+  const [fov, setFov] = useState(activeOverride ? activeOverride.fov : 80);
 
-  // Google Static Street View API URL (querying from frontage arrival point with computed heading)
-  const staticStreetViewUrl = apiKey
-    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${frontLat},${frontLng}&fov=${fov}&heading=${computedHeading}&pitch=${pitch}&source=outdoor&key=${apiKey}`
-    : null;
+  useEffect(() => {
+    if (activeOverride) {
+      setHeading(activeOverride.heading ?? initialHeading);
+      setPitch(activeOverride.pitch ?? 5);
+      setFov(activeOverride.fov ?? 80);
+    } else {
+      setHeading(initialHeading);
+    }
+  }, [activeOverride, initialHeading]);
 
-  // Google Maps Embed API StreetView URL
+  const handleSaveView = async () => {
+    if (!activeCall?.address) return;
+    setSaveStatus('saving');
+    try {
+      const payload = {
+        clean_address: cleanAddrKey,
+        front_lat: frontLat,
+        front_lng: frontLng,
+        heading: Math.round(heading),
+        pitch: Math.round(pitch),
+        fov: Math.round(fov)
+      };
+      await apiClient.streetView.saveOverride(payload);
+      setDbOverride(payload);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch (e) {
+      console.error('Failed to save Street View angle:', e);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 3000);
+    }
+  };
+
   const embedStreetViewUrl = apiKey
-    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${computedHeading}&pitch=${pitch}`
+    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${heading}&pitch=${pitch}&fov=${fov}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
+  const renderContent = () => (
+    <div className="w-full h-full relative bg-slate-900 flex flex-col">
+      <iframe
+        title="Live Interactive Google Street View"
+        width="100%"
+        height="100%"
+        style={{ border: 0 }}
+        loading="lazy"
+        allowFullScreen
+        src={embedStreetViewUrl}
+        className="w-full h-full"
+      />
+
+      {/* Angle Fine-Tuning & Save Overlay */}
+      <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/90 backdrop-blur border border-slate-800 p-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xl">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300">
+          <span className="text-amber-400 font-bold">📍 Address:</span>
+          <span className="text-white font-semibold">{activeCall?.address || 'Destination'}</span>
+          {dbOverride && <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold">SAVED OVERRIDE</span>}
+        </div>
+
+        {/* Heading & Pitch Controls */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-300">
+            <span>Heading:</span>
+            <button
+              onClick={() => setHeading((h) => (h - 15 + 360) % 360)}
+              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
+              title="Rotate Left 15°"
+            >
+              ↺
+            </button>
+            <span className="text-amber-400 font-bold min-w-[32px] text-center">{Math.round(heading)}°</span>
+            <button
+              onClick={() => setHeading((h) => (h + 15) % 360)}
+              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
+              title="Rotate Right 15°"
+            >
+              ↻
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-300">
+            <span>Pitch:</span>
+            <button
+              onClick={() => setPitch((p) => Math.max(-45, p - 5))}
+              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
+              title="Tilt Down 5°"
+            >
+              ⬇
+            </button>
+            <span className="text-sky-400 font-bold min-w-[28px] text-center">{Math.round(pitch)}°</span>
+            <button
+              onClick={() => setPitch((p) => Math.min(45, p + 5))}
+              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
+              title="Tilt Up 5°"
+            >
+              ⬆
+            </button>
+          </div>
+
+          {/* Save Preferred View Button */}
+          <button
+            onClick={handleSaveView}
+            disabled={saveStatus === 'saving'}
+            className={`px-3 py-1 rounded-lg border font-bold text-xs transition shadow flex items-center gap-1.5 ${
+              saveStatus === 'saved'
+                ? 'bg-emerald-600 border-emerald-400 text-white'
+                : saveStatus === 'error'
+                ? 'bg-red-600 border-red-400 text-white'
+                : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950'
+            }`}
+          >
+            <span>💾</span>
+            <span>
+              {saveStatus === 'saving'
+                ? 'Saving...'
+                : saveStatus === 'saved'
+                ? '✅ Saved!'
+                : saveStatus === 'error'
+                ? '❌ Failed'
+                : 'Save Preferred View'}
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center">
-      {/* Header Badge */}
-      <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-400 flex items-center gap-1.5 shadow">
-        <span>📷</span>
-        <span>Google Street View</span>
-        {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">WAN Failsafe Mode</span>}
+    <>
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
+        {/* Header Controls */}
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-400 flex items-center gap-1.5 shadow">
+          <span>📷</span>
+          <span>Google Street View (360° Live)</span>
+          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
+        </div>
+
+        <button
+          onClick={() => setIsExpanded(true)}
+          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow"
+          title="Pop Out Full Screen View"
+        >
+          <span>⤢</span>
+          <span className="hidden sm:inline">Expand</span>
+        </button>
+
+        {isOnline ? (
+          renderContent()
+        ) : (
+          <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
+            <span className="text-2xl">🏛️</span>
+            <p className="text-xs font-semibold">Local Building Footprint Canvas</p>
+            <span className="text-[10px] text-slate-500">Address Centroid Verified</span>
+          </div>
+        )}
       </div>
 
-      {isOnline ? (
-        <div className="w-full h-full relative bg-slate-900 flex items-center justify-center">
-          {staticStreetViewUrl && !imageError ? (
-            <img
-              src={staticStreetViewUrl}
-              alt="Google Street View"
-              className="w-full h-full object-cover"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <iframe
-              title="Google Street View"
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              loading="lazy"
-              allowFullScreen
-              src={embedStreetViewUrl}
-              className="w-full h-full opacity-90 hover:opacity-100 transition-opacity"
-            />
-          )}
+      {/* Popout Full-Screen Modal */}
+      {isExpanded && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-md p-4 sm:p-8 flex flex-col animate-in fade-in duration-200">
+          <div className="flex items-center justify-between mb-3 bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📷</span>
+              <div>
+                <h3 className="text-base font-bold text-white uppercase tracking-wide">Google Street View 360° Inspection & Camera Calibration</h3>
+                <p className="text-xs text-indigo-400 font-mono">📍 {activeCall?.address || 'Target Property'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5"
+            >
+              <span>✕</span>
+              <span>CLOSE</span>
+            </button>
+          </div>
 
-          {/* Target Location Pin Badge Overlay */}
-          <div className="absolute bottom-2 left-2 z-20 bg-slate-900/90 backdrop-blur border border-slate-800 text-[10px] font-mono text-amber-300 px-2 py-1 rounded-lg flex items-center gap-1.5 shadow">
-            <span className="text-amber-400 font-bold">📍 Target Address:</span>
-            <span className="text-white font-semibold">{activeCall?.address || 'Destination'}</span>
+          <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-indigo-500/50 shadow-2xl relative">
+            {renderContent()}
           </div>
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5">
-          <span className="text-2xl">🏛️</span>
-          <p className="text-xs font-semibold">Local Building Footprint Canvas</p>
-          <span className="text-[10px] text-slate-500">Address Centroid Verified</span>
-        </div>
       )}
-    </div>
+    </>
   );
 }

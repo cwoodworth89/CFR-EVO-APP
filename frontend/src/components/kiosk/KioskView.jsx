@@ -219,7 +219,9 @@ export default function KioskView({ kioskState }) {
           <div className="flex flex-col items-end font-mono leading-tight">
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Elapsed Time</div>
             <div className="text-xl font-black text-emerald-400">{elapsedFormatted}</div>
-            <div className="text-[9px] text-slate-500">Auto-Dismiss in {timeoutFormatted}</div>
+            <div className="text-[9px] text-slate-500">
+              {(isSimulationMode || activeCall?.isSimulated) ? '⏸️ Auto-Dismiss Paused' : `Auto-Dismiss in ${timeoutFormatted}`}
+            </div>
           </div>
 
           {(isSimulationMode || activeCall?.isSimulated) ? (
@@ -228,7 +230,7 @@ export default function KioskView({ kioskState }) {
               className="bg-purple-700 hover:bg-purple-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow cursor-pointer border border-purple-500 flex items-center gap-1"
             >
               <span>🚪</span>
-              <span>EXIT SIMULATION</span>
+              <span>EXIT REVIEW MODE</span>
             </button>
           ) : (
             !isTvMode && (

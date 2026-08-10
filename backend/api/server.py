@@ -41,11 +41,11 @@ def is_allowed_network(client_ip_str: str) -> bool:
 
 try:
     from backend.api.database import get_db, engine, Base, SessionLocal
-    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
+    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, StreetViewOverrideModel
     from backend.api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 except ModuleNotFoundError:
     from api.database import get_db, engine, Base, SessionLocal
-    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
+    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, StreetViewOverrideModel
     from api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 
 # Ensure database tables exist
@@ -515,13 +515,82 @@ def trigger_road_closure_sync(db: Session = Depends(get_db)):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Manual sync failed: {str(e)}")
+class StreetViewOverrideSchema(BaseModel):
+    clean_address: str
+    front_lat: float
+    front_lng: float
+    heading: float = 0.0
+    pitch: float = 5.0
+    fov: float = 80.0
 
 
+@app.get("/api/streetview-overrides")
+def get_all_streetview_overrides(db: Session = Depends(get_db)):
+    records = db.query(StreetViewOverrideModel).all()
+    out = {}
+    for r in records:
+        out[r.clean_address.upper()] = {
+            "lat": r.front_lat,
+            "lng": r.front_lng,
+            "heading": r.heading,
+            "pitch": r.pitch,
+            "fov": r.fov
+        }
+    return out
+
+
+@app.get("/api/streetview-overrides/{address}")
+def get_streetview_override(address: str, db: Session = Depends(get_db)):
+    clean_addr = address.strip().upper()
+    r = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == clean_addr).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Streetview override not found")
+    return {
+        "clean_address": r.clean_address,
+        "lat": r.front_lat,
+        "lng": r.front_lng,
+        "heading": r.heading,
+        "pitch": r.pitch,
+        "fov": r.fov
+    }
+
+
+@app.post("/api/streetview-overrides")
+def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = Depends(get_db)):
+    clean_addr = payload.clean_address.strip().upper()
+    existing = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == clean_addr).first()
+    if existing:
+        existing.front_lat = payload.front_lat
+        existing.front_lng = payload.front_lng
+        existing.heading = payload.heading
+        existing.pitch = payload.pitch
+        existing.fov = payload.fov
+    else:
+        existing = StreetViewOverrideModel(
+            clean_address=clean_addr,
+            front_lat=payload.front_lat,
+            front_lng=payload.front_lng,
+            heading=payload.heading,
+            pitch=payload.pitch,
+            fov=payload.fov
+        )
+        db.add(existing)
+    db.commit()
+    db.refresh(existing)
+    return {
+        "status": "success",
+        "clean_address": existing.clean_address,
+        "lat": existing.front_lat,
+        "lng": existing.front_lng,
+        "heading": existing.heading,
+        "pitch": existing.pitch,
+        "fov": existing.fov
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "8000"))
     uvicorn.run("backend.api.server:app", host="0.0.0.0", port=port, reload=False)
+
 

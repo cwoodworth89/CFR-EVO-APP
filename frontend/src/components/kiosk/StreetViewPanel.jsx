@@ -23,6 +23,7 @@ export default function StreetViewPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
+  const [viewMode, setViewMode] = useState('photo'); // 'photo' | 'embed'
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
@@ -97,25 +98,42 @@ export default function StreetViewPanel({ activeCall }) {
     }
   };
 
+  const staticStreetViewUrl = apiKey
+    ? `https://maps.googleapis.com/maps/api/streetview?size=900x500&location=${frontLat},${frontLng}&fov=${fov}&heading=${heading}&pitch=${pitch}&source=outdoor&key=${apiKey}`
+    : null;
+
   const embedStreetViewUrl = apiKey
     ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${heading}&pitch=${pitch}&fov=${fov}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
   const renderContent = () => (
-    <div className="w-full h-full relative bg-slate-900 flex flex-col">
-      <iframe
-        title="Live Interactive Google Street View"
-        width="100%"
-        height="100%"
-        style={{ border: 0 }}
-        loading="lazy"
-        allowFullScreen
-        src={embedStreetViewUrl}
-        className="w-full h-full"
-      />
+    <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
+      {viewMode === 'photo' && staticStreetViewUrl ? (
+        <div className="w-full h-full relative bg-slate-950 flex items-center justify-center">
+          <img
+            src={staticStreetViewUrl}
+            alt="Google Street View High-Res"
+            className="w-full h-full object-cover"
+            onError={() => setViewMode('embed')}
+          />
+          {/* Subtle vignette */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+        </div>
+      ) : (
+        <iframe
+          title="Live Interactive Google Street View"
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          loading="lazy"
+          allowFullScreen
+          src={embedStreetViewUrl}
+          className="w-full h-full"
+        />
+      )}
 
       {/* Angle Fine-Tuning & Save Overlay */}
-      <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/90 backdrop-blur border border-slate-800 p-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xl">
+      <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/95 backdrop-blur border border-slate-800 p-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xl">
         <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300">
           <span className="text-amber-400 font-bold">📍 Address:</span>
           <span className="text-white font-semibold">{activeCall?.address || 'Destination'}</span>
@@ -128,7 +146,7 @@ export default function StreetViewPanel({ activeCall }) {
             <span>Heading:</span>
             <button
               onClick={() => setHeading((h) => (h - 15 + 360) % 360)}
-              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
+              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
               title="Rotate Left 15°"
             >
               ↺
@@ -136,7 +154,7 @@ export default function StreetViewPanel({ activeCall }) {
             <span className="text-amber-400 font-bold min-w-[32px] text-center">{Math.round(heading)}°</span>
             <button
               onClick={() => setHeading((h) => (h + 15) % 360)}
-              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
+              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
               title="Rotate Right 15°"
             >
               ↻
@@ -147,7 +165,7 @@ export default function StreetViewPanel({ activeCall }) {
             <span>Pitch:</span>
             <button
               onClick={() => setPitch((p) => Math.max(-45, p - 5))}
-              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
+              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
               title="Tilt Down 5°"
             >
               ⬇
@@ -155,7 +173,7 @@ export default function StreetViewPanel({ activeCall }) {
             <span className="text-sky-400 font-bold min-w-[28px] text-center">{Math.round(pitch)}°</span>
             <button
               onClick={() => setPitch((p) => Math.min(45, p + 5))}
-              className="px-1 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
+              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
               title="Tilt Up 5°"
             >
               ⬆
@@ -171,7 +189,7 @@ export default function StreetViewPanel({ activeCall }) {
                 ? 'bg-emerald-600 border-emerald-400 text-white'
                 : saveStatus === 'error'
                 ? 'bg-red-600 border-red-400 text-white'
-                : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950'
+                : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950 cursor-pointer'
             }`}
           >
             <span>💾</span>
@@ -194,15 +212,34 @@ export default function StreetViewPanel({ activeCall }) {
     <>
       <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
         {/* Header Controls */}
-        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-400 flex items-center gap-1.5 shadow">
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-400 flex items-center gap-2 shadow">
           <span>📷</span>
-          <span>Google Street View (360° Live)</span>
+          <span>Google Street View</span>
+          
+          {/* Mode Switcher Toggle */}
+          <div className="flex items-center bg-slate-950 rounded border border-slate-800 p-0.5 text-[9px] font-mono">
+            <button
+              onClick={() => setViewMode('photo')}
+              className={`px-1.5 py-0.5 rounded transition ${viewMode === 'photo' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              title="High-Resolution Street View Photo"
+            >
+              Photo
+            </button>
+            <button
+              onClick={() => setViewMode('embed')}
+              className={`px-1.5 py-0.5 rounded transition ${viewMode === 'embed' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              title="Interactive 360° Embed Mode"
+            >
+              Interactive 360°
+            </button>
+          </div>
+
           {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
         </div>
 
         <button
           onClick={() => setIsExpanded(true)}
-          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow"
+          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow cursor-pointer"
           title="Pop Out Full Screen View"
         >
           <span>⤢</span>
@@ -233,7 +270,7 @@ export default function StreetViewPanel({ activeCall }) {
             </div>
             <button
               onClick={() => setIsExpanded(false)}
-              className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5"
+              className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <span>✕</span>
               <span>CLOSE</span>

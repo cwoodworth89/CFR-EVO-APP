@@ -1,18 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
-function AutoCenterAndResize({ center }) {
+function StableAutoCenterAndResize({ lat, lng, callKey }) {
   const map = useMap();
+  const lastKeyRef = useRef(null);
+
+  // Only recenter when target call changes, preserving manual panning
   useEffect(() => {
-    if (!map || !center) return;
-    map.setView([center.lat, center.lng], 18);
+    if (!map || lat == null || lng == null) return;
+    const currentKey = callKey || `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    if (lastKeyRef.current !== currentKey) {
+      lastKeyRef.current = currentKey;
+      map.setView([lat, lng], 18, { animate: false });
+    }
+  }, [map, lat, lng, callKey]);
+
+  useEffect(() => {
+    if (!map) return;
     const timer = setTimeout(() => {
       map.invalidateSize();
-    }, 150);
+    }, 200);
     return () => clearTimeout(timer);
-  }, [map, center]);
+  }, [map]);
+
   return null;
 }
 
@@ -31,7 +43,7 @@ export default function PropertySatellitePanel({ activeCall }) {
 
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
-  const center = { lat: destLat, lng: destLng };
+  const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || `${destLat},${destLng}`);
 
   const polygonCoords = activeCall?.rings && activeCall.rings.length > 0
     ? activeCall.rings[0].map(([lng, lat]) => [lat, lng])
@@ -60,7 +72,7 @@ export default function PropertySatellitePanel({ activeCall }) {
         <Popup>📍 Destination: {activeCall?.address || 'Target Location'}</Popup>
       </Marker>
 
-      <AutoCenterAndResize center={center} />
+      <StableAutoCenterAndResize lat={destLat} lng={destLng} callKey={callKey} />
     </MapContainer>
   );
 

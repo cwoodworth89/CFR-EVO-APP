@@ -383,6 +383,12 @@ export function LeftSidebar({
   setFilterAccessOnly,
   filterCaution,
   setFilterCaution,
+  showActiveNow = true,
+  setShowActiveNow,
+  showNext24h = false,
+  setShowNext24h,
+  showNext7d = false,
+  setShowNext7d,
   // Training HUD
   score,
   currentQuestion,
@@ -867,15 +873,30 @@ export function LeftSidebar({
                              <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wider">📅 Closure Timeframe Window</span>
                              <div className="flex flex-col gap-1.5">
                                 <label className="flex items-center gap-2 text-xs text-emerald-400 font-bold cursor-pointer">
-                                   <input type="checkbox" checked readOnly className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" />
+                                   <input 
+                                      type="checkbox" 
+                                      checked={showActiveNow} 
+                                      onChange={(e) => setShowActiveNow && setShowActiveNow(e.target.checked)}
+                                      className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" 
+                                   />
                                    <span>Active Now</span>
                                 </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-not-allowed">
-                                   <input type="checkbox" disabled className="rounded border-slate-900 bg-slate-950 text-slate-700 w-3.5 h-3.5" />
+                                <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer">
+                                   <input 
+                                      type="checkbox" 
+                                      checked={showNext24h} 
+                                      onChange={(e) => setShowNext24h && setShowNext24h(e.target.checked)}
+                                      className="rounded border-slate-850 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" 
+                                   />
                                    <span>Next 24 Hours</span>
                                 </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-not-allowed">
-                                   <input type="checkbox" disabled className="rounded border-slate-900 bg-slate-950 text-slate-700 w-3.5 h-3.5" />
+                                <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer">
+                                   <input 
+                                      type="checkbox" 
+                                      checked={showNext7d} 
+                                      onChange={(e) => setShowNext7d && setShowNext7d(e.target.checked)}
+                                      className="rounded border-slate-850 bg-slate-950 text-purple-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" 
+                                   />
                                    <span>Next 7 Days (Planned)</span>
                                 </label>
                              </div>
@@ -1065,6 +1086,9 @@ export function RightSidebar({
   filterNoAccess,
   filterAccessOnly,
   filterCaution,
+  showActiveNow = true,
+  showNext24h = false,
+  showNext7d = false,
   map,
   onSelectClosure,
   zones = [],
@@ -1121,7 +1145,17 @@ export function RightSidebar({
         if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
         if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
         if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
-        return true;
+
+        const isCurrentlyActive = closure.isActive;
+        const is24hFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 24 * 3600 * 1000);
+        const is7dFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 7 * 86400 * 1000);
+
+        const matchesTimeframe = 
+          (showActiveNow && isCurrentlyActive) ||
+          (showNext24h && is24hFuture) ||
+          (showNext7d && is7dFuture);
+
+        return matchesTimeframe;
       });
 
     const groups = { "1": [], "2": [], "3": [], "4": [], OTHER: [] };

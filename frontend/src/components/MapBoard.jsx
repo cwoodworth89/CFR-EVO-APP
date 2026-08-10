@@ -334,6 +334,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   const [showHydrants, setShowHydrants] = useState(true); 
   const [showZones, setShowZones] = useState(true); 
   const [showRoadClosures, setShowRoadClosures] = useState(true); 
+  const [showActiveNow, setShowActiveNow] = useState(true);
+  const [showNext24h, setShowNext24h] = useState(false);
+  const [showNext7d, setShowNext7d] = useState(false);
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
   const [showSchools, setShowSchools] = useState(false);
   const [showFireHalls, setShowFireHalls] = useState(true);
@@ -986,13 +989,25 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     };
   };
  
-  // Filter closures for map and alerts rendering (only show currently active ones on map)
+  // Filter closures for map and alerts rendering based on access severity & timeframe window
   const activeClosures = roadClosures.filter(closure => {
-    if (!closure.isActive) return false;
+    // 1. Access Severity Filter
     if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
     if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
     if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
-    return true;
+
+    // 2. Timeframe Window Filter
+    const now = new Date();
+    const isCurrentlyActive = closure.isActive;
+    const is24hFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 24 * 3600 * 1000);
+    const is7dFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 7 * 86400 * 1000);
+
+    const matchesTimeframe = 
+      (showActiveNow && isCurrentlyActive) ||
+      (showNext24h && is24hFuture) ||
+      (showNext7d && is7dFuture);
+
+    return matchesTimeframe;
   });
  
   return (
@@ -1057,6 +1072,12 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setFilterAccessOnly={setFilterAccessOnly}
           filterCaution={filterCaution}
           setFilterCaution={setFilterCaution}
+          showActiveNow={showActiveNow}
+          setShowActiveNow={setShowActiveNow}
+          showNext24h={showNext24h}
+          setShowNext24h={setShowNext24h}
+          showNext7d={showNext7d}
+          setShowNext7d={setShowNext7d}
           score={score}
           currentQuestion={currentQuestion}
           feedback={feedback}
@@ -1374,6 +1395,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             filterNoAccess={filterNoAccess}
             filterAccessOnly={filterAccessOnly}
             filterCaution={filterCaution}
+            showActiveNow={showActiveNow}
+            showNext24h={showNext24h}
+            showNext7d={showNext7d}
             map={map}
             onSelectClosure={setSelectedClosure}
             zones={zones}

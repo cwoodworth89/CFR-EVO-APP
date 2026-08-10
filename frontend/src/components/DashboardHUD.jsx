@@ -727,36 +727,6 @@ export function LeftSidebar({
                            </div>
                         )}
                      </div>
-                    {/* 1. Basemap Style & Config */}
-                    <div className="flex flex-col gap-2">
-                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">BASEMAP STYLE & CONFIG</h3>
-                       <div className="flex flex-col gap-2 mt-1.5">
-                          <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850">
-                             {['GREY', 'DARK'].map(style => (
-                                <button 
-                                  key={style} 
-                                  onClick={() => setMapStyle && setMapStyle(style)} 
-                                  className={`flex-1 py-1.5 text-[10px] font-black rounded transition-all cursor-pointer ${
-                                    mapStyle === style 
-                                      ? "bg-slate-800 text-white shadow" 
-                                      : "text-slate-500 hover:text-slate-300"
-                                  }`}
-                                >
-                                  {style === 'GREY' ? '🗺️ GREY MAP' : '🌙 DARK MAP'}
-                                </button>
-                             ))}
-                          </div>
-
-                          {onOpenRoutingConfig && (
-                             <button 
-                               onClick={onOpenRoutingConfig}
-                               className="w-full bg-slate-950 hover:bg-slate-850 text-sky-400 hover:text-sky-300 font-black py-1.5 px-3 rounded-lg text-xs border border-slate-850 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                             >
-                               ⚙️ ROUTING & SPEED CONFIG
-                             </button>
-                          )}
-                       </div>
-                    </div>
 
                     {/* 2. Map Overlays / Layers */}
                     <div className="flex flex-col gap-2">

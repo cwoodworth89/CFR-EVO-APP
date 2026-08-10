@@ -519,5 +519,5 @@ def get_road_closures(background_tasks: BackgroundTasks, db: Session = Depends(g
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run("backend.api.server:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("backend.api.server:app", host="0.0.0.0", port=port, reload=False)
 

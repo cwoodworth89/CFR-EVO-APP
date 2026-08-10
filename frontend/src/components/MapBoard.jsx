@@ -669,100 +669,111 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES (Primary: Relative /api/road-closures via Nginx, Fallback: Central apiClient IP-agnostic gateway, Fallback: Direct DriveBC)
+  // LOAD ROAD CLOSURES (Primary: Relative /api/road-closures via Nginx, Fallback: Central apiClient gateway, Fallback: Direct DriveBC)
   useEffect(() => {
-    const fetchFromGateway = fetch("/api/road-closures")
-      .then(r => (r.ok && r.headers.get("content-type")?.includes("application/json")) ? r.json() : Promise.reject("Relative /api response not JSON"))
-      .catch(() => apiClient.roadClosures.fetchAll())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          return data;
-        }
-        return Promise.reject("Empty gateway payload");
-      });
-
-    const fetchDirectDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
-      .then(r => r.ok ? r.json() : { events: [] })
-      .then(dbData => {
-        const events = (dbData.events || [])
-          .filter(evt => {
-            if (!evt.geography || !evt.geography.coordinates) return false;
-            let coords = evt.geography.type === "Point" ? [evt.geography.coordinates] : (evt.geography.type === "LineString" ? evt.geography.coordinates : []);
-            
-            // Strict latitude filter (>= 49.231 to exclude Surrey/New West)
-            const inCoqBounds = coords.some(([lng, lat]) => lat >= 49.231 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68);
-            if (!inCoqBounds) return false;
-
-            const text = `${evt.headline || ''} ${evt.description || ''} ${evt.road_name || ''}`.toLowerCase();
-            if (["surrey", "delta", "langley", "richmond", "pattullo"].some(c => text.includes(c))) {
-              return false;
-            }
-            return true;
-          })
-          .map(evt => {
-            let lat = 49.28, lng = -122.80, polyline = [];
-            if (evt.geography.type === "Point") {
-              lng = evt.geography.coordinates[0];
-              lat = evt.geography.coordinates[1];
-            } else if (evt.geography.type === "LineString") {
-              polyline = evt.geography.coordinates.map(pt => [pt[1], pt[0]]);
-              const mid = Math.floor(evt.geography.coordinates.length / 2);
-              lng = evt.geography.coordinates[mid][0];
-              lat = evt.geography.coordinates[mid][1];
-            }
-            const sev = (evt.severity || "MINOR").toUpperCase();
-            return {
-              id: evt.id || Math.random().toString(),
-              headline: evt.headline || "TRAFFIC ALERT",
-              street: evt.road_name || "Regional Corridor",
-              severity: sev,
-              emergencyAccess: sev === "MAJOR" ? "NO_ACCESS" : "CAUTION",
-              description: evt.description || "Active traffic event.",
-              coordinates: [lat, lng],
-              polyline: polyline,
-              source: "DriveBC Open511",
-              startDate: evt.created || null,
-              endDate: null
-            };
-          });
-        return events;
-      });
-
-    fetchFromGateway
-      .catch(err => {
-        console.warn("FastAPI Gateway /api/road-closures unavailable, falling back to direct DriveBC API:", err);
-        return fetchDirectDriveBC;
-      })
-      .then(rawEvents => {
-        const now = new Date();
-        const processed = rawEvents.map(evt => {
-          const start = evt.startDate ? new Date(evt.startDate) : null;
-          const end = evt.endDate ? new Date(evt.endDate) : null;
-
-          let isActive = false, isFuture = false, isExpired = false;
-          if (start && now < start) {
-            isFuture = true;
-          } else if (end && now > end) {
-            isExpired = true;
-          } else {
-            isActive = true;
+    const loadClosures = () => {
+      const fetchFromGateway = fetch("/api/road-closures")
+        .then(r => (r.ok && r.headers.get("content-type")?.includes("application/json")) ? r.json() : Promise.reject("Relative /api response not JSON"))
+        .catch(() => apiClient.roadClosures.fetchAll())
+        .then(data => {
+          if (Array.isArray(data)) {
+            return data;
           }
-          return {
-            ...evt,
-            start,
-            end,
-            isActive,
-            isFuture,
-            isExpired
-          };
+          return Promise.reject("Invalid gateway payload format");
         });
 
-        const unexpired = processed.filter(evt => !evt.isExpired);
-        setRoadClosures(unexpired);
-      })
-      .catch(err => {
-        console.error("Error loading road closures:", err);
-      });
+      const fetchDirectDriveBC = fetch("https://api.open511.gov.bc.ca/events?format=json&limit=100")
+        .then(r => r.ok ? r.json() : { events: [] })
+        .then(dbData => {
+          return (dbData.events || [])
+            .filter(evt => {
+              if (!evt.geography || !evt.geography.coordinates) return false;
+              let coords = evt.geography.type === "Point" ? [evt.geography.coordinates] : (evt.geography.type === "LineString" ? evt.geography.coordinates : []);
+              
+              // Strict latitude filter (>= 49.231 to exclude Surrey/New West)
+              const inCoqBounds = coords.some(([lng, lat]) => lat >= 49.231 && lat <= 49.38 && lng >= -122.92 && lng <= -122.68);
+              if (!inCoqBounds) return false;
+
+              const text = `${evt.headline || ''} ${evt.description || ''} ${evt.road_name || ''}`.toLowerCase();
+              if (["surrey", "delta", "langley", "richmond", "pattullo"].some(c => text.includes(c))) {
+                return false;
+              }
+              return true;
+            })
+            .map(evt => {
+              let lat = 49.28, lng = -122.80, polyline = [];
+              if (evt.geography.type === "Point") {
+                lng = evt.geography.coordinates[0];
+                lat = evt.geography.coordinates[1];
+              } else if (evt.geography.type === "LineString") {
+                polyline = evt.geography.coordinates.map(pt => [pt[1], pt[0]]);
+                const mid = Math.floor(evt.geography.coordinates.length / 2);
+                lng = evt.geography.coordinates[mid][0];
+                lat = evt.geography.coordinates[mid][1];
+              }
+              const sev = (evt.severity || "MINOR").toUpperCase();
+              return {
+                id: evt.id || Math.random().toString(),
+                headline: evt.headline || "TRAFFIC ALERT",
+                street: evt.road_name || "Regional Corridor",
+                severity: sev,
+                emergencyAccess: sev === "MAJOR" ? "NO_ACCESS" : "CAUTION",
+                description: evt.description || "Active traffic event.",
+                coordinates: [lat, lng],
+                polyline: polyline,
+                source: "DriveBC Open511",
+                startDate: evt.created || null,
+                endDate: null
+              };
+            });
+        });
+
+      fetchFromGateway
+        .then(data => {
+          if (data.length === 0) {
+            return fetchDirectDriveBC.then(driveEvents => driveEvents.length > 0 ? driveEvents : data);
+          }
+          return data;
+        })
+        .catch(err => {
+          console.warn("FastAPI Gateway /api/road-closures unavailable, falling back to direct DriveBC API:", err);
+          return fetchDirectDriveBC;
+        })
+        .then(rawEvents => {
+          const now = new Date();
+          const processed = rawEvents.map(evt => {
+            const start = evt.startDate ? new Date(evt.startDate) : null;
+            const end = evt.endDate ? new Date(evt.endDate) : null;
+
+            let isActive = false, isFuture = false, isExpired = false;
+            if (start && now < start) {
+              isFuture = true;
+            } else if (end && now > end) {
+              isExpired = true;
+            } else {
+              isActive = true;
+            }
+            return {
+              ...evt,
+              start,
+              end,
+              isActive,
+              isFuture,
+              isExpired
+            };
+          });
+
+          const unexpired = processed.filter(evt => !evt.isExpired);
+          setRoadClosures(unexpired);
+        })
+        .catch(err => {
+          console.error("Error loading road closures:", err);
+        });
+    };
+
+    loadClosures();
+    const interval = setInterval(loadClosures, 60000);
+    return () => clearInterval(interval);
   }, []);
 
 

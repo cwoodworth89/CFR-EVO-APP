@@ -4,6 +4,63 @@ import BlockParcelPanel from './BlockParcelPanel';
 import PropertySatellitePanel from './PropertySatellitePanel';
 import StreetViewPanel from './StreetViewPanel';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { STATIONS } from '../MapConstants';
+
+function getUnitIcon(unit) {
+  const u = String(unit).toUpperCase();
+  if (u.startsWith('M')) return '🚑'; // Medic
+  if (u.startsWith('L')) return '🚒'; // Ladder
+  if (u.startsWith('E')) return '🚒'; // Engine
+  if (u.startsWith('R')) return '🚒'; // Rescue
+  if (u.startsWith('C') || u.startsWith('B')) return '🚨'; // Chief / Battalion
+  if (u.startsWith('WT') || u.startsWith('W')) return '💧'; // Water Tender
+  if (u.startsWith('SQ')) return '⚡'; // Squad
+  return '🚒';
+}
+
+function calculateUnitEta(unitName, destLat, destLng) {
+  const cleanUnit = String(unitName).trim().toUpperCase();
+  const numMatch = cleanUnit.match(/\d+/);
+  const hallId = numMatch ? numMatch[0] : '1';
+  const station = STATIONS.find((s) => s.id === hallId) || STATIONS[0];
+
+  if (!destLat || !destLng || !station?.coords) {
+    return {
+      unit: cleanUnit,
+      hall: `Hall ${hallId}`,
+      etaStr: null,
+      distStr: null,
+      icon: getUnitIcon(cleanUnit),
+    };
+  }
+
+  // Haversine crow-flies distance
+  const [stnLat, stnLng] = station.coords;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(destLat - stnLat);
+  const dLng = toRad(destLng - stnLng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(stnLat)) * Math.cos(toRad(destLat)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const crowKm = 6371 * c;
+
+  // Emergency urban road network factor (~1.35x crow-flies)
+  const roadKm = crowKm * 1.35;
+  // Emergency vehicle response speed (~45 km/h) + 30s apron turnout
+  const totalMinutes = (roadKm / 45) * 60 + 0.5;
+  const etaMin = Math.max(1, Math.round(totalMinutes));
+
+  return {
+    unit: cleanUnit,
+    hall: `Hall ${hallId}`,
+    etaMin,
+    etaStr: `~${etaMin} min`,
+    distStr: `${roadKm.toFixed(1)} km`,
+    icon: getUnitIcon(cleanUnit),
+  };
+}
 
 export default function KioskView({ kioskState }) {
   const isOnline = useOnlineStatus();
@@ -78,15 +135,23 @@ export default function KioskView({ kioskState }) {
     String(activeCall.response_type).toLowerCase() === 'emergency';
 
   // Parse responding units list (preserving exact order dispatched)
-  const unitList = Array.isArray(activeCall?.responding_units)
-    ? activeCall.responding_units
-    : (typeof activeCall?.responding_units === 'string' && activeCall.responding_units.length > 0)
-      ? activeCall.responding_units.split(',').map(u => u.trim())
-      : (typeof activeCall?.units === 'string' && activeCall.units.length > 0)
-        ? activeCall.units.split(',').map(u => u.trim())
-        : (typeof activeCall?.raw_units === 'string' && activeCall.raw_units.length > 0)
-          ? activeCall.raw_units.split(',').map(u => u.trim())
-          : [];
+  const rawUnits =
+    activeCall?.responding_units ||
+    activeCall?.units ||
+    activeCall?.verified_units ||
+    activeCall?.raw_units ||
+    [];
+
+  const unitList = Array.isArray(rawUnits)
+    ? rawUnits
+    : typeof rawUnits === 'string' && rawUnits.trim().length > 0
+    ? rawUnits.split(',').map((u) => u.trim()).filter(Boolean)
+    : [];
+
+  const destLat = activeCall?.lat ?? 49.2838;
+  const destLng = activeCall?.lng ?? -122.7932;
+
+  const unitEtas = unitList.map((unit) => calculateUnitEta(unit, destLat, destLng));
 
   const talkGroup = activeCall?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
   const rawMapGrid = activeCall?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
@@ -118,8 +183,8 @@ export default function KioskView({ kioskState }) {
 
       {/* Streamlined Header HUD */}
       <header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3 flex items-center justify-between shadow-xl flex-shrink-0 backdrop-blur">
-        {/* Left Side: Priority Badge, Units, Talk Group & Verification */}
-        <div className="flex flex-col items-start gap-1.5 text-left max-w-sm">
+        {/* Left Side: Priority Badge, Dispatched Units with Live ETAs, & Talk Group */}
+        <div className="flex flex-col items-start gap-1.5 text-left max-w-md">
           <div className="flex items-center gap-2">
             <div className={`px-3 py-1 rounded-lg font-black uppercase text-[11px] tracking-wider shadow ${isEmergency ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
               {isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'}
@@ -128,55 +193,54 @@ export default function KioskView({ kioskState }) {
             {(isSimulationMode || activeCall?.isSimulated) && (
               <div className="bg-purple-950/90 border border-purple-500/80 text-purple-200 px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold flex items-center gap-1 shadow animate-pulse">
                 <span>🧪</span>
-                <span>SIMULATED CALL</span>
+                <span>SIMULATED / REVIEW</span>
               </div>
-            )}
-          </div>
-
-          {/* Dispatched Units Badges (In Order Dispatched) */}
-          {unitList.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-              {unitList.map((unit, idx) => (
-                <span key={idx} className="bg-slate-950 text-sky-400 border border-sky-500/40 px-2.5 py-0.5 rounded text-[11px] font-black tracking-wider font-mono shadow-sm">
-                  🚒 {unit}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-              <span className="bg-slate-950 text-sky-400 border border-sky-500/40 px-2.5 py-0.5 rounded text-[11px] font-black tracking-wider font-mono shadow-sm">
-                🚒 E1
-              </span>
-              <span className="bg-slate-950 text-sky-400 border border-sky-500/40 px-2.5 py-0.5 rounded text-[11px] font-black tracking-wider font-mono shadow-sm">
-                🚒 L1
-              </span>
-            </div>
-          )}
-
-          {/* Talk Group & Verification Badges */}
-          <div className="flex items-center gap-2 font-mono text-[10px] mt-0.5">
-            {talkGroup && (
-              <span className="bg-slate-950 text-amber-300 border border-slate-800 px-2 py-0.5 rounded font-bold">
-                📻 {talkGroup}
-              </span>
-            )}
-
-            {!activeCall.verify_location ? (
-              <span className="bg-amber-950/90 border border-amber-600/80 text-amber-300 px-2 py-0.5 rounded font-bold animate-pulse">
-                ⚠️ PHASE 1 VERIFICATION
-              </span>
-            ) : (
-              <span className="bg-emerald-950/90 border border-emerald-600/80 text-emerald-300 px-2 py-0.5 rounded font-bold">
-                ✓ LOCATION VERIFIED
-              </span>
             )}
 
             {isRecentlyUpdated && (
-              <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold animate-bounce">
+              <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold text-[10px] animate-bounce">
                 ⚡ UPDATED
               </span>
             )}
           </div>
+
+          {/* Dispatched Units with Live ETAs from Home Halls */}
+          {unitEtas.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+              {unitEtas.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="bg-slate-950 text-sky-400 border border-sky-500/50 rounded-lg px-2.5 py-1 flex items-center gap-2 shadow-sm font-mono"
+                >
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs">{item.icon}</span>
+                    <span className="text-white font-black text-xs tracking-wider">{item.unit}</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">({item.hall})</span>
+                  </div>
+                  {item.etaStr && (
+                    <div className="flex items-center gap-1 bg-sky-950/90 border border-sky-700/60 px-1.5 py-0.5 rounded text-[10px] font-bold text-sky-300">
+                      <span>⏱️ {item.etaStr}</span>
+                      <span className="text-slate-400 text-[9px]">({item.distStr})</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              <span>🚒</span>
+              <span>{activeCall?.tone_name || 'Radio Broadcast Assignment'}</span>
+            </div>
+          )}
+
+          {/* Talk Group */}
+          {talkGroup && (
+            <div className="flex items-center gap-2 font-mono text-[10px] mt-0.5">
+              <span className="bg-slate-950 text-amber-300 border border-slate-800 px-2 py-0.5 rounded font-bold">
+                📻 {talkGroup}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Center: Extra Large Address & Centered Call Type */}

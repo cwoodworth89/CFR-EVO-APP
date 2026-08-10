@@ -61,14 +61,19 @@ export function useKioskQueue() {
 
   // Handle incoming INSERT dispatch event
   const handleInsert = useCallback((newCall) => {
+    // If this is a real live dispatch, exit simulation/review mode immediately
+    if (!newCall?.isSimulated) {
+      setIsSimulationMode(false);
+    }
+
     setActiveCall((current) => {
-      if (!current) {
-        // IDLE -> Activate immediately
+      // If idle or currently showing a simulated/review call, real call takes over immediately!
+      if (!current || (current.isSimulated && !newCall?.isSimulated)) {
         resetTimeoutClock();
         setElapsedSeconds(0);
         return newCall;
       } else {
-        // ACTIVE -> Push to queue and chime
+        // Active real call in progress -> queue next call and chime
         setQueuedCalls((prev) => [...prev, newCall]);
         playQueuedChime();
         return current;

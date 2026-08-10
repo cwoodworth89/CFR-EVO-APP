@@ -21,7 +21,8 @@ export function Header({
   setShowRoadClosures,
   onOpenRoutingConfig,
   alertsCount,
-  gisOffline
+  gisOffline,
+  homeHall
 }) {
   const [showLayersMenu, setShowLayersMenu] = React.useState(false);
   const isExplore = appMode === "EXPLORE";
@@ -33,29 +34,19 @@ export function Header({
 
   return (
     <div className="bg-slate-950 text-white p-3 shadow-md z-[1100] flex justify-between items-center border-b border-slate-800 h-16 relative select-none">
-        {/* Left Side: Brand Logo and Sidebar Toggles */}
+        {/* Left Side: Brand Logo */}
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-            className={`p-2 rounded-lg border text-xs font-bold transition-all ${
-              leftSidebarOpen 
-                ? "bg-slate-800 border-slate-700 text-sky-400" 
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
-            }`}
-            title="Toggle Left Control Panel"
-          >
-            📋 CONTROL PANEL
-          </button>
-          
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold tracking-wider flex items-center gap-1.5 select-none">
-              CFR <span className="text-emerald-500 font-extrabold">EVO</span>
-              <span className="text-slate-500 font-normal text-[10px] uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2">APP</span>
+            <h1 className="text-lg font-bold tracking-wider flex items-center gap-1.5 select-none uppercase">
+              CFR <span className="text-emerald-500 font-extrabold">DISPATCH</span>
+              <span className="text-slate-500 font-normal text-[10px] uppercase tracking-widest ml-1.5 border-l border-slate-800 pl-2">
+                {homeHall ? `HALL ${homeHall}` : "HALL 1"}
+              </span>
             </h1>
             
             {gisOffline && (
               <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-mono font-bold px-2 py-0.5 rounded flex items-center gap-1.5 select-none animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-455"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                 COQUITLAM GIS OFFLINE
               </span>
             )}
@@ -109,9 +100,9 @@ export function Header({
                 ? "bg-amber-950/80 border-amber-600/80 text-amber-300 shadow-md animate-pulse" 
                 : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white"
             }`}
-            title="Toggle Road Hazards & Active Alerts Panel"
+            title="Toggle Road Closures Panel"
           >
-            🚧 HAZARDS & ALERTS {alertsCount > 0 && <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full ml-1">{alertsCount}</span>}
+            🚧 ROAD CLOSURES {alertsCount > 0 && <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full ml-1">{alertsCount}</span>}
           </button>
         </div>
     </div>
@@ -1182,8 +1173,8 @@ export function RightSidebar({
           <div className="w-80 h-full flex flex-col overflow-hidden">
              {/* Header Title */}
              <div className="bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0">
-                <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO ALERTS</div>
-                <div className="text-lg text-rose-500 font-extrabold uppercase font-sans tracking-wide">ACTIVE HAZARDS</div>
+                <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR DISPATCH</div>
+                <div className="text-lg text-rose-500 font-extrabold uppercase font-sans tracking-wide">ROAD CLOSURES</div>
              </div>
 
              {/* Alerts Card List */}

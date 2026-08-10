@@ -1003,6 +1003,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         onOpenRoutingConfig={() => setShowRoutingConfigModal(true)}
         alertsCount={showRoadClosures ? activeClosures.length : 0}
         gisOffline={cadastralError}
+        homeHall={homeHall}
       />
 
       <div className="flex flex-row flex-grow w-full h-[calc(100vh-4rem)] relative overflow-hidden z-10">

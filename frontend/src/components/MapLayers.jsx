@@ -18,10 +18,10 @@ export const createFireHallIcon = (stationId = '1') => {
     STATION_ICON_CACHE[key] = L.divIcon({
       className: 'custom-station-user-icon',
       html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;opacity:0.95;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-        <div style="width:38px;height:38px;border-radius:50%;background:#dc2626;border:2px solid #ffffff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.6);">
-          <span style="font-size:20px;line-height:1;user-select:none;">🚒</span>
-        </div>
-        <span style="position:absolute;top:-2px;right:-2px;background:#0f172a;color:#fbbf24;border:1.5px solid #fbbf24;border-radius:9999px;font-size:10px;font-weight:900;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-family:monospace;box-shadow:0 2px 5px rgba(0,0,0,0.8);pointer-events:none;">${key}</span>
+        <img src="${BASE_URL}icons/fire_hall.png" 
+             style="width:38px;height:38px;max-width:38px;max-height:38px;object-fit:cover;border-radius:50%;overflow:hidden;background:transparent;border:none;display:block;" 
+             alt="Fire Hall ${key}" />
+        <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(15,23,42,0.92);color:#fbbf24;border:1.5px solid #fbbf24;border-radius:9999px;font-size:11px;font-weight:900;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-family:monospace;box-shadow:0 2px 5px rgba(0,0,0,0.8);pointer-events:none;">${key}</span>
       </div>`,
       iconSize: [38, 38],
       iconAnchor: [19, 19],

@@ -331,7 +331,11 @@ def sync_road_closures_to_db(db: Session):
     except Exception as e:
         logger.warning(f"Municipal 511 ingestion warning: {e}")
 
-    # Upsert notices into PostgreSQL
+    # Upsert notices into PostgreSQL differentials
+    if not raw_notices:
+        logger.warning("No road closure notices were scraped from remote feeds. Retaining local database cache for offline survival.")
+        return 0
+
     active_closure_ids = set()
 
     for item in raw_notices:
@@ -381,13 +385,55 @@ def sync_road_closures_to_db(db: Session):
             )
             db.add(new_record)
 
-    # Deactivate records no longer present in live feeds
+    # Differential cleanup: ONLY deactivate active records if they are no longer in active_closure_ids
+    if active_closure_ids:
+        db.query(RoadClosureModel).filter(
+            RoadClosureModel.active == True,
+            ~RoadClosureModel.closure_id.in_(active_closure_ids)
+        ).update({RoadClosureModel.active: False}, synchronize_session=False)
+
+    # Also automatically deactivate any records whose end_time has passed
     db.query(RoadClosureModel).filter(
         RoadClosureModel.active == True,
-        ~RoadClosureModel.closure_id.in_(active_closure_ids)
+        RoadClosureModel.end_time != None,
+        RoadClosureModel.end_time < now_utc
     ).update({RoadClosureModel.active: False}, synchronize_session=False)
 
     db.commit()
-    logger.info(f"Successfully synced {len(active_closure_ids)} active road closures to database.")
+    logger.info(f"Successfully differentials-synced {len(active_closure_ids)} active road closures to database.")
     return len(active_closure_ids)
+
+
+def check_and_sync_if_stale(db: Session, max_age_seconds: int = 86400) -> bool:
+    """
+    Checks the last update timestamp of local road closures in PostgreSQL.
+    If the database is empty OR the last update is older than max_age_seconds (default 24h),
+    triggers a differential sync.
+    """
+    from sqlalchemy import func
+    latest_update = db.query(func.max(RoadClosureModel.updated_at)).scalar()
+    active_count = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).count()
+
+    now_utc = datetime.now(timezone.utc)
+    
+    should_sync = False
+    if active_count == 0 or latest_update is None:
+        logger.info("Local database contains 0 active road closures. Triggering immediate sync...")
+        should_sync = True
+    else:
+        if latest_update.tzinfo is None:
+            latest_update = latest_update.replace(tzinfo=timezone.utc)
+        age_seconds = (now_utc - latest_update).total_seconds()
+        logger.info(f"Local road closure database last updated {age_seconds:.0f}s ago (threshold: {max_age_seconds}s).")
+        if age_seconds > max_age_seconds:
+            should_sync = True
+
+    if should_sync:
+        try:
+            sync_road_closures_to_db(db)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to run scheduled road closure sync: {e}")
+            return False
+    return False
 

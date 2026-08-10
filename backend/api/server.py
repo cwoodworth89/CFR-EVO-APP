@@ -41,11 +41,11 @@ def is_allowed_network(client_ip_str: str) -> bool:
 try:
     from backend.api.database import get_db, engine, Base, SessionLocal
     from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
-    from backend.api.road_closure_service import sync_road_closures_to_db
+    from backend.api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 except ModuleNotFoundError:
-    from api.database import get_db, engine, Base
+    from api.database import get_db, engine, Base, SessionLocal
     from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
-    from api.road_closure_service import sync_road_closures_to_db
+    from api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 
 # Ensure database tables exist
 Base.metadata.create_all(bind=engine)
@@ -94,9 +94,26 @@ def init_mqtt():
     except Exception as e:
         logging.warning(f"Could not connect to MQTT broker ({MQTT_HOST}:{MQTT_PORT}): {e}. Dispatches will still save to DB.")
 
+def run_periodic_road_closure_sync():
+    """Background daemon worker: checks database staleness and performs daily differential road closure sync."""
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                check_and_sync_if_stale(db, max_age_seconds=86400)
+            finally:
+                db.close()
+        except Exception as e:
+            logging.error(f"Error in periodic road closure sync daemon: {e}")
+        # Sleep for 1 hour between staleness checks
+        time.sleep(3600)
+
 @app.on_event("startup")
 def startup_event():
     init_mqtt()
+    sync_thread = threading.Thread(target=run_periodic_road_closure_sync, daemon=True)
+    sync_thread.start()
+    logging.info("Started background daemon thread for 24h road closure differential synchronization.")
 
 def publish_mqtt_event(event_type: str, record_dict: dict):
     if not mqtt_client:
@@ -448,37 +465,9 @@ class PythonGeometryDecoder:
         self.index += n
         return pts
 
-ROAD_CLOSURES_CACHE = {"timestamp": 0}
-
-def run_road_closure_sync():
-    """
-    Background worker to execute the spatial scrape and zone mapping.
-    """
-    db = SessionLocal()
-    try:
-        sync_road_closures_to_db(db)
-    except Exception as e:
-        logging.warning(f"Background road closure sync failed: {e}")
-    finally:
-        db.close()
 
 @app.get("/api/road-closures")
-def get_road_closures(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    now_ts = time.time()
-    db_count = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).count()
-    
-    # Run sync synchronously on initial startup if DB is completely empty.
-    # Otherwise, return DB results instantly and trigger update in background.
-    if db_count == 0:
-        try:
-            sync_road_closures_to_db(db)
-            ROAD_CLOSURES_CACHE["timestamp"] = now_ts
-        except Exception as sync_err:
-            logging.warning(f"Initial startup sync failed: {sync_err}")
-    elif now_ts - ROAD_CLOSURES_CACHE["timestamp"] > 86400:
-        ROAD_CLOSURES_CACHE["timestamp"] = now_ts
-        background_tasks.add_task(run_road_closure_sync)
-
+def get_road_closures(db: Session = Depends(get_db)):
     records = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).order_by(desc(RoadClosureModel.updated_at)).all()
     
     results = []

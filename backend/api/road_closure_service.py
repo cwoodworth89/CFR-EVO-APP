@@ -4,7 +4,7 @@ import re
 import math
 import logging
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 
 try:
@@ -385,22 +385,32 @@ def sync_road_closures_to_db(db: Session):
             )
             db.add(new_record)
 
-    # Differential cleanup: ONLY deactivate active records if they are no longer in active_closure_ids
+    # Early completion deactivation: If a closure is missing from a successful scrape (where raw_notices > 0)
+    # and its start_time is in the past, mark active = False (assuming construction completed early).
     if active_closure_ids:
         db.query(RoadClosureModel).filter(
             RoadClosureModel.active == True,
+            RoadClosureModel.start_time != None,
+            RoadClosureModel.start_time <= now_utc,
             ~RoadClosureModel.closure_id.in_(active_closure_ids)
         ).update({RoadClosureModel.active: False}, synchronize_session=False)
 
-    # Also automatically deactivate any records whose end_time has passed
+    # Scheduled expiration deactivation: Deactivate records whose scheduled end_time has passed
     db.query(RoadClosureModel).filter(
         RoadClosureModel.active == True,
         RoadClosureModel.end_time != None,
         RoadClosureModel.end_time < now_utc
     ).update({RoadClosureModel.active: False}, synchronize_session=False)
 
+    # 30-Day Retention Purge: Hard-delete records that have been soft-deactivated (active = False) for > 30 days
+    purge_cutoff = now_utc - timedelta(days=30)
+    deleted_count = db.query(RoadClosureModel).filter(
+        RoadClosureModel.active == False,
+        RoadClosureModel.updated_at < purge_cutoff
+    ).delete(synchronize_session=False)
+
     db.commit()
-    logger.info(f"Successfully differentials-synced {len(active_closure_ids)} active road closures to database.")
+    logger.info(f"Successfully differentials-synced {len(active_closure_ids)} road closures. Purged {deleted_count} stale records older than 30 days.")
     return len(active_closure_ids)
 
 

@@ -504,6 +504,20 @@ def get_road_closures(db: Session = Depends(get_db)):
     return results
 
 
+@app.post("/api/road-closures/sync")
+def trigger_road_closure_sync(db: Session = Depends(get_db)):
+    """Manual admin endpoint to trigger immediate differential road closure sync."""
+    try:
+        count = sync_road_closures_to_db(db)
+        return {
+            "status": "success", 
+            "syncedCount": count, 
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Manual sync failed: {str(e)}")
+
+
 
 
 if __name__ == "__main__":

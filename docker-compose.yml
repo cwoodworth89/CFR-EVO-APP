@@ -48,6 +48,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/audio_files/recordings:/app/backend/audio_files/recordings
+      - ./backend/data:/app/backend/data
       - ./frontend/public/data:/app/frontend/public/data:ro
     depends_on:
       - postgres

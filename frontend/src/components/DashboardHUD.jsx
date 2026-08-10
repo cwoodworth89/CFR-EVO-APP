@@ -1070,13 +1070,21 @@ export function RightSidebar({
   zones = [],
   homeHall = "1"
 }) {
+  const [collapsedGroups, setCollapsedGroups] = React.useState({});
+
+  const toggleGroup = (groupId) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
   const groupDefs = {
-    E1: { label: "Engine 1 (Hall 1)", color: "border-rose-500/80 text-rose-400 bg-rose-950/40" },
-    E2: { label: "Engine 2 (Hall 2)", color: "border-blue-500/80 text-blue-400 bg-blue-950/40" },
-    E3: { label: "Engine 3 (Hall 3)", color: "border-emerald-500/80 text-emerald-400 bg-emerald-950/40" },
-    Q5: { label: "Quint 5 (Hall 3)", color: "border-teal-500/80 text-teal-400 bg-teal-950/40" },
-    E4: { label: "Engine 4 (Hall 4)", color: "border-purple-500/80 text-purple-400 bg-purple-950/40" },
-    OTHER: { label: "Regional Corridors / Other", color: "border-slate-600 text-slate-400 bg-slate-800/30" }
+    "1": { label: "Town Centre (Hall 1)", color: "border-rose-500/80 text-rose-400 bg-rose-950/40" },
+    "2": { label: "Mariner (Hall 2)", color: "border-blue-500/80 text-blue-400 bg-blue-950/40" },
+    "3": { label: "Austin Heights (Hall 3)", color: "border-emerald-500/80 text-emerald-400 bg-emerald-950/40" },
+    "4": { label: "Burke Mountain (Hall 4)", color: "border-purple-500/80 text-purple-400 bg-purple-950/40" },
+    "OTHER": { label: "Regional Corridors / Other", color: "border-slate-600 text-slate-400 bg-slate-800/30" }
   };
 
   const groupedClosures = React.useMemo(() => {
@@ -1116,12 +1124,19 @@ export function RightSidebar({
         return true;
       });
 
-    const groups = { E1: [], E2: [], E3: [], Q5: [], E4: [], OTHER: [] };
+    const groups = { "1": [], "2": [], "3": [], "4": [], OTHER: [] };
     filtered.forEach(closure => {
       const zoneMatch = zones.find(z => String(z.zone_id) === String(closure.zoneId));
-      const unit = zoneMatch ? zoneMatch.unit_id : "OTHER";
-      if (groups[unit]) {
-        groups[unit].push(closure);
+      let hall = "OTHER";
+      if (zoneMatch) {
+        const u = zoneMatch.unit_id;
+        if (u === "E1") hall = "1";
+        else if (u === "E2") hall = "2";
+        else if (u === "E3" || u === "Q5") hall = "3";
+        else if (u === "E4") hall = "4";
+      }
+      if (groups[hall]) {
+        groups[hall].push(closure);
       } else {
         groups["OTHER"].push(closure);
       }
@@ -1135,17 +1150,17 @@ export function RightSidebar({
       });
     });
 
-    let order = ["E1", "E2", "E3", "Q5", "E4", "OTHER"];
-    if (homeHall === "1") order = ["E1", "E2", "E3", "Q5", "E4", "OTHER"];
-    else if (homeHall === "2") order = ["E2", "E1", "E3", "Q5", "E4", "OTHER"];
-    else if (homeHall === "3") order = ["E3", "Q5", "E1", "E2", "E4", "OTHER"];
-    else if (homeHall === "4") order = ["E4", "E1", "E2", "E3", "Q5", "OTHER"];
+    let order = ["1", "2", "3", "4", "OTHER"];
+    if (homeHall === "1") order = ["1", "2", "3", "4", "OTHER"];
+    else if (homeHall === "2") order = ["2", "1", "3", "4", "OTHER"];
+    else if (homeHall === "3") order = ["3", "1", "2", "4", "OTHER"];
+    else if (homeHall === "4") order = ["4", "1", "2", "3", "OTHER"];
 
     return order
-      .map(unitKey => ({
-        unit: unitKey,
-        closures: groups[unitKey],
-        ...groupDefs[unitKey]
+      .map(hallKey => ({
+        unit: hallKey,
+        closures: groups[hallKey],
+        ...groupDefs[hallKey]
       }))
       .filter(g => g.closures.length > 0);
   }, [roadClosures, zones, homeHall, filterNoAccess, filterAccessOnly, filterCaution]);
@@ -1190,13 +1205,20 @@ export function RightSidebar({
                             groupedClosures.map((group) => (
                                 <div key={group.unit} className="flex flex-col gap-2">
                                     {/* Group Title Header */}
-                                    <div className={`text-[10px] font-black uppercase font-mono px-2 py-1 border-l-2 rounded-r-md flex justify-between items-center shadow-sm ${group.color}`}>
-                                        <span>📍 {group.label}</span>
+                                    <div 
+                                      onClick={() => toggleGroup(group.unit)}
+                                      className={`text-[10px] font-black uppercase font-mono px-2 py-1.5 border-l-2 rounded-r-md flex justify-between items-center shadow-sm cursor-pointer select-none hover:brightness-110 transition-all ${group.color}`}
+                                    >
+                                        <span className="flex items-center gap-1.5">
+                                          <span>{collapsedGroups[group.unit] ? "▶" : "▼"}</span>
+                                          <span>📍 {group.label}</span>
+                                        </span>
                                         <span className="opacity-75 font-mono">{group.closures.length}</span>
                                     </div>
                                     
                                     {/* Group Closures */}
-                                    <div className="flex flex-col gap-2 pl-1 border-l border-slate-800/40">
+                                    {!collapsedGroups[group.unit] && (
+                                      <div className="flex flex-col gap-2 pl-1 border-l border-slate-800/40">
                                         {group.closures.map((closure) => (
                                             <div 
                                               key={closure.id} 
@@ -1255,7 +1277,8 @@ export function RightSidebar({
                                                  </div>
                                             </div>
                                         ))}
-                                    </div>
+                                      </div>
+                                    )}
                                 </div>
                             ))
                         ) : (

@@ -6,7 +6,7 @@ import ipaddress
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -39,7 +39,7 @@ def is_allowed_network(client_ip_str: str) -> bool:
     return False
 
 try:
-    from backend.api.database import get_db, engine, Base
+    from backend.api.database import get_db, engine, Base, SessionLocal
     from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel
     from backend.api.road_closure_service import sync_road_closures_to_db
 except ModuleNotFoundError:
@@ -450,19 +450,35 @@ class PythonGeometryDecoder:
 
 ROAD_CLOSURES_CACHE = {"timestamp": 0}
 
+def run_road_closure_sync():
+    """
+    Background worker to execute the spatial scrape and zone mapping.
+    """
+    db = SessionLocal()
+    try:
+        sync_road_closures_to_db(db)
+    except Exception as e:
+        logging.warning(f"Background road closure sync failed: {e}")
+    finally:
+        db.close()
+
 @app.get("/api/road-closures")
-def get_road_closures(db: Session = Depends(get_db)):
+def get_road_closures(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     now_ts = time.time()
-    # Trigger spatial ingestion sync if cache is older than 5 minutes or DB is empty
     db_count = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).count()
-    if db_count == 0 or (now_ts - ROAD_CLOSURES_CACHE["timestamp"] > 300):
+    
+    # Run sync synchronously on initial startup if DB is completely empty.
+    # Otherwise, return DB results instantly and trigger update in background.
+    if db_count == 0:
         try:
             sync_road_closures_to_db(db)
             ROAD_CLOSURES_CACHE["timestamp"] = now_ts
         except Exception as sync_err:
-            logging.warning(f"Failed to sync road closures to DB: {sync_err}")
+            logging.warning(f"Initial startup sync failed: {sync_err}")
+    elif now_ts - ROAD_CLOSURES_CACHE["timestamp"] > 300:
+        ROAD_CLOSURES_CACHE["timestamp"] = now_ts
+        background_tasks.add_task(run_road_closure_sync)
 
-    # Query active notices from PostgreSQL database
     records = db.query(RoadClosureModel).filter(RoadClosureModel.active == True).order_by(desc(RoadClosureModel.updated_at)).all()
     
     results = []

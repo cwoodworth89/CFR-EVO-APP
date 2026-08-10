@@ -346,7 +346,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
 
   // NAVIGATION & ROUTING STATES
   const [homeHall, setHomeHall] = useState(() => {
-    return localStorage.getItem('home_hall') || "1";
+    return localStorage.getItem('home_hall') || import.meta.env.VITE_DEFAULT_HALL || "1";
   });
   const [targetAddress, setTargetAddress] = useState(null);
   const [targetPolygon, setTargetPolygon] = useState(null);

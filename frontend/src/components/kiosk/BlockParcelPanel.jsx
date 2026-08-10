@@ -45,8 +45,10 @@ export default function BlockParcelPanel({ activeCall }) {
   const destLng = activeCall?.lng ?? -122.7932;
   const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || `${destLat},${destLng}`);
 
-  const polygonCoords = activeCall?.rings && activeCall.rings.length > 0
-    ? activeCall.rings[0].map(([lng, lat]) => [lat, lng])
+  const polygonPositions = activeCall?.rings && activeCall.rings.length > 0
+    ? (Array.isArray(activeCall.rings[0][0])
+        ? activeCall.rings.map(ring => ring.map(([lng, lat]) => [lat, lng]))
+        : [activeCall.rings.map(([lng, lat]) => [lat, lng])])
     : null;
 
   const renderMapContent = () => (
@@ -67,8 +69,8 @@ export default function BlockParcelPanel({ activeCall }) {
 
       <HydrantsLayer visible={true} mode="EXPLORE" zoom={16.5} />
 
-      {polygonCoords && (
-        <Polygon positions={polygonCoords} pathOptions={{ color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.4, weight: 3 }} />
+      {polygonPositions && (
+        <Polygon positions={polygonPositions} pathOptions={{ color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.4, weight: 3 }} />
       )}
 
       <Marker position={[destLat, destLng]} icon={targetIcon}>

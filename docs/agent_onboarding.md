@@ -205,7 +205,7 @@ When reviewing dispatches in the admin interface:
 - **Whisper Training Dataset Opt-in**: Automatically defaults to unchecked (`false`) for calls under 35 seconds (cut-off calls) and checked (`true`) for full calls. This is editable at any time.
 
 ### 1. Extract Training Ground-Truth Data
-Pull verified user corrections (ground truth reference transcripts) and their raw `.wav` recordings from Supabase to your local cache:
+Pull verified user corrections (ground truth reference transcripts) and their raw `.wav` recordings from local PostgreSQL DB to your local cache:
 ```bash
 ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/extract_training_data.py"
 ```
@@ -220,7 +220,7 @@ Evaluate the current model's accuracy (Word Error Rate & Character Error Rate) a
 ```bash
 ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/backtest_regression.py"
 ```
-* **Output**: Renders a side-by-side comparison (Human Reference, Old Hypothesis, New Hypothesis), logs results locally, and inserts a run summary into the Supabase `evaluation_history` table to feed the dashboard chart.
+* **Output**: Renders a side-by-side comparison (Human Reference, Old Hypothesis, New Hypothesis), logs results locally, and inserts a run summary into the local `evaluation_history` table to feed the dashboard chart.
 * **Template-Normalized WER**: The backtest parses and reconstructs the Human Reference text before calculating WER, providing a true 0-to-100% structured accuracy check (SMMR - Structured Metadata Match Rate).
 
 ### 3. Sync Dataset to Google Drive (rclone)

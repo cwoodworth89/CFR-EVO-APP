@@ -185,16 +185,16 @@ The python agent pushes notification payloads to `ntfy.sh` to trigger instant au
 
 ---
 
-## 💾 Supabase Realtime Payload Schema
+## 💾 FastAPI Gateway & MQTT Payload Schema
 
-Updates pushed via Supabase Realtime use a standardized json object layout for the React frontend client:
+Updates pushed via Mosquitto MQTT WebSockets use a standardized JSON object layout matching the PostgreSQL database schema for the React frontend client:
 
-*   **`live_calls` Table Schema**:
+*   **`live_calls` Table & MQTT Schema**:
     *   `dispatch_id` (Text): Unique alphanumeric index (`DISP-[Year]-[HEX]`).
     *   `incident_type` (Text): Parsed or verified incident category.
     *   `responding_units` (Array): Array of active units (e.g., `["E1", "L1"]`).
     *   `raw_transcript` / `sanitized_transcript` (Text): Text representations.
-    *   `audio_url` (Text): Direct Supabase storage link.
+    *   `audio_url` (Text): Local FastAPI static serving endpoint link.
     *   `verify_location` (Boolean): Boolean flag. `true` triggers visual map warnings.
     *   `target` (JSONB): Structured geocoding parameters:
         ```json

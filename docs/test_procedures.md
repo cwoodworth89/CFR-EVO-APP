@@ -150,33 +150,33 @@ python backend/scripts/feed_recorded_call.py backend/audio_files/custom_call.wav
 3. **MQTT Broadcast**: An `INSERT` event is published to `cfr/dispatches` over Mosquitto MQTT.
 4. **WebSocket Push**: The web client dashboard (`http://localhost:5173/`) instantly centers the map on the geocoded address, draws a route line from the station, and highlights the three closest fire hydrants.
 
----
+## 🧪 Procedure 5: Local Stack Web Simulation Testing
 
-## 🧪 Procedure 5: Supabase Web Simulation Poller Testing
-
-The python agent runs a background poller thread that checks for simulation requests initiated by developers or station admins via the web app.
+The python agent runs a background runner and FastAPI server that allows developers to trigger simulations via HTTP requests or REST API triggers.
 
 ### 📋 Testing Steps:
-1. Ensure the agent is running:
+1. Ensure the container stack and agent are running:
    ```powershell
    python main.py
    ```
-2. Insert a row into the `simulation_requests` table on Supabase with:
-   - `status = "pending"`
-   - `audio_url = "[URL_TO_WAV_FILE]"`
-   - `verified_transcript = "[EXPECTED_TEXT]"` (optional)
+2. Trigger a simulation run by sending a POST request to the local FastAPI Gateway endpoint:
+   ```powershell
+   Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/dispatches/simulate" -Body (ConvertTo-Json @{
+       audio_url = "[URL_TO_WAV_FILE]"
+       verified_transcript = "[EXPECTED_TEXT]"
+   }) -ContentType "application/json"
+   ```
 3. Check the agent console logs or `dispatch.log`. You should see:
-   - *"Processing simulation request [ID]..."*
-   - Status transitions to `processing`.
-   - Download, transcription, parsing, and geocoding executing.
-   - A new dispatch entry pushed to the `live_calls` table.
-   - Status transitions to `completed` in the `simulation_requests` table, with the final JSON response saved in the `result` column.
+   - *"Processing simulation request..."*
+   - Transcription, parsing, and geocoding executing.
+   - A new dispatch entry pushed/upserted to the local PostgreSQL `live_calls` table.
+   - Live update published over MQTT to local station kiosk displays.
 
 ---
 
 ## 🧪 Procedure 6: Comparative Parser Backtesting Suite (`backtest_parser.py`)
 
-This test script evaluates the performance of the production parser ([parser.py](../backend/cfr_dispatch/parser.py)) against alternative parsing modules (such as [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py)) by benchmarking their extractions against the entire dataset of human-verified calls stored in Supabase.
+This test script evaluates the performance of the production parser ([parser.py](../backend/cfr_dispatch/parser.py)) against alternative parsing modules (such as [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py)) by benchmarking their extractions against the entire dataset of human-verified calls stored in the local PostgreSQL database.
 
 ### 🏃 Running the Backtest Suite
 ```powershell
@@ -184,7 +184,7 @@ This test script evaluates the performance of the production parser ([parser.py]
 ```
 
 ### 📋 What it Validates & Reports:
-1. **Ground-Truth Data Pull**: Queries all live calls from Supabase where `feedback_submitted = true`.
+1. **Ground-Truth Data Pull**: Queries all live calls from the local PostgreSQL database where `feedback_submitted = true`.
 2. **Side-by-Side Accuracy Metrics**: Calculates exact precision for 5 key extraction variables:
    - **Address / Location**: Normalizes street suffixes (e.g. `Street` $\rightarrow$ `St`, `Avenue` $\rightarrow$ `Ave`) and performs set-overlap intersection comparisons.
    - **Incident Type**: Evaluates full incident name resolution (e.g. `Medical Aid - Fall` vs generic `Medical Aid`).
@@ -203,5 +203,5 @@ This test script evaluates the performance of the production parser ([parser.py]
 | **`PaErrorCode -9997`** | Invalid Sample Rate | The input device does not support the default `16000Hz` sample rate. Ensure you are targeting a device that supports 16kHz capture, or use a WASAPI loopback driver. |
 | **Geocoding returns `None` coordinates** | Address shapefile mapping issue | Verify that the address suffix matches the Coquitlam database. For example, the parser translates "Sandstone Crescent" to `Sandstone Cres` to match the local GIS shapefiles. Check the spelling in `data/vocabulary/street_names.txt`. |
 | **`GOOGLE_APPLICATION_CREDENTIALS` error** | GCP JSON file missing/expired | Ensure your Google Cloud service account key is saved at `backend/cfr-dispatch-mapping-b30ef9734c12.json` and that the file path is correctly specified in your `.env`. |
-| **Real-time updates not showing in web app** | Supabase Anon Key invalid | Ensure the publishable key starting with `sb_` or public JWT is updated in `frontend/.env.local` as `VITE_SUPABASE_ANON_KEY`. Check browser developer console (F12) for websocket connection errors. |
+| **Real-time updates not showing in web app** | Mosquitto MQTT broker down / WS Port blocked | Ensure Mosquitto MQTT container is running and WebSockets port `9001` is open. Verify MQTT settings in `frontend/.env.local` connect to `ws://localhost:9001/mqtt`. Check browser developer console (F12) for connection errors. |
 

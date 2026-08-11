@@ -62,20 +62,41 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | :--- | :--- | :--- |
 | **Project Overview** | [README.md](../README.md) | High-level system structure, mermaid workflow schemas, and 2-phase pipelines. |
 | **Local DB Setup** | [docs/local_database_setup.md](./local_database_setup.md) | Containerized PostgreSQL 16 schema, FastAPI gateway REST routes, and Mosquitto MQTT sync. |
-| **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./ntfy_server_access_and_qr_spec.md) | Ntfy push server access, HTTP vs HTTPS rules, monthly salt spec, and QR deep link payloads. |
-| **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./public_domain_and_ssl_migration.md) | Blueprint for Nginx SSL reverse proxy, Let's Encrypt certificates, and public domain routing. |
-| **Call Structure** | [docs/call_structure.md](./call_structure.md) | Dispatch speech templates, regex parsing splits, and phonetic correction matrices. |
-| **Supabase Setup** | [docs/supabase_setup.md](./supabase_setup.md) | Legacy cloud database contracts and migration fallback procedures. |
-| **GIS Endpoints** | [docs/gis_endpoints.md](./gis_endpoints.md) | Coquitlam ArcGIS MapServer layers list, and local Dynamic Viewport mock blueprints. |
-| **Test Matrix** | [docs/test_procedures.md](./test_procedures.md) | Step-by-step diagnostic workflows for tone SPOT tests, database inserts, and mic levels. |
-| **Hardware Spec** | [docs/hardware_specification.md](./hardware_specification.md) | Physical setup configs (Pi soundcards, Nginx server blocks, and x86 laptop kiosks). |
-| **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./laptop_kiosk_setup.md) | Detailed installation tutorial for headless Ubuntu kiosk displays and auto-updates. |
-| **Milestones** | [docs/milestones.md](./milestones.md) | Development roadmap tracking completed steps and target release items. |
-| **Privacy Compliance** | [docs/privacy.md](./privacy.md) | Voice monitoring rules, local RAM buffering specs, and FOI compliant data policies. |
+| **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./docs/ntfy_server_access_and_qr_spec.md) | Ntfy push server access, HTTP vs HTTPS rules, monthly salt spec, and QR deep link payloads. |
+| **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./docs/public_domain_and_ssl_migration.md) | Blueprint for Nginx SSL reverse proxy, Let's Encrypt certificates, and public domain routing. |
+| **Call Structure** | [docs/call_structure.md](./docs/call_structure.md) | Dispatch speech templates, regex parsing splits, and phonetic correction matrices. |
+| **Supabase Setup** | [docs/supabase_setup.md](./docs/supabase_setup.md) | Legacy cloud database contracts and migration fallback procedures. |
+| **GIS Endpoints** | [docs/gis_endpoints.md](./docs/gis_endpoints.md) | Coquitlam ArcGIS MapServer layers list, and local Dynamic Viewport mock blueprints. |
+| **Test Matrix** | [docs/test_procedures.md](./docs/test_procedures.md) | Step-by-step diagnostic workflows for tone SPOT tests, database inserts, and mic levels. |
+| **Hardware Spec** | [docs/hardware_specification.md](./docs/hardware_specification.md) | Physical setup configs (Pi soundcards, Nginx server blocks, and x86 laptop kiosks). |
+| **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./docs/laptop_kiosk_setup.md) | Detailed installation tutorial for headless Ubuntu kiosk displays and auto-updates. |
+| **Milestones** | [docs/milestones.md](./docs/milestones.md) | Development roadmap tracking completed steps and target release items. |
+| **Privacy Compliance** | [docs/privacy.md](./docs/privacy.md) | Voice monitoring rules, local RAM buffering specs, and FOI compliant data policies. |
 | **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Structural refactoring details of decoupling the monolith into microservices. |
 | **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant overlay integration and NFPA 291 vector markers mapping. |
 | **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | Full migration audit, PostgreSQL index tuning, Ntfy container setup, and DSP tone spotter calibration. |
 
+---
+
+## 🤖 AI Agent Customizations (Custom Skills & Sub-agents)
+
+CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in the [**`.agents`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents) directory. These resources extend agent capabilities and document domain runbooks.
+
+### 🛠️ Specialized Sub-agents
+When spawning helper sub-agents, inherit from these type specifications:
+* **`call-review-analyst`**: Specialist in auditing dispatch call logs, triaging HITL reviews, diagnosing audio transcripts, and phonetic ambiguity analysis.
+* **`dispatch-qa-engineer`**: Specialist in automated end-to-end dispatch simulations, testing protocol enforcement, and clean QA database teardowns.
+* **`performance-metrics-analyst`**: Specialist in operational metrics analytics (Turnout Lead Time, Parsing Accuracy %, Stage Latency) and executive HUD telemetry design.
+
+### 📚 Domain Skills
+These markdown runbooks guide agents through complex developer workflows:
+* [**`dispatch-pipeline-ops`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/dispatch-pipeline-ops/SKILL.md): Architecture of the 2-phase real-time dispatch audio pipeline.
+* [**`e2e-dispatch-testing`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/e2e-dispatch-testing/SKILL.md): Running system tests, MQTT validation, and purging test entries.
+* [**`performance-metrics-analytics`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/performance-metrics-analytics/SKILL.md): Guidelines for measuring pipeline latencies and business intelligence metrics.
+* [**`gis-spatial-analysis`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/gis-spatial-analysis/SKILL.md): Procedures for shapefile queries, coordinate reference transformations, and NFPA 291 hydrants.
+* [**`gis-pipeline-sync`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/gis-pipeline-sync/SKILL.md): Pulling Coquitlam ESRI shapefiles and GIS caching updates.
+* [**`google-imagery-streetview`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/google-imagery-streetview/SKILL.md): Ingestion and display of satellite imagery and Google Street View.
+* [**`road-closure-management`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/road-closure-management/SKILL.md): Tracking active road closures, construction zones, and routing around hazards.
 
 ---
 

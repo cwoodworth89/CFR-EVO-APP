@@ -387,12 +387,14 @@ def process_full_dispatch(
     send_ntfy: bool = True,
     is_test: bool = False,
     save_db: bool = True,
-    save_audio: bool = False
+    save_audio: bool = False,
+    dispatch_id: str = None
 ) -> dict:
     """Processes a full dispatch audio buffer synchronously (single-phase / simulation mode)."""
     import uuid
     import time
-    dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
+    if not dispatch_id:
+        dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
     units_vocab = units_vocab or UNITS_VOCABULARY
     logging.info(f"--- STARTING SIMULATED / FULL DISPATCH PROCESSING (ID: {dispatch_id}, is_test={is_test}) ---")
     

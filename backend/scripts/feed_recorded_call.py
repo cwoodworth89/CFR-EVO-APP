@@ -70,6 +70,12 @@ def main():
         help="Re-save audio to public recordings folder (default False to avoid re-recording duplicate files)"
     )
     parser.add_argument(
+        "--dispatch-id",
+        dest="dispatch_id",
+        default=None,
+        help="Use specific dispatch_id instead of generating a random UUID (updates existing records via upsert)"
+    )
+    parser.add_argument(
         "--production",
         dest="is_test",
         action="store_false",
@@ -116,6 +122,8 @@ def main():
     validator = get_shared_validator()
     
     mode_desc = f"Full System Test (MQTT: {'ON' if args.send_mqtt else 'OFF'}, Phones Ntfy: {'ON' if args.send_ntfy else 'OFF'}, DB: {'ON' if args.save_db else 'OFF'}, Audio Re-record: {'ON' if args.save_audio else 'OFF'}, *TEST* Prefix: {'ON' if args.is_test else 'OFF (PRODUCTION)'})"
+    if args.dispatch_id:
+        mode_desc += f" [Custom ID: {args.dispatch_id}]"
     print(f"Feeding audio array ({len(audio_data)} samples) into pipeline | Mode: {mode_desc}...")
     
     # Wrap in a list so np.concatenate works as expected inside process_full_dispatch
@@ -128,7 +136,8 @@ def main():
         send_ntfy=args.send_ntfy,
         is_test=args.is_test,
         save_db=args.save_db,
-        save_audio=args.save_audio
+        save_audio=args.save_audio,
+        dispatch_id=args.dispatch_id
     )
     print("Finished feeding call to pipeline.")
 

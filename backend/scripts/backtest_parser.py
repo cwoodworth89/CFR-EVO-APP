@@ -15,9 +15,9 @@ from cfr_dispatch.parser import parse_dispatch_announcement, split_rounds, abbre
 from cfr_dispatch.destructive_parser import parse_destructive
 from cfr_dispatch.config import UNITS_VOCABULARY
 
-def load_credentials() -> tuple[str, str]:
-    url, key = None, None
+def load_local_api_url() -> str:
     env_path = os.path.join(backend_dir, ".env")
+    local_url = "http://localhost:8000"
     if os.path.exists(env_path):
         with open(env_path, "r") as f:
             for line in f:
@@ -26,25 +26,23 @@ def load_credentials() -> tuple[str, str]:
                     continue
                 if "=" in line:
                     k, v = line.split("=", 1)
-                    if k.strip() == "SUPABASE_URL":
-                        url = v.strip()
-                    elif k.strip() == "SUPABASE_SERVICE_ROLE_KEY":
-                        key = v.strip()
-    return url, key
+                    if k.strip() == "LOCAL_API_URL":
+                        local_url = v.strip().rstrip("/")
+    return local_url
 
-def fetch_verified_calls(url: str, key: str) -> List[Dict[str, Any]]:
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json"
-    }
-    # Query all verified calls
-    endpoint = f"{url.rstrip('/')}/rest/v1/live_calls?feedback_submitted=eq.true&order=timestamp.desc"
-    res = requests.get(endpoint, headers=headers)
-    if res.status_code == 200:
-        return res.json()
-    else:
-        print(f"Error fetching calls: {res.status_code} {res.text}")
+def fetch_verified_calls(local_api_url: str) -> List[Dict[str, Any]]:
+    # Query all calls and filter verified ones
+    endpoint = f"{local_api_url}/api/dispatches?limit=1000"
+    try:
+        res = requests.get(endpoint, timeout=15)
+        if res.status_code == 200:
+            all_calls = res.json()
+            return [c for c in all_calls if c.get("feedback_submitted")]
+        else:
+            print(f"Error fetching calls: {res.status_code} {res.text}")
+            return []
+    except Exception as e:
+        print(f"Failed to connect to local API: {e}")
         return []
 
 def normalize_street_suffixes(s: str) -> str:
@@ -103,14 +101,10 @@ def parse_units_to_set(units_val: Any) -> set:
     return set()
 
 def main():
-    url, key = load_credentials()
-    if not url or not key:
-        print("Error: Supabase URL or Service Role Key missing from backend/.env")
-        sys.exit(1)
-
-    calls = fetch_verified_calls(url, key)
+    local_url = load_local_api_url()
+    calls = fetch_verified_calls(local_url)
     if not calls:
-        print("No human-verified calls found in database to evaluate.")
+        print("No human-verified calls found in local database to evaluate.")
         return
 
     print(f"Loaded {len(calls)} human-verified dispatches for comparative backtesting.\n")

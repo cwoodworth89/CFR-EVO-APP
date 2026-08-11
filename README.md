@@ -149,13 +149,7 @@ sequenceDiagram
 docker compose up -d
 ```
 
-### 2. Import & Preserve Historical Data
-```bash
-# Run smart migration script (checks local audio files first, downloads missing audio, and populates local Postgres)
-python backend/scripts/migrate_supabase_to_local.py
-```
-
-### 3. Launch Frontend Kiosks (Halls 1 to 4)
+### 2. Launch Frontend Kiosks (Halls 1 to 4)
 Before building or running the frontend, configure the specific hall identifier for this kiosk display:
 1. Create or edit a local environment file `frontend/.env.local` (which is git-ignored and device-specific).
 2. Set the default station hall (1, 2, 3, or 4):

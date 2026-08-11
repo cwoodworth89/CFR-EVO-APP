@@ -31,4 +31,4 @@ All information collected, geocoded, and displayed by this application consists 
 
 ## 3. Data Storage & Transmission
 
-All parsed call details are transmitted securely to a dedicated database instance (Supabase) and are used solely to populate the incident mapping screens at the stations. The database holds no records of who is in the room, ambient audio, or off-duty personnel conversations.
+All parsed call details are transmitted securely to a dedicated local database instance (PostgreSQL) and are used solely to populate the incident mapping screens at the stations. The database holds no records of who is in the room, ambient audio, or off-duty personnel conversations.

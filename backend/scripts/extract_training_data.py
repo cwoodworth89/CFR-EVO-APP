@@ -169,12 +169,13 @@ def main():
         # Download audio if not cached locally
         if audio_url and not os.path.exists(local_path):
             download_url = audio_url
-            if "/object/public/" in audio_url:
-                download_url = audio_url.replace("/object/public/", "/object/authenticated/")
+            # If URL is a relative path, prepends the local API url
+            if download_url.startswith("/"):
+                download_url = f"{local_api_url}{download_url}"
                 
             logging.info(f"Downloading audio for {dispatch_id} from {download_url}...")
             try:
-                audio_response = requests.get(download_url, headers=headers, timeout=20)
+                audio_response = requests.get(download_url, timeout=20)
                 audio_response.raise_for_status()
                 with open(local_path, "wb") as f:
                     f.write(audio_response.content)
@@ -216,17 +217,13 @@ def main():
     synced_ids = [r.get("dispatch_id") for r in records if r.get("dispatch_id")]
     if synced_ids:
         logging.info(f"Updating model_updated status for {len(synced_ids)} calls in database...")
-        chunk_size = 50
-        for i in range(0, len(synced_ids), chunk_size):
-            chunk = synced_ids[i:i+chunk_size]
-            id_filter = ",".join(f"{id_val}" for id_val in chunk)
-            patch_url = f"{supabase_url.rstrip('/')}/rest/v1/live_calls?dispatch_id=in.({id_filter})"
+        for id_val in synced_ids:
+            patch_url = f"{local_api_url}/api/dispatches/{id_val}"
             try:
-                patch_response = requests.patch(patch_url, headers=headers, json={"model_updated": True})
+                patch_response = requests.patch(patch_url, json={"model_updated": True}, timeout=10)
                 patch_response.raise_for_status()
-                logging.info(f"  Successfully marked chunk of {len(chunk)} dispatches as synced.")
             except Exception as e:
-                logging.warning(f"  Failed to update model_updated flag for chunk: {e}")
+                logging.warning(f"  Failed to update model_updated flag for dispatch {id_val}: {e}")
 
     logging.info(f"SUCCESS: Dataset sync complete. {len(csv_rows)} rows cached. {downloaded_count} new WAV files downloaded.")
 

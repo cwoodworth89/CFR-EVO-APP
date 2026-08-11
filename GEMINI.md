@@ -40,10 +40,15 @@ To prevent duplicate work, reduce AI token usage (saving credit spending), and g
 2. **Consult the Master Index**:
    * **`dispatch-pipeline-ops`**: Core 2-phase audio processing pipeline architecture.
    * **`e2e-dispatch-testing`**: Live simulation guides, QA tests, and database purge rules.
-   * **`performance-metrics-analytics`**: Word Error Rate metrics and Turnout KPI dashboard details.
-   * **`gis-spatial-analysis` / `gis-pipeline-sync`**: Shapefile bounds, coordinates, and open-data feeds.
+   * **`local-stack-orchestrator`**: Docker Compose local container stack (PostgreSQL, MQTT, FastAPI) control.
+   * **`emergency-routing-engine`**: Apparatus-aware pathfinding and route biasing logic.
+   * **`stt-mlops-backtest`** / **`hitl-log-analysis`**: Word Error Rate metrics, Whisper STT regressions, and parsing corrections.
+   * **`gis-spatial-analysis`** / **`gis-pipeline-sync`**: Shapefile bounds geocoding, parcel layers, and ESRI updates.
    * **`road-closure-management`**: Ingestion, hazard mapping, and dynamic routing updates.
-   * **`kiosk-remote-ops` / `kiosk-ui-audit`**: Kiosk screen deployment, restarts, and display testing.
+   * **`kiosk-remote-ops`** / **`kiosk-ui-audit`**: Kiosk screen builds, daemon restarts, and display testing.
+   * **`kiosk-responsive-ergonomics`**: CSS/UI ergonomic layout rules for kiosks.
+   * **`google-imagery-streetview`**: Orienting aerial maps and panorama street-view renders.
+   * **`performance-metrics-analytics`**: Latency profiling and management KPI telemetry.
 3. **Use Specialized Sub-agents**: Delegate relevant sub-tasks to the pre-configured sub-agents:
    * **`call-review-analyst`** (Auditing, HITL logs, parser regressions)
    * **`dispatch-qa-engineer`** (End-to-end simulation pipelines, teardown scripts)

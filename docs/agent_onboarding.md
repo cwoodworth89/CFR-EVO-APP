@@ -58,23 +58,23 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 
 Please refer to the following documents for comprehensive domain-specific blueprints:
 
-| Document | Target Location | Scope |
-| :--- | :--- | :--- |
-| **Project Overview** | [README.md](../README.md) | High-level system structure, mermaid workflow schemas, and 2-phase pipelines. |
-| **Local DB Setup** | [docs/local_database_setup.md](./local_database_setup.md) | Containerized PostgreSQL 16 schema, FastAPI gateway REST routes, and Mosquitto MQTT sync. |
-| **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./docs/ntfy_server_access_and_qr_spec.md) | Ntfy push server access, HTTP vs HTTPS rules, monthly salt spec, and QR deep link payloads. |
-| **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./docs/public_domain_and_ssl_migration.md) | Blueprint for Nginx SSL reverse proxy, Let's Encrypt certificates, and public domain routing. |
-| **Call Structure** | [docs/call_structure.md](./docs/call_structure.md) | Dispatch speech templates, regex parsing splits, and phonetic correction matrices. |
-| **Supabase Setup** | [docs/supabase_setup.md](./docs/supabase_setup.md) | Legacy cloud database contracts and migration fallback procedures. |
-| **GIS Endpoints** | [docs/gis_endpoints.md](./docs/gis_endpoints.md) | Coquitlam ArcGIS MapServer layers list, and local Dynamic Viewport mock blueprints. |
-| **Test Matrix** | [docs/test_procedures.md](./docs/test_procedures.md) | Step-by-step diagnostic workflows for tone SPOT tests, database inserts, and mic levels. |
-| **Hardware Spec** | [docs/hardware_specification.md](./docs/hardware_specification.md) | Physical setup configs (Pi soundcards, Nginx server blocks, and x86 laptop kiosks). |
-| **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./docs/laptop_kiosk_setup.md) | Detailed installation tutorial for headless Ubuntu kiosk displays and auto-updates. |
-| **Milestones** | [docs/milestones.md](./docs/milestones.md) | Development roadmap tracking completed steps and target release items. |
-| **Privacy Compliance** | [docs/privacy.md](./docs/privacy.md) | Voice monitoring rules, local RAM buffering specs, and FOI compliant data policies. |
-| **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Structural refactoring details of decoupling the monolith into microservices. |
-| **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant overlay integration and NFPA 291 vector markers mapping. |
-| **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | Full migration audit, PostgreSQL index tuning, Ntfy container setup, and DSP tone spotter calibration. |
+| Document | Target Location | Scope | Active Agent Skill |
+| :--- | :--- | :--- | :--- |
+| **Project Overview** | [README.md](../README.md) | High-level system structure and two-phase pipelines. | `dispatch-pipeline-ops` |
+| **Local DB Setup** | [docs/local_database_setup.md](./local_database_setup.md) | Containerized PostgreSQL 16 schema, FastAPI routes. | `local-stack-orchestrator` |
+| **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./docs/ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
+| **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./docs/public_domain_and_ssl_migration.md) | Nginx reverse proxy and SSL certs. | None |
+| **Call Structure** | [docs/call_structure.md](./docs/call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
+| **Supabase Setup** | [docs/supabase_setup.md](./docs/supabase_setup.md) | Legacy database contracts and migrations. | `stt-mlops-backtest` |
+| **GIS Endpoints** | [docs/gis_endpoints.md](./docs/gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
+| **Test Matrix** | [docs/test_procedures.md](./docs/test_procedures.md) | Tone spot checks, database inserts, mic levels. | `e2e-dispatch-testing` |
+| **Hardware Spec** | [docs/hardware_specification.md](./docs/hardware_specification.md) | Pi soundcards and laptop kiosk hardware. | None |
+| **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./docs/laptop_kiosk_setup.md) | Kiosk displays and auto-updates. | `kiosk-remote-ops` |
+| **Milestones** | [docs/milestones.md](./docs/milestones.md) | Development roadmap and releases. | None |
+| **Privacy Compliance** | [docs/privacy.md](./docs/privacy.md) | Voice monitoring rules and local RAM buffer. | None |
+| **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Decoupling monolith into microservices. | None |
+| **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant mapping. | `gis-pipeline-sync` |
+| **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | PostgreSQL index tuning and DSP calibration. | `performance-metrics-analytics` |
 
 ---
 

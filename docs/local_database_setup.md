@@ -2,6 +2,9 @@
 
 This document outlines the containerized database schema, API gateway endpoints, and real-time MQTT settings required to run **CFR EVO** on a **Station Server / Raspberry Pi** without external cloud dependencies.
 
+> [!TIP]
+> **AI Agent Workflows**: To manage the local container orchestration, check the [`local-stack-orchestrator`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/local-stack-orchestrator/SKILL.md) skill. Agents can query the database directly using the **`cfr-postgres`** MCP server and check container health/logs using the **`cfr-docker`** MCP server.
+
 ---
 
 ## 📊 Container Stack Architecture

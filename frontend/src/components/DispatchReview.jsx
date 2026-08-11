@@ -256,22 +256,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
         const displayUnits = selectedCall.verified_units || [];
         setVerifiedUnits(displayUnits.join(', '));
         
-        const rawTonesStr = selectedCall.target?.tone_name;
-        let initialTones = [];
-        if (rawTonesStr) {
-          initialTones = rawTonesStr.split(',')
-            .map(t => {
-              const clean = t.trim().toLowerCase();
-              if (clean.includes('chief')) return 'chief';
-              if (clean.includes('engine')) return 'engine';
-              if (clean.includes('rescue')) return 'rescue';
-              return clean;
-            })
-            .filter(Boolean);
-        } else {
-          const checkUnits = selectedCall.responding_units || [];
-          initialTones = deriveTonesFromUnitsList(checkUnits);
-        }
+        const initialTones = getCallTones(selectedCall);
         setVerifiedTones(initialTones);
         
         setSuccessMsg('');

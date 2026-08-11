@@ -32,3 +32,21 @@ The station kiosk is accessible over Tailscale SSH (`tcfire@100.95.146.94`, host
    ```
 5. **Git-Ignored Files**: Files in `.gitignore` (e.g. `backend/.env`, `frontend/.env.local`, model caches in `backend/models/`, shapefiles in `backend/data/`) are not synced via git and must be transferred manually via `scp` when updated.
 
+---
+
+## 4. Mandatory Agent Skill & Sub-agent Search Protocol
+To prevent duplicate work, reduce AI token usage (saving credit spending), and guarantee standard workflows:
+1. **Check Local Skills First**: Before drafting implementation plans or performing developer tasks, the agent MUST search and read the corresponding `SKILL.md` in the local [**`.agents/skills/`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills) directory.
+2. **Consult the Master Index**:
+   * **`dispatch-pipeline-ops`**: Core 2-phase audio processing pipeline architecture.
+   * **`e2e-dispatch-testing`**: Live simulation guides, QA tests, and database purge rules.
+   * **`performance-metrics-analytics`**: Word Error Rate metrics and Turnout KPI dashboard details.
+   * **`gis-spatial-analysis` / `gis-pipeline-sync`**: Shapefile bounds, coordinates, and open-data feeds.
+   * **`road-closure-management`**: Ingestion, hazard mapping, and dynamic routing updates.
+   * **`kiosk-remote-ops` / `kiosk-ui-audit`**: Kiosk screen deployment, restarts, and display testing.
+3. **Use Specialized Sub-agents**: Delegate relevant sub-tasks to the pre-configured sub-agents:
+   * **`call-review-analyst`** (Auditing, HITL logs, parser regressions)
+   * **`dispatch-qa-engineer`** (End-to-end simulation pipelines, teardown scripts)
+   * **`performance-metrics-analyst`** (Dashboard metrics and latency stats)
+4. **Learn & Persist**: Propose updating rules in `GEMINI.md` or creating new custom skills in `.agents/skills/` when introducing recurring developer workflows.
+

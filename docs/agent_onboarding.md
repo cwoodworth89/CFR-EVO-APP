@@ -88,6 +88,36 @@ The remote station kiosk machine is connected to this development host via **Tai
 * **Tailscale IP**: `100.95.146.94`
 * **Username**: `tcfire`
 
+### 💻 SSH Config Shortcuts (Dev Laptop Alignment)
+To connect using simple shortcuts, add the following to your development machine's `~/.ssh/config` (or `C:\Users\Curtis\.ssh\config` on Windows):
+
+```text
+# --- Kiosk / Dispatch Display ---
+Host tcfire-dispatch
+    HostName cfr-mapping-tcfh.otter-sailfin.ts.net
+    User tcfire
+
+# --- Local & VPN NAS Shortcut (with automatic failover) ---
+# 1. Use local physical IP if connected locally on network (pingable)
+Match Host nas Exec "ping -n 1 -w 100 10.10.20.5"
+    HostName 10.10.20.5
+    User admin
+
+# 2. Otherwise, fall back to Tailscale DNS domain
+Host nas
+    HostName nas.otter-sailfin.ts.net
+    User admin
+```
+
+With this, future agents and developers can execute SSH commands using simple aliases:
+* `ssh tcfire-dispatch`
+* `ssh nas`
+
+Additionally, you can map the local IP address permanently to hosts file on Windows (`C:\Windows\System32\drivers\etc\hosts`) to get `\\nas` sharing work locally:
+```text
+10.10.20.5  nas
+```
+
 ### 🔄 Git & Remote Programming Workflow (CRITICAL)
 To maintain code sanity and avoid divergence between development and production, follow this workflow:
 1. **Local Edits**: Make all permanent code, configuration, or documentation changes in the local git repository workspace first. **Do not modify production code files directly on the remote kiosk.**

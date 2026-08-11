@@ -150,6 +150,7 @@ def sanitize_transcript(text: str) -> str:
         r'\bgaidens\s+burry\b': 'gatensbury',
         r'\bgateonsbury\b': 'gatensbury',
         r'\bgaitensbury\b': 'gatensbury',
+        r'\bgatiensbury\b': 'gatensbury',
         r'\bdancing\s+(ave|avenue)\b': r'dancy \1',
         r'\bdayani\s+springs\b': 'dayanee springs',
         r'\bdeyani\s+springs\b': 'dayanee springs',

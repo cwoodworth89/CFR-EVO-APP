@@ -132,15 +132,29 @@ export function FireZonesLayer({ visible, pane }) {
     return null;
 }
 
+// Helper distance function (Haversine formula in meters)
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity;
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // 💧 NEW: WATER HYDRANTS GIS LAYER
-export function HydrantsLayer({ visible }) {
+export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
     const map = useMap();
     const [zoom, setZoom] = React.useState(map.getZoom());
     const [hydrants, setHydrants] = React.useState([]);
     const [allHydrants, setAllHydrants] = React.useState([]);
     const [boundsTick, setBoundsTick] = React.useState(0);
 
-    // Track map zoom and movements (firing state update on move, moveend & zoomend)
+    // Track map zoom and movements
     React.useEffect(() => {
       if (!visible) return;
 
@@ -153,7 +167,6 @@ export function HydrantsLayer({ visible }) {
       map.on('moveend', handleMapChange);
       map.on('move', handleMapChange);
       
-      // Initialize
       handleMapChange();
 
       return () => {
@@ -183,13 +196,13 @@ export function HydrantsLayer({ visible }) {
 
     // Filter local hydrants in-memory with 25% viewport buffer padding
     React.useEffect(() => {
-      if (!visible || zoom < 16 || allHydrants.length === 0) {
+      const activeMinZoom = targetCoords ? minZoom : 16;
+      if (!visible || zoom < activeMinZoom || allHydrants.length === 0) {
         setHydrants([]);
         return;
       }
 
       const bounds = map.getBounds();
-      // Add 25% padding buffer around viewport so hydrants render seamlessly as user pans!
       const padLat = (bounds.getNorth() - bounds.getSouth()) * 0.25;
       const padLng = (bounds.getEast() - bounds.getWest()) * 0.25;
 
@@ -198,13 +211,11 @@ export function HydrantsLayer({ visible }) {
       const minLat = bounds.getSouth() - padLat;
       const maxLat = bounds.getNorth() + padLat;
 
-      // Filter hydrants in padded viewport bounds
       const filtered = allHydrants.filter(h => 
         h.lng >= minLng && h.lng <= maxLng &&
         h.lat >= minLat && h.lat <= maxLat
       );
 
-      // Map back to format expected by rendering code: { geometry: {x,y}, attributes: {OBJECTID,gis_id,status,flow_class} }
       const formatted = filtered.map(h => ({
         geometry: { x: h.lng, y: h.lat },
         attributes: {
@@ -216,41 +227,62 @@ export function HydrantsLayer({ visible }) {
       }));
 
       setHydrants(formatted);
-    }, [visible, zoom, map, boundsTick, allHydrants]);
+    }, [visible, zoom, map, boundsTick, allHydrants, targetCoords, minZoom]);
 
-    // Custom Icon styling to highlight details and flow ratings in a premium dot-and-ring aesthetic
+    // Calculate nearest City Hydrant & nearest Private Hydrant to targetCoords
+    const { nearestCity, nearestPrivate } = React.useMemo(() => {
+      if (!targetCoords || !Array.isArray(targetCoords) || targetCoords.length < 2 || allHydrants.length === 0) {
+        return { nearestCity: null, nearestPrivate: null };
+      }
+      const [tLat, tLng] = targetCoords;
+      let cBest = null;
+      let cMin = Infinity;
+      let pBest = null;
+      let pMin = Infinity;
+
+      for (const h of allHydrants) {
+        const d = getDistanceMeters(tLat, tLng, h.lat, h.lng);
+        const st = (h.status || '').toUpperCase();
+        if (st === 'PRIVATE') {
+          if (d < pMin && d <= 400) {
+            pMin = d;
+            pBest = { ...h, distMeters: Math.round(d) };
+          }
+        } else if (st !== 'ABANDONED' && st !== 'OUT_OF_SERVICE' && st !== 'INACTIVE') {
+          if (d < cMin && d <= 800) {
+            cMin = d;
+            cBest = { ...h, distMeters: Math.round(d) };
+          }
+        }
+      }
+      return { nearestCity: cBest, nearestPrivate: pBest };
+    }, [targetCoords, allHydrants]);
+
+    // Custom Icon styling
     const getHydrantIcon = (status, flowClass) => {
-      let bgColor = 'rgba(15, 23, 42, 0.6)'; // dark fill inside the ring
-      let borderColor = '#facc15'; // default yellow
+      let bgColor = 'rgba(15, 23, 42, 0.6)';
+      let borderColor = '#facc15';
       let borderStyle = '2px solid';
       let opacity = '1.0';
-      
       let isSpecial = false;
       let emoji = '';
 
       if (status === 'PRIVATE') {
-        borderColor = '#f59e0b'; // Amber
+        borderColor = '#f59e0b';
         isSpecial = true;
         emoji = '🔒';
       } else if (status === 'ABANDONED' || status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
-        borderColor = '#ef4444'; // Red
+        borderColor = '#ef4444';
         isSpecial = true;
         emoji = '⚠️';
         opacity = '0.9';
       } else {
-        // NFPA 291 Color code by flow class rating
         const fc = (flowClass || "").toUpperCase();
-        if (fc === 'AA') {
-          borderColor = '#38bdf8'; // Sky Blue
-        } else if (fc === 'A') {
-          borderColor = '#4ade80'; // Green
-        } else if (fc === 'B') {
-          borderColor = '#fb923c'; // Orange
-        } else if (fc === 'C') {
-          borderColor = '#f87171'; // Red
-        } else {
-          borderColor = '#facc15'; // Yellow
-        }
+        if (fc === 'AA') borderColor = '#38bdf8';
+        else if (fc === 'A') borderColor = '#4ade80';
+        else if (fc === 'B') borderColor = '#fb923c';
+        else if (fc === 'C') borderColor = '#f87171';
+        else borderColor = '#facc15';
       }
 
       const iconHtml = isSpecial ? `
@@ -291,7 +323,6 @@ export function HydrantsLayer({ visible }) {
         </div>
       `;
 
-      // High-contrast rating label (e.g. AA) in white
       const ratingHtml = flowClass ? `
         <div style="
           font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, sans-serif;
@@ -305,7 +336,6 @@ export function HydrantsLayer({ visible }) {
         ">${flowClass}</div>
       ` : '';
 
-      // Combined vertical stack label block (Only displaying rating under icon per user request)
       const labelHtml = ratingHtml ? `
         <div style="
           display: flex; 
@@ -331,10 +361,58 @@ export function HydrantsLayer({ visible }) {
             ${labelHtml}
           </div>
         `,
-        // Covers vertical height of circle (20px) + margin/text (~20px) = 40px
         iconSize: [24, 40],
-        iconAnchor: [12, 10], // Centered horizontally (12) and vertically in the circle (10)
+        iconAnchor: [12, 10],
         popupAnchor: [0, -10]
+      });
+    };
+
+    // Tactical Highlight Icons for Nearest City & Private Hydrants
+    const createTacticalHighlightIcon = (isPrivate, gisId, flowClass, distMeters) => {
+      const mainColor = isPrivate ? '#f59e0b' : '#00e5ff';
+      const badgeTitle = isPrivate ? '🔒 PRIVATE HYDRANT' : '💧 CITY HYDRANT';
+      const badgeBg = isPrivate ? 'rgba(245, 158, 11, 0.95)' : 'rgba(2, 132, 199, 0.95)';
+
+      return L.divIcon({
+        className: 'custom-tactical-hydrant-highlight',
+        html: `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+            <div style="
+              width: 32px;
+              height: 32px;
+              border: 3px solid ${mainColor};
+              border-radius: 50%;
+              background: rgba(15, 23, 42, 0.85);
+              box-shadow: 0 0 15px ${mainColor}, inset 0 0 10px ${mainColor};
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 14px;
+              animation: pulse 2s infinite;
+            ">
+              ${isPrivate ? '🔒' : '💧'}
+            </div>
+            <div style="
+              background: ${badgeBg};
+              color: #ffffff;
+              font-family: monospace, sans-serif;
+              font-size: 9px;
+              font-weight: 900;
+              padding: 2px 6px;
+              border-radius: 6px;
+              border: 1px solid rgba(255,255,255,0.4);
+              box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+              white-space: nowrap;
+              margin-top: 3px;
+              letter-spacing: 0.5px;
+            ">
+              ${badgeTitle} (${gisId}) • ${distMeters}m ${flowClass ? '• ' + flowClass : ''}
+            </div>
+          </div>
+        `,
+        iconSize: [180, 55],
+        iconAnchor: [90, 16],
+        popupAnchor: [0, -16]
       });
     };
 
@@ -342,9 +420,60 @@ export function HydrantsLayer({ visible }) {
 
     if (!visible) return null;
 
+    const activeMinZoom = targetCoords ? minZoom : 16;
+
     return (
       <>
-        {zoom >= 16 && hydrants.map((h, i) => {
+        {/* Render Highlighted Nearest City Hydrant */}
+        {nearestCity && (
+          <Marker
+            position={[nearestCity.lat, nearestCity.lng]}
+            icon={createTacticalHighlightIcon(false, nearestCity.gisId, nearestCity.flowClass, nearestCity.distMeters)}
+            zIndexOffset={1000}
+          >
+            <Popup className="hydrant-popup">
+              <div className="bg-slate-950 text-white p-3 border border-sky-500 rounded-xl shadow-2xl" style={{ minWidth: '200px' }}>
+                <span className="text-[9px] text-sky-400 font-mono font-black uppercase tracking-wider">💧 NEAREST CITY MUNICIPAL HYDRANT</span>
+                <h3 className="font-bold text-sm text-white mt-1">ID: {nearestCity.gisId}</h3>
+                <div className="mt-2 pt-2 border-t border-slate-800 flex justify-between text-xs font-mono">
+                  <span className="text-slate-400">Distance to Pin</span>
+                  <span className="text-emerald-400 font-bold">{nearestCity.distMeters} meters</span>
+                </div>
+                <div className="mt-1 flex justify-between text-xs font-mono">
+                  <span className="text-slate-400">NFPA 291 Rating</span>
+                  <span className="text-sky-300 font-bold">Class {nearestCity.flowClass || 'AA'}</span>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Render Highlighted Nearest Private Hydrant */}
+        {nearestPrivate && (
+          <Marker
+            position={[nearestPrivate.lat, nearestPrivate.lng]}
+            icon={createTacticalHighlightIcon(true, nearestPrivate.gisId, nearestPrivate.flowClass, nearestPrivate.distMeters)}
+            zIndexOffset={999}
+          >
+            <Popup className="hydrant-popup">
+              <div className="bg-slate-950 text-white p-3 border border-amber-500 rounded-xl shadow-2xl" style={{ minWidth: '200px' }}>
+                <span className="text-[9px] text-amber-400 font-mono font-black uppercase tracking-wider">🔒 NEARBY PRIVATE PROPERTY HYDRANT</span>
+                <h3 className="font-bold text-sm text-white mt-1">ID: {nearestPrivate.gisId}</h3>
+                <div className="mt-2 pt-2 border-t border-slate-800 flex justify-between text-xs font-mono">
+                  <span className="text-slate-400">Distance to Pin</span>
+                  <span className="text-amber-400 font-bold">{nearestPrivate.distMeters} meters</span>
+                </div>
+                <div className="mt-1 flex justify-between text-xs font-mono">
+                  <span className="text-slate-400">Access Status</span>
+                  <span className="text-amber-300 font-bold">PRIVATE</span>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Viewport Hydrants */}
+        {zoom >= activeMinZoom && hydrants.map((h, i) => {
           if (!h.geometry || h.geometry.x === undefined || h.geometry.y === undefined) return null;
           const coords = [h.geometry.y, h.geometry.x];
           const statusVal = (h.attributes.status || "").toUpperCase();

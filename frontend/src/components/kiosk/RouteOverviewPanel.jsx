@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
-import { CoquitlamOverlays, StationsLayer } from '../MapLayers';
+import { CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
@@ -150,6 +150,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
         {/* Station Halls Layer */}
         <StationsLayer visible={true} />
+
+        {/* 💧 Hydrants Layer on Main Route Overview with Nearest City & Private Hydrant Highlighting */}
+        <HydrantsLayer visible={true} targetCoords={[destLat, destLng]} minZoom={12} />
 
         {/* Live OSRM Emergency Response Routing Overlay */}
         <RoutingOverlay

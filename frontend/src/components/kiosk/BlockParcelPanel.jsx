@@ -67,7 +67,7 @@ export default function BlockParcelPanel({ activeCall }) {
 
       <CoquitlamOverlays visible={true} />
 
-      <HydrantsLayer visible={true} mode="EXPLORE" zoom={16.5} />
+      <HydrantsLayer visible={true} targetCoords={[destLat, destLng]} minZoom={14} />
 
       {polygonPositions && (
         <Polygon positions={polygonPositions} pathOptions={{ color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.4, weight: 3 }} />

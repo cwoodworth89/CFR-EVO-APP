@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
@@ -6,11 +6,22 @@ import { CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
-function AutoFitBounds({ origin, destination, userPanned }) {
+function AutoFitBounds({ origin, destination, userPanned, callKey }) {
   const map = useMap();
+  const lastKeyRef = useRef(null);
 
   useEffect(() => {
-    if (!map || !origin || !destination || userPanned) return;
+    if (!map || !origin || !destination) return;
+
+    const currentKey = callKey || `${destination.lat},${destination.lng}`;
+    const callChanged = lastKeyRef.current !== currentKey;
+    if (callChanged) {
+      lastKeyRef.current = currentKey;
+    }
+
+    // Don't auto-fit if user manually panned on the SAME call, but ALWAYS auto-fit when active call changes!
+    if (userPanned && !callChanged) return;
+
     const bounds = L.latLngBounds(
       [origin.lat, origin.lng],
       [destination.lat, destination.lng]
@@ -31,7 +42,7 @@ function AutoFitBounds({ origin, destination, userPanned }) {
       maxZoom: 17,
       animate: true
     });
-  }, [map, origin, destination, userPanned]);
+  }, [map, origin, destination, userPanned, callKey]);
 
   return null;
 }
@@ -68,6 +79,13 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const [routeInfo, setRouteInfo] = useState(null);
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
+
+  const callKey = activeCall?.dispatch_id || activeCall?.id || (activeCall?.address ? activeCall.address : `${destLat},${destLng}`);
+
+  // Automatically reset userPanned whenever the active call changes so new dispatches auto-center
+  useEffect(() => {
+    setUserPanned(false);
+  }, [callKey]);
 
   const handleRouteCalculated = (coordinates) => {
     if (coordinates && coordinates.length > 0) {
@@ -165,7 +183,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           <Popup>Target Destination: {activeCall?.address}</Popup>
         </Marker>
 
-        <AutoFitBounds origin={origin} destination={destination} userPanned={userPanned} />
+        <AutoFitBounds origin={origin} destination={destination} userPanned={userPanned} callKey={callKey} />
       </MapContainer>
     </div>
   );

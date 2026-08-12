@@ -80,3 +80,8 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Objective**: Filter push notifications dynamically.
 *   **Implementation**: Build a mobile-friendly onboarding interface where firefighters can subscribe their devices to a specific apparatus (e.g., E1, L1, or R1) on shift startup, receiving alerts only when their assigned vehicle is dispatched.
 
+### 📍 Milestone 12: Call Pin Mode (Incident Map Analytics)
+*   **Objective**: Visualize historical dispatch distribution and spatial call density across Coquitlam.
+*   **Implementation**: Add an interactive map mode with timeframe filters (`Last 24 Hours`, `Last 7 Days`, `Last 30 Days`, `Last 365 Days`) and color-coded incident category pins (`Medical`, `Alarms`, `MVA`, `Chief Tone Calls`, `Other`).
+
+

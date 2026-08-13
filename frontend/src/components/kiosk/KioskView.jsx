@@ -182,22 +182,30 @@ export default function KioskView({ kioskState }) {
     String(activeCall.priority_code).toLowerCase() === 'emergency' ||
     String(activeCall.response_type).toLowerCase() === 'emergency';
 
-  // Parse responding units list (preserving exact order dispatched)
-  const rawUnits =
-    activeCall?.responding_units ||
-    activeCall?.units ||
-    activeCall?.verified_units ||
-    activeCall?.raw_units ||
-    activeCall?.target?.responding_units ||
-    activeCall?.target?.units ||
-    activeCall?.target?.verified_units ||
-    [];
+  // Parse responding units list (preserving exact order dispatched from database)
+  const extractCallUnits = (call) => {
+    if (!call) return [];
+    const candidates = [
+      call.verified_units,
+      call.responding_units,
+      call.units,
+      call.raw_units,
+      call.target?.verified_units,
+      call.target?.responding_units,
+      call.target?.units
+    ];
 
-  let unitList = Array.isArray(rawUnits)
-    ? rawUnits
-    : typeof rawUnits === 'string' && rawUnits.trim().length > 0
-    ? rawUnits.split(',').map((u) => u.trim()).filter(Boolean)
-    : [];
+    for (const cand of candidates) {
+      if (Array.isArray(cand) && cand.length > 0) return cand;
+      if (typeof cand === 'string' && cand.trim().length > 0) {
+        const parsed = cand.split(',').map((u) => u.trim()).filter(Boolean);
+        if (parsed.length > 0) return parsed;
+      }
+    }
+    return [];
+  };
+
+  let unitList = extractCallUnits(activeCall);
 
   if (unitList.length === 0) {
     const toneStr = (activeCall?.tone_name || activeCall?.target?.tone_name || '').toLowerCase();

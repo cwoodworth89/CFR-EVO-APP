@@ -535,6 +535,25 @@ class StreetViewOverrideSchema(BaseModel):
     pitch: float = 5.0
     fov: float = 80.0
 
+class ParcelCameraOverrideSchema(BaseModel):
+    gis_id: Optional[str] = None
+    clean_address: Optional[str] = None
+    heading: float = 0.0
+    pitch: float = 5.0
+    fov: float = 80.0
+    front_lat: Optional[float] = None
+    front_lng: Optional[float] = None
+
+class ParcelMetadataSchema(BaseModel):
+    gis_id: str
+    lock_box_notes: Optional[str] = None
+    hazard_notes: Optional[str] = None
+    pre_plan_pdf_url: Optional[str] = None
+    entrance_lat: Optional[float] = None
+    entrance_lng: Optional[float] = None
+    construction_type: Optional[str] = None
+    floor_count: Optional[int] = None
+
 
 def _clean_streetview_address(addr: str) -> str:
     if not addr:
@@ -552,6 +571,94 @@ def _clean_streetview_address(addr: str) -> str:
     s = re.sub(r'\bCRT?\b', 'CRT', s)
     s = re.sub(r'\bPL?\b', 'PL', s)
     return s.strip()
+
+
+@app.get("/api/parcels/lookup")
+def lookup_parcel(query: str, db: Session = Depends(get_db)):
+    clean_addr = _clean_streetview_address(query)
+    raw_upper = query.strip().upper()
+    p = db.query(ParcelModel).filter(
+        (ParcelModel.gis_id == query.strip()) |
+        (ParcelModel.clean_address == clean_addr) |
+        (ParcelModel.clean_address == raw_upper)
+    ).first()
+    if not p and clean_addr:
+        p = db.query(ParcelModel).filter(ParcelModel.clean_address.ilike(f"%{clean_addr}%")).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+    return {
+        "gis_id": p.gis_id,
+        "clean_address": p.clean_address,
+        "full_address": p.full_address,
+        "zone_id": p.zone_id,
+        "front_lat": p.front_lat,
+        "front_lng": p.front_lng,
+        "streetview_camera": {
+            "heading": p.streetview_heading,
+            "pitch": p.streetview_pitch,
+            "fov": p.streetview_fov
+        } if p.streetview_heading is not None else None,
+        "lock_box_notes": p.lock_box_notes,
+        "hazard_notes": p.hazard_notes,
+        "pre_plan_pdf_url": p.pre_plan_pdf_url,
+        "entrance_lat": p.entrance_lat,
+        "entrance_lng": p.entrance_lng,
+        "construction_type": p.construction_type,
+        "floor_count": p.floor_count
+    }
+
+
+@app.post("/api/parcels/streetview")
+def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = Depends(get_db)):
+    target_id = payload.gis_id or payload.clean_address
+    if not target_id:
+        raise HTTPException(status_code=400, detail="gis_id or clean_address required")
+    
+    clean_addr = _clean_streetview_address(target_id)
+    p = db.query(ParcelModel).filter(
+        (ParcelModel.gis_id == target_id) |
+        (ParcelModel.clean_address == clean_addr)
+    ).first()
+    
+    if not p:
+        p = ParcelModel(
+            gis_id=target_id,
+            clean_address=clean_addr,
+            front_lat=payload.front_lat,
+            front_lng=payload.front_lng
+        )
+        db.add(p)
+
+    p.streetview_heading = payload.heading
+    p.streetview_pitch = payload.pitch
+    p.streetview_fov = payload.fov
+    if payload.front_lat: p.front_lat = payload.front_lat
+    if payload.front_lng: p.front_lng = payload.front_lng
+
+    # Also update legacy table for backwards compatibility
+    legacy = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == clean_addr).first()
+    if not legacy:
+        legacy = StreetViewOverrideModel(
+            clean_address=clean_addr,
+            front_lat=payload.front_lat or 0.0,
+            front_lng=payload.front_lng or 0.0
+        )
+        db.add(legacy)
+    legacy.heading = payload.heading
+    legacy.pitch = payload.pitch
+    legacy.fov = payload.fov
+
+    db.commit()
+    db.refresh(p)
+    return {
+        "status": "success",
+        "gis_id": p.gis_id,
+        "streetview_camera": {
+            "heading": p.streetview_heading,
+            "pitch": p.streetview_pitch,
+            "fov": p.streetview_fov
+        }
+    }
 
 
 @app.get("/api/streetview-overrides")
@@ -573,6 +680,24 @@ def get_all_streetview_overrides(db: Session = Depends(get_db)):
 def get_streetview_override(address: str, db: Session = Depends(get_db)):
     clean_addr = _clean_streetview_address(address)
     raw_upper = address.strip().upper()
+
+    # Try ParcelModel first
+    p = db.query(ParcelModel).filter(
+        (ParcelModel.clean_address == clean_addr) |
+        (ParcelModel.clean_address == raw_upper)
+    ).first()
+
+    if p and p.streetview_heading is not None:
+        return {
+            "clean_address": p.clean_address or address,
+            "lat": p.front_lat or 0.0,
+            "lng": p.front_lng or 0.0,
+            "heading": p.streetview_heading,
+            "pitch": p.streetview_pitch,
+            "fov": p.streetview_fov
+        }
+
+    # Fallback to legacy StreetViewOverrideModel
     r = db.query(StreetViewOverrideModel).filter(
         (StreetViewOverrideModel.clean_address == clean_addr) |
         (StreetViewOverrideModel.clean_address == raw_upper)
@@ -595,32 +720,14 @@ def get_streetview_override(address: str, db: Session = Depends(get_db)):
 
 @app.post("/api/streetview-overrides")
 def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = Depends(get_db)):
-    clean_addr = payload.clean_address.strip().upper()
-    existing = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == clean_addr).first()
-    if existing:
-        existing.front_lat = payload.front_lat
-        existing.front_lng = payload.front_lng
-        existing.heading = payload.heading
-        existing.pitch = payload.pitch
-        existing.fov = payload.fov
-    else:
-        existing = StreetViewOverrideModel(
-            clean_address=clean_addr,
+    return save_parcel_streetview(
+        ParcelCameraOverrideSchema(
+            clean_address=payload.clean_address,
             front_lat=payload.front_lat,
             front_lng=payload.front_lng,
             heading=payload.heading,
             pitch=payload.pitch,
             fov=payload.fov
-        )
-        db.add(existing)
-    db.commit()
-    db.refresh(existing)
-    return {
-        "status": "success",
-        "clean_address": existing.clean_address,
-        "lat": existing.front_lat,
-        "lng": existing.front_lng,
-        "heading": existing.heading,
         "pitch": existing.pitch,
         "fov": existing.fov
     }

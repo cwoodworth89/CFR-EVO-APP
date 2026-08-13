@@ -3,12 +3,12 @@ import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-l
 import L from 'leaflet';
 import { HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
+import PrePlanModal from './PrePlanModal';
 
 function StableAutoCenterAndResize({ lat, lng, callKey }) {
   const map = useMap();
   const lastKeyRef = useRef(null);
 
-  // Only recenter when target call changes, preserving manual panning
   useEffect(() => {
     if (!map || lat == null || lng == null) return;
     const currentKey = callKey || `${lat.toFixed(5)},${lng.toFixed(5)}`;
@@ -40,6 +40,7 @@ const targetIcon = new L.Icon({
 
 export default function BlockParcelPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showPrePlan, setShowPrePlan] = useState(false);
 
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
@@ -85,9 +86,21 @@ export default function BlockParcelPanel({ activeCall }) {
     <>
       <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
         {/* Header Controls */}
-        <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-sky-400 flex items-center gap-1.5 shadow">
-          <span>📦</span>
-          <span>Cadastral Block & Hydrants</span>
+        <div className="absolute top-2 left-2 z-[1000] flex items-center gap-2">
+          <div className="bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-sky-400 flex items-center gap-1.5 shadow">
+            <span>📦</span>
+            <span>Cadastral Block & Hydrants</span>
+          </div>
+
+          {/* Pre-Incident Construction Plan Action Button */}
+          <button
+            onClick={() => setShowPrePlan(true)}
+            className="bg-sky-950/90 hover:bg-sky-900/90 text-sky-300 hover:text-white backdrop-blur px-2.5 py-1 rounded-lg border border-sky-800/80 text-[11px] font-mono font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
+            title="Open Pre-Incident Construction Plan PDF"
+          >
+            <span>📄</span>
+            <span>Pre-Plan</span>
+          </button>
         </div>
 
         <button
@@ -115,13 +128,24 @@ export default function BlockParcelPanel({ activeCall }) {
                 <p className="text-xs text-sky-400 font-mono">📍 {activeCall?.address || 'Target Location'}</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsExpanded(false)}
-              className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5"
-            >
-              <span>✕</span>
-              <span>CLOSE</span>
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPrePlan(true)}
+                className="bg-sky-950 hover:bg-sky-900 text-sky-300 hover:text-white font-mono font-bold text-xs px-3 py-2 rounded-lg border border-sky-800 transition shadow flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>📄</span>
+                <span>Pre-Incident Plan</span>
+              </button>
+
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>✕</span>
+                <span>CLOSE</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-2xl relative">
@@ -129,6 +153,15 @@ export default function BlockParcelPanel({ activeCall }) {
           </div>
         </div>
       )}
+
+      {/* Pre-Incident Construction Plan Modal */}
+      <PrePlanModal
+        isOpen={showPrePlan}
+        onClose={() => setShowPrePlan(false)}
+        pdfUrl={activeCall?.target?.pre_plan_pdf_url || activeCall?.pre_plan_pdf_url}
+        address={activeCall?.address}
+        gisId={activeCall?.target?.gis_id || activeCall?.gis_id}
+      />
     </>
   );
 }

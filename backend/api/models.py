@@ -94,7 +94,41 @@ class RoadClosureModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+class ParcelModel(Base):
+    __tablename__ = "parcels"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    gis_id = Column(String, unique=True, index=True, nullable=False)
+    clean_address = Column(String, index=True, nullable=True)
+    full_address = Column(String, nullable=True)
+    zone_id = Column(String(16), index=True, nullable=True)
+    
+    geometry = Column(SafeJSON, nullable=True)
+    front_lat = Column(Float, nullable=True)
+    front_lng = Column(Float, nullable=True)
+    centroid_lat = Column(Float, nullable=True)
+    centroid_lng = Column(Float, nullable=True)
+
+    # Preferred Street View Camera Angle
+    streetview_heading = Column(Float, nullable=True)
+    streetview_pitch = Column(Float, nullable=True)
+    streetview_fov = Column(Float, nullable=True)
+
+    # Coquitlam Tactical Property & Pre-Plan Metadata
+    lock_box_notes = Column(Text, nullable=True)
+    hazard_notes = Column(Text, nullable=True)
+    pre_plan_pdf_url = Column(Text, nullable=True)
+    entrance_lat = Column(Float, nullable=True)
+    entrance_lng = Column(Float, nullable=True)
+    construction_type = Column(String, nullable=True)
+    floor_count = Column(Integer, nullable=True)
+
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class StreetViewOverrideModel(Base):
+    """Deprecated: Legacy table. Use ParcelModel fields instead."""
     __tablename__ = "streetview_overrides"
     __table_args__ = {'extend_existing': True}
 

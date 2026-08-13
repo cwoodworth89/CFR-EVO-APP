@@ -13,7 +13,8 @@ export const STREETVIEW_OVERRIDES = {
   "775 MARINER WAY": { lat: 49.2635, lng: -122.8048, heading: 180, fov: 90, pitch: 0 },
   "438 NELSON ST": { lat: 49.2475, lng: -122.8682, heading: 320, fov: 90, pitch: 0 },
   "3501 DAVID AVE": { lat: 49.3012, lng: -122.7560, heading: 190, fov: 90, pitch: 0 },
-  "1386 COAST MERIDIAN RD": { lat: 49.297541, lng: -122.755800, heading: 270, fov: 90, pitch: 0 }
+  "1386 COAST MERIDIAN RD": { lat: 49.297541, lng: -122.755800, heading: 270, fov: 90, pitch: 0 },
+  "3030 GORDON AVE": { lat: 49.26995, lng: -122.79190, heading: 35, fov: 80, pitch: 10 }
 };
 
 export default function StreetViewPanel({ activeCall }) {

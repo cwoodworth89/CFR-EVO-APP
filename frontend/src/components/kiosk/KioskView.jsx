@@ -241,7 +241,19 @@ export default function KioskView({ kioskState }) {
 
   const talkGroup = activeCall?.radio_channel || activeCall?.target?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
   const rawMapGrid = activeCall?.map_grid || activeCall?.target?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
-  const formattedGrid = rawMapGrid ? (rawMapGrid.toString().toUpperCase().startsWith('GRID') ? rawMapGrid.toString().toUpperCase() : `GRID ${rawMapGrid}`) : null;
+  const isReviewed = activeCall.feedback_submitted || (activeCall.quality_rating && activeCall.quality_rating !== 'PENDING');
+  const displayAddress = (isReviewed && activeCall.verified_address)
+    ? activeCall.verified_address
+    : (activeCall.address || activeCall.target?.address || 'Address Unspecified');
+
+  const rawIncident = (isReviewed && activeCall.verified_incident)
+    ? activeCall.verified_incident
+    : (activeCall.incident_type || activeCall.target?.incident_type || 'EMERGENCY DISPATCH');
+
+  const displayIncident = activeCall.is_test && !rawIncident.includes('*TEST*')
+    ? `*TEST* ${rawIncident}`
+    : rawIncident;
+
   const borderColor = isEmergency ? 'border-red-600' : 'border-emerald-500';
 
   return (
@@ -359,11 +371,10 @@ export default function KioskView({ kioskState }) {
             )}
           </div>
         </div>
-
         {/* Center: Extra Large Address & Centered Call Type */}
         <div className="flex flex-col items-center text-center">
           <h1 className={`font-black tracking-tight text-white uppercase font-sans ${isTvMode ? 'text-4xl' : 'text-3xl'}`}>
-            {activeCall.address || 'Address Unspecified'}
+            {displayAddress}
             {formattedGrid && (
               <span className="text-amber-400 font-mono ml-2.5">({formattedGrid})</span>
             )}
@@ -373,9 +384,7 @@ export default function KioskView({ kioskState }) {
           <div className={`font-black tracking-wider uppercase font-mono mt-1 ${
             activeCall.is_test ? 'text-orange-400' : 'text-amber-400'
           } ${isTvMode ? 'text-3xl' : 'text-2xl'}`}>
-            {activeCall.is_test && !(activeCall.incident_type || '').includes('*TEST*')
-              ? `*TEST* ${activeCall.incident_type || 'EMERGENCY DISPATCH'}`
-              : (activeCall.incident_type || 'EMERGENCY DISPATCH')}
+            {displayIncident}
           </div>
 
           {activeCall.is_test && (

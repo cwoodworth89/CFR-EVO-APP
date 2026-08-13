@@ -24,6 +24,9 @@ export default function StreetViewPanel({ activeCall }) {
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
   const [sdkError, setSdkError] = useState(false);
+  const [dismissBanner, setDismissBanner] = useState(false);
+  const [manualHeadingOffset, setManualHeadingOffset] = useState(0);
+  const [manualPitchOffset, setManualPitchOffset] = useState(0);
 
   const containerRef = useRef(null);
   const modalContainerRef = useRef(null);
@@ -50,6 +53,8 @@ export default function StreetViewPanel({ activeCall }) {
   useEffect(() => {
     let isMounted = true;
     setDbOverride(null);
+    setManualHeadingOffset(0);
+    setManualPitchOffset(0);
     if (cleanAddrKey) {
       apiClient.streetView.fetchOverride(cleanAddrKey).then((data) => {
         if (!data && activeCall?.address) {
@@ -91,10 +96,13 @@ export default function StreetViewPanel({ activeCall }) {
   const initialPitch = activeOverride ? parseFloat(activeOverride.pitch || 5) : 5;
   const initialFov = activeOverride ? parseFloat(activeOverride.fov || 80) : 80;
 
+  const effectiveHeading = (initialHeading + manualHeadingOffset + 360) % 360;
+  const effectivePitch = Math.max(-85, Math.min(85, initialPitch + manualPitchOffset));
+
   // Track initial heading/pitch in ref
   useEffect(() => {
-    currentPovRef.current = { heading: initialHeading, pitch: initialPitch, zoom: 1 };
-  }, [initialHeading, initialPitch]);
+    currentPovRef.current = { heading: effectiveHeading, pitch: effectivePitch, zoom: 1 };
+  }, [effectiveHeading, effectivePitch]);
 
   // Global auth failure handler
   useEffect(() => {
@@ -119,7 +127,7 @@ export default function StreetViewPanel({ activeCall }) {
 
       try {
         const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
-          pov: { heading: initialHeading, pitch: initialPitch },
+          pov: { heading: effectiveHeading, pitch: effectivePitch },
           zoom: 1,
           fullscreenControl: false, // Hide Google's native fullscreen button
           addressControl: false,
@@ -141,7 +149,7 @@ export default function StreetViewPanel({ activeCall }) {
         }, (data, status) => {
           if (status === window.google.maps.StreetViewStatus.OK && data && data.location) {
             pano.setPano(data.location.pano);
-            pano.setPov({ heading: initialHeading, pitch: initialPitch });
+            pano.setPov({ heading: effectiveHeading, pitch: effectivePitch });
             pano.setVisible(true);
           } else {
             console.warn("Outdoor StreetViewService fallback to position:", status);
@@ -152,7 +160,7 @@ export default function StreetViewPanel({ activeCall }) {
         // Real-time POV drag listener (captures exact touch & mouse camera angles!)
         pano.addListener('pov_changed', () => {
           const pov = pano.getPov();
-          if (pov) {
+          if (pov && !isNaN(pov.heading)) {
             currentPovRef.current = {
               heading: Math.round(pov.heading || 0),
               pitch: Math.round(pov.pitch || 0),
@@ -189,7 +197,7 @@ export default function StreetViewPanel({ activeCall }) {
       if (targetContainer) targetContainer.innerHTML = '';
       panoramaRef.current = null;
     };
-  }, [frontLat, frontLng, initialHeading, initialPitch, apiKey, isOnline, isExpanded, sdkError]);
+  }, [frontLat, frontLng, effectiveHeading, effectivePitch, apiKey, isOnline, isExpanded, sdkError]);
 
   const handleSaveView = async () => {
     if (!activeCall?.address || !cleanAddrKey) return;
@@ -241,13 +249,13 @@ export default function StreetViewPanel({ activeCall }) {
   };
 
   const embedStreetViewUrl = apiKey
-    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}&fov=${initialFov}`
+    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${effectiveHeading}&pitch=${effectivePitch}&fov=${initialFov}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
   const renderContent = (isModal = false) => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
       {sdkError ? (
-        <div className="w-full h-full relative flex flex-col items-center justify-center p-4 text-center bg-slate-950 text-slate-300">
+        <div className="w-full h-full relative flex flex-col items-center justify-center bg-slate-950 text-slate-300">
           <iframe
             title="Fallback Google Street View Embed"
             width="100%"
@@ -258,8 +266,54 @@ export default function StreetViewPanel({ activeCall }) {
             src={embedStreetViewUrl}
             className="w-full h-full"
           />
-          <div className="absolute top-2 left-2 right-2 z-30 bg-amber-950/90 text-amber-200 border border-amber-600/80 p-2 rounded-xl text-xs font-mono shadow-xl flex items-center justify-between">
-            <span>⚠️ JS SDK disabled on Key. Enable "Maps JavaScript API" in Google Cloud Console. Rendering embed fallback.</span>
+
+          {/* Diagnostic Info Banner with Dismiss Button */}
+          {!dismissBanner && (
+            <div className="absolute top-12 left-2 right-2 z-30 bg-amber-950/95 text-amber-200 border border-amber-600/80 px-3 py-1.5 rounded-xl text-[11px] font-mono shadow-xl flex items-center justify-between backdrop-blur">
+              <div className="flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Enable <strong>Maps JavaScript API</strong> in Google Cloud Console for full drag sync.</span>
+              </div>
+              <button
+                onClick={() => setDismissBanner(true)}
+                className="text-amber-300 hover:text-white font-bold ml-2 text-xs cursor-pointer"
+                title="Dismiss Notice"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Quick Angle Adjustment Pills in Fallback Mode */}
+          <div className="absolute top-3 right-2 z-20 flex items-center gap-1 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded-xl shadow-lg">
+            <button
+              onClick={() => setManualHeadingOffset((h) => h - 45)}
+              className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer transition"
+              title="Rotate Left 45°"
+            >
+              ⟲ -45°
+            </button>
+            <button
+              onClick={() => setManualHeadingOffset((h) => h + 45)}
+              className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer transition"
+              title="Rotate Right 45°"
+            >
+              ⟳ +45°
+            </button>
+            <button
+              onClick={() => setManualPitchOffset((p) => Math.min(85, p + 10))}
+              className="bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer transition"
+              title="Tilt Up"
+            >
+              ▲ Tilt
+            </button>
+            <button
+              onClick={() => setManualPitchOffset((p) => Math.max(-85, p - 10))}
+              className="bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer transition"
+              title="Tilt Down"
+            >
+              ▼ Tilt
+            </button>
           </div>
         </div>
       ) : (
@@ -289,7 +343,7 @@ export default function StreetViewPanel({ activeCall }) {
           <span className="text-white font-bold">{activeCall?.address || 'Destination'}</span>
           {dbOverride && (
             <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
-              SAVED PREFERRED VIEW ({activeOverride.heading || initialHeading}°)
+              SAVED PREFERRED VIEW ({effectiveHeading}°)
             </span>
           )}
         </div>

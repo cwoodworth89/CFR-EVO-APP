@@ -3,19 +3,37 @@ import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-l
 import L from 'leaflet';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
-function StableAutoCenterAndResize({ lat, lng, callKey }) {
+function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
   const map = useMap();
   const lastKeyRef = useRef(null);
 
-  // Only recenter when target call changes, preserving manual panning
+  // Auto-fit property bounds and zoom out 1 step for full surrounding context
   useEffect(() => {
     if (!map || lat == null || lng == null) return;
     const currentKey = callKey || `${lat.toFixed(5)},${lng.toFixed(5)}`;
     if (lastKeyRef.current !== currentKey) {
       lastKeyRef.current = currentKey;
-      map.setView([lat, lng], 18, { animate: false });
+
+      if (polygonPositions && polygonPositions.length > 0) {
+        try {
+          const poly = L.polygon(polygonPositions);
+          const bounds = poly.getBounds();
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [45, 45], maxZoom: 17.5, animate: false });
+            const fitZoom = map.getZoom();
+            // Zoom out 1 step from fitted bounds so full parcel and surrounding roads are visible
+            map.setZoom(Math.max(fitZoom - 1, 15.5), { animate: false });
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to fit parcel bounds:', e);
+        }
+      }
+
+      // Default fallback zoom level (16.5 instead of 18)
+      map.setView([lat, lng], 16.5, { animate: false });
     }
-  }, [map, lat, lng, callKey]);
+  }, [map, lat, lng, polygonPositions, callKey]);
 
   useEffect(() => {
     if (!map) return;
@@ -40,7 +58,6 @@ const targetIcon = new L.Icon({
 export default function PropertySatellitePanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showRoadLabels, setShowRoadLabels] = useState(true);
 
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
@@ -55,39 +72,33 @@ export default function PropertySatellitePanel({ activeCall }) {
   const renderMapContent = () => (
     <MapContainer
       center={[destLat, destLng]}
-      zoom={18}
+      zoom={16.5}
       maxZoom={20}
       className="w-full h-full z-0"
       zoomControl={true}
+      attributionControl={false}
     >
       {/* High-Resolution Satellite Basemap */}
       <TileLayer
-        attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         maxNativeZoom={19}
         maxZoom={20}
       />
 
-      {/* Road & Place Name Labels Overlay (Transparent Layer) */}
-      {showRoadLabels && (
-        <TileLayer
-          attribution="&copy; Esri &mdash; Transportation & Places"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-          maxNativeZoom={19}
-          maxZoom={20}
-          zIndex={500}
-        />
-      )}
+      {/* Road & Place Name Labels Overlay (Always On) */}
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={19}
+        maxZoom={20}
+        zIndex={500}
+      />
 
-      {showRoadLabels && (
-        <TileLayer
-          attribution="&copy; Esri &mdash; Transportation"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-          maxNativeZoom={19}
-          maxZoom={20}
-          zIndex={501}
-        />
-      )}
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={19}
+        maxZoom={20}
+        zIndex={501}
+      />
 
       {polygonPositions && (
         <Polygon positions={polygonPositions} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />
@@ -97,7 +108,7 @@ export default function PropertySatellitePanel({ activeCall }) {
         <Popup>📍 Destination: {activeCall?.address || 'Target Location'}</Popup>
       </Marker>
 
-      <StableAutoCenterAndResize lat={destLat} lng={destLng} callKey={callKey} />
+      <StableAutoCenterAndResize lat={destLat} lng={destLng} polygonPositions={polygonPositions} callKey={callKey} />
     </MapContainer>
   );
 
@@ -105,23 +116,9 @@ export default function PropertySatellitePanel({ activeCall }) {
     <>
       <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
         {/* Header Controls */}
-        <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-2 shadow">
+        <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
           <span>🛰️</span>
           <span>Property Satellite View</span>
-          
-          {/* Road Labels Toggle */}
-          <button
-            onClick={() => setShowRoadLabels((prev) => !prev)}
-            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition border ${
-              showRoadLabels
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-            }`}
-            title="Toggle Road & Street Name Labels"
-          >
-            {showRoadLabels ? '🏷️ Labels ON' : '🏷️ Labels OFF'}
-          </button>
-
           {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
         </div>
 
@@ -137,7 +134,7 @@ export default function PropertySatellitePanel({ activeCall }) {
         {isOnline ? (
           <div className="w-full h-full relative z-0">
             {renderMapContent()}
-            <div className="absolute bottom-2 left-2 text-[10px] text-slate-300 font-mono bg-slate-900/90 px-2 py-0.5 rounded border border-slate-800 z-[1000] pointer-events-none">
+            <div className="absolute bottom-1.5 left-2 text-[9px] text-slate-400 font-mono bg-slate-950/80 backdrop-blur px-2 py-0.5 rounded border border-slate-800/80 z-[1000] pointer-events-none opacity-80">
               WGS84: {destLat.toFixed(5)}, {destLng.toFixed(5)}
             </div>
           </div>

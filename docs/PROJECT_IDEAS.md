@@ -24,3 +24,16 @@ This document tracks feature requests, operational enhancements, and future idea
   - **Time-Range Slider / Selector**: Quick toggle buttons for 24h / 7d / Month / Year views.
   - **Category Filtering**: Checkbox toggles to isolate or layer specific call types (e.g. view only MVAs or Chief Tone calls).
   - **Incident Detail Popups**: Click/hover popups displaying call timestamp, unit responses, address, and incident summary.
+
+---
+
+### 2. 🗺️ Cross-Road Spatial-Phonetic Radius Correction
+* **Description**: Enhance cross-street transcription and extraction accuracy by applying a spatial radius filter derived from the high-confidence primary address.
+* **Core Concept**:
+  1. **Primary Address Anchor**: Once the primary address is geocoded with high confidence (e.g. `3030 Gordon Ave`), extract its spatial coordinate $(Lat, Lng)$.
+  2. **500ft Spatial Radius Buffer**: Query Coquitlam GIS street line segments within a ~500-foot (~150m) radius of the primary address coordinate.
+  3. **Phonetic & Levenshtein Cross-Street Snap**: Match the raw transcribed cross-street words against this small candidate list using Double Metaphone and fuzzy string matching.
+* **Benefits**:
+  - Eliminates phonetic ambiguity for misheard cross-streets (e.g. snapping "near Christmas Way" vs "near Cristmas Way").
+  - Drastically improves overall transcript accuracy even when cross-streets are not explicitly displayed in main UI metadata.
+

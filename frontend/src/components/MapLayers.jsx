@@ -465,55 +465,7 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
 
     return (
       <>
-        {/* Render Highlighted Nearest City Hydrant */}
-        {nearestCity && (
-          <Marker
-            position={[nearestCity.lat, nearestCity.lng]}
-            icon={createTacticalHighlightIcon(false, nearestCity.gisId, nearestCity.flowClass, nearestCity.distMeters)}
-            zIndexOffset={1000}
-          >
-            <Popup className="hydrant-popup">
-              <div className="bg-slate-950 text-white p-3 border border-sky-500 rounded-xl shadow-2xl" style={{ minWidth: '200px' }}>
-                <span className="text-[9px] text-sky-400 font-mono font-black uppercase tracking-wider">💧 NEAREST CITY MUNICIPAL HYDRANT</span>
-                <h3 className="font-bold text-sm text-white mt-1">ID: {nearestCity.gisId}</h3>
-                <div className="mt-2 pt-2 border-t border-slate-800 flex justify-between text-xs font-mono">
-                  <span className="text-slate-400">Distance to Pin</span>
-                  <span className="text-emerald-400 font-bold">{nearestCity.distMeters} meters</span>
-                </div>
-                <div className="mt-1 flex justify-between text-xs font-mono">
-                  <span className="text-slate-400">NFPA 291 Rating</span>
-                  <span className="text-sky-300 font-bold">Class {nearestCity.flowClass || 'AA'}</span>
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-
-        {/* Render Highlighted Nearest Private Hydrant */}
-        {nearestPrivate && (
-          <Marker
-            position={[nearestPrivate.lat, nearestPrivate.lng]}
-            icon={createTacticalHighlightIcon(true, nearestPrivate.gisId, nearestPrivate.flowClass, nearestPrivate.distMeters)}
-            zIndexOffset={999}
-          >
-            <Popup className="hydrant-popup">
-              <div className="bg-slate-950 text-white p-3 border border-amber-500 rounded-xl shadow-2xl" style={{ minWidth: '200px' }}>
-                <span className="text-[9px] text-amber-400 font-mono font-black uppercase tracking-wider">🔒 NEARBY PRIVATE PROPERTY HYDRANT</span>
-                <h3 className="font-bold text-sm text-white mt-1">ID: {nearestPrivate.gisId}</h3>
-                <div className="mt-2 pt-2 border-t border-slate-800 flex justify-between text-xs font-mono">
-                  <span className="text-slate-400">Distance to Pin</span>
-                  <span className="text-amber-400 font-bold">{nearestPrivate.distMeters} meters</span>
-                </div>
-                <div className="mt-1 flex justify-between text-xs font-mono">
-                  <span className="text-slate-400">Access Status</span>
-                  <span className="text-amber-300 font-bold">PRIVATE</span>
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-
-        {/* Viewport Hydrants */}
+        {/* Viewport Hydrants (Nearest Hydrant Dot Pulses Smoothly) */}
         {zoom >= activeMinZoom && hydrants.map((h, i) => {
           if (!h.geometry || h.geometry.x === undefined || h.geometry.y === undefined) return null;
           const coords = [h.geometry.y, h.geometry.x];
@@ -521,6 +473,10 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
           const gisId = h.attributes.gis_id || "Unknown";
           const flowClass = h.attributes.flow_class || "";
           
+          const isNearestCity = nearestCity && nearestCity.gisId === gisId;
+          const isNearestPrivate = nearestPrivate && nearestPrivate.gisId === gisId;
+          const isNearest = isNearestCity || isNearestPrivate;
+
           let label = "OPERATING";
           if (statusVal === "PRIVATE") label = "PRIVATE";
           if (statusVal === "ABANDONED" || statusVal === "OUT_OF_SERVICE" || statusVal === "INACTIVE") label = "OUT OF SERVICE";
@@ -534,43 +490,27 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
           if (statusVal === 'PRIVATE') borderColor = '#f59e0b';
           if (statusVal === 'ABANDONED' || statusVal === 'OUT_OF_SERVICE' || statusVal === 'INACTIVE') borderColor = '#ef4444';
 
-          if (zoom < 17) {
-            return (
-              <CircleMarker
-                key={`canvas-${gisId}-${i}`}
-                center={coords}
-                radius={5}
-                renderer={canvasRenderer}
-                pathOptions={{
-                  color: '#0f172a',
-                  fillColor: borderColor,
-                  fillOpacity: 0.95,
-                  weight: 1.5
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -6]} className="!bg-transparent !border-0 !p-0 !shadow-none">
-                  <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
-                </Tooltip>
-                <Popup className="hydrant-popup">
-                  <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
-                </Popup>
-              </CircleMarker>
-            );
-          }
-
           return (
-            <Marker 
-              key={`${gisId}-${i}`} 
-              position={coords} 
-              icon={getHydrantIcon(statusVal, flowClass)}
+            <CircleMarker
+              key={`canvas-${gisId}-${i}`}
+              center={coords}
+              radius={isNearest ? 7.5 : 5}
+              renderer={canvasRenderer}
+              pathOptions={{
+                color: isNearest ? (isNearestPrivate ? '#f59e0b' : '#38bdf8') : '#0f172a',
+                fillColor: borderColor,
+                fillOpacity: isNearest ? 1 : 0.95,
+                weight: isNearest ? 3 : 1.5,
+                className: isNearest ? 'animate-pulse' : ''
+              }}
             >
-              <Tooltip direction="top" offset={[0, -10]} className="!bg-transparent !border-0 !p-0 !shadow-none">
+              <Tooltip direction="top" offset={[0, -6]} className="!bg-transparent !border-0 !p-0 !shadow-none">
                 <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
               </Tooltip>
               <Popup className="hydrant-popup">
                 <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
               </Popup>
-            </Marker>
+            </CircleMarker>
           );
         })}
       </>

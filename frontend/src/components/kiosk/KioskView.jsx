@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import RouteOverviewPanel from './RouteOverviewPanel';
 import BlockParcelPanel from './BlockParcelPanel';
 import PropertySatellitePanel from './PropertySatellitePanel';
 import StreetViewPanel from './StreetViewPanel';
+import PrePlanModal from './PrePlanModal';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { STATIONS } from '../MapConstants';
 
@@ -124,6 +125,8 @@ export default function KioskView({ kioskState }) {
     exitSimulation,
     toggleTvMode,
   } = kioskState;
+
+  const [showPrePlanModal, setShowPrePlanModal] = useState(false);
 
   // Station Idle Monitor Screen
   if (!activeCall) {
@@ -316,6 +319,16 @@ export default function KioskView({ kioskState }) {
                 <span className="text-slate-400">({activeCall?.target?.nearest_private_dist || activeCall?.nearest_private_dist || '18'}m)</span>
               </div>
             )}
+            {(activeCall?.target?.pre_plan_pdf_url || activeCall?.pre_plan_pdf_url) && (
+              <button
+                onClick={() => setShowPrePlanModal(true)}
+                className="bg-sky-950/90 hover:bg-sky-900 text-sky-300 hover:text-white border border-sky-600 px-3 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 shadow-md animate-pulse cursor-pointer"
+                title="Open Pre-Incident Construction Plan PDF"
+              >
+                <span>📄</span>
+                <span>Pre-Incident Plan</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -413,6 +426,15 @@ export default function KioskView({ kioskState }) {
           </div>
         </section>
       </main>
+
+      {/* Pre-Incident Construction Plan PDF Viewer Modal */}
+      <PrePlanModal
+        isOpen={showPrePlanModal}
+        onClose={() => setShowPrePlanModal(false)}
+        pdfUrl={activeCall?.target?.pre_plan_pdf_url || activeCall?.pre_plan_pdf_url}
+        address={activeCall?.address}
+        gisId={activeCall?.target?.gis_id || activeCall?.gis_id}
+      />
     </div>
   );
 }

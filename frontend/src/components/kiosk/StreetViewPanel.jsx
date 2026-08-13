@@ -119,7 +119,6 @@ export default function StreetViewPanel({ activeCall }) {
 
       try {
         const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
-          position: { lat: frontLat, lng: frontLng },
           pov: { heading: initialHeading, pitch: initialPitch },
           zoom: 1,
           fullscreenControl: false, // Hide Google's native fullscreen button
@@ -128,7 +127,26 @@ export default function StreetViewPanel({ activeCall }) {
           linksControl: true,
           motionTracking: false,
           motionTrackingControl: false,
-          showRoadLabels: true
+          showRoadLabels: true,
+          visible: true
+        });
+
+        // Resolve nearest street panorama within 300m outdoor radius (prevents rooftop centroid ZERO_RESULTS gray screens!)
+        const svService = new window.google.maps.StreetViewService();
+        svService.getPanorama({
+          location: { lat: frontLat, lng: frontLng },
+          radius: 300,
+          source: window.google.maps.StreetViewSource.OUTDOOR,
+          preference: window.google.maps.StreetViewPreference.NEAREST
+        }, (data, status) => {
+          if (status === window.google.maps.StreetViewStatus.OK && data && data.location) {
+            pano.setPano(data.location.pano);
+            pano.setPov({ heading: initialHeading, pitch: initialPitch });
+            pano.setVisible(true);
+          } else {
+            console.warn("Outdoor StreetViewService fallback to position:", status);
+            pano.setPosition({ lat: frontLat, lng: frontLng });
+          }
         });
 
         // Real-time POV drag listener (captures exact touch & mouse camera angles!)
@@ -179,19 +197,30 @@ export default function StreetViewPanel({ activeCall }) {
 
     let currentHeading = currentPovRef.current.heading;
     let currentPitch = currentPovRef.current.pitch;
+    let saveLat = frontLat;
+    let saveLng = frontLng;
 
-    if (panoramaRef.current && typeof panoramaRef.current.getPov === 'function') {
-      const pov = panoramaRef.current.getPov();
-      if (pov && !isNaN(pov.heading)) {
-        currentHeading = Math.round(pov.heading || 0);
-        currentPitch = Math.round(pov.pitch || 0);
+    if (panoramaRef.current) {
+      if (typeof panoramaRef.current.getPov === 'function') {
+        const pov = panoramaRef.current.getPov();
+        if (pov && !isNaN(pov.heading)) {
+          currentHeading = Math.round(pov.heading || 0);
+          currentPitch = Math.round(pov.pitch || 0);
+        }
+      }
+      if (typeof panoramaRef.current.getLocation === 'function') {
+        const loc = panoramaRef.current.getLocation();
+        if (loc && loc.latLng) {
+          saveLat = loc.latLng.lat();
+          saveLng = loc.latLng.lng();
+        }
       }
     }
 
     const payload = {
       clean_address: cleanAddrKey,
-      front_lat: frontLat,
-      front_lng: frontLng,
+      front_lat: saveLat,
+      front_lng: saveLng,
       heading: currentHeading,
       pitch: currentPitch,
       fov: initialFov

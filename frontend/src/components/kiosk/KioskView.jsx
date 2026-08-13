@@ -215,15 +215,6 @@ export default function KioskView({ kioskState }) {
 
   let unitList = extractCallUnits(activeCall);
 
-  if (unitList.length === 0) {
-    const toneStr = (activeCall?.tone_name || activeCall?.target?.tone_name || '').toLowerCase();
-    if (toneStr.includes('engine') || toneStr.includes('station')) unitList.push('Engine 1', 'Engine 2');
-    if (toneStr.includes('ladder') || toneStr.includes('truck')) unitList.push('Ladder 1');
-    if (toneStr.includes('rescue')) unitList.push('Rescue 2');
-    if (toneStr.includes('chief')) unitList.push('Chief 6');
-    if (unitList.length === 0) unitList = ['Engine 1', 'Rescue 2'];
-  }
-
   const destLat = activeCall?.lat ?? activeCall?.target?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? activeCall?.target?.lng ?? -122.7932;
 

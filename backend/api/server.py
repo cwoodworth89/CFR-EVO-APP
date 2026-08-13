@@ -536,6 +536,24 @@ class StreetViewOverrideSchema(BaseModel):
     fov: float = 80.0
 
 
+def _clean_streetview_address(addr: str) -> str:
+    if not addr:
+        return ""
+    s = addr.upper().strip()
+    s = re.sub(r',\s*(COQUITLAM|PORT COQUITLAM|PORT MOODY|BC|BRITISH COLUMBIA).*$', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^(UNIT|APT|SUITE|#)\s*\d+[\w-]*\s+', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bAVE?\b', 'AVE', s)
+    s = re.sub(r'\bRD?\b', 'RD', s)
+    s = re.sub(r'\bST?\b', 'ST', s)
+    s = re.sub(r'\bDR?\b', 'DR', s)
+    s = re.sub(r'\bHWY?\b', 'HIGHWAY', s)
+    s = re.sub(r'\bBLVD?\b', 'BLVD', s)
+    s = re.sub(r'\bWAY\b', 'WAY', s)
+    s = re.sub(r'\bCRT?\b', 'CRT', s)
+    s = re.sub(r'\bPL?\b', 'PL', s)
+    return s.strip()
+
+
 @app.get("/api/streetview-overrides")
 def get_all_streetview_overrides(db: Session = Depends(get_db)):
     records = db.query(StreetViewOverrideModel).all()
@@ -553,8 +571,16 @@ def get_all_streetview_overrides(db: Session = Depends(get_db)):
 
 @app.get("/api/streetview-overrides/{address}")
 def get_streetview_override(address: str, db: Session = Depends(get_db)):
-    clean_addr = address.strip().upper()
-    r = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == clean_addr).first()
+    clean_addr = _clean_streetview_address(address)
+    raw_upper = address.strip().upper()
+    r = db.query(StreetViewOverrideModel).filter(
+        (StreetViewOverrideModel.clean_address == clean_addr) |
+        (StreetViewOverrideModel.clean_address == raw_upper)
+    ).first()
+    if not r and clean_addr:
+        r = db.query(StreetViewOverrideModel).filter(
+            StreetViewOverrideModel.clean_address.ilike(f"%{clean_addr}%")
+        ).first()
     if not r:
         raise HTTPException(status_code=404, detail="Streetview override not found")
     return {

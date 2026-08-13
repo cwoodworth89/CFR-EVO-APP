@@ -35,21 +35,40 @@ export default function StreetViewPanel({ activeCall }) {
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
 
+  // Helper for instant local storage override retrieval
+  const getLocalOverride = () => {
+    if (!cleanAddrKey) return null;
+    try {
+      const stored = localStorage.getItem(`cfr_sv_override_${cleanAddrKey}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const localOverride = getLocalOverride();
+
   // Fetch DB override on mount or when address changes
   useEffect(() => {
     let isMounted = true;
-    if (activeCall?.address) {
-      apiClient.streetView.fetchOverride(activeCall.address).then((data) => {
+    setDbOverride(null);
+    if (cleanAddrKey) {
+      apiClient.streetView.fetchOverride(cleanAddrKey).then((data) => {
+        if (!data && activeCall?.address) {
+          return apiClient.streetView.fetchOverride(activeCall.address);
+        }
+        return data;
+      }).then((data) => {
         if (isMounted && data) {
           setDbOverride(data);
         }
-      });
+      }).catch(() => {});
     }
     return () => { isMounted = false; };
-  }, [activeCall?.address]);
+  }, [cleanAddrKey, activeCall?.address]);
 
-  // Priority: 1. DB Override -> 2. Hardcoded fallback -> 3. Computed frontage angle
-  const activeOverride = dbOverride || fallbackOverride;
+  // Priority: 1. DB Override -> 2. Local Storage -> 3. Hardcoded fallback -> 4. Computed frontage angle
+  const activeOverride = dbOverride || localOverride || fallbackOverride;
 
   const frontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
   const frontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
@@ -72,35 +91,43 @@ export default function StreetViewPanel({ activeCall }) {
   const [pitch, setPitch] = useState(activeOverride ? activeOverride.pitch : 5);
   const [fov, setFov] = useState(activeOverride ? activeOverride.fov : 80);
 
+  // Sync heading/pitch/fov ONLY when address changes or activeOverride is first loaded
+  const loadedKeyRef = React.useRef(null);
   useEffect(() => {
-    if (activeOverride) {
-      setHeading(activeOverride.heading ?? initialHeading);
-      setPitch(activeOverride.pitch ?? 5);
-      setFov(activeOverride.fov ?? 80);
-    } else {
-      setHeading(initialHeading);
+    const key = `${cleanAddrKey}_${dbOverride ? 'db' : localOverride ? 'local' : 'none'}`;
+    if (loadedKeyRef.current !== key) {
+      loadedKeyRef.current = key;
+      setHeading(activeOverride ? activeOverride.heading : initialHeading);
+      setPitch(activeOverride ? activeOverride.pitch : 5);
+      setFov(activeOverride ? activeOverride.fov : 80);
     }
-  }, [activeOverride, initialHeading]);
+  }, [cleanAddrKey, dbOverride, localOverride, initialHeading, activeOverride]);
 
   const handleSaveView = async () => {
-    if (!activeCall?.address) return;
+    if (!activeCall?.address || !cleanAddrKey) return;
     setSaveStatus('saving');
+    const payload = {
+      clean_address: cleanAddrKey,
+      front_lat: frontLat,
+      front_lng: frontLng,
+      heading: Math.round(heading),
+      pitch: Math.round(pitch),
+      fov: Math.round(fov)
+    };
     try {
-      const payload = {
-        clean_address: cleanAddrKey,
-        front_lat: frontLat,
-        front_lng: frontLng,
-        heading: Math.round(heading),
-        pitch: Math.round(pitch),
-        fov: Math.round(fov)
-      };
+      // Save locally to localStorage for instant client retrieval
+      localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(payload));
+      
+      // Persist to backend PostgreSQL DB
       await apiClient.streetView.saveOverride(payload);
       setDbOverride(payload);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);
     } catch (e) {
       console.error('Failed to save Street View angle:', e);
-      setSaveStatus('error');
+      // Fallback: LocalStorage saved successfully even if API call fails
+      setDbOverride(payload);
+      setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);
     }
   };

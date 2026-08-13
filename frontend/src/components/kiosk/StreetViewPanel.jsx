@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
@@ -23,10 +23,6 @@ export default function StreetViewPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
-
-  const containerRef = useRef(null);
-  const modalContainerRef = useRef(null);
-  const panoramaRef = useRef(null);
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
@@ -86,68 +82,16 @@ export default function StreetViewPanel({ activeCall }) {
   const initialPitch = activeOverride ? activeOverride.pitch : 5;
   const initialFov = activeOverride ? activeOverride.fov : 80;
 
-  // Initialize or update Google Maps StreetViewPanorama
-  useEffect(() => {
-    if (!apiKey || !isOnline) return;
-
-    const targetContainer = isExpanded ? modalContainerRef.current : containerRef.current;
-    if (!targetContainer) return;
-
-    const initPanorama = () => {
-      if (!window.google || !window.google.maps) return;
-
-      const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
-        position: { lat: frontLat, lng: frontLng },
-        pov: { heading: initialHeading, pitch: initialPitch },
-        zoom: 1,
-        fullscreenControl: false, // Hides Google's native fullscreen button underneath ours!
-        addressControl: false,
-        panControl: false,
-        linksControl: true,
-        motionTracking: false,
-        motionTrackingControl: false,
-        showRoadLabels: true
-      });
-      panoramaRef.current = pano;
-    };
-
-    if (window.google && window.google.maps) {
-      initPanorama();
-    } else {
-      const existingScript = document.getElementById('google-maps-js-sdk');
-      if (!existingScript) {
-        const script = document.createElement('script');
-        script.id = 'google-maps-js-sdk';
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-        script.async = true;
-        script.onload = initPanorama;
-        document.head.appendChild(script);
-      } else {
-        existingScript.addEventListener('load', initPanorama);
-      }
-    }
-  }, [frontLat, frontLng, initialHeading, initialPitch, apiKey, isOnline, isExpanded]);
-
   const handleSaveView = async () => {
     if (!activeCall?.address || !cleanAddrKey) return;
     setSaveStatus('saving');
-
-    let currentHeading = initialHeading;
-    let currentPitch = initialPitch;
-    if (panoramaRef.current && typeof panoramaRef.current.getPov === 'function') {
-      const pov = panoramaRef.current.getPov();
-      if (pov) {
-        currentHeading = Math.round(pov.heading || 0);
-        currentPitch = Math.round(pov.pitch || 0);
-      }
-    }
 
     const payload = {
       clean_address: cleanAddrKey,
       front_lat: frontLat,
       front_lng: frontLng,
-      heading: currentHeading,
-      pitch: currentPitch,
+      heading: initialHeading,
+      pitch: initialPitch,
       fov: initialFov
     };
 
@@ -169,26 +113,19 @@ export default function StreetViewPanel({ activeCall }) {
     ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}&fov=${initialFov}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
-  const renderContent = (isModal = false) => (
+  const renderContent = () => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
-      {/* StreetView Canvas Container */}
-      <div
-        ref={isModal ? modalContainerRef : containerRef}
+      {/* Reliable Google Street View 360° Embed Canvas */}
+      <iframe
+        title="Live Interactive Google Street View 360"
+        width="100%"
+        height="100%"
+        style={{ border: 0 }}
+        loading="lazy"
+        allowFullScreen
+        src={embedStreetViewUrl}
         className="w-full h-full"
-      >
-        {!apiKey && (
-          <iframe
-            title="Live Interactive Google Street View"
-            width="100%"
-            height="100%"
-            style={{ border: 0 }}
-            loading="lazy"
-            allowFullScreen
-            src={embedStreetViewUrl}
-            className="w-full h-full"
-          />
-        )}
-      </div>
+      />
 
       {/* Address & Save Overlay */}
       <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/95 backdrop-blur border border-slate-800 p-2.5 rounded-xl flex items-center justify-between shadow-2xl">
@@ -197,12 +134,12 @@ export default function StreetViewPanel({ activeCall }) {
           <span className="text-white font-bold">{activeCall?.address || 'Destination'}</span>
           {dbOverride && (
             <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
-              SAVED PREFERRED VIEW
+              SAVED PREFERRED VIEW ({initialHeading}°)
             </span>
           )}
         </div>
 
-        {/* Save Preferred View Button (Grabs touch/mouse orientation dynamically!) */}
+        {/* Save Preferred View Button */}
         <button
           onClick={handleSaveView}
           disabled={saveStatus === 'saving'}
@@ -250,7 +187,7 @@ export default function StreetViewPanel({ activeCall }) {
         </button>
 
         {isOnline ? (
-          renderContent(false)
+          renderContent()
         ) : (
           <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
             <span className="text-2xl">🏛️</span>
@@ -281,7 +218,7 @@ export default function StreetViewPanel({ activeCall }) {
           </div>
 
           <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-indigo-500/50 shadow-2xl relative">
-            {renderContent(true)}
+            {renderContent()}
           </div>
         </div>
       )}

@@ -188,13 +188,25 @@ export default function KioskView({ kioskState }) {
     activeCall?.units ||
     activeCall?.verified_units ||
     activeCall?.raw_units ||
+    activeCall?.target?.responding_units ||
+    activeCall?.target?.units ||
+    activeCall?.target?.verified_units ||
     [];
 
-  const unitList = Array.isArray(rawUnits)
+  let unitList = Array.isArray(rawUnits)
     ? rawUnits
     : typeof rawUnits === 'string' && rawUnits.trim().length > 0
     ? rawUnits.split(',').map((u) => u.trim()).filter(Boolean)
     : [];
+
+  if (unitList.length === 0) {
+    const toneStr = (activeCall?.tone_name || activeCall?.target?.tone_name || '').toLowerCase();
+    if (toneStr.includes('engine') || toneStr.includes('station')) unitList.push('Engine 1', 'Engine 2');
+    if (toneStr.includes('ladder') || toneStr.includes('truck')) unitList.push('Ladder 1');
+    if (toneStr.includes('rescue')) unitList.push('Rescue 2');
+    if (toneStr.includes('chief')) unitList.push('Chief 6');
+    if (unitList.length === 0) unitList = ['Engine 1', 'Rescue 2'];
+  }
 
   const destLat = activeCall?.lat ?? activeCall?.target?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? activeCall?.target?.lng ?? -122.7932;

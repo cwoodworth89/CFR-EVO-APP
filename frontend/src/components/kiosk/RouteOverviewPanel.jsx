@@ -155,11 +155,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         <MapInteractivity onPan={() => setUserPanned(true)} />
         <ZoomControl position="bottomright" />
 
-        {/* Original CartoDB light_nolabels Basemap for vector layer compatibility */}
+        {/* CartoDB Light with Labels Basemap for emergency navigation */}
         <TileLayer
-          attribution={BASE_LAYERS.GREY.attribution}
-          url={BASE_LAYERS.GREY.url}
-          subdomains={BASE_LAYERS.GREY.subdomains}
+          attribution="© OpenStreetMap contributors & Carto"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          subdomains={['a', 'b', 'c', 'd']}
           maxZoom={22}
         />
 

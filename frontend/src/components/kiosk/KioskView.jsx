@@ -185,14 +185,22 @@ export default function KioskView({ kioskState }) {
   // Parse responding units list (preserving exact order dispatched from database)
   const extractCallUnits = (call) => {
     if (!call) return [];
+
+    const isReviewed = call.feedback_submitted || (call.quality_rating && call.quality_rating !== 'PENDING');
+
+    // 1. If call is human-reviewed & verified units exist, use reviewed units!
+    if (isReviewed && Array.isArray(call.verified_units) && call.verified_units.length > 0) {
+      return call.verified_units;
+    }
+
+    // 2. If call is pending review (or unreviewed), use raw AI pipeline extracted data!
     const candidates = [
-      call.verified_units,
       call.responding_units,
       call.units,
       call.raw_units,
-      call.target?.verified_units,
       call.target?.responding_units,
-      call.target?.units
+      call.target?.units,
+      call.verified_units
     ];
 
     for (const cand of candidates) {

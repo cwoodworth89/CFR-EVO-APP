@@ -108,24 +108,24 @@ export default function StreetViewPanel({ activeCall }) {
     };
   }, []);
 
-  // Initialize Google Maps StreetViewPanorama with real-time finger/mouse drag POV listener
+  // Primary Google Maps StreetViewPanorama Initialization (Runs once per mount/expand)
   useEffect(() => {
     if (!apiKey || !isOnline || sdkError) return;
 
     const targetContainer = isExpanded ? modalContainerRef.current : containerRef.current;
     if (!targetContainer) return;
 
-    // Clear previous DOM contents before mounting new canvas instance
-    targetContainer.innerHTML = '';
-
     const initPanorama = () => {
       if (!window.google || !window.google.maps) return;
+
+      // Clean container DOM before mounting
+      targetContainer.innerHTML = '';
 
       try {
         const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
           pov: { heading: initialHeading, pitch: initialPitch },
           zoom: 1,
-          fullscreenControl: false, // Hide Google's native fullscreen button underneath custom Expand button
+          fullscreenControl: false,
           addressControl: false,
           panControl: false,
           linksControl: true,
@@ -135,7 +135,7 @@ export default function StreetViewPanel({ activeCall }) {
           visible: true
         });
 
-        // Resolve nearest street panorama within 300m outdoor radius (prevents rooftop centroid ZERO_RESULTS gray screens!)
+        // Resolve nearest street panorama within 300m outdoor radius
         const svService = new window.google.maps.StreetViewService();
         svService.getPanorama({
           location: { lat: frontLat, lng: frontLng },
@@ -193,7 +193,30 @@ export default function StreetViewPanel({ activeCall }) {
       if (targetContainer) targetContainer.innerHTML = '';
       panoramaRef.current = null;
     };
-  }, [frontLat, frontLng, initialHeading, initialPitch, apiKey, isOnline, isExpanded, sdkError]);
+  }, [cleanAddrKey, isExpanded, apiKey, isOnline, sdkError]);
+
+  // Smooth POV & Location update when dbOverride arrives (WITHOUT tearing down the DOM container!)
+  useEffect(() => {
+    if (!panoramaRef.current || !window.google || !window.google.maps) return;
+
+    try {
+      const svService = new window.google.maps.StreetViewService();
+      svService.getPanorama({
+        location: { lat: frontLat, lng: frontLng },
+        radius: 300,
+        source: window.google.maps.StreetViewSource.OUTDOOR,
+        preference: window.google.maps.StreetViewPreference.NEAREST
+      }, (data, status) => {
+        if (status === window.google.maps.StreetViewStatus.OK && data && data.location && panoramaRef.current) {
+          panoramaRef.current.setPano(data.location.pano);
+          panoramaRef.current.setPov({ heading: initialHeading, pitch: initialPitch });
+          panoramaRef.current.setVisible(true);
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to update active panorama POV:", e);
+    }
+  }, [frontLat, frontLng, initialHeading, initialPitch]);
 
   const handleSaveView = async () => {
     if (!activeCall?.address || !cleanAddrKey) return;
@@ -264,7 +287,7 @@ export default function StreetViewPanel({ activeCall }) {
       ) : (
         <div
           ref={isModal ? modalContainerRef : containerRef}
-          className="w-full h-full"
+          style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
         >
           {!apiKey && (
             <iframe

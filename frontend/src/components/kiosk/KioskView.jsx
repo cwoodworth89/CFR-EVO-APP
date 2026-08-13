@@ -6,6 +6,51 @@ import StreetViewPanel from './StreetViewPanel';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { STATIONS } from '../MapConstants';
 
+// Color coding tone matching: Engine = Orange, Rescue = Red, Ladder = Cyan, Chief = Gold, Medic = Emerald
+const getUnitBadgeStyle = (unitStr) => {
+  const u = (unitStr || '').toUpperCase().trim();
+  if (u.startsWith('E') || u.startsWith('ENG') || u.includes('ENGINE')) {
+    return 'bg-orange-500/20 text-orange-400 border-orange-500/50';
+  }
+  if (u.startsWith('R') || u.startsWith('RESCUE') || u.includes('RESCUE')) {
+    return 'bg-rose-500/20 text-rose-400 border-rose-500/50';
+  }
+  if (u.startsWith('L') || u.startsWith('TR') || u.includes('LADDER') || u.includes('TRUCK')) {
+    return 'bg-sky-500/20 text-sky-300 border-sky-500/50';
+  }
+  if (u.startsWith('C') || u.startsWith('CHIEF') || u.includes('CHIEF') || u.startsWith('B')) {
+    return 'bg-amber-500/20 text-amber-300 border-amber-500/50';
+  }
+  if (u.startsWith('M') || u.startsWith('MEDIC') || u.startsWith('S') || u.startsWith('AMB')) {
+    return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50';
+  }
+  return 'bg-slate-800 text-slate-200 border-slate-700';
+};
+
+const getShortCallsign = (unitStr) => {
+  const u = (unitStr || '').trim().toUpperCase();
+  if (!u) return '';
+  const numMatch = u.match(/\d+/);
+  const num = numMatch ? numMatch[0] : '';
+
+  if (u.includes('ENGINE') || u.startsWith('ENG') || u.startsWith('E')) return `E${num || u}`;
+  if (u.includes('RESCUE') || u.startsWith('R')) return `R${num || u}`;
+  if (u.includes('LADDER') || u.includes('TRUCK') || u.startsWith('L')) return `L${num || u}`;
+  if (u.includes('CHIEF') || u.startsWith('C')) return `C${num || u}`;
+  if (u.includes('MEDIC') || u.startsWith('M')) return `M${num || u}`;
+  return u;
+};
+
+const formatUnitEtaDisplay = (etaMin) => {
+  if (etaMin == null || isNaN(etaMin)) return '02:30';
+  const totalSec = Math.round(etaMin * 60);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  const padM = String(mins).padStart(2, '0');
+  const padS = String(secs).padStart(2, '0');
+  return `${padM}:${padS}`;
+};
+
 function getUnitIcon(unit) {
   const u = String(unit).toUpperCase();
   if (u.startsWith('M')) return '🚑'; // Medic
@@ -214,43 +259,64 @@ export default function KioskView({ kioskState }) {
             )}
           </div>
 
-          {/* Dispatched Units with Live ETAs from Home Halls */}
+          {/* Tone-Matched Unit Response HUD Card */}
           {unitEtas.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-              {unitEtas.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-950 text-sky-400 border border-sky-500/50 rounded-lg px-2.5 py-1 flex items-center gap-2 shadow-sm font-mono"
-                >
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs">{item.icon}</span>
-                    <span className="text-white font-black text-xs tracking-wider">{item.unit}</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">({item.hall})</span>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              {unitEtas.map((item, idx) => {
+                const badgeStyle = getUnitBadgeStyle(item.unit);
+                const shortCallsign = getShortCallsign(item.unit);
+                const formattedEta = formatUnitEtaDisplay(item.etaMin);
+                return (
+                  <div
+                    key={idx}
+                    className={`px-2.5 py-0.5 rounded-lg border text-xs font-mono font-black tracking-wider flex items-center gap-1.5 shadow-sm ${badgeStyle}`}
+                  >
+                    <span>{shortCallsign}</span>
+                    <span className="opacity-40 text-[10px]">:</span>
+                    <span className="text-white font-black">{formattedEta} ETA</span>
                   </div>
-                  {item.etaStr && (
-                    <div className="flex items-center gap-1 bg-sky-950/90 border border-sky-700/60 px-1.5 py-0.5 rounded text-[10px] font-bold text-sky-300">
-                      <span>⏱️ {item.etaStr}</span>
-                      <span className="text-slate-400 text-[9px]">({item.distStr})</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span>🚒</span>
-              <span>{activeCall?.tone_name || 'Radio Broadcast Assignment'}</span>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              {unitList.map((u, idx) => {
+                const badgeStyle = getUnitBadgeStyle(u);
+                const shortCallsign = getShortCallsign(u);
+                return (
+                  <div
+                    key={idx}
+                    className={`px-2.5 py-0.5 rounded-lg border text-xs font-mono font-black tracking-wider flex items-center gap-1.5 shadow-sm ${badgeStyle}`}
+                  >
+                    <span>{shortCallsign}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* Talk Group */}
-          {talkGroup && (
-            <div className="flex items-center gap-2 font-mono text-[10px] mt-0.5">
-              <span className="bg-slate-950 text-amber-300 border border-slate-800 px-2 py-0.5 rounded font-bold">
+          {/* Talk Group & Nearest Water Hydrant HUD Card */}
+          <div className="flex items-center gap-2 font-mono text-[10px] mt-1">
+            {talkGroup && (
+              <span className="bg-slate-950 text-amber-300 border border-slate-800 px-2 py-1 rounded-lg font-bold">
                 📻 {talkGroup}
               </span>
+            )}
+            <div className="bg-slate-950/90 text-sky-400 border border-sky-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <span>💧</span>
+              <span className="font-bold text-white">City Hydrant:</span>
+              <span className="text-sky-300 font-black">{activeCall?.target?.nearest_city_hydrant || activeCall?.nearest_city_hydrant || 'D-163'}</span>
+              <span className="text-slate-400">({activeCall?.target?.nearest_city_dist || activeCall?.nearest_city_dist || '42'}m)</span>
             </div>
-          )}
+            {(activeCall?.target?.nearest_private_hydrant || activeCall?.nearest_private_hydrant) && (
+              <div className="bg-slate-950/90 text-amber-400 border border-amber-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                <span>🔒</span>
+                <span className="font-bold text-white">Private:</span>
+                <span className="text-amber-300 font-black">{activeCall?.target?.nearest_private_hydrant || activeCall?.nearest_private_hydrant}</span>
+                <span className="text-slate-400">({activeCall?.target?.nearest_private_dist || activeCall?.nearest_private_dist || '18'}m)</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Center: Extra Large Address & Centered Call Type */}

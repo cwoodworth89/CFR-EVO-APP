@@ -169,9 +169,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         {/* Station Halls Layer */}
         <StationsLayer visible={true} />
 
-        {/* 💧 Hydrants Layer on Main Route Overview with Nearest City & Private Hydrant Highlighting */}
-        <HydrantsLayer visible={true} targetCoords={[destLat, destLng]} minZoom={12} />
-
         {/* Live OSRM Emergency Response Routing Overlay */}
         <RoutingOverlay
           from={[origin.lat, origin.lng]}

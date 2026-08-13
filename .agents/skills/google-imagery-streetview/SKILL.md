@@ -1,11 +1,11 @@
 ---
 name: google-imagery-streetview
-description: Procedures and integration workflows for fetching, caching, orienting, and rendering Google Street View panoramas and high-resolution satellite aerial imagery in CFR EVO.
+description: Procedures and integration workflows for fetching, caching, orienting, persisting, and rendering Google Street View panoramas and high-resolution satellite aerial imagery in CFR EVO.
 ---
 
 # Satellite Imagery & Street View Enrichment Runbook
 
-This skill outlines how to fetch, orient, cache, and display high-resolution **Google Satellite aerial imagery** and **Street View 360° building facade views** for emergency dispatches in **CFR EVO**.
+This skill outlines how to fetch, orient, cache, persist, and display high-resolution **Google Satellite aerial imagery** and **Street View 360° building facade views** for emergency dispatches in **CFR EVO**.
 
 ---
 
@@ -17,17 +17,17 @@ When arriving at an incident, crew situational awareness is dramatically improve
 
 ```mermaid
 flowchart TD
-    A[Geocoded Incident Coordinates] --> B[Calculate Heading Angle θ]
+    A[Geocoded Incident Coordinates] --> B[Calculate Frontage Heading θ]
     B --> C[Fetch Google Street View API]
     A --> D[Fetch High-Res Satellite Static Map]
     
-    C --> E[Local Image Cache: frontend/public/imagery/]
+    C --> E[Local Image Cache & PostgreSQL Database]
     D --> E
     
     E --> F[Kiosk UI Split-Screen Display]
-    F --> F1[Live Tactical Vector Map]
+    F --> F1[Live Tactical Vector Map (CartoDB Voyager)]
     F --> F2[Satellite Aerial with Parcel Polygon]
-    F --> F3[Street View Building Entrance]
+    F --> F3[Street View 360° Building Entrance]
 ```
 
 ---
@@ -56,74 +56,62 @@ def calculate_streetview_heading(street_lat: float, street_lng: float, parcel_la
 
 ---
 
-## 3. Google Static Imagery API Integration
+## 3. Real-Time POV Drag Synchronization Pattern (React + Google JS SDK)
 
-### A. Satellite Aerial View with Parcel Outline & Hydrant Markers
-* **Endpoint**: `https://maps.googleapis.com/maps/api/staticmap`
-* **Query Parameters**:
-  ```properties
-  center=49.2781,-122.8123
-  zoom=18
-  size=640x480
-  scale=2
-  maptype=satellite
-  key=GOOGLE_MAPS_API_KEY
-  ```
-* **Embedding Parcel Polygon & Hydrant Pins**:
-  - `path=color:0x00e676ff|weight:3|fillcolor:0x00e67620|49.2781,-122.8123|49.2782,-122.8124|...`
-  - `markers=color:blue|label:H|49.2785,-122.8120` (Nearest NFPA Hydrant)
+In interactive 360° mode, cross-origin Security (`same-origin` policy) prevents `<iframe>` elements from leaking user touch/mouse camera rotation angles back to React. To capture the exact angle a user drags to when tapping **"Save Preferred View"**, use `window.google.maps.StreetViewPanorama` with a real-time `pov_changed` listener:
 
-### B. Street View Static Facade View
-* **Endpoint**: `https://maps.googleapis.com/maps/api/streetview`
-* **Query Parameters**:
-  ```properties
-  size=640x480
-  location=49.2781,-122.8123
-  fov=90
-  heading=245
-  pitch=10
-  key=GOOGLE_MAPS_API_KEY
-  ```
+```javascript
+// frontend/src/components/kiosk/StreetViewPanel.jsx
+const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1 });
 
----
+const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
+  position: { lat: parseFloat(frontLat), lng: parseFloat(frontLng) },
+  pov: { heading: parseFloat(initialHeading), pitch: parseFloat(initialPitch) },
+  zoom: 1,
+  fullscreenControl: false, // Hides Google's native button underneath custom Expand button
+  addressControl: false,
+  panControl: false,
+  linksControl: true
+});
 
-## 4. Local Caching Strategy (Zero-Latency & Quota Protection)
-
-To minimize API costs and guarantee instant loading on station kiosks:
-1. When Phase 1 or Phase 2 geocodes a dispatch, a background task requests both images.
-2. The image buffers are persisted directly into `frontend/public/imagery/`:
-   - `frontend/public/imagery/{dispatch_id}_satellite.jpg`
-   - `frontend/public/imagery/{dispatch_id}_streetview.jpg`
-3. The React kiosk UI references local relative paths (`/imagery/{dispatch_id}_streetview.jpg`). If external internet drops, previously fetched imagery continues to display seamlessly.
-
----
-
-## 5. React Kiosk HUD Component Pattern
-
-```jsx
-// frontend/src/components/kiosk/TacticalImageryPanel.jsx
-export function TacticalImageryPanel({ dispatchId, lat, lng }) {
-  const satelliteUrl = `/imagery/${dispatchId}_satellite.jpg`;
-  const streetViewUrl = `/imagery/${dispatchId}_streetview.jpg`;
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-      {/* Satellite Aerial */}
-      <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-slate-900">
-        <span className="absolute top-3 left-3 px-3 py-1 bg-slate-900/80 text-xs font-bold text-emerald-400 rounded-lg">
-          SATELLITE RECON
-        </span>
-        <img src={satelliteUrl} alt="Satellite Aerial" className="w-full h-full object-cover" />
-      </div>
-
-      {/* Street View Facade */}
-      <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-slate-900">
-        <span className="absolute top-3 left-3 px-3 py-1 bg-slate-900/80 text-xs font-bold text-cyan-400 rounded-lg">
-          STREET VIEW FACADE
-        </span>
-        <img src={streetViewUrl} alt="Street View" className="w-full h-full object-cover" />
-      </div>
-    </div>
-  );
-}
+// Real-time POV drag listener (captures exact touch & mouse camera angles!)
+pano.addListener('pov_changed', () => {
+  const pov = pano.getPov();
+  if (pov && !isNaN(pov.heading)) {
+    currentPovRef.current = {
+      heading: Math.round(pov.heading || 0),
+      pitch: Math.round(pov.pitch || 0),
+      zoom: Math.round(pano.getZoom() || 1)
+    };
+  }
+});
 ```
+
+---
+
+## 4. PostgreSQL Parcel Schema & Override Persistence
+
+Camera vectors (`streetview_heading`, `streetview_pitch`, `streetview_fov`), Lock Box notes, and Pre-Incident Construction Plan PDF URLs are consolidated directly into the `parcels` table in PostgreSQL:
+
+```sql
+-- PostgreSQL Parcel Schema Extension
+ALTER TABLE parcels 
+ADD COLUMN IF NOT EXISTS streetview_heading DOUBLE PRECISION DEFAULT 0.0,
+ADD COLUMN IF NOT EXISTS streetview_pitch DOUBLE PRECISION DEFAULT 5.0,
+ADD COLUMN IF NOT EXISTS streetview_fov DOUBLE PRECISION DEFAULT 80.0,
+ADD COLUMN IF NOT EXISTS lock_box_notes TEXT,
+ADD COLUMN IF NOT EXISTS pre_plan_pdf_url TEXT;
+```
+
+When a user taps **"Save Preferred View"**:
+1. Post payload `{ clean_address, front_lat, front_lng, heading, pitch, fov }` to `/api/parcels/streetview`.
+2. Cache payload in `localStorage` under `cfr_sv_override_${cleanAddress}` for zero-latency client retrieval.
+
+---
+
+## 5. Google Cloud Console API Requirements
+
+To ensure zero gray error boxes on station kiosks, the Google Maps API Key (`VITE_GOOGLE_MAPS_API_KEY`) must have the following APIs enabled in Google Cloud Console:
+1. **Maps JavaScript API** (Required for `StreetViewPanorama` WebGL canvas & `pov_changed` drag events)
+2. **Maps Embed API** (Required for reliable `<iframe>` embed fallback)
+3. **Geocoding API** (Required for address centroid lookups)

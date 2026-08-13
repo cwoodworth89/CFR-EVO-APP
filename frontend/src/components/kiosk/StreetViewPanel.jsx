@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
@@ -23,6 +23,12 @@ export default function StreetViewPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
+  const [sdkError, setSdkError] = useState(false);
+
+  const containerRef = useRef(null);
+  const modalContainerRef = useRef(null);
+  const panoramaRef = useRef(null);
+  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1 });
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
@@ -62,13 +68,16 @@ export default function StreetViewPanel({ activeCall }) {
   // Priority: 1. DB Override -> 2. Local Storage -> 3. Hardcoded fallback -> 4. Computed frontage angle
   const activeOverride = dbOverride || localOverride || fallbackOverride;
 
-  const frontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
-  const frontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
+  const rawFrontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
+  const rawFrontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
 
-  const targetLat = activeCall?.lat ?? activeCall?.target?.lat ?? frontLat;
-  const targetLng = activeCall?.lng ?? activeCall?.target?.lng ?? frontLng;
+  const frontLat = parseFloat(rawFrontLat) || 49.2838;
+  const frontLng = parseFloat(rawFrontLng) || -122.7932;
 
-  let initialHeading = activeOverride ? activeOverride.heading : 0;
+  const targetLat = parseFloat(activeCall?.lat ?? activeCall?.target?.lat ?? frontLat);
+  const targetLng = parseFloat(activeCall?.lng ?? activeCall?.target?.lng ?? frontLng);
+
+  let initialHeading = activeOverride ? parseFloat(activeOverride.heading) : 0;
   if (!activeOverride && (frontLat !== targetLat || frontLng !== targetLng)) {
     const dLng = (targetLng - frontLng) * (Math.PI / 180);
     const targetLatRad = targetLat * (Math.PI / 180);
@@ -79,19 +88,112 @@ export default function StreetViewPanel({ activeCall }) {
     initialHeading = Math.round((bearing + 360) % 360);
   }
 
-  const initialPitch = activeOverride ? activeOverride.pitch : 5;
-  const initialFov = activeOverride ? activeOverride.fov : 80;
+  const initialPitch = activeOverride ? parseFloat(activeOverride.pitch || 5) : 5;
+  const initialFov = activeOverride ? parseFloat(activeOverride.fov || 80) : 80;
+
+  // Track initial heading/pitch in ref
+  useEffect(() => {
+    currentPovRef.current = { heading: initialHeading, pitch: initialPitch, zoom: 1 };
+  }, [initialHeading, initialPitch]);
+
+  // Global auth failure handler
+  useEffect(() => {
+    window.gm_authFailure = () => {
+      console.warn("Google Maps JS SDK auth failure triggered. Check Google Cloud Console 'Maps JavaScript API' status.");
+      setSdkError(true);
+    };
+  }, []);
+
+  // Initialize or update Google Maps StreetViewPanorama with real-time drag POV listener & lifecycle cleanup
+  useEffect(() => {
+    if (!apiKey || !isOnline || sdkError) return;
+
+    const targetContainer = isExpanded ? modalContainerRef.current : containerRef.current;
+    if (!targetContainer) return;
+
+    // Clear previous DOM contents before mounting new canvas instance
+    targetContainer.innerHTML = '';
+
+    const initPanorama = () => {
+      if (!window.google || !window.google.maps) return;
+
+      try {
+        const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
+          position: { lat: frontLat, lng: frontLng },
+          pov: { heading: initialHeading, pitch: initialPitch },
+          zoom: 1,
+          fullscreenControl: false, // Hide Google's native fullscreen button
+          addressControl: false,
+          panControl: false,
+          linksControl: true,
+          motionTracking: false,
+          motionTrackingControl: false,
+          showRoadLabels: true
+        });
+
+        // Real-time POV drag listener (captures exact touch & mouse camera angles!)
+        pano.addListener('pov_changed', () => {
+          const pov = pano.getPov();
+          if (pov) {
+            currentPovRef.current = {
+              heading: Math.round(pov.heading || 0),
+              pitch: Math.round(pov.pitch || 0),
+              zoom: Math.round(pano.getZoom() || 1)
+            };
+          }
+        });
+
+        panoramaRef.current = pano;
+      } catch (err) {
+        console.error("Failed to initialize Google StreetViewPanorama:", err);
+        setSdkError(true);
+      }
+    };
+
+    if (window.google && window.google.maps) {
+      initPanorama();
+    } else {
+      const existingScript = document.getElementById('google-maps-js-sdk');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.id = 'google-maps-js-sdk';
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+        script.async = true;
+        script.onload = initPanorama;
+        script.onerror = () => setSdkError(true);
+        document.head.appendChild(script);
+      } else {
+        existingScript.addEventListener('load', initPanorama);
+      }
+    }
+
+    return () => {
+      if (targetContainer) targetContainer.innerHTML = '';
+      panoramaRef.current = null;
+    };
+  }, [frontLat, frontLng, initialHeading, initialPitch, apiKey, isOnline, isExpanded, sdkError]);
 
   const handleSaveView = async () => {
     if (!activeCall?.address || !cleanAddrKey) return;
     setSaveStatus('saving');
 
+    let currentHeading = currentPovRef.current.heading;
+    let currentPitch = currentPovRef.current.pitch;
+
+    if (panoramaRef.current && typeof panoramaRef.current.getPov === 'function') {
+      const pov = panoramaRef.current.getPov();
+      if (pov && !isNaN(pov.heading)) {
+        currentHeading = Math.round(pov.heading || 0);
+        currentPitch = Math.round(pov.pitch || 0);
+      }
+    }
+
     const payload = {
       clean_address: cleanAddrKey,
       front_lat: frontLat,
       front_lng: frontLng,
-      heading: initialHeading,
-      pitch: initialPitch,
+      heading: currentHeading,
+      pitch: currentPitch,
       fov: initialFov
     };
 
@@ -113,19 +215,43 @@ export default function StreetViewPanel({ activeCall }) {
     ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}&fov=${initialFov}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
-  const renderContent = () => (
+  const renderContent = (isModal = false) => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
-      {/* Reliable Google Street View 360° Embed Canvas */}
-      <iframe
-        title="Live Interactive Google Street View 360"
-        width="100%"
-        height="100%"
-        style={{ border: 0 }}
-        loading="lazy"
-        allowFullScreen
-        src={embedStreetViewUrl}
-        className="w-full h-full"
-      />
+      {sdkError ? (
+        <div className="w-full h-full relative flex flex-col items-center justify-center p-4 text-center bg-slate-950 text-slate-300">
+          <iframe
+            title="Fallback Google Street View Embed"
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            loading="lazy"
+            allowFullScreen
+            src={embedStreetViewUrl}
+            className="w-full h-full"
+          />
+          <div className="absolute top-2 left-2 right-2 z-30 bg-amber-950/90 text-amber-200 border border-amber-600/80 p-2 rounded-xl text-xs font-mono shadow-xl flex items-center justify-between">
+            <span>⚠️ JS SDK disabled on Key. Enable "Maps JavaScript API" in Google Cloud Console. Rendering embed fallback.</span>
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={isModal ? modalContainerRef : containerRef}
+          className="w-full h-full"
+        >
+          {!apiKey && (
+            <iframe
+              title="Live Interactive Google Street View 360"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              loading="lazy"
+              allowFullScreen
+              src={embedStreetViewUrl}
+              className="w-full h-full"
+            />
+          )}
+        </div>
+      )}
 
       {/* Address & Save Overlay */}
       <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/95 backdrop-blur border border-slate-800 p-2.5 rounded-xl flex items-center justify-between shadow-2xl">
@@ -134,7 +260,7 @@ export default function StreetViewPanel({ activeCall }) {
           <span className="text-white font-bold">{activeCall?.address || 'Destination'}</span>
           {dbOverride && (
             <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
-              SAVED PREFERRED VIEW ({initialHeading}°)
+              SAVED PREFERRED VIEW ({activeOverride.heading || initialHeading}°)
             </span>
           )}
         </div>
@@ -187,7 +313,7 @@ export default function StreetViewPanel({ activeCall }) {
         </button>
 
         {isOnline ? (
-          renderContent()
+          renderContent(false)
         ) : (
           <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
             <span className="text-2xl">🏛️</span>
@@ -218,7 +344,7 @@ export default function StreetViewPanel({ activeCall }) {
           </div>
 
           <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-indigo-500/50 shadow-2xl relative">
-            {renderContent()}
+            {renderContent(true)}
           </div>
         </div>
       )}

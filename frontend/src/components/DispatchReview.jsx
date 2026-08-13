@@ -193,11 +193,12 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
 
   const adjustTranscriptHeight = () => {
     if (transcriptTextareaRef.current) {
-      transcriptTextareaRef.current.style.height = 'auto';
-      const scrollH = transcriptTextareaRef.current.scrollHeight;
-      // Minimum height ~110px (~5 visible lines), max failsafe ~260px
-      const targetH = Math.min(Math.max(scrollH, 110), 260);
-      transcriptTextareaRef.current.style.height = `${targetH}px`;
+      const el = transcriptTextareaRef.current;
+      el.style.height = 'auto';
+      const scrollH = el.scrollHeight;
+      // Minimum height ~140px (~6 full visible lines), max failsafe ~320px
+      const targetH = Math.min(Math.max(scrollH, 140), 320);
+      el.style.height = `${targetH}px`;
     }
   };
 
@@ -301,7 +302,10 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
 
   // Dynamic auto-expand height for Ground-Truth Transcript textarea
   useEffect(() => {
-    adjustTranscriptHeight();
+    const timer = setTimeout(() => {
+      adjustTranscriptHeight();
+    }, 50);
+    return () => clearTimeout(timer);
   }, [verifiedTranscript, selectedCall]);
 
   const handleSelectCall = (call) => {
@@ -1262,7 +1266,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                   </div>
                   <textarea
                     ref={transcriptTextareaRef}
-                    rows={5}
+                    rows={6}
                     placeholder={selectedCall.sanitized_transcript || selectedCall.raw_transcript || "Enter confirmed transcript... (Ctrl+Space to prefill)"}
                     value={verifiedTranscript}
                     onChange={(e) => {
@@ -1274,7 +1278,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                       handleInputKeyDown(e, 'transcript');
                     }}
                     onDoubleClick={() => prefillField('transcript')}
-                    className="w-full min-h-[110px] max-h-[260px] bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono leading-relaxed overflow-y-auto"
+                    className="w-full min-h-[140px] max-h-[320px] bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono leading-relaxed overflow-y-auto"
                   />
                 </div>
 

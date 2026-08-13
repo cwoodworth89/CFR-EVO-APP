@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
@@ -23,14 +23,10 @@ export default function StreetViewPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
-  const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('cfr_streetview_mode') || 'embed';
-  });
 
-  const handleSetViewMode = (mode) => {
-    setViewMode(mode);
-    localStorage.setItem('cfr_streetview_mode', mode);
-  };
+  const containerRef = useRef(null);
+  const modalContainerRef = useRef(null);
+  const panoramaRef = useRef(null);
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
@@ -87,157 +83,148 @@ export default function StreetViewPanel({ activeCall }) {
     initialHeading = Math.round((bearing + 360) % 360);
   }
 
-  const [heading, setHeading] = useState(initialHeading);
-  const [pitch, setPitch] = useState(activeOverride ? activeOverride.pitch : 5);
-  const [fov, setFov] = useState(activeOverride ? activeOverride.fov : 80);
+  const initialPitch = activeOverride ? activeOverride.pitch : 5;
+  const initialFov = activeOverride ? activeOverride.fov : 80;
 
-  // Sync heading/pitch/fov ONLY when address changes or activeOverride is first loaded
-  const loadedKeyRef = React.useRef(null);
+  // Initialize or update Google Maps StreetViewPanorama
   useEffect(() => {
-    const key = `${cleanAddrKey}_${dbOverride ? 'db' : localOverride ? 'local' : 'none'}`;
-    if (loadedKeyRef.current !== key) {
-      loadedKeyRef.current = key;
-      setHeading(activeOverride ? activeOverride.heading : initialHeading);
-      setPitch(activeOverride ? activeOverride.pitch : 5);
-      setFov(activeOverride ? activeOverride.fov : 80);
+    if (!apiKey || !isOnline) return;
+
+    const targetContainer = isExpanded ? modalContainerRef.current : containerRef.current;
+    if (!targetContainer) return;
+
+    const initPanorama = () => {
+      if (!window.google || !window.google.maps) return;
+
+      const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
+        position: { lat: frontLat, lng: frontLng },
+        pov: { heading: initialHeading, pitch: initialPitch },
+        zoom: 1,
+        fullscreenControl: false, // Hides Google's native fullscreen button underneath ours!
+        addressControl: false,
+        panControl: false,
+        linksControl: true,
+        motionTracking: false,
+        motionTrackingControl: false,
+        showRoadLabels: true
+      });
+      panoramaRef.current = pano;
+    };
+
+    if (window.google && window.google.maps) {
+      initPanorama();
+    } else {
+      const existingScript = document.getElementById('google-maps-js-sdk');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.id = 'google-maps-js-sdk';
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+        script.async = true;
+        script.onload = initPanorama;
+        document.head.appendChild(script);
+      } else {
+        existingScript.addEventListener('load', initPanorama);
+      }
     }
-  }, [cleanAddrKey, dbOverride, localOverride, initialHeading, activeOverride]);
+  }, [frontLat, frontLng, initialHeading, initialPitch, apiKey, isOnline, isExpanded]);
 
   const handleSaveView = async () => {
     if (!activeCall?.address || !cleanAddrKey) return;
     setSaveStatus('saving');
+
+    let currentHeading = initialHeading;
+    let currentPitch = initialPitch;
+    if (panoramaRef.current && typeof panoramaRef.current.getPov === 'function') {
+      const pov = panoramaRef.current.getPov();
+      if (pov) {
+        currentHeading = Math.round(pov.heading || 0);
+        currentPitch = Math.round(pov.pitch || 0);
+      }
+    }
+
     const payload = {
       clean_address: cleanAddrKey,
       front_lat: frontLat,
       front_lng: frontLng,
-      heading: Math.round(heading),
-      pitch: Math.round(pitch),
-      fov: Math.round(fov)
+      heading: currentHeading,
+      pitch: currentPitch,
+      fov: initialFov
     };
+
     try {
-      // Save locally to localStorage for instant client retrieval
       localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(payload));
-      
-      // Persist to backend PostgreSQL DB
       await apiClient.streetView.saveOverride(payload);
       setDbOverride(payload);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);
     } catch (e) {
       console.error('Failed to save Street View angle:', e);
-      // Fallback: LocalStorage saved successfully even if API call fails
       setDbOverride(payload);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);
     }
   };
 
-  const staticStreetViewUrl = apiKey
-    ? `https://maps.googleapis.com/maps/api/streetview?size=900x500&location=${frontLat},${frontLng}&fov=${fov}&heading=${heading}&pitch=${pitch}&source=outdoor&key=${apiKey}`
-    : null;
-
   const embedStreetViewUrl = apiKey
-    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${heading}&pitch=${pitch}&fov=${fov}`
+    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}&fov=${initialFov}`
     : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
 
-  const renderContent = () => (
+  const renderContent = (isModal = false) => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
-      {viewMode === 'photo' && staticStreetViewUrl ? (
-        <div className="w-full h-full relative bg-slate-950 flex items-center justify-center">
-          <img
-            src={staticStreetViewUrl}
-            alt="Google Street View High-Res"
-            className="w-full h-full object-cover"
-            onError={() => setViewMode('embed')}
+      {/* StreetView Canvas Container */}
+      <div
+        ref={isModal ? modalContainerRef : containerRef}
+        className="w-full h-full"
+      >
+        {!apiKey && (
+          <iframe
+            title="Live Interactive Google Street View"
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            loading="lazy"
+            allowFullScreen
+            src={embedStreetViewUrl}
+            className="w-full h-full"
           />
-          {/* Subtle vignette */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
-        </div>
-      ) : (
-        <iframe
-          title="Live Interactive Google Street View"
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          loading="lazy"
-          allowFullScreen
-          src={embedStreetViewUrl}
-          className="w-full h-full"
-        />
-      )}
+        )}
+      </div>
 
-      {/* Angle Fine-Tuning & Save Overlay */}
-      <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/95 backdrop-blur border border-slate-800 p-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xl">
-        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300">
+      {/* Address & Save Overlay */}
+      <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/95 backdrop-blur border border-slate-800 p-2.5 rounded-xl flex items-center justify-between shadow-2xl">
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
           <span className="text-amber-400 font-bold">📍 Address:</span>
-          <span className="text-white font-semibold">{activeCall?.address || 'Destination'}</span>
-          {dbOverride && <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold">SAVED OVERRIDE</span>}
-        </div>
-
-        {/* Heading & Pitch Controls */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-300">
-            <span>Heading:</span>
-            <button
-              onClick={() => setHeading((h) => (h - 15 + 360) % 360)}
-              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
-              title="Rotate Left 15°"
-            >
-              ↺
-            </button>
-            <span className="text-amber-400 font-bold min-w-[32px] text-center">{Math.round(heading)}°</span>
-            <button
-              onClick={() => setHeading((h) => (h + 15) % 360)}
-              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-amber-300 font-bold"
-              title="Rotate Right 15°"
-            >
-              ↻
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-300">
-            <span>Pitch:</span>
-            <button
-              onClick={() => setPitch((p) => Math.max(-45, p - 5))}
-              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
-              title="Tilt Down 5°"
-            >
-              ⬇
-            </button>
-            <span className="text-sky-400 font-bold min-w-[28px] text-center">{Math.round(pitch)}°</span>
-            <button
-              onClick={() => setPitch((p) => Math.min(45, p + 5))}
-              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-sky-300 font-bold"
-              title="Tilt Up 5°"
-            >
-              ⬆
-            </button>
-          </div>
-
-          {/* Save Preferred View Button */}
-          <button
-            onClick={handleSaveView}
-            disabled={saveStatus === 'saving'}
-            className={`px-3 py-1 rounded-lg border font-bold text-xs transition shadow flex items-center gap-1.5 ${
-              saveStatus === 'saved'
-                ? 'bg-emerald-600 border-emerald-400 text-white'
-                : saveStatus === 'error'
-                ? 'bg-red-600 border-red-400 text-white'
-                : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950 cursor-pointer'
-            }`}
-          >
-            <span>💾</span>
-            <span>
-              {saveStatus === 'saving'
-                ? 'Saving...'
-                : saveStatus === 'saved'
-                ? '✅ Saved!'
-                : saveStatus === 'error'
-                ? '❌ Failed'
-                : 'Save Preferred View'}
+          <span className="text-white font-bold">{activeCall?.address || 'Destination'}</span>
+          {dbOverride && (
+            <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
+              SAVED PREFERRED VIEW
             </span>
-          </button>
+          )}
         </div>
+
+        {/* Save Preferred View Button (Grabs touch/mouse orientation dynamically!) */}
+        <button
+          onClick={handleSaveView}
+          disabled={saveStatus === 'saving'}
+          className={`px-4 py-1.5 rounded-xl border font-bold text-xs transition shadow flex items-center gap-1.5 ${
+            saveStatus === 'saved'
+              ? 'bg-emerald-600 border-emerald-400 text-white'
+              : saveStatus === 'error'
+              ? 'bg-red-600 border-red-400 text-white'
+              : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950 cursor-pointer'
+          }`}
+        >
+          <span>💾</span>
+          <span>
+            {saveStatus === 'saving'
+              ? 'Saving...'
+              : saveStatus === 'saved'
+              ? '✅ Saved Preferred View!'
+              : saveStatus === 'error'
+              ? '❌ Failed'
+              : 'Save Preferred View'}
+          </span>
+        </button>
       </div>
     </div>
   );
@@ -245,43 +232,25 @@ export default function StreetViewPanel({ activeCall }) {
   return (
     <>
       <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
-        {/* Header Controls */}
-        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-400 flex items-center gap-2 shadow">
+        {/* Header Title Bar */}
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-indigo-400 flex items-center gap-2 shadow">
           <span>📷</span>
-          <span>Google Street View</span>
-          
-          {/* Mode Switcher Toggle */}
-          <div className="flex items-center bg-slate-950 rounded border border-slate-800 p-0.5 text-[9px] font-mono">
-            <button
-              onClick={() => handleSetViewMode('embed')}
-              className={`px-2 py-0.5 rounded transition ${viewMode === 'embed' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-              title="Interactive 360° Live Embed"
-            >
-              Interactive 360°
-            </button>
-            <button
-              onClick={() => handleSetViewMode('photo')}
-              className={`px-2 py-0.5 rounded transition ${viewMode === 'photo' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-              title="High-Resolution Street View Photo"
-            >
-              Photo
-            </button>
-          </div>
-
+          <span>Google Street View 360°</span>
           {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
         </div>
 
+        {/* Custom Expand Button (Sitting cleanly in top right corner!) */}
         <button
           onClick={() => setIsExpanded(true)}
-          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow cursor-pointer"
+          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
           title="Pop Out Full Screen View"
         >
           <span>⤢</span>
-          <span className="hidden sm:inline">Expand</span>
+          <span>Expand</span>
         </button>
 
         {isOnline ? (
-          renderContent()
+          renderContent(false)
         ) : (
           <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
             <span className="text-2xl">🏛️</span>
@@ -298,7 +267,7 @@ export default function StreetViewPanel({ activeCall }) {
             <div className="flex items-center gap-2">
               <span className="text-xl">📷</span>
               <div>
-                <h3 className="text-base font-bold text-white uppercase tracking-wide">Google Street View 360° Inspection & Camera Calibration</h3>
+                <h3 className="text-base font-bold text-white uppercase tracking-wide">Google Street View 360° Inspection</h3>
                 <p className="text-xs text-indigo-400 font-mono">📍 {activeCall?.address || 'Target Property'}</p>
               </div>
             </div>
@@ -312,7 +281,7 @@ export default function StreetViewPanel({ activeCall }) {
           </div>
 
           <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-indigo-500/50 shadow-2xl relative">
-            {renderContent()}
+            {renderContent(true)}
           </div>
         </div>
       )}

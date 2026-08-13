@@ -189,6 +189,17 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const prevAudioUrlRef = useRef(null);
   const audioRef = useRef(null);
   const formContainerRef = useRef(null);
+  const transcriptTextareaRef = useRef(null);
+
+  const adjustTranscriptHeight = () => {
+    if (transcriptTextareaRef.current) {
+      transcriptTextareaRef.current.style.height = 'auto';
+      const scrollH = transcriptTextareaRef.current.scrollHeight;
+      // Minimum height ~110px (~5 visible lines), max failsafe ~260px
+      const targetH = Math.min(Math.max(scrollH, 110), 260);
+      transcriptTextareaRef.current.style.height = `${targetH}px`;
+    }
+  };
 
 
   const deriveTonesFromUnitsList = (units) => {
@@ -287,6 +298,11 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       prevSelectedCallIdRef.current = null;
     }
   }, [selectedCall?.id, selectedCall?.audio_url]);
+
+  // Dynamic auto-expand height for Ground-Truth Transcript textarea
+  useEffect(() => {
+    adjustTranscriptHeight();
+  }, [verifiedTranscript, selectedCall]);
 
   const handleSelectCall = (call) => {
     setSelectedCall(call);
@@ -1245,16 +1261,20 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                     </button>
                   </div>
                   <textarea
-                    rows={3}
+                    ref={transcriptTextareaRef}
+                    rows={5}
                     placeholder={selectedCall.sanitized_transcript || selectedCall.raw_transcript || "Enter confirmed transcript... (Ctrl+Space to prefill)"}
                     value={verifiedTranscript}
-                    onChange={(e) => setVerifiedTranscript(e.target.value)}
+                    onChange={(e) => {
+                      setVerifiedTranscript(e.target.value);
+                      adjustTranscriptHeight();
+                    }}
                     onKeyDown={(e) => {
                       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
                       handleInputKeyDown(e, 'transcript');
                     }}
                     onDoubleClick={() => prefillField('transcript')}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono resize-none leading-relaxed"
+                    className="w-full min-h-[110px] max-h-[260px] bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono leading-relaxed overflow-y-auto"
                   />
                 </div>
 

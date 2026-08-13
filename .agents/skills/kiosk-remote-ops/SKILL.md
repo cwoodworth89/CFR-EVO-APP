@@ -10,25 +10,35 @@ This skill provides step-by-step procedures for managing the remote kiosk host o
 ## Connection & Security Specifications
 * **Host**: `100.95.146.94` (hostname: `cfr-mapping-tcfh`)
 * **User**: `tcfire`
+* **Docker Container Stack**:
+  - PostgreSQL: `cfr_postgres` (DB: `cfr_dispatch`, User: `cfr_user`, Port: `5432`)
+  - API Gateway: `cfr_api` (FastAPI, Port: `8000`)
+  - MQTT Broker: `cfr_mosquitto` (WebSockets Port: `9001`)
+  - Push Server: `cfr_ntfy` (Port: `8080`)
 * **PortAudio Environment**: Must prepend `XDG_RUNTIME_DIR=/run/user/1000` for all sounddevice / audio commands.
 
 ---
 
-## 1. System Health & Audio Hardware Inspection
+## 1. System Health & Container Stack Inspection
 
-Check system uptime and list all detected audio capture cards:
+Check system uptime and container status:
 ```bash
-ssh tcfire@100.95.146.94 "uname -a; uptime"
+ssh tcfire@100.95.146.94 "uptime && docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
 ```
 
-List audio input devices using PortAudio:
+Query PostgreSQL directly without shell escaping issues:
 ```bash
-ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python -c 'import sounddevice as sd; print(sd.query_devices())'"
+ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch -c 'SELECT * FROM streetview_overrides;'"
 ```
 
 ---
 
 ## 2. Audio Capture Diagnostics & Log Auditing
+
+List audio input devices using PortAudio:
+```bash
+ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python -c 'import sounddevice as sd; print(sd.query_devices())'"
+```
 
 Run a 15-second audio capture diagnostic on device index 13:
 ```bash
@@ -59,25 +69,26 @@ ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/frontend && npm install &&
 ## 4. Full-Stack Remote Verification Workflow
 
 Whenever a bug fix or feature edit is completed:
-1. Stage, commit, and push changes locally:
+1. **Stage, commit, and push changes locally**:
    ```bash
    git add .
    git commit -m "fix/feat: description"
    git push origin main
    ```
-2. Pull updates and rebuild frontend assets on the remote kiosk:
+2. **Pull updates and rebuild frontend assets on remote kiosk**:
    ```bash
+   ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend && npm run build"
+   ```
+
+---
+
 ## 5. Human-Readable Database & Dispatch Inspection Rule
 
 To prevent Windows PowerShell quoting errors and keep all command logs 100% human-readable:
 1. **Use Version-Controlled Helper Scripts**:
-   - Run `inspect_dispatch.py` inside the container stack for clean human-readable output:
+   - Run helper scripts (e.g. `inspect_dispatch.py`, `update_streetview.py`) inside the container stack for clean human-readable output:
      ```bash
      ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec cfr_api python backend/scripts/inspect_dispatch.py DISP-2026-2659EC"
      ```
-2. **Stream Local Python Files via Stdin**:
-   - Stream local python scripts over SSH stdin without shell quote escaping or Base64 encoding:
-     ```bash
-     ssh tcfire@100.95.146.94 "python3 -s" < local_script.py
-     ```
-
+2. **Execute Dedicated SQL Scripts**:
+   - Use `docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch` with standard SQL queries rather than deeply nested inline quotes.

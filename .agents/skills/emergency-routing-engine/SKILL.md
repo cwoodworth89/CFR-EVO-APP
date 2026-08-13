@@ -80,7 +80,18 @@ Different vehicle classes require specific path weighting:
 
 ---
 
-## 4. Road Closure & Obstruction Avoidance
+## 4. Response Mode Physics & ETAs (Code 3 Emergency vs Code 1 Routine)
+
+The routing engine dynamically adjusts speed profiles, road curvature multipliers, and turnout chute times based on the parsed `response_type`:
+
+| Response Mode | Signal Preemption (EmTrac / Opticom) | Avg Urban Speed | Road Multiplier | Turnout Buffer | Driving Characteristics |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **🚨 Emergency (Code 3)** | **Active** (Lights & Siren, Opticom green-light request) | **45.0 km/h** | `1.35x` | **0.5 min** (30s) | Priority intersection clearance, running red signals safely, Opticom preempted green lights |
+| **🟢 Routine (Code 1)** | **Inactive** (Standard Public Drive Time) | **32.0 km/h** | `1.45x` | **1.0 min** (60s) | Obeys all traffic signals, stop signs, speed limits, and standard public traffic congestion |
+
+---
+
+## 5. Road Closure & Obstruction Avoidance
 
 When active closures exist (from `road_closures` table):
 1. Closed road segments are converted into exclusion coordinate polygons or forbidden bounding boxes.

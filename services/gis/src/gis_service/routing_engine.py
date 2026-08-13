@@ -90,21 +90,33 @@ class EVORoutingEngine:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1.0 - a)))
         return R * c
 
-    def calculate_unit_metrics(self, unit: str, dest_lat: float, dest_lng: float) -> Dict[str, Any]:
+    def calculate_unit_metrics(
+        self,
+        unit: str,
+        dest_lat: float,
+        dest_lng: float,
+        response_type: str = "emergency"
+    ) -> Dict[str, Any]:
         """
         Calculates driving distance, road routing factor, and ETA for a specific unit from its Home Fire Hall.
+
+        Response Modes:
+          - Emergency (Code 3): EmTrac/Opticom signal preemption, Code 3 speed (~45 km/h avg, 1.35x road factor, 0.5m turnout).
+          - Routine (Code 1): Standard public drive times, obeying traffic signals & speed limits (~32 km/h avg, 1.45x road factor, 1.0m turnout).
         """
         clean_unit = str(unit).strip().upper()
         station_id = get_unit_station_id(clean_unit)
         hall = self.get_hall_location(station_id)
 
         crow_km = self.calculate_distance_km(hall["lat"], hall["lng"], dest_lat, dest_lng)
-        # Emergency urban road curvature multiplier (~1.35x crow-flies)
-        road_km = round(crow_km * 1.35, 2)
         
-        # Average emergency driving speed ~45 km/h + 30-second turnout buffer
-        avg_speed_kmh = 45.0
-        total_minutes = (road_km / avg_speed_kmh) * 60 + 0.5
+        is_routine = str(response_type).lower().strip() == "routine"
+        road_factor = 1.45 if is_routine else 1.35
+        avg_speed_kmh = 32.0 if is_routine else 45.0
+        turnout_minutes = 1.0 if is_routine else 0.5
+
+        road_km = round(crow_km * road_factor, 2)
+        total_minutes = (road_km / avg_speed_kmh) * 60 + turnout_minutes
         eta_minutes = max(1, round(total_minutes))
 
         return {
@@ -119,6 +131,7 @@ class EVORoutingEngine:
             "road_distance_km": road_km,
             "eta_minutes": eta_minutes,
             "speed_kmh": avg_speed_kmh,
+            "response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)",
             "calculated_at": datetime.now(timezone.utc).isoformat()
         }
 
@@ -126,7 +139,8 @@ class EVORoutingEngine:
         self,
         responding_units: List[str],
         dest_lat: Optional[float],
-        dest_lng: Optional[float]
+        dest_lng: Optional[float],
+        response_type: str = "emergency"
     ) -> List[Dict[str, Any]]:
         """
         Generates structured routing metrics for all dispatched units.
@@ -141,7 +155,7 @@ class EVORoutingEngine:
             if clean and clean not in seen:
                 seen.add(clean)
                 try:
-                    m = self.calculate_unit_metrics(clean, dest_lat, dest_lng)
+                    m = self.calculate_unit_metrics(clean, dest_lat, dest_lng, response_type=response_type)
                     metrics.append(m)
                 except Exception as e:
                     logging.warning(f"Failed to calculate routing for unit {clean}: {e}")
@@ -153,7 +167,8 @@ class EVORoutingEngine:
         dest_lng: float,
         start_lat: Optional[float] = None,
         start_lng: Optional[float] = None,
-        station_id: Optional[str] = None
+        station_id: Optional[str] = None,
+        response_type: str = "emergency"
     ) -> Dict:
         """
         Computes response route polyline, distance in km, and ETA in minutes.
@@ -164,10 +179,13 @@ class EVORoutingEngine:
             start_lng = hall["lng"]
 
         dist_km = self.calculate_distance_km(start_lat, start_lng, dest_lat, dest_lng)
-        road_km = round(dist_km * 1.35, 2)
-        
-        avg_speed_kmh = 45.0
-        eta_minutes = max(1, round((road_km / avg_speed_kmh) * 60 + 0.5))
+        is_routine = str(response_type).lower().strip() == "routine"
+        road_factor = 1.45 if is_routine else 1.35
+        avg_speed_kmh = 32.0 if is_routine else 45.0
+        turnout_minutes = 1.0 if is_routine else 0.5
+
+        road_km = round(dist_km * road_factor, 2)
+        eta_minutes = max(1, round((road_km / avg_speed_kmh) * 60 + turnout_minutes))
 
         mid_lat = (start_lat + dest_lat) / 2.0 + (0.0015 if start_lat < dest_lat else -0.0015)
         mid_lng = (start_lng + dest_lng) / 2.0
@@ -182,6 +200,7 @@ class EVORoutingEngine:
             "status": "success",
             "distance_km": road_km,
             "eta_minutes": eta_minutes,
+            "response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)",
             "origin": {"lat": start_lat, "lng": start_lng},
             "destination": {"lat": dest_lat, "lng": dest_lng},
             "polyline": coordinates

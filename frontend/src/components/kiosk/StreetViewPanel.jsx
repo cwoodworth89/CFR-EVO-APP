@@ -60,6 +60,9 @@ export default function StreetViewPanel({ activeCall }) {
       }).then((data) => {
         if (isMounted && data) {
           setDbOverride(data);
+          try {
+            localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(data));
+          } catch (e) {}
         }
       }).catch(() => {});
     }

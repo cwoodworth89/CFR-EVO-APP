@@ -242,12 +242,12 @@ export default function KioskView({ kioskState }) {
   const talkGroup = activeCall?.radio_channel || activeCall?.target?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
   const rawMapGrid = activeCall?.map_grid || activeCall?.target?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
   const isReviewed = activeCall.feedback_submitted || (activeCall.quality_rating && activeCall.quality_rating !== 'PENDING');
-  const displayAddress = (isReviewed && activeCall.verified_address)
-    ? activeCall.verified_address
+  const displayAddress = (isReviewed && typeof activeCall.verified_address === 'string' && activeCall.verified_address.trim().length > 0)
+    ? activeCall.verified_address.trim()
     : (activeCall.address || activeCall.target?.address || 'Address Unspecified');
 
-  const rawIncident = (isReviewed && activeCall.verified_incident)
-    ? activeCall.verified_incident
+  const rawIncident = (isReviewed && typeof activeCall.verified_incident === 'string' && activeCall.verified_incident.trim().length > 0)
+    ? activeCall.verified_incident.trim()
     : (activeCall.incident_type || activeCall.target?.incident_type || 'EMERGENCY DISPATCH');
 
   const displayIncident = activeCall.is_test && !rawIncident.includes('*TEST*')

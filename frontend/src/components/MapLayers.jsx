@@ -146,6 +146,47 @@ function getDistanceMeters(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// Unified single-source Hydrant Detail Card component for both hover Tooltip & click Popup
+function HydrantDetailCard({ gisId, statusVal, flowClass, label }) {
+  const isOperating = label === 'OPERATING';
+  const isPrivate = label === 'PRIVATE';
+
+  const statusStyle = isOperating
+    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+    : isPrivate
+    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+    : 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+
+  let flowBadgeColor = 'text-sky-400';
+  const fc = (flowClass || '').toUpperCase();
+  if (fc === 'AA') flowBadgeColor = 'text-sky-400';
+  else if (fc === 'A') flowBadgeColor = 'text-emerald-400';
+  else if (fc === 'B') flowBadgeColor = 'text-amber-400';
+  else if (fc === 'C') flowBadgeColor = 'text-rose-400';
+
+  return (
+    <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-xl shadow-2xl font-mono" style={{ minWidth: '180px', maxWidth: '240px' }}>
+      <div className="flex justify-between items-center gap-2 border-b border-slate-850 pb-1.5">
+        <span className="text-[9px] text-slate-400 font-mono uppercase tracking-wider font-bold">HYDRANT DETAIL</span>
+        <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider border ${statusStyle}`}>
+          {label}
+        </span>
+      </div>
+      <h3 className="font-bold text-sm text-sky-400 mt-1.5 leading-tight">ID: {gisId}</h3>
+      {flowClass && (
+        <div className="mt-2 pt-1.5 border-t border-slate-850 flex justify-between items-center text-xs">
+          <span className="text-slate-400 font-sans">Flow Rating</span>
+          <span className={`font-mono font-bold ${flowBadgeColor}`}>{flowClass}</span>
+        </div>
+      )}
+      <div className="mt-1 flex justify-between items-center text-xs">
+        <span className="text-slate-400 font-sans font-medium">Status</span>
+        <span className="text-slate-300 font-mono font-semibold">{statusVal}</span>
+      </div>
+    </div>
+  );
+}
+
 // 💧 NEW: WATER HYDRANTS GIS LAYER
 export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
     const map = useMap();
@@ -507,47 +548,11 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
                   weight: 1.5
                 }}
               >
-                <Tooltip direction="top" offset={[0, -5]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
-                  <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
-                    <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">HYDRANT ID</span>
-                    <span className="text-white text-sm font-bold">{gisId}</span>
-                    
-                    <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">STATUS</span>
-                    <span className={`font-bold text-xs ${
-                      label === "OPERATING" ? "text-emerald-400" :
-                      label === "PRIVATE" ? "text-amber-400" : "text-rose-400"
-                    }`}>{label}</span>
-                    
-                    {flowClass && (
-                      <>
-                        <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">FLOW CLASS</span>
-                        <span className="text-sky-400 text-xs font-semibold">{flowClass}</span>
-                      </>
-                    )}
-                  </div>
+                <Tooltip direction="top" offset={[0, -6]} className="!bg-transparent !border-0 !p-0 !shadow-none">
+                  <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
                 </Tooltip>
                 <Popup className="hydrant-popup">
-                  <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '180px', maxWidth: '240px' }}>
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="text-[9px] text-slate-400 font-mono font-medium">HYDRANT DETAIL</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
-                        label === 'OPERATING' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                        label === 'PRIVATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                        'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                      }`}>{label}</span>
-                    </div>
-                    <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">ID: {gisId}</h3>
-                    
-                    <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-xs">
-                      <span className="text-slate-400 font-sans">Flow Rating</span>
-                      <span className="text-white font-mono font-bold">{flowClass || "N/A"}</span>
-                    </div>
-                    
-                    <div className="mt-1 flex justify-between text-xs">
-                      <span className="text-slate-400 font-sans">Type/Status</span>
-                      <span className="text-slate-300 font-mono font-semibold">{statusVal}</span>
-                    </div>
-                  </div>
+                  <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
                 </Popup>
               </CircleMarker>
             );
@@ -559,47 +564,11 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
               position={coords} 
               icon={getHydrantIcon(statusVal, flowClass)}
             >
-              <Tooltip direction="top" offset={[0, -10]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
-                <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
-                  <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">HYDRANT ID</span>
-                  <span className="text-white text-sm font-bold">{gisId}</span>
-                  
-                  <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">STATUS</span>
-                  <span className={`font-bold text-xs ${
-                    label === "OPERATING" ? "text-emerald-400" :
-                    label === "PRIVATE" ? "text-amber-400" : "text-rose-400"
-                  }`}>{label}</span>
-                  
-                  {flowClass && (
-                    <>
-                      <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">FLOW CLASS</span>
-                      <span className="text-sky-400 text-xs font-semibold">{flowClass}</span>
-                    </>
-                  )}
-                </div>
+              <Tooltip direction="top" offset={[0, -10]} className="!bg-transparent !border-0 !p-0 !shadow-none">
+                <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
               </Tooltip>
               <Popup className="hydrant-popup">
-                <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '180px', maxWidth: '240px' }}>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-[9px] text-slate-400 font-mono font-medium">HYDRANT DETAIL</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
-                      label === 'OPERATING' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                      label === 'PRIVATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                      'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                    }`}>{label}</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">ID: {gisId}</h3>
-                  
-                  <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-xs">
-                    <span className="text-slate-400 font-sans">Flow Rating</span>
-                    <span className="text-white font-mono font-bold">{flowClass || "N/A"}</span>
-                  </div>
-                  
-                  <div className="mt-1 flex justify-between text-xs">
-                    <span className="text-slate-400 font-sans">Type/Status</span>
-                    <span className="text-slate-300 font-mono font-semibold">{statusVal}</span>
-                  </div>
-                </div>
+                <HydrantDetailCard gisId={gisId} statusVal={statusVal} flowClass={flowClass} label={label} />
               </Popup>
             </Marker>
           );

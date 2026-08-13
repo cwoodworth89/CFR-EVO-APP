@@ -65,13 +65,30 @@ In interactive 360° mode, cross-origin Security (`same-origin` policy) prevents
 const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1 });
 
 const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
-  position: { lat: parseFloat(frontLat), lng: parseFloat(frontLng) },
   pov: { heading: parseFloat(initialHeading), pitch: parseFloat(initialPitch) },
   zoom: 1,
   fullscreenControl: false, // Hides Google's native button underneath custom Expand button
   addressControl: false,
   panControl: false,
-  linksControl: true
+  linksControl: true,
+  visible: true
+});
+
+// Resolve nearest street panorama within 300m outdoor radius (prevents rooftop centroid ZERO_RESULTS gray screens!)
+const svService = new window.google.maps.StreetViewService();
+svService.getPanorama({
+  location: { lat: parseFloat(frontLat), lng: parseFloat(frontLng) },
+  radius: 300,
+  source: window.google.maps.StreetViewSource.OUTDOOR,
+  preference: window.google.maps.StreetViewPreference.NEAREST
+}, (data, status) => {
+  if (status === window.google.maps.StreetViewStatus.OK && data && data.location) {
+    pano.setPano(data.location.pano);
+    pano.setPov({ heading: parseFloat(initialHeading), pitch: parseFloat(initialPitch) });
+    pano.setVisible(true);
+  } else {
+    pano.setPosition({ lat: parseFloat(frontLat), lng: parseFloat(frontLng) });
+  }
 });
 
 // Real-time POV drag listener (captures exact touch & mouse camera angles!)

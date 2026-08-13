@@ -27,17 +27,20 @@ This document tracks feature requests, operational enhancements, and future idea
 
 ---
 
-### 2. 🗺️ Cross-Road Spatial-Phonetic Radius Correction & Spatial Preprocessing
-* **Description**: Enhance cross-street transcription and extraction accuracy by applying a preprocessed spatial radius filter derived from the primary address.
+### 2. 🗺️ Cross-Road Spatial-Phonetic Radius Correction & Block-Segmented Preprocessing
+* **Description**: Enhance cross-street transcription and extraction accuracy by applying a preprocessed spatial radius filter derived from the primary address block segment.
 * **Core Concept**:
-  1. **Primary Address Anchor**: Once the primary address is geocoded with high confidence (e.g. `3030 Gordon Ave`), extract its spatial coordinate $(Lat, Lng)$.
-  2. **1,200ft (~400m) Expanded Spatial Radius**: Uses an expanded **1,200-foot (~400m)** spatial buffer to capture nearby arterial crossroads, block corners, and collector intersections (reducing total search space from ~1,200 Coquitlam streets down to just ~15–25 local candidates—a 98% reduction!).
-  3. **$O(1)$ Preprocessed Spatial Neighbor Index (`spatial_street_index.json`)**:
-     - **Offline Preprocessing**: Pre-calculate and index nearby streets for every Coquitlam address point / 100m grid cell during shapefile build time (`update_gis_data.py`).
-     - **Zero-Latency Runtime**: When a dispatch occurs, perform a $O(1)$ dictionary lookup (`STREET_NEIGHBORS["3030 GORDON AVE"]`) with zero spatial computation latency.
-  4. **Phonetic & Levenshtein Cross-Street Snap**: Match raw transcribed cross-street words against the preprocessed local candidate list using Double Metaphone and fuzzy string matching.
+  1. **Primary Address Anchor**: Once the primary address is geocoded with high confidence (e.g. `3030 Gordon Ave`), extract its block number (`3000-Block Gordon Ave`) and spatial coordinate $(Lat, Lng)$.
+  2. **Block-Segmented Linear Neighbor Map (`spatial_street_index.json`)**:
+     - **Short Residential Streets** (e.g. `Sandstone Cres`): Single entry mapping to all nearby intersecting streets.
+     - **Long Arterial Corridors** (e.g. `Lougheed Hwy`, `Como Lake Rd`): Divided into linear block buckets (e.g. `LOUGHEED HWY (2000-Block)`, `LOUGHEED HWY (3000-Block)`, `LOUGHEED HWY (4000-Block)`).
+     - **Linear Overlap (No Border Edge-Effects)**: Each block segment's spatial buffer overlaps neighboring blocks by ±600ft, ensuring cross-streets right on block or zone boundaries are never missed.
+  3. **$O(1)$ Instant Preprocessed Lookup**:
+     - At runtime, query `STREET_NEIGHBORS["3000-BLOCK LOUGHEED HWY"]` for zero-latency $O(1)$ retrieval of candidate cross-streets (~10–15 streets).
+  4. **Phonetic & Levenshtein Cross-Street Snap**: Match raw transcribed cross-street words against the preprocessed candidate list using Double Metaphone and fuzzy string matching.
 * **Benefits**:
   - Eliminates phonetic ambiguity for misheard cross-streets (e.g. snapping "near Christmas Way" vs "near Cristmas Way").
+  - Prevents zone-boundary edge effects by using linear road-geometry buffer overlaps instead of hard polygon borders.
   - $O(1)$ instant execution with zero runtime spatial calculation overhead.
   - Drastically improves overall transcript accuracy even when cross-streets are not explicitly displayed in main UI metadata.
 

@@ -67,7 +67,17 @@ Whenever a bug fix or feature edit is completed:
    ```
 2. Pull updates and rebuild frontend assets on the remote kiosk:
    ```bash
-   ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend && npm run build"
-   ```
-3. Verify services and test clean full-stack execution on the remote kiosk host before concluding the task.
+## 5. Human-Readable Database & Dispatch Inspection Rule
+
+To prevent Windows PowerShell quoting errors and keep all command logs 100% human-readable:
+1. **Use Version-Controlled Helper Scripts**:
+   - Run `inspect_dispatch.py` inside the container stack for clean human-readable output:
+     ```bash
+     ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec cfr_api python backend/scripts/inspect_dispatch.py DISP-2026-2659EC"
+     ```
+2. **Stream Local Python Files via Stdin**:
+   - Stream local python scripts over SSH stdin without shell quote escaping or Base64 encoding:
+     ```bash
+     ssh tcfire@100.95.146.94 "python3 -s" < local_script.py
+     ```
 

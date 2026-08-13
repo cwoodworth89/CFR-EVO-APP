@@ -498,15 +498,58 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
               <CircleMarker
                 key={`canvas-${gisId}-${i}`}
                 center={coords}
-                radius={4}
+                radius={5}
                 renderer={canvasRenderer}
                 pathOptions={{
                   color: '#0f172a',
                   fillColor: borderColor,
-                  fillOpacity: 0.9,
-                  weight: 1
+                  fillOpacity: 0.95,
+                  weight: 1.5
                 }}
-              />
+              >
+                <Tooltip direction="top" offset={[0, -5]} className="font-bold text-xs bg-slate-950 text-white border border-slate-800 shadow-xl rounded-md p-2">
+                  <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
+                    <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">HYDRANT ID</span>
+                    <span className="text-white text-sm font-bold">{gisId}</span>
+                    
+                    <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">STATUS</span>
+                    <span className={`font-bold text-xs ${
+                      label === "OPERATING" ? "text-emerald-400" :
+                      label === "PRIVATE" ? "text-amber-400" : "text-rose-400"
+                    }`}>{label}</span>
+                    
+                    {flowClass && (
+                      <>
+                        <span className="text-[9px] text-slate-400 uppercase font-mono tracking-wider mt-1.5">FLOW CLASS</span>
+                        <span className="text-sky-400 text-xs font-semibold">{flowClass}</span>
+                      </>
+                    )}
+                  </div>
+                </Tooltip>
+                <Popup className="hydrant-popup">
+                  <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '180px', maxWidth: '240px' }}>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-[9px] text-slate-400 font-mono font-medium">HYDRANT DETAIL</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider ${
+                        label === 'OPERATING' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                        label === 'PRIVATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                        'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      }`}>{label}</span>
+                    </div>
+                    <h3 className="font-bold text-sm text-sky-400 mt-2 leading-tight">ID: {gisId}</h3>
+                    
+                    <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-xs">
+                      <span className="text-slate-400 font-sans">Flow Rating</span>
+                      <span className="text-white font-mono font-bold">{flowClass || "N/A"}</span>
+                    </div>
+                    
+                    <div className="mt-1 flex justify-between text-xs">
+                      <span className="text-slate-400 font-sans">Type/Status</span>
+                      <span className="text-slate-300 font-mono font-semibold">{statusVal}</span>
+                    </div>
+                  </div>
+                </Popup>
+              </CircleMarker>
             );
           }
 

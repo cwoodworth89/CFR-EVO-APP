@@ -27,13 +27,17 @@ This document tracks feature requests, operational enhancements, and future idea
 
 ---
 
-### 2. 🗺️ Cross-Road Spatial-Phonetic Radius Correction
-* **Description**: Enhance cross-street transcription and extraction accuracy by applying a spatial radius filter derived from the high-confidence primary address.
+### 2. 🗺️ Cross-Road Spatial-Phonetic Radius Correction & Spatial Preprocessing
+* **Description**: Enhance cross-street transcription and extraction accuracy by applying a preprocessed spatial radius filter derived from the primary address.
 * **Core Concept**:
   1. **Primary Address Anchor**: Once the primary address is geocoded with high confidence (e.g. `3030 Gordon Ave`), extract its spatial coordinate $(Lat, Lng)$.
-  2. **500ft Spatial Radius Buffer**: Query Coquitlam GIS street line segments within a ~500-foot (~150m) radius of the primary address coordinate.
-  3. **Phonetic & Levenshtein Cross-Street Snap**: Match the raw transcribed cross-street words against this small candidate list using Double Metaphone and fuzzy string matching.
+  2. **1,200ft (~400m) Expanded Spatial Radius**: Uses an expanded **1,200-foot (~400m)** spatial buffer to capture nearby arterial crossroads, block corners, and collector intersections (reducing total search space from ~1,200 Coquitlam streets down to just ~15–25 local candidates—a 98% reduction!).
+  3. **$O(1)$ Preprocessed Spatial Neighbor Index (`spatial_street_index.json`)**:
+     - **Offline Preprocessing**: Pre-calculate and index nearby streets for every Coquitlam address point / 100m grid cell during shapefile build time (`update_gis_data.py`).
+     - **Zero-Latency Runtime**: When a dispatch occurs, perform a $O(1)$ dictionary lookup (`STREET_NEIGHBORS["3030 GORDON AVE"]`) with zero spatial computation latency.
+  4. **Phonetic & Levenshtein Cross-Street Snap**: Match raw transcribed cross-street words against the preprocessed local candidate list using Double Metaphone and fuzzy string matching.
 * **Benefits**:
   - Eliminates phonetic ambiguity for misheard cross-streets (e.g. snapping "near Christmas Way" vs "near Cristmas Way").
+  - $O(1)$ instant execution with zero runtime spatial calculation overhead.
   - Drastically improves overall transcript accuracy even when cross-streets are not explicitly displayed in main UI metadata.
 

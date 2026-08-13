@@ -37,10 +37,14 @@ This document tracks feature requests, operational enhancements, and future idea
      - **Linear Overlap (No Border Edge-Effects)**: Each block segment's spatial buffer overlaps neighboring blocks by ±600ft, ensuring cross-streets right on block or zone boundaries are never missed.
   3. **$O(1)$ Instant Preprocessed Lookup**:
      - At runtime, query `STREET_NEIGHBORS["3000-BLOCK LOUGHEED HWY"]` for zero-latency $O(1)$ retrieval of candidate cross-streets (~10–15 streets).
-  4. **Phonetic & Levenshtein Cross-Street Snap**: Match raw transcribed cross-street words against the preprocessed candidate list using Double Metaphone and fuzzy string matching.
+  4. **Two-Stage Integration (Prompt Weighting & Post-Processing Snapping)**:
+     - **Stage 1 (Transcription Biasing)**: Inject candidate block-neighbor street names into Whisper's `initial_prompt` / `hotwords` to weight audio decoding toward correct phonetic spelling.
+     - **Stage 2 (Post-Processing Extraction)**: Extract the raw cross-street phrase and fuzzy-match against candidate block-neighbors (Levenshtein / Double Metaphone).
+  5. **Safe Pass-Through Fallback (Zero Risk)**:
+     - Enforces a strict 75%+ similarity threshold. If no local candidate matches above threshold (or if audio is ambiguous), the engine **safely passes raw text through unchanged**. It will NEVER force an inaccurate match.
 * **Benefits**:
   - Eliminates phonetic ambiguity for misheard cross-streets (e.g. snapping "near Christmas Way" vs "near Cristmas Way").
   - Prevents zone-boundary edge effects by using linear road-geometry buffer overlaps instead of hard polygon borders.
   - $O(1)$ instant execution with zero runtime spatial calculation overhead.
-  - Drastically improves overall transcript accuracy even when cross-streets are not explicitly displayed in main UI metadata.
+  - Safe pass-through fallback ensures zero risk of forced false matches.
 

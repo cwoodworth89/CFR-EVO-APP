@@ -113,7 +113,7 @@ class EVORoutingEngine:
         is_routine = str(response_type).lower().strip() == "routine"
         road_factor = 1.45 if is_routine else 1.35
         avg_speed_kmh = 32.0 if is_routine else 45.0
-        turnout_minutes = 1.0 if is_routine else 0.5
+        turnout_minutes = 0.0  # Strictly enroute drive times (turnout buffer excluded)
 
         road_km = round(crow_km * road_factor, 2)
         total_minutes = (road_km / avg_speed_kmh) * 60 + turnout_minutes
@@ -182,7 +182,7 @@ class EVORoutingEngine:
         is_routine = str(response_type).lower().strip() == "routine"
         road_factor = 1.45 if is_routine else 1.35
         avg_speed_kmh = 32.0 if is_routine else 45.0
-        turnout_minutes = 1.0 if is_routine else 0.5
+        turnout_minutes = 0.0  # Strictly enroute drive times (turnout buffer excluded)
 
         road_km = round(dist_km * road_factor, 2)
         eta_minutes = max(1, round((road_km / avg_speed_kmh) * 60 + turnout_minutes))

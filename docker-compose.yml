@@ -40,10 +40,10 @@ services:
     container_name: cfr_osrm
     restart: always
     command: >
-      sh -c 'if [ -f /data/british-columbia-latest.osrm.timestamp ]; then
-        exec osrm-routed --algorithm mld /data/british-columbia-latest.osrm;
+      sh -c 'if [ -f /data/vancouver.osrm.timestamp ]; then
+        exec osrm-routed --algorithm mld /data/vancouver.osrm;
       else
-        echo "OSRM dataset not yet mounted in /data/british-columbia-latest.osrm. Standing by in fallback mode...";
+        echo "OSRM dataset not yet mounted in /data/vancouver.osrm. Standing by in fallback mode...";
         while true; do sleep 3600; done;
       fi'
     ports:
@@ -51,7 +51,7 @@ services:
     volumes:
       - ./backend/data/osrm:/data
     healthcheck:
-      test: ["CMD-SHELL", "if [ -f /data/british-columbia-latest.osrm.timestamp ]; then curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1; else exit 0; fi"]
+      test: ["CMD-SHELL", "if [ -f /data/vancouver.osrm.timestamp ]; then curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1; else exit 0; fi"]
       interval: 10s
       timeout: 5s
       retries: 5

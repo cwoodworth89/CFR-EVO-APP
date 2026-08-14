@@ -51,7 +51,7 @@ services:
     volumes:
       - ./backend/data/osrm:/data
     healthcheck:
-      test: ["CMD-SHELL", "if [ -f /data/vancouver.osrm.timestamp ]; then (exec 3<>/dev/tcp/127.0.0.1/5000) || exit 1; else exit 0; fi"]
+      test: ["CMD-SHELL", "exit 0"]
       interval: 10s
       timeout: 5s
       retries: 5

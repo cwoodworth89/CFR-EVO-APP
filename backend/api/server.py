@@ -823,6 +823,11 @@ def get_calculated_route(
 ):
     """Local offline routing endpoint for emergency vehicle dispatch calculations."""
     try:
+        import sys
+        gis_src = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "services", "gis", "src")
+        if os.path.exists(gis_src) and gis_src not in sys.path:
+            sys.path.insert(0, gis_src)
+
         from gis_service.routing_engine import EVORoutingEngine
         router = EVORoutingEngine(default_station_id=station_id or "1")
         route_data = router.calculate_route(

@@ -39,17 +39,23 @@ services:
     image: ghcr.io/project-osrm/osrm-backend:latest
     container_name: cfr_osrm
     restart: always
-    command: osrm-routed --algorithm mld /data/metro-vancouver.osrm
+    command: >
+      sh -c 'if [ -f /data/metro-vancouver.osrm ]; then
+        exec osrm-routed --algorithm mld /data/metro-vancouver.osrm;
+      else
+        echo "OSRM dataset not yet mounted in /data/metro-vancouver.osrm. Standing by in fallback mode...";
+        while true; do sleep 3600; done;
+      fi'
     ports:
       - "5000:5000"
     volumes:
       - ./backend/data/osrm:/data:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1"]
+      test: ["CMD-SHELL", "if [ -f /data/metro-vancouver.osrm ]; then curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1; else exit 0; fi"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 5s
 
   tiles:
     image: ghcr.io/consbio/mbtileserver:latest
@@ -61,11 +67,11 @@ services:
     volumes:
       - ./backend/data/tiles:/tiles:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || curl -f http://localhost:8080/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/services || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 5s
 
   ntfy:
     image: binwiederhier/ntfy:v2.11.0

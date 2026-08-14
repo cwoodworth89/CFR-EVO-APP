@@ -79,3 +79,51 @@ CREATE TABLE IF NOT EXISTS public.dispatch_uploads (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dispatch_uploads_status ON public.dispatch_uploads (status);
+
+-- 4. Create parcels Table
+CREATE TABLE IF NOT EXISTS public.parcels (
+    id SERIAL PRIMARY KEY,
+    gis_id VARCHAR(255),
+    clean_address VARCHAR(255) UNIQUE NOT NULL,
+    full_address VARCHAR(255),
+    street_number VARCHAR(50),
+    street_name VARCHAR(255),
+    municipality VARCHAR(100),
+    zone_id VARCHAR(16),
+    geometry JSONB,
+    parcel_lat DOUBLE PRECISION,
+    parcel_lng DOUBLE PRECISION,
+    front_lat DOUBLE PRECISION,
+    front_lng DOUBLE PRECISION,
+    centroid_lat DOUBLE PRECISION,
+    centroid_lng DOUBLE PRECISION,
+    entrance_lat DOUBLE PRECISION,
+    entrance_lng DOUBLE PRECISION,
+    streetview_heading DOUBLE PRECISION DEFAULT 0.0,
+    streetview_pitch DOUBLE PRECISION DEFAULT 5.0,
+    streetview_fov DOUBLE PRECISION DEFAULT 80.0,
+    lock_box_notes TEXT,
+    hazard_notes TEXT,
+    pre_plan_pdf_url TEXT,
+    construction_type VARCHAR(100),
+    floor_count INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_parcels_clean_address ON public.parcels (clean_address);
+
+-- 5. Create streetview_overrides Table (legacy)
+CREATE TABLE IF NOT EXISTS public.streetview_overrides (
+    id SERIAL PRIMARY KEY,
+    clean_address VARCHAR(255) UNIQUE NOT NULL,
+    front_lat DOUBLE PRECISION NOT NULL,
+    front_lng DOUBLE PRECISION NOT NULL,
+    heading DOUBLE PRECISION DEFAULT 0.0,
+    pitch DOUBLE PRECISION DEFAULT 5.0,
+    fov DOUBLE PRECISION DEFAULT 80.0,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_streetview_overrides_clean_address ON public.streetview_overrides (clean_address);
+

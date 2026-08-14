@@ -16,7 +16,7 @@ flowchart TD
     subgraph Lenovo Flex 5 Kiosk
         B -->|1/4" TS to RCA Cable| C[Behringer UCA202 USB Card]
         C -->|USB Port| D[Python Listening Agent]
-        D -->|Local WebSockets / Supabase| E[Chromium Kiosk Screen]
+        D -->|FastAPI / MQTT WebSockets| E[Chromium Kiosk Screen]
         F[GitHub Remote Repo] -->|Auto-Updates Cron| E
     end
 ```

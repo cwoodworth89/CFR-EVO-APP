@@ -193,6 +193,46 @@ export const apiClient = {
     }
   },
 
+  parcels: {
+    async lookup(query) {
+      if (!query) return null;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/parcels/lookup?query=${encodeURIComponent(query)}`, { headers: getHeaders() });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    },
+
+    async saveStreetView(payload) {
+      const res = await fetch(`${API_BASE_URL}/api/parcels/streetview`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    }
+  },
+
+  streetviewOverrides: {
+    async get(address) {
+      if (!address) return null;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/streetview-overrides/${encodeURIComponent(address)}`, { headers: getHeaders() });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    },
+
+    async save(payload) {
+      return apiClient.streetView.saveOverride(payload);
+    }
+  },
+
   streetView: {
     async fetchAll() {
       const res = await fetch(`${API_BASE_URL}/api/streetview-overrides`, { headers: getHeaders() });

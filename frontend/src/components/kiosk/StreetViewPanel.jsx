@@ -25,11 +25,12 @@ export default function StreetViewPanel({ activeCall }) {
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
   const [sdkError, setSdkError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const containerRef = useRef(null);
   const modalContainerRef = useRef(null);
   const panoramaRef = useRef(null);
-  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1 });
+  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1, fov: 80, lat: 49.2838, lng: -122.7932, pano_id: '' });
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
   const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
@@ -47,27 +48,39 @@ export default function StreetViewPanel({ activeCall }) {
 
   const localOverride = getLocalOverride();
 
-  // Fetch DB override on mount or when address changes
+  // Fetch DB override on mount or when address changes via apiClient.parcels.lookup / apiClient.streetviewOverrides.get
   useEffect(() => {
     let isMounted = true;
     setDbOverride(null);
-    if (cleanAddrKey) {
-      apiClient.streetView.fetchOverride(cleanAddrKey).then((data) => {
-        if (!data && activeCall?.address) {
-          return apiClient.streetView.fetchOverride(activeCall.address);
-        }
-        return data;
-      }).then((data) => {
-        if (isMounted && data) {
-          setDbOverride(data);
-          try {
-            localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(data));
-          } catch (e) {}
-        }
-      }).catch(() => {});
+    if (!cleanAddrKey) return;
+
+    const stored = getLocalOverride();
+    if (stored && isMounted) {
+      setDbOverride(stored);
     }
+
+    apiClient.parcels.lookup(cleanAddrKey).then((data) => {
+      let parcelData = null;
+      if (data && data.found && data.parcel) {
+        parcelData = data.parcel;
+      }
+      if (!parcelData) {
+        return apiClient.streetviewOverrides.get(cleanAddrKey).then((ov) => ov || null);
+      }
+      return parcelData;
+    }).then((overrideData) => {
+      if (isMounted && overrideData) {
+        setDbOverride(overrideData);
+        try {
+          localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(overrideData));
+        } catch (e) {}
+      }
+    }).catch((err) => {
+      console.warn("Error looking up parcel StreetView override:", err);
+    });
+
     return () => { isMounted = false; };
-  }, [cleanAddrKey, activeCall?.address]);
+  }, [cleanAddrKey]);
 
   // Priority: 1. DB Override -> 2. Local Storage -> 3. Hardcoded fallback -> 4. Computed frontage angle
   const activeOverride = dbOverride || localOverride || fallbackOverride;
@@ -81,7 +94,7 @@ export default function StreetViewPanel({ activeCall }) {
   const targetLat = parseFloat(activeCall?.lat ?? activeCall?.target?.lat ?? frontLat);
   const targetLng = parseFloat(activeCall?.lng ?? activeCall?.target?.lng ?? frontLng);
 
-  let initialHeading = activeOverride ? parseFloat(activeOverride.heading) : 0;
+  let initialHeading = activeOverride ? parseFloat(activeOverride.heading ?? activeOverride.streetview_heading ?? 0) : 0;
   if (!activeOverride && (frontLat !== targetLat || frontLng !== targetLng)) {
     const dLng = (targetLng - frontLng) * (Math.PI / 180);
     const targetLatRad = targetLat * (Math.PI / 180);
@@ -92,28 +105,41 @@ export default function StreetViewPanel({ activeCall }) {
     initialHeading = Math.round((bearing + 360) % 360);
   }
 
-  const initialPitch = activeOverride ? parseFloat(activeOverride.pitch || 5) : 5;
-  const initialFov = activeOverride ? parseFloat(activeOverride.fov || 80) : 80;
+  const initialPitch = activeOverride ? parseFloat(activeOverride.pitch ?? activeOverride.streetview_pitch ?? 5) : 5;
+  const initialFov = activeOverride ? parseFloat(activeOverride.fov ?? activeOverride.streetview_fov ?? 80) : 80;
+  const initialZoom = activeOverride ? parseFloat(activeOverride.zoom ?? 1) : 1;
+  const initialPanoId = activeOverride?.pano_id || '';
 
-  // Track initial heading/pitch in ref
+  // Initialize camera vector in ref
   useEffect(() => {
-    currentPovRef.current = { heading: initialHeading, pitch: initialPitch, zoom: 1 };
-  }, [initialHeading, initialPitch]);
+    currentPovRef.current = {
+      heading: initialHeading,
+      pitch: initialPitch,
+      zoom: initialZoom,
+      fov: initialFov,
+      lat: frontLat,
+      lng: frontLng,
+      pano_id: initialPanoId
+    };
+  }, [initialHeading, initialPitch, initialZoom, initialFov, frontLat, frontLng, initialPanoId]);
 
   // Global auth failure handler
   useEffect(() => {
     window.gm_authFailure = () => {
       console.warn("Google Maps JS SDK auth failure triggered. Check Google Cloud Console 'Maps JavaScript API' status.");
       setSdkError(true);
+      setIsLoading(false);
     };
   }, []);
 
-  // Primary Google Maps StreetViewPanorama Initialization (Runs once per mount/expand)
+  // Primary Google Maps StreetViewPanorama Initialization (Conforms strictly to JS SDK)
   useEffect(() => {
     if (!apiKey || !isOnline || sdkError) return;
 
     const targetContainer = isExpanded ? modalContainerRef.current : containerRef.current;
     if (!targetContainer) return;
+
+    setIsLoading(true);
 
     const initPanorama = () => {
       if (!window.google || !window.google.maps) return;
@@ -122,9 +148,9 @@ export default function StreetViewPanel({ activeCall }) {
       targetContainer.innerHTML = '';
 
       try {
-        const pano = new window.google.maps.StreetViewPanorama(targetContainer, {
+        const panoOptions = {
           pov: { heading: initialHeading, pitch: initialPitch },
-          zoom: 1,
+          zoom: Math.min(Math.max(initialZoom, 1), 4),
           fullscreenControl: false,
           addressControl: false,
           panControl: false,
@@ -133,35 +159,110 @@ export default function StreetViewPanel({ activeCall }) {
           motionTrackingControl: false,
           showRoadLabels: true,
           visible: true
-        });
+        };
+
+        if (initialPanoId) {
+          panoOptions.pano = initialPanoId;
+        }
+
+        const pano = new window.google.maps.StreetViewPanorama(targetContainer, panoOptions);
 
         // Resolve nearest street panorama within 300m outdoor radius
         const svService = new window.google.maps.StreetViewService();
-        svService.getPanorama({
-          location: { lat: frontLat, lng: frontLng },
-          radius: 300,
-          source: window.google.maps.StreetViewSource.OUTDOOR,
-          preference: window.google.maps.StreetViewPreference.NEAREST
-        }, (data, status) => {
-          if (status === window.google.maps.StreetViewStatus.OK && data && data.location) {
-            pano.setPano(data.location.pano);
-            pano.setPov({ heading: initialHeading, pitch: initialPitch });
-            pano.setVisible(true);
-          } else {
-            console.warn("Outdoor StreetViewService fallback to position:", status);
-            pano.setPosition({ lat: frontLat, lng: frontLng });
-          }
-        });
+        if (initialPanoId) {
+          pano.setPano(initialPanoId);
+          pano.setPov({ heading: initialHeading, pitch: initialPitch });
+          pano.setVisible(true);
+          setIsLoading(false);
+        } else {
+          svService.getPanorama({
+            location: { lat: frontLat, lng: frontLng },
+            radius: 300,
+            source: window.google.maps.StreetViewSource.OUTDOOR,
+            preference: window.google.maps.StreetViewPreference.NEAREST
+          }, (data, status) => {
+            if (status === window.google.maps.StreetViewStatus.OK && data && data.location) {
+              pano.setPano(data.location.pano);
+              pano.setPov({ heading: initialHeading, pitch: initialPitch });
+              pano.setVisible(true);
+            } else {
+              console.warn("Outdoor StreetViewService fallback to position:", status);
+              pano.setPosition({ lat: frontLat, lng: frontLng });
+            }
+            setIsLoading(false);
+          });
+        }
 
-        // Real-time POV drag listener (captures exact touch & mouse camera angles!)
+        // 1. pov_changed: Continuous heading & pitch tracking
         pano.addListener('pov_changed', () => {
           const pov = pano.getPov();
           if (pov && !isNaN(pov.heading)) {
             currentPovRef.current = {
+              ...currentPovRef.current,
               heading: Math.round(pov.heading || 0),
-              pitch: Math.round(pov.pitch || 0),
-              zoom: Math.round(pano.getZoom() || 1)
+              pitch: Math.round(pov.pitch || 0)
             };
+          }
+        });
+
+        // 2. position_changed: Continuous lat/lng tracking
+        pano.addListener('position_changed', () => {
+          const pos = pano.getPosition();
+          if (pos) {
+            const latVal = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
+            const lngVal = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+            if (!isNaN(latVal) && !isNaN(lngVal)) {
+              currentPovRef.current = {
+                ...currentPovRef.current,
+                lat: latVal,
+                lng: lngVal
+              };
+            }
+          }
+        });
+
+        // 3. pano_changed: Continuous pano_id & position tracking
+        pano.addListener('pano_changed', () => {
+          const panoId = pano.getPano();
+          if (panoId) {
+            currentPovRef.current = {
+              ...currentPovRef.current,
+              pano_id: panoId
+            };
+            const pos = pano.getPosition();
+            if (pos) {
+              const latVal = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
+              const lngVal = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+              if (!isNaN(latVal) && !isNaN(lngVal)) {
+                currentPovRef.current = {
+                  ...currentPovRef.current,
+                  lat: latVal,
+                  lng: lngVal
+                };
+              }
+            }
+          }
+        });
+
+        // 4. zoom_changed: Continuous zoom tracking
+        pano.addListener('zoom_changed', () => {
+          const z = pano.getZoom();
+          if (z !== undefined && !isNaN(z)) {
+            currentPovRef.current = {
+              ...currentPovRef.current,
+              zoom: Math.round(z || 1),
+              fov: Math.round(z || 1)
+            };
+          }
+        });
+
+        // 5. status_changed: Monitor panorama status & update loading skeleton
+        pano.addListener('status_changed', () => {
+          const status = pano.getStatus ? pano.getStatus() : 'OK';
+          if (status === window.google.maps.StreetViewStatus.OK) {
+            setIsLoading(false);
+          } else {
+            console.warn("StreetViewPanorama status changed:", status);
           }
         });
 
@@ -169,6 +270,7 @@ export default function StreetViewPanel({ activeCall }) {
       } catch (err) {
         console.error("Failed to initialize Google StreetViewPanorama:", err);
         setSdkError(true);
+        setIsLoading(false);
       }
     };
 
@@ -182,7 +284,10 @@ export default function StreetViewPanel({ activeCall }) {
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
         script.async = true;
         script.onload = initPanorama;
-        script.onerror = () => setSdkError(true);
+        script.onerror = () => {
+          setSdkError(true);
+          setIsLoading(false);
+        };
         document.head.appendChild(script);
       } else {
         existingScript.addEventListener('load', initPanorama);
@@ -195,37 +300,47 @@ export default function StreetViewPanel({ activeCall }) {
     };
   }, [cleanAddrKey, isExpanded, apiKey, isOnline, sdkError]);
 
-  // Smooth POV & Location update when dbOverride arrives (WITHOUT tearing down the DOM container!)
+  // Smooth POV & Location update when dbOverride arrives
   useEffect(() => {
     if (!panoramaRef.current || !window.google || !window.google.maps) return;
 
     try {
       const svService = new window.google.maps.StreetViewService();
-      svService.getPanorama({
-        location: { lat: frontLat, lng: frontLng },
-        radius: 300,
-        source: window.google.maps.StreetViewSource.OUTDOOR,
-        preference: window.google.maps.StreetViewPreference.NEAREST
-      }, (data, status) => {
-        if (status === window.google.maps.StreetViewStatus.OK && data && data.location && panoramaRef.current) {
-          panoramaRef.current.setPano(data.location.pano);
-          panoramaRef.current.setPov({ heading: initialHeading, pitch: initialPitch });
-          panoramaRef.current.setVisible(true);
-        }
-      });
+      if (initialPanoId) {
+        panoramaRef.current.setPano(initialPanoId);
+        panoramaRef.current.setPov({ heading: initialHeading, pitch: initialPitch });
+        panoramaRef.current.setVisible(true);
+      } else {
+        svService.getPanorama({
+          location: { lat: frontLat, lng: frontLng },
+          radius: 300,
+          source: window.google.maps.StreetViewSource.OUTDOOR,
+          preference: window.google.maps.StreetViewPreference.NEAREST
+        }, (data, status) => {
+          if (status === window.google.maps.StreetViewStatus.OK && data && data.location && panoramaRef.current) {
+            panoramaRef.current.setPano(data.location.pano);
+            panoramaRef.current.setPov({ heading: initialHeading, pitch: initialPitch });
+            panoramaRef.current.setVisible(true);
+          }
+        });
+      }
     } catch (e) {
       console.warn("Failed to update active panorama POV:", e);
     }
-  }, [frontLat, frontLng, initialHeading, initialPitch]);
+  }, [frontLat, frontLng, initialHeading, initialPitch, initialPanoId]);
 
+  // Save Preferred View handler reading camera vector from currentPovRef.current
   const handleSaveView = async () => {
     if (!activeCall?.address || !cleanAddrKey) return;
     setSaveStatus('saving');
 
-    let currentHeading = currentPovRef.current.heading;
-    let currentPitch = currentPovRef.current.pitch;
-    let saveLat = frontLat;
-    let saveLng = frontLng;
+    const curr = currentPovRef.current || {};
+    let currentHeading = curr.heading ?? initialHeading;
+    let currentPitch = curr.pitch ?? initialPitch;
+    let currentZoom = curr.zoom ?? curr.fov ?? 1;
+    let currentPanoId = curr.pano_id || '';
+    let saveLat = curr.lat ?? frontLat;
+    let saveLng = curr.lng ?? frontLng;
 
     if (panoramaRef.current) {
       if (typeof panoramaRef.current.getPov === 'function') {
@@ -235,11 +350,25 @@ export default function StreetViewPanel({ activeCall }) {
           currentPitch = Math.round(pov.pitch || 0);
         }
       }
-      if (typeof panoramaRef.current.getLocation === 'function') {
-        const loc = panoramaRef.current.getLocation();
-        if (loc && loc.latLng) {
-          saveLat = loc.latLng.lat();
-          saveLng = loc.latLng.lng();
+      if (typeof panoramaRef.current.getZoom === 'function') {
+        const z = panoramaRef.current.getZoom();
+        if (z !== undefined && !isNaN(z)) {
+          currentZoom = Math.round(z || 1);
+        }
+      }
+      if (typeof panoramaRef.current.getPano === 'function') {
+        const pId = panoramaRef.current.getPano();
+        if (pId) currentPanoId = pId;
+      }
+      if (typeof panoramaRef.current.getPosition === 'function') {
+        const loc = panoramaRef.current.getPosition();
+        if (loc) {
+          const latVal = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
+          const lngVal = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
+          if (!isNaN(latVal) && !isNaN(lngVal)) {
+            saveLat = latVal;
+            saveLng = lngVal;
+          }
         }
       }
     }
@@ -250,12 +379,16 @@ export default function StreetViewPanel({ activeCall }) {
       front_lng: saveLng,
       heading: currentHeading,
       pitch: currentPitch,
-      fov: initialFov
+      fov: currentZoom,
+      pano_id: currentPanoId
     };
 
     try {
       localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(payload));
-      await apiClient.streetView.saveOverride(payload);
+      await apiClient.parcels.saveStreetView(payload);
+      try {
+        await apiClient.streetView.saveOverride(payload);
+      } catch (e) {}
       setDbOverride(payload);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);
@@ -273,6 +406,16 @@ export default function StreetViewPanel({ activeCall }) {
 
   const renderContent = (isModal = false) => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
+      {/* Sleek Dark HUD Skeleton Loader */}
+      {isLoading && isOnline && !sdkError && (
+        <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3 transition-opacity duration-300">
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider animate-pulse">
+            Loading Street View Facade...
+          </div>
+        </div>
+      )}
+
       {sdkError ? (
         <iframe
           title="Fallback Google Street View Embed"
@@ -309,9 +452,9 @@ export default function StreetViewPanel({ activeCall }) {
         <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
           <span className="text-amber-400 font-bold">📍 Address:</span>
           <span className="text-white font-bold">{activeCall?.address || 'Destination'}</span>
-          {dbOverride && (
+          {activeOverride && (
             <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
-              SAVED PREFERRED VIEW ({activeOverride.heading || initialHeading}°)
+              SAVED PREFERRED VIEW ({(activeOverride.heading ?? activeOverride.streetview_heading ?? initialHeading)}°)
             </span>
           )}
         </div>
@@ -346,10 +489,15 @@ export default function StreetViewPanel({ activeCall }) {
   return (
     <>
       <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
-        {/* Header Title Bar */}
+        {/* Header Title Bar with High-Visibility SAVED PREFERRED VIEW Badge */}
         <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-indigo-400 flex items-center gap-2 shadow">
           <span>📷</span>
           <span>Google Street View 360°</span>
+          {activeOverride && (
+            <span className="bg-emerald-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black tracking-wider shadow animate-pulse">
+              [SAVED PREFERRED VIEW]
+            </span>
+          )}
           {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
         </div>
 
@@ -384,6 +532,11 @@ export default function StreetViewPanel({ activeCall }) {
                 <h3 className="text-base font-bold text-white uppercase tracking-wide">Google Street View 360° Inspection</h3>
                 <p className="text-xs text-indigo-400 font-mono">📍 {activeCall?.address || 'Target Property'}</p>
               </div>
+              {activeOverride && (
+                <span className="bg-emerald-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black tracking-wider shadow animate-pulse ml-2">
+                  [SAVED PREFERRED VIEW]
+                </span>
+              )}
             </div>
             <button
               onClick={() => setIsExpanded(false)}

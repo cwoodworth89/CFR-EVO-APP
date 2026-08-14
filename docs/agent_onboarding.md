@@ -32,7 +32,7 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 ## ⚙️ Project Configuration & Environments
 
 * **`.env` files**:
-  * Copy `.env.example` in `/backend` and `/frontend` respectively to configure environment parameters (GCP credentials path, Supabase Anon/Service-role keys, NTFY push topics, and STT engine types).
+  * Copy `.env.example` in `/backend` and `/frontend` respectively to configure environment parameters (GCP credentials path, NTFY push topics, and STT engine types).
 * **Consolidated Python Configurations**:
   * All DSP noise floor values, audio sample rates, vocab target directories, and GIS shapefile mappings are centralized and re-exported in [backend/cfr_dispatch/config/\_\_init\_\_.py](../backend/cfr_dispatch/config/__init__.py).
 
@@ -43,7 +43,6 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 | Command | Location | Purpose |
 | :--- | :--- | :--- |
 | `docker compose up -d` | `./` | Start the local containerized stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI). |
-| `python -m backend.scripts.migrate_supabase_to_local` | `./` | Migrate historical calls, transcripts, and audio from Supabase to local PostgreSQL. |
 | `python main.py` | `backend/` | Launch the continuous audio listener background runner. |
 | `python tests/run_test_suite.py` | `backend/` | Execute the QA verification test suite (transcription accuracy and geocoder matching checks). |
 | `python scripts/feed_recorded_call.py <wav_path> [tone]` | `backend/` | Simulate an incoming radio dispatch feed by streaming a WAV file to the listener. |
@@ -65,7 +64,6 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./docs/ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
 | **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./docs/public_domain_and_ssl_migration.md) | Nginx reverse proxy and SSL certs. | None |
 | **Call Structure** | [docs/call_structure.md](./docs/call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
-| **Supabase Setup** | [docs/supabase_setup.md](./docs/supabase_setup.md) | Legacy database contracts and migrations. | `stt-mlops-backtest` |
 | **GIS Endpoints** | [docs/gis_endpoints.md](./docs/gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
 | **Test Matrix** | [docs/test_procedures.md](./docs/test_procedures.md) | Tone spot checks, database inserts, mic levels. | `e2e-dispatch-testing` |
 | **Hardware Spec** | [docs/hardware_specification.md](./docs/hardware_specification.md) | Pi soundcards and laptop kiosk hardware. | None |

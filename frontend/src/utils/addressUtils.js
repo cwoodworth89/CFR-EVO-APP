@@ -52,32 +52,9 @@ export function calculateParcelFrontagePoint(rings, streetName = '') {
       midLng: (p1[0] + p2[0]) / 2
     });
   }
-  if (!edges.length) return { front_lat: avgLat, front_lng: avgLng };
-
-  const upperStreet = (streetName || '').toUpperCase();
-  const isNS = NS_STREETS.some(s => upperStreet.includes(s));
-
-  let frontEdge;
-  if (isNS) {
-    const minLng = Math.min(...pts.map(p => p[0]));
-    const maxLng = Math.max(...pts.map(p => p[0]));
-    if (Math.abs(maxLng - avgLng) >= Math.abs(avgLng - minLng)) {
-      frontEdge = edges.reduce((prev, curr) => (curr.midLng > prev.midLng ? curr : prev), edges[0]);
-    } else {
-      frontEdge = edges.reduce((prev, curr) => (curr.midLng < prev.midLng ? curr : prev), edges[0]);
-    }
-  } else {
-    const minLat = Math.min(...pts.map(p => p[1]));
-    const maxLat = Math.max(...pts.map(p => p[1]));
-    if (Math.abs(maxLat - avgLat) >= Math.abs(avgLat - minLat)) {
-      frontEdge = edges.reduce((prev, curr) => (curr.midLat > prev.midLat ? curr : prev), edges[0]);
-    } else {
-      frontEdge = edges.reduce((prev, curr) => (curr.midLat < prev.midLat ? curr : prev), edges[0]);
-    }
-  }
-
+  // Return exact parcel centroid for reliable street frontage matching
   return {
-    front_lat: Number(frontEdge.midLat.toFixed(6)),
-    front_lng: Number(frontEdge.midLng.toFixed(6))
+    front_lat: Number(avgLat.toFixed(6)),
+    front_lng: Number(avgLng.toFixed(6))
   };
 }

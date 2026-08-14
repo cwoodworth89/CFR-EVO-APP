@@ -64,11 +64,11 @@ export default function StreetViewPanel({ activeCall }) {
     };
   }, [cleanAddrKey]);
 
-  // Priority: 1. DB Override -> 2. Local Storage -> 3. Computed frontage angle
+  // Priority: 1. DB Override -> 2. Local Storage -> 3. Target parcel centroid -> 4. Fallback
   const activeOverride = dbOverride || localOverride;
 
-  const rawFrontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
-  const rawFrontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);
+  const rawFrontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.lat ?? activeCall?.front_lat ?? activeCall?.target?.lat ?? 49.2838);
+  const rawFrontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.lng ?? activeCall?.front_lng ?? activeCall?.target?.lng ?? -122.7932);
 
   const frontLat = parseFloat(rawFrontLat) || 49.2838;
   const frontLng = parseFloat(rawFrontLng) || -122.7932;

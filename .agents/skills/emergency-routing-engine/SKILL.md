@@ -100,7 +100,33 @@ When active closures exist (from `road_closures` table):
 
 ---
 
-## 5. Driver Station HUD & Mobile QR Integration
+## 6. Tactical EVO Routing Biases & Corridor Weighting
+
+When crafting prompt instructions or configuring custom routing rules, use standard **Tactical Emergency Vehicle Operator (EVO)** weighting principles:
+
+### A. Core Tactical Principles:
+1. **EmTrac / Opticom Preemption Corridors**:
+   - Always prefer multi-lane arterial corridors equipped with EmTrac green-light preemption (e.g. `Pinetree Way`, `Lougheed Hwy`) over shorter residential cut-throughs.
+2. **Curb-Side (Passenger-Side) Arrival Bias**:
+   - Route apparatus so the target structure arrives on the **right-hand passenger side**. This keeps firefighters and pump operators safe from oncoming traffic and avoids dragging attack lines across active roadways.
+3. **Turn Hierarchy (Controlled Lefts $\rightarrow$ Easy Rights)**:
+   - Make necessary left-hand turns at **major signalized EmTrac intersections** (e.g. `Pinetree Way → Left onto Lougheed Hwy`).
+   - Use right-hand turns for local block approaches (e.g. `Lougheed Hwy → Right onto Christmas Way → Right onto Gordon Ave`).
+
+### B. Implementation via Intermediate Waypoints:
+To force an explicit tactical corridor for a target neighborhood:
+```json
+{
+  "origin": "1300 Pinetree Way (Hall 1)",
+  "destination": "3030 Gordon Ave",
+  "waypoints": ["Lougheed Hwy & Christmas Way"],
+  "approach_bias": "right_curb"
+}
+```
+
+---
+
+## 7. Driver Station HUD & Mobile QR Integration
 
 The route output generates three synchronized formats:
 1. **Interactive Leaflet/MapLibre Polyline**: Bold glowing emerald line (`#00e676`) with directional arrows.

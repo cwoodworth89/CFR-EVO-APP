@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r /app/backend/api/requirements.txt
 COPY backend /app/backend
 COPY services /app/services
 
-ENV PYTHONPATH=/app:/app/services
+ENV PYTHONPATH=/app:/app/services:/app/services/gis/src:/app/services/audio/src:/app/services/dispatch_notifications/src
 
 EXPOSE 8000
 

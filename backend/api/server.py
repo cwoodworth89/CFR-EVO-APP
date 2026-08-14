@@ -5,8 +5,20 @@ import time
 import threading
 import ipaddress
 import re
+import sys
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta, timezone
+
+# Dynamically inject sibling microservices (/services/*/src) into sys.path
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SERVICES_DIR = os.path.join(BASE_DIR, "services")
+for s in ["gis", "audio", "dispatch_notifications"]:
+    p = os.path.join(SERVICES_DIR, s, "src")
+    if os.path.exists(p) and p not in sys.path:
+        sys.path.insert(0, p)
+    p_container = f"/app/services/{s}/src"
+    if os.path.exists(p_container) and p_container not in sys.path:
+        sys.path.insert(0, p_container)
 
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware

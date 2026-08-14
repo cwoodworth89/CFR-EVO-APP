@@ -816,6 +816,33 @@ def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = De
     }
 
 
+@app.get("/api/route")
+def get_calculated_route(
+    dest_lat: float,
+    dest_lng: float,
+    start_lat: Optional[float] = None,
+    start_lng: Optional[float] = None,
+    station_id: Optional[str] = "1",
+    response_type: str = "emergency"
+):
+    """Local offline routing endpoint for emergency vehicle dispatch calculations."""
+    try:
+        from gis_service.routing_engine import EVORoutingEngine
+        router = EVORoutingEngine(default_station_id=station_id or "1")
+        route_data = router.calculate_route(
+            dest_lat=dest_lat,
+            dest_lng=dest_lng,
+            start_lat=start_lat,
+            start_lng=start_lng,
+            station_id=station_id,
+            response_type=response_type
+        )
+        return route_data
+    except Exception as e:
+        logging.error(f"Error computing local route: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "8000"))

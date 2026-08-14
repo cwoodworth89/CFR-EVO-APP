@@ -21,79 +21,46 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
   useEffect(() => {
     if (!map || fromLat === null || fromLng === null || toLat === null || toLng === null) return;
 
-    // Check if L.Routing is available (loaded via CDN)
-    if (!L.Routing || !L.Routing.control) {
-      console.warn("Leaflet Routing Machine is not loaded.");
-      return;
-    }
+    let isMounted = true;
+    let polylineLayer = null;
 
-    // Build tactical waypoints array (Injecting Hall 1 tactical corridors)
-    const waypoints = [L.latLng(fromLat, fromLng)];
+    const fetchLocalRoute = async () => {
+      try {
+        const resp = await fetch(`/api/route?start_lat=${fromLat}&start_lng=${fromLng}&dest_lat=${toLat}&dest_lng=${toLng}&station_id=1`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.polyline && isMounted) {
+            const latLngs = data.polyline.map(pt => L.latLng(pt[0], pt[1]));
+            
+            // Render high-visibility glowing emerald emergency route polyline
+            polylineLayer = L.polyline(latLngs, {
+              color: '#00e676',
+              weight: 6,
+              opacity: 0.95,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }).addTo(map);
 
-    // Check if departing from Hall 1 (Town Centre: ~49.291, -122.790)
-    const isHall1 = Math.abs(fromLat - 49.29109) < 0.008 && Math.abs(fromLng - (-122.7907)) < 0.008;
-
-    if (isHall1) {
-      // Sector A: Mariner Way / Southwest Sector (Take Guildford -> Johnson St -> Mariner to avoid Lougheed traffic medians)
-      if (toLat < 49.280 && toLng < -122.800) {
-        waypoints.push(L.latLng(49.2847, -122.7915)); // Pinetree & Guildford
-        waypoints.push(L.latLng(49.2845, -122.8055)); // Guildford & Johnson St
-        waypoints.push(L.latLng(49.2785, -122.8125)); // Johnson St & Mariner Way
-      }
-      // Sector B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
-      else if (toLat >= 49.275 && toLat <= 49.286 && toLng >= -122.795 && toLng <= -122.780) {
-        waypoints.push(L.latLng(49.2785, -122.7915)); // Pinetree & Lougheed
-        waypoints.push(L.latLng(49.2785, -122.7850)); // Lougheed & Christmas Way
-      }
-    }
-
-    waypoints.push(L.latLng(toLat, toLng));
-
-    const routingControl = L.Routing.control({
-      waypoints,
-      router: L.Routing.osrmv1({
-        serviceUrl: 'https://router.project-osrm.org/route/v1',
-        profile: 'car',
-        useHints: false
-      }),
-      // Emergency response routing: allow arriving at destination from any direction without forcing curb U-turns
-      approaches: ['unrestricted', 'unrestricted'],
-      routeWhileDragging: false,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      fitSelectedRoutes: false,
-      show: false, // Hides the textual routing directions panel
-      createMarker: () => null, // Disables default start/end waypoint markers (we render our own Hall/Target icons)
-      lineOptions: {
-        styles: [
-          { color: '#4f46e5', weight: 6, opacity: 0.8 } // High-contrast Indigo route line overlay
-        ],
-        extendToWaypoints: true,
-        missingRouteTolerance: 10
-      }
-    }).addTo(map);
-
-    routingControl.on('routesfound', (e) => {
-      const routes = e.routes;
-      if (routes && routes.length > 0) {
-        const coordinates = routes[0].coordinates; // array of L.LatLng
-        if (onRouteCalculatedRef.current) {
-          onRouteCalculatedRef.current(coordinates);
+            if (onRouteCalculatedRef.current) {
+              onRouteCalculatedRef.current(latLngs.map(l => ({ lat: l.lat, lng: l.lng })));
+            }
+          }
         }
+      } catch (err) {
+        console.warn("Local route fetch error:", err);
       }
-    });
+    };
 
-    // Force-hide the LRM instruction container container if it ignores the 'show' parameter
-    const container = routingControl.getContainer();
-    if (container) {
-      container.style.display = 'none';
-    }
+    fetchLocalRoute();
 
     return () => {
-      try {
-        map.removeControl(routingControl);
-      } catch (e) {
-        console.warn("Clean up Leaflet routing control error:", e);
+      isMounted = false;
+      if (polylineLayer && map) {
+        try {
+          map.removeLayer(polylineLayer);
+        } catch (e) {
+          console.warn("Clean up routing polyline error:", e);
+        }
       }
     };
   }, [map, fromLat, fromLng, toLat, toLng]);

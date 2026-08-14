@@ -3,6 +3,7 @@ import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-routing-machine';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+import { API_BASE_URL } from '../apiClient';
 
 export function RoutingOverlay({ from, to, onRouteCalculated }) {
   const map = useMap();
@@ -26,7 +27,7 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
 
     const fetchLocalRoute = async () => {
       try {
-        const resp = await fetch(`/api/route?start_lat=${fromLat}&start_lng=${fromLng}&dest_lat=${toLat}&dest_lng=${toLng}&station_id=1`);
+        const resp = await fetch(`${API_BASE_URL}/api/route?start_lat=${fromLat}&start_lng=${fromLng}&dest_lat=${toLat}&dest_lng=${toLng}&station_id=1`);
         if (resp.ok) {
           const data = await resp.json();
           if (data && data.polyline && isMounted) {

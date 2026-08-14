@@ -246,21 +246,24 @@ class EVORoutingEngine:
 
         fallback_road_km = round(dist_km * road_factor, 2)
 
-        # Tactical Corridor Waypoint Injection for Hall 1 Departures
+        # Station 1 Dual-Carriageway Apron Resolution:
+        # Station 1 (1300 Pinetree Way) sits on the east side of Pinetree Way (divided arterial).
+        # For southbound calls, depart from the Southbound Apron Exit (-122.7915, 49.2905) to prevent OSRM median U-turn loops.
+        is_hall_1 = (abs(start_lat - 49.291) < 0.008 and abs(start_lng - (-122.790)) < 0.008) or (str(station_id) == "1")
+
+        if is_hall_1 and dest_lat < 49.290:
+            start_lat = 49.2905
+            start_lng = -122.7915
+
         waypoint_pts = [[start_lat, start_lng]]
-        is_hall_1 = (abs(start_lat - 49.291) < 0.005 and abs(start_lng - (-122.790)) < 0.005) or (str(station_id) == "1")
 
         if is_hall_1:
             # Corridor A: Mariner Way / Southwest Sector (Take Guildford -> Johnson St -> Mariner)
             if dest_lat < 49.280 and dest_lng < -122.800:
-                waypoint_pts.append([49.2847, -122.7915])  # Pinetree & Guildford
                 waypoint_pts.append([49.2845, -122.8055])  # Guildford & Johnson St
                 waypoint_pts.append([49.2785, -122.8125])  # Johnson St & Mariner Way
             # Corridor B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
             elif 49.270 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780:
-                waypoint_pts.append([49.2890, -122.7912])  # Pinetree Way Southbound
-                waypoint_pts.append([49.2847, -122.7915])  # Pinetree & Guildford
-                waypoint_pts.append([49.2785, -122.7912])  # Pinetree & Lougheed
                 waypoint_pts.append([49.2780, -122.7854])  # Lougheed & Christmas Way
 
         waypoint_pts.append([dest_lat, dest_lng])

@@ -133,17 +133,3 @@ class ParcelModel(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
-class StreetViewOverrideModel(Base):
-    """Deprecated: Legacy table. Use ParcelModel fields instead."""
-    __tablename__ = "streetview_overrides"
-    __table_args__ = {'extend_existing': True}
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    clean_address = Column(String, unique=True, index=True, nullable=False)
-    front_lat = Column(Float, nullable=False)
-    front_lng = Column(Float, nullable=False)
-    heading = Column(Float, default=0.0, nullable=False)
-    pitch = Column(Float, default=5.0, nullable=False)
-    fov = Column(Float, default=80.0, nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-

@@ -3,20 +3,6 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
 
-// Fallback hardcoded overrides table
-export const STREETVIEW_OVERRIDES = {
-  "3000 RIVERBEND DR": { lat: 49.2552, lng: -122.7840, heading: 180, fov: 90, pitch: 0 },
-  "3100 OZADA AVE": { lat: 49.3015, lng: -122.7758, heading: 170, fov: 90, pitch: 5 },
-  "2680 MARINER WAY": { lat: 49.2780, lng: -122.8050, heading: 240, fov: 90, pitch: 0 },
-  "1190 PIPELINE RD": { lat: 49.2965, lng: -122.7910, heading: 90, fov: 90, pitch: 0 },
-  "1300 PINETREE WAY": { lat: 49.2838, lng: -122.7932, heading: 270, fov: 90, pitch: 0 },
-  "775 MARINER WAY": { lat: 49.2635, lng: -122.8048, heading: 180, fov: 90, pitch: 0 },
-  "438 NELSON ST": { lat: 49.2475, lng: -122.8682, heading: 320, fov: 90, pitch: 0 },
-  "3501 DAVID AVE": { lat: 49.3012, lng: -122.7560, heading: 190, fov: 90, pitch: 0 },
-  "1386 COAST MERIDIAN RD": { lat: 49.297541, lng: -122.755800, heading: 270, fov: 90, pitch: 0 },
-  "3030 GORDON AVE": { lat: 49.26995, lng: -122.79190, heading: 35, fov: 80, pitch: 10 }
-};
-
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -33,7 +19,6 @@ export default function StreetViewPanel({ activeCall }) {
   const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1, fov: 80, lat: 49.2838, lng: -122.7932, pano_id: '' });
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
-  const fallbackOverride = STREETVIEW_OVERRIDES[cleanAddrKey];
 
   // Helper for instant local storage override retrieval
   const getLocalOverride = () => {
@@ -48,42 +33,39 @@ export default function StreetViewPanel({ activeCall }) {
 
   const localOverride = getLocalOverride();
 
-  // Fetch DB override on mount or when address changes via apiClient.parcels.lookup / apiClient.streetviewOverrides.get
+  // Fetch DB override on mount or when address changes via apiClient.parcels.lookup
   useEffect(() => {
     let isMounted = true;
     setDbOverride(null);
     if (!cleanAddrKey) return;
 
-    const stored = getLocalOverride();
-    if (stored && isMounted) {
-      setDbOverride(stored);
-    }
+    apiClient.parcels.lookup(cleanAddrKey)
+      .then((res) => {
+        if (isMounted && res?.found && res?.parcel) {
+          const p = res.parcel;
+          if (p.heading != null || p.streetview_heading != null || p.front_lat != null) {
+            setDbOverride({
+              lat: p.front_lat ?? p.lat,
+              lng: p.front_lng ?? p.lng,
+              heading: p.streetview_heading ?? p.heading ?? 0,
+              pitch: p.streetview_pitch ?? p.pitch ?? 5,
+              fov: p.streetview_fov ?? p.fov ?? 80,
+              zoom: p.zoom
+            });
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch parcel Street View override:', err);
+      });
 
-    apiClient.parcels.lookup(cleanAddrKey).then((data) => {
-      let parcelData = null;
-      if (data && data.found && data.parcel) {
-        parcelData = data.parcel;
-      }
-      if (!parcelData) {
-        return apiClient.streetviewOverrides.get(cleanAddrKey).then((ov) => ov || null);
-      }
-      return parcelData;
-    }).then((overrideData) => {
-      if (isMounted && overrideData) {
-        setDbOverride(overrideData);
-        try {
-          localStorage.setItem(`cfr_sv_override_${cleanAddrKey}`, JSON.stringify(overrideData));
-        } catch (e) {}
-      }
-    }).catch((err) => {
-      console.warn("Error looking up parcel StreetView override:", err);
-    });
-
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [cleanAddrKey]);
 
-  // Priority: 1. DB Override -> 2. Local Storage -> 3. Hardcoded fallback -> 4. Computed frontage angle
-  const activeOverride = dbOverride || localOverride || fallbackOverride;
+  // Priority: 1. DB Override -> 2. Local Storage -> 3. Computed frontage angle
+  const activeOverride = dbOverride || localOverride;
 
   const rawFrontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.front_lat ?? activeCall?.target?.frontage_lat ?? activeCall?.lat ?? 49.2838);
   const rawFrontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.front_lng ?? activeCall?.target?.frontage_lng ?? activeCall?.lng ?? -122.7932);

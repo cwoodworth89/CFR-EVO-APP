@@ -58,7 +58,6 @@ const targetIcon = new L.Icon({
 export default function PropertySatellitePanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showRoadLabels, setShowRoadLabels] = useState(true);
 
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
@@ -87,22 +86,18 @@ export default function PropertySatellitePanel({ activeCall }) {
       />
 
       {/* Road & Place Name Labels Overlay */}
-      {showRoadLabels && (
-        <>
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-            maxNativeZoom={19}
-            maxZoom={20}
-            zIndex={500}
-          />
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-            maxNativeZoom={19}
-            maxZoom={20}
-            zIndex={501}
-          />
-        </>
-      )}
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={19}
+        maxZoom={20}
+        zIndex={500}
+      />
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={19}
+        maxZoom={20}
+        zIndex={501}
+      />
 
       {polygonPositions && (
         <Polygon positions={polygonPositions} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />
@@ -161,18 +156,6 @@ export default function PropertySatellitePanel({ activeCall }) {
                 <h3 className="text-base font-bold text-white uppercase tracking-wide">Property High-Res Satellite Inspection</h3>
                 <p className="text-xs text-amber-400 font-mono">📍 {activeCall?.address || 'Target Property'}</p>
               </div>
-
-              {/* Modal Road Labels Toggle */}
-              <button
-                onClick={() => setShowRoadLabels((prev) => !prev)}
-                className={`px-2 py-1 rounded text-xs font-mono font-bold transition border ${
-                  showRoadLabels
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                }`}
-              >
-                {showRoadLabels ? '🏷️ Road Labels ON' : '🏷️ Road Labels OFF'}
-              </button>
             </div>
             <button
               onClick={() => setIsExpanded(false)}

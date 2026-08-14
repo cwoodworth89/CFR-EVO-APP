@@ -42,7 +42,8 @@ FIRE_HALLS: Dict[str, Dict[str, Any]] = {
 def get_unit_type(unit: str) -> str:
     """Returns human-readable apparatus type."""
     u = str(unit).strip().upper()
-    if u.startswith('T') or u.startswith('WT') or u.startswith('LAV'): return 'Tanker / Tender'
+    if u.startswith('LAV'): return 'Light Attack Vehicle'
+    if u.startswith('T') or u.startswith('WT'): return 'Tanker / Tender'
     if u.startswith('E'): return 'Engine / Pumper'
     if u.startswith('L'): return 'Ladder / Aerial'
     if u.startswith('R'): return 'Heavy Rescue'
@@ -50,6 +51,22 @@ def get_unit_type(unit: str) -> str:
     if u.startswith('C') or u.startswith('B'): return 'Command Vehicle'
     if u.startswith('S') or u.startswith('M'): return 'Specialty / Medic'
     return 'Apparatus'
+
+def get_apparatus_profile_class(unit_str: str) -> str:
+    """
+    Classifies apparatus into routing profile classes:
+      - light: C (Command), M (Medic), S (Specialty), B (Battalion), LAV (Light Attack Vehicle)
+      - heavy: L (Ladder/Aerial), Q (Quint), T/WT (Tenders/Tankers)
+      - standard: E (Engine/Pumper), R (Rescue), and default fallbacks
+    """
+    u = str(unit_str).strip().upper()
+    if u.startswith('LAV'):
+        return "light"
+    if u.startswith('C') or u.startswith('M') or u.startswith('S') or u.startswith('B'):
+        return "light"
+    if u.startswith('L') or u.startswith('Q') or u.startswith('T') or u.startswith('WT'):
+        return "heavy"
+    return "standard"
 
 def get_unit_station_id(unit_str: str) -> str:
     """Extracts home station ID from unit abbreviation (e.g. M1 -> 1, E3 -> 3, WT4 -> 4, Q5 -> 3)."""
@@ -162,18 +179,29 @@ class EVORoutingEngine:
         """
         Calculates driving distance, road routing factor, and ETA for a specific unit from its Home Fire Hall.
 
-        Response Modes:
-          - Emergency (Code 3): EmTrac/Opticom signal preemption, Code 3 speed (~45 km/h avg, 1.35x road factor, 0.0m turnout buffer).
-          - Routine (Code 1): Standard public drive times, obeying traffic signals & speed limits (~32 km/h avg, 1.45x road factor, 0.0m turnout buffer).
+        Apparatus Profiles:
+          - light: Command (C), Medic (M), Specialty (S), LAV (Light Attack Vehicle) -> 52 km/h Code 3, 1.25x factor
+          - standard: Engine/Pumper (E), Heavy Rescue (R) -> 45 km/h Code 3, 1.35x factor
+          - heavy: Ladder/Aerial (L), Quint (Q), Tender/Tanker (T/WT) -> 38 km/h Code 3, 1.45x factor
         """
         clean_unit = str(unit).strip().upper()
         station_id = get_unit_station_id(clean_unit)
         hall = self.get_hall_location(station_id)
+        profile_class = get_apparatus_profile_class(clean_unit)
         
         crow_km = self.calculate_distance_km(hall["lat"], hall["lng"], dest_lat, dest_lng)
         is_routine = str(response_type).lower().strip() == "routine"
-        road_factor = 1.45 if is_routine else 1.35
-        avg_speed_kmh = 32.0 if is_routine else 45.0
+
+        if profile_class == "light":
+            avg_speed_kmh = 38.0 if is_routine else 52.0
+            road_factor = 1.35 if is_routine else 1.25
+        elif profile_class == "heavy":
+            avg_speed_kmh = 28.0 if is_routine else 38.0
+            road_factor = 1.55 if is_routine else 1.45
+        else:  # standard
+            avg_speed_kmh = 32.0 if is_routine else 45.0
+            road_factor = 1.45 if is_routine else 1.35
+
         turnout_minutes = 0.0
 
         road_km = round(crow_km * road_factor, 2)
@@ -183,6 +211,7 @@ class EVORoutingEngine:
         return {
             "unit": clean_unit,
             "unit_type": get_unit_type(clean_unit),
+            "apparatus_class": profile_class,
             "origin_hall": hall["id"],
             "hall_name": hall["name"],
             "hall_address": hall["address"],

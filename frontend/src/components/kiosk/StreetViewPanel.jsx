@@ -167,11 +167,12 @@ export default function StreetViewPanel({ activeCall }) {
               pano.setPano(data.location.pano);
               pano.setPov({ heading: initialHeading, pitch: initialPitch });
               pano.setVisible(true);
+              setIsLoading(false);
             } else {
               console.warn("Outdoor StreetViewService fallback to position:", status);
               pano.setPosition({ lat: frontLat, lng: frontLng });
+              setIsLoading(false);
             }
-            setIsLoading(false);
           });
         }
 
@@ -201,6 +202,7 @@ export default function StreetViewPanel({ activeCall }) {
               };
             }
           }
+          setIsLoading(false);
         });
 
         // 3. pano_changed: Continuous pano_id & position tracking
@@ -240,15 +242,15 @@ export default function StreetViewPanel({ activeCall }) {
 
         // 5. status_changed: Monitor panorama status & update loading skeleton
         pano.addListener('status_changed', () => {
-          const status = pano.getStatus ? pano.getStatus() : 'OK';
-          if (status === window.google.maps.StreetViewStatus.OK) {
-            setIsLoading(false);
-          } else {
-            console.warn("StreetViewPanorama status changed:", status);
-          }
+          setIsLoading(false);
         });
 
         panoramaRef.current = pano;
+
+        // Safety fallback timer to clear loading skeleton after 3.5 seconds max
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 3500);
       } catch (err) {
         console.error("Failed to initialize Google StreetViewPanorama:", err);
         setSdkError(true);
@@ -272,7 +274,18 @@ export default function StreetViewPanel({ activeCall }) {
         };
         document.head.appendChild(script);
       } else {
-        existingScript.addEventListener('load', initPanorama);
+        if (window.google && window.google.maps) {
+          initPanorama();
+        } else {
+          existingScript.addEventListener('load', initPanorama);
+          const interval = setInterval(() => {
+            if (window.google && window.google.maps) {
+              clearInterval(interval);
+              initPanorama();
+            }
+          }, 300);
+          setTimeout(() => clearInterval(interval), 4000);
+        }
       }
     }
 

@@ -27,11 +27,30 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
       return;
     }
 
+    // Build tactical waypoints array (Injecting Hall 1 tactical corridors)
+    const waypoints = [L.latLng(fromLat, fromLng)];
+
+    // Check if departing from Hall 1 (Town Centre: ~49.291, -122.790)
+    const isHall1 = Math.abs(fromLat - 49.29109) < 0.008 && Math.abs(fromLng - (-122.7907)) < 0.008;
+
+    if (isHall1) {
+      // Sector A: Mariner Way / Southwest Sector (Take Guildford -> Johnson St -> Mariner to avoid Lougheed traffic medians)
+      if (toLat < 49.280 && toLng < -122.800) {
+        waypoints.push(L.latLng(49.2847, -122.7915)); // Pinetree & Guildford
+        waypoints.push(L.latLng(49.2845, -122.8055)); // Guildford & Johnson St
+        waypoints.push(L.latLng(49.2785, -122.8125)); // Johnson St & Mariner Way
+      }
+      // Sector B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
+      else if (toLat >= 49.275 && toLat <= 49.286 && toLng >= -122.795 && toLng <= -122.780) {
+        waypoints.push(L.latLng(49.2785, -122.7915)); // Pinetree & Lougheed
+        waypoints.push(L.latLng(49.2785, -122.7850)); // Lougheed & Christmas Way
+      }
+    }
+
+    waypoints.push(L.latLng(toLat, toLng));
+
     const routingControl = L.Routing.control({
-      waypoints: [
-        L.latLng(fromLat, fromLng),
-        L.latLng(toLat, toLng)
-      ],
+      waypoints,
       router: L.Routing.osrmv1({
         serviceUrl: 'https://router.project-osrm.org/route/v1',
         profile: 'car',

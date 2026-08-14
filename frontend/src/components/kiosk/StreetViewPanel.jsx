@@ -149,7 +149,7 @@ export default function StreetViewPanel({ activeCall }) {
 
         const pano = new window.google.maps.StreetViewPanorama(targetContainer, panoOptions);
 
-        // Resolve nearest street panorama within 300m outdoor radius
+        // Resolve nearest street panorama within 50m outdoor radius (prevents jumping to random streets 300m away)
         const svService = new window.google.maps.StreetViewService();
         if (initialPanoId) {
           pano.setPano(initialPanoId);
@@ -159,7 +159,7 @@ export default function StreetViewPanel({ activeCall }) {
         } else {
           svService.getPanorama({
             location: { lat: frontLat, lng: frontLng },
-            radius: 300,
+            radius: 50,
             source: window.google.maps.StreetViewSource.OUTDOOR,
             preference: window.google.maps.StreetViewPreference.NEAREST
           }, (data, status) => {
@@ -169,9 +169,23 @@ export default function StreetViewPanel({ activeCall }) {
               pano.setVisible(true);
               setIsLoading(false);
             } else {
-              console.warn("Outdoor StreetViewService fallback to position:", status);
-              pano.setPosition({ lat: frontLat, lng: frontLng });
-              setIsLoading(false);
+              // 100m fallback if 50m tight radius misses
+              svService.getPanorama({
+                location: { lat: frontLat, lng: frontLng },
+                radius: 100,
+                source: window.google.maps.StreetViewSource.OUTDOOR,
+                preference: window.google.maps.StreetViewPreference.NEAREST
+              }, (data2, status2) => {
+                if (status2 === window.google.maps.StreetViewStatus.OK && data2 && data2.location) {
+                  pano.setPano(data2.location.pano);
+                  pano.setPov({ heading: initialHeading, pitch: initialPitch });
+                  pano.setVisible(true);
+                } else {
+                  console.warn("Outdoor StreetViewService fallback to position:", status2);
+                  pano.setPosition({ lat: frontLat, lng: frontLng });
+                }
+                setIsLoading(false);
+              });
             }
           });
         }
@@ -311,7 +325,7 @@ export default function StreetViewPanel({ activeCall }) {
       } else {
         svService.getPanorama({
           location: { lat: frontLat, lng: frontLng },
-          radius: 300,
+          radius: 50,
           source: window.google.maps.StreetViewSource.OUTDOOR,
           preference: window.google.maps.StreetViewPreference.NEAREST
         }, (data, status) => {

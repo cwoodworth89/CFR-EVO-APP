@@ -90,6 +90,32 @@ class EVORoutingEngine:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1.0 - a)))
         return R * c
 
+    def _fetch_osrm_polyline(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float]]:
+        if not waypoints or len(waypoints) < 2:
+            return None, None
+        
+        loc_str = ";".join([f"{pt[1]},{pt[0]}" for pt in waypoints])
+        endpoints = [
+            f"https://router.project-osrm.org/route/v1/driving/{loc_str}?overview=full&geometries=geojson",
+            f"http://127.0.0.1:5000/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
+        ]
+        
+        for url in endpoints:
+            try:
+                resp = requests.get(url, timeout=3.5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("code") == "Ok" and data.get("routes"):
+                        route = data["routes"][0]
+                        coords = route["geometry"]["coordinates"]
+                        lat_lngs = [[pt[1], pt[0]] for pt in coords]
+                        dist_km = round(route["distance"] / 1000.0, 2)
+                        return lat_lngs, dist_km
+            except Exception as e:
+                logging.debug(f"OSRM query failed for {url}: {e}")
+        
+        return None, None
+
     def calculate_unit_metrics(
         self,
         unit: str,

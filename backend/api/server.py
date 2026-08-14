@@ -785,10 +785,6 @@ def get_streetview_override(address: str, db: Session = Depends(get_db)):
         "lat": p.front_lat or 0.0,
         "lng": p.front_lng or 0.0
     }
-        "fov": r.fov,
-        "lat": r.front_lat,
-        "lng": r.front_lng
-    }
 
 
 @app.post("/api/streetview-overrides")

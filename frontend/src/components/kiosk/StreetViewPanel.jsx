@@ -295,6 +295,9 @@ export default function StreetViewPanel({ activeCall }) {
     }
 
     return () => {
+      if (window.google?.maps?.event && panoramaRef.current) {
+        window.google.maps.event.clearInstanceListeners(panoramaRef.current);
+      }
       if (targetContainer) targetContainer.innerHTML = '';
       panoramaRef.current = null;
     };

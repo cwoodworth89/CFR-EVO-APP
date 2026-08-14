@@ -92,6 +92,7 @@ class EVORoutingEngine:
         return R * c
 
     def _fetch_osrm_polyline(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float]]:
+        import requests
         if not waypoints or len(waypoints) < 2:
             return None, None
         

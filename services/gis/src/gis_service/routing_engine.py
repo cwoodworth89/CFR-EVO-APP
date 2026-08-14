@@ -262,9 +262,6 @@ class EVORoutingEngine:
             if dest_lat < 49.280 and dest_lng < -122.800:
                 waypoint_pts.append([49.2845, -122.8055])  # Guildford & Johnson St
                 waypoint_pts.append([49.2785, -122.8125])  # Johnson St & Mariner Way
-            # Corridor B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
-            elif 49.270 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780:
-                waypoint_pts.append([49.2780, -122.7854])  # Lougheed & Christmas Way
 
         waypoint_pts.append([dest_lat, dest_lng])
 

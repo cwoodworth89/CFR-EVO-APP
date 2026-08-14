@@ -1,19 +1,18 @@
-## 2026-08-13T23:52:42Z
-You are the Forensic Auditor for Milestone 1 (Backend PostgreSQL & REST Overhaul).
+# Forensic Auditor (Milestone 1) Dispatch
 
-Your assigned working directory is: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m1\`
+## Mission
+Conduct an independent forensic integrity audit on Milestone 1 code changes (`services/gis/src/gis_service/routing_engine.py`, `backend/tests/test_routing_engine.py`).
 
-Read the verbatim user request from: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
-Also read Worker M1's handoff report at: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`
+## Reading
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\PROJECT.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\GEMINI.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`
 
-Your mission:
-Perform forensic integrity verification of all code modified or created by Worker M1 (`backend/api/init_db.sql`, `backend/api/models.py`, `backend/api/server.py`, `backend/scripts/migrate_streetview_to_parcels.py`, `backend/tests/test_parcels_and_streetview_api.py`).
+## Audit Checks
+1. Integrity Forensics: Check for hardcoded test results, facade logic, mock short-circuiting in production code, or dummy implementations.
+2. Code Genuineness: Verify that `services/gis/src/gis_service/routing_engine.py` genuinely implements the OSRM query logic, URL endpoint ordering, `continue_straight=true`, tactical corridor logic, and Haversine fallback formulas.
+3. Execution Verification: Run `pytest backend/tests/test_routing_engine.py -v` independently to verify tests are genuine and pass.
 
-Verify:
-1. Are there any hardcoded test results, fake responses, or dummy implementations?
-2. Are the SQL DDL and SQLAlchemy ORM models genuine and fully functional?
-3. Is FastAPI routing and database persistence real?
-4. Are test cases checking genuine API/DB behavior rather than asserting static mocks?
-
-Write your audit report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m1\audit.md` and handoff report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m1\handoff.md`.
-End your handoff report with a clear verdict: `VERDICT: CLEAN` or `VERDICT: INTEGRITY VIOLATION`. Send a summary message to orchestrator when complete.
+Write your forensic audit verdict (`CLEAN` or `INTEGRITY VIOLATION`) and detailed evidence report to:
+`c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m1\handoff.md`

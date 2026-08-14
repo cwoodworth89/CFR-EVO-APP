@@ -92,7 +92,9 @@ class EVORoutingEngine:
         return R * c
 
     def _fetch_osrm_polyline(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float]]:
-        import requests
+        import urllib.request
+        import json
+
         if not waypoints or len(waypoints) < 2:
             return None, None
         
@@ -102,21 +104,20 @@ class EVORoutingEngine:
             f"http://127.0.0.1:5000/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
         ]
         
-        headers = {'User-Agent': 'CFREVOApp/1.0 (Coquitlam Fire EVO Routing)'}
         for url in endpoints:
             try:
-                resp = requests.get(url, headers=headers, timeout=5.0)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("code") == "Ok" and data.get("routes"):
-                        route = data["routes"][0]
-                        coords = route["geometry"]["coordinates"]
-                        lat_lngs = [[pt[1], pt[0]] for pt in coords]
-                        dist_km = round(route["distance"] / 1000.0, 2)
-                        return lat_lngs, dist_km
-                print(f"[OSRM] Status {resp.status_code} from {url}", flush=True)
+                req = urllib.request.Request(url, headers={'User-Agent': 'CFREVOApp/1.0 (Coquitlam Fire EVO Routing)'})
+                with urllib.request.urlopen(req, timeout=4.0) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode('utf-8'))
+                        if data.get("code") == "Ok" and data.get("routes"):
+                            route = data["routes"][0]
+                            coords = route["geometry"]["coordinates"]
+                            lat_lngs = [[pt[1], pt[0]] for pt in coords]
+                            dist_km = round(route["distance"] / 1000.0, 2)
+                            return lat_lngs, dist_km
             except Exception as e:
-                print(f"[OSRM] Error from {url}: {e}", flush=True)
+                logging.debug(f"OSRM query failed for {url}: {e}")
         
         return None, None
 

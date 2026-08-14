@@ -14,6 +14,7 @@ from gis_service.routing_engine import (
     FIRE_HALLS,
     get_unit_type,
     get_unit_station_id,
+    get_apparatus_profile_class,
 )
 
 
@@ -57,8 +58,24 @@ class TestFireHallsAndApparatusMapping:
         assert get_unit_type("S3") == "Specialty / Medic"
         assert get_unit_type("T4") == "Tanker / Tender"
         assert get_unit_type("WT4") == "Tanker / Tender"
-        assert get_unit_type("LAV4") == "Tanker / Tender"
+        assert get_unit_type("LAV4") == "Light Attack Vehicle"
         assert get_unit_type("UNKNOWN99") == "Apparatus"
+
+    def test_get_apparatus_profile_class(self):
+        assert get_apparatus_profile_class("LAV4") == "light"
+        assert get_apparatus_profile_class("C1") == "light"
+        assert get_apparatus_profile_class("C10") == "light"
+        assert get_apparatus_profile_class("M1") == "light"
+        assert get_apparatus_profile_class("S3") == "light"
+
+        assert get_apparatus_profile_class("E1") == "standard"
+        assert get_apparatus_profile_class("E4") == "standard"
+        assert get_apparatus_profile_class("R1") == "standard"
+
+        assert get_apparatus_profile_class("L1") == "heavy"
+        assert get_apparatus_profile_class("Q5") == "heavy"
+        assert get_apparatus_profile_class("T4") == "heavy"
+        assert get_apparatus_profile_class("WT4") == "heavy"
 
     def test_get_unit_station_id(self):
         assert get_unit_station_id("E1") == "1"

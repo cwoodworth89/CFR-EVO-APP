@@ -1,19 +1,23 @@
 // Map & Layer Constants
+import { TILE_BASE_URL } from '../apiClient';
 
 // 🗺️ BASE LAYERS (Clean no-label basemaps for Coquitlam municipal vector overlays)
+// Prioritizes local containerized offline tile server (:8081) with graceful online fallback
 export const BASE_LAYERS = {
   GREY: {
     type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
+    url: `${TILE_BASE_URL}/services/vancouver_light/tiles/{z}/{x}/{y}.png`,
+    fallbackUrl: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
     subdomains: ['a', 'b', 'c', 'd'],
     maxNativeZoom: 19,
     maxZoom: 22,
   },
   DARK: {
     type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
+    url: `${TILE_BASE_URL}/services/vancouver_dark/tiles/{z}/{x}/{y}.png`,
+    fallbackUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
     subdomains: ['a', 'b', 'c', 'd'],
     maxNativeZoom: 19,
     maxZoom: 22,
@@ -21,6 +25,7 @@ export const BASE_LAYERS = {
   SATELLITE: {
     type: 'tile',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Esri, Maxar, Earthstar Geographics',
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 18,
@@ -28,16 +33,18 @@ export const BASE_LAYERS = {
   },
   OSM: {
     type: 'tile',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '© OpenStreetMap contributors',
+    url: `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`,
+    fallbackUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '© OpenStreetMap contributors (Offline Local)',
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 19,
     maxZoom: 22
   },
   VOYAGER: {
     type: 'tile',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto',
+    url: `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`,
+    fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
     subdomains: ['a', 'b', 'c', 'd'],
     maxNativeZoom: 19,
     maxZoom: 22

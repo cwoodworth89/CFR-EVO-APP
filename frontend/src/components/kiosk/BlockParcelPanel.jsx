@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
+import { BaseMap, HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 
 function StableAutoCenterAndResize({ lat, lng, callKey }) {
@@ -57,12 +57,8 @@ export default function BlockParcelPanel({ activeCall }) {
       className="w-full h-full z-0"
       zoomControl={true}
     >
-      <TileLayer
-        attribution={BASE_LAYERS.GREY.attribution}
-        url={BASE_LAYERS.GREY.url}
-        subdomains={BASE_LAYERS.GREY.subdomains}
-        maxZoom={22}
-      />
+      {/* Offline-First Cadastral Basemap (Prioritizes local :8081 tile server with graceful online fallback) */}
+      <BaseMap style="GREY" />
 
       <CoquitlamOverlays visible={true} />
 

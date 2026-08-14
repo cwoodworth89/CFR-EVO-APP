@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { dynamicMapLayer } from 'esri-leaflet';
 import * as turf from '@turf/turf';
 import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
+import { TILE_BASE_URL } from '../apiClient';
 
 
 
@@ -53,17 +54,48 @@ export function BaseMap({ style, useLabelsFallback }) {
         cleanup();
 
         const config = BASE_LAYERS[style] || BASE_LAYERS.GREY;
-        let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.GREY.url || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
+        let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.GREY.url || `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`);
+        let fallbackUrl = typeof config === 'object' ? config.fallbackUrl : null;
+
         if (useLabelsFallback && url && url.includes('_nolabels')) {
             url = url.replace('_nolabels', '_all');
         }
+        if (useLabelsFallback && fallbackUrl && fallbackUrl.includes('_nolabels')) {
+            fallbackUrl = fallbackUrl.replace('_nolabels', '_all');
+        }
 
-        const attribution = typeof config === 'object' ? config.attribution : '&copy; <a href="https://carto.com/">CARTO</a>';
-        const subdomains = typeof config === 'object' ? config.subdomains : 'abcd';
+        const attribution = typeof config === 'object' ? config.attribution : '© OpenStreetMap contributors (Offline Local)';
+        const subdomains = typeof config === 'object' ? config.subdomains : ['a', 'b', 'c', 'd'];
         const maxNativeZoom = typeof config === 'object' ? (config.maxNativeZoom ?? 19) : 19;
         const maxZoom = typeof config === 'object' ? (config.maxZoom ?? 22) : 22;
 
-        const tileLayer = L.tileLayer(url, {
+        // Custom Leaflet TileLayer with graceful fallback support
+        const FallbackTileLayer = L.TileLayer.extend({
+            createTile: function(coords, done) {
+                const tile = L.TileLayer.prototype.createTile.call(this, coords, done);
+                if (fallbackUrl) {
+                    tile.onerror = function() {
+                        if (!tile.dataset.fallbackTried) {
+                            tile.dataset.fallbackTried = 'true';
+                            let sub = 'a';
+                            if (Array.isArray(subdomains) && subdomains.length > 0) {
+                                sub = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
+                            }
+                            const fUrl = fallbackUrl
+                                .replace('{s}', sub)
+                                .replace('{z}', coords.z)
+                                .replace('{x}', coords.x)
+                                .replace('{y}', coords.y)
+                                .replace('{r}', '');
+                            tile.src = fUrl;
+                        }
+                    };
+                }
+                return tile;
+            }
+        });
+
+        const tileLayer = new FallbackTileLayer(url, {
             attribution: attribution,
             subdomains: subdomains,
             maxNativeZoom: maxNativeZoom,

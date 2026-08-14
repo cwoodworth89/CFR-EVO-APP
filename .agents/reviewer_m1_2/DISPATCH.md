@@ -1,17 +1,19 @@
-## 2026-08-13T16:52:42-07:00
-You are Reviewer 2 for Milestone 1 (Backend PostgreSQL & REST Overhaul).
+# Reviewer 2 (Milestone 1) Dispatch
 
-Your assigned working directory is: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\reviewer_m1_2\`
+## Mission
+Independently review the Milestone 1 implementation of the OSRM Emergency Routing Stack in `services/gis/src/gis_service/routing_engine.py` and unit tests in `backend/tests/test_routing_engine.py`.
 
-Read the verbatim user request from: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
-Also read Worker M1's handoff report at: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`
+## Reading
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\PROJECT.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\GEMINI.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`
 
-Your mission:
-Independently review the backend code changes made for Milestone 1:
-1. Check SQL injection safety and parameter binding in database queries.
-2. Check FastAPI error handling, HTTP status codes, and JSON response structures.
-3. Check fallback logic between `parcels` table and legacy `streetview_overrides` table.
-4. Run test suites (`python backend/tests/test_parcels_and_streetview_api.py` or pytest).
+## Evaluation Criteria
+1. Correctness: Verify endpoint ordering, parameter injection (`continue_straight=true`, `overview=full`, `geometries=geojson`).
+2. Edge cases: Empty waypoints, invalid coordinates, timeout handling, malformed JSON responses, non-200 HTTP codes.
+3. Code quality: No unused/missing imports, clean Python typing, compatibility with `backend/api/server.py`.
+4. Run `pytest backend/tests/test_routing_engine.py -v`.
 
-Write your detailed review in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\reviewer_m1_2\review.md` and handoff report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\reviewer_m1_2\handoff.md`.
-End your handoff report with a clear verdict: `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES`. Send a summary message to orchestrator when complete.
+Write your review verdict (`APPROVE` or `REQUEST_CHANGES`) and report to:
+`c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\reviewer_m1_2\handoff.md`

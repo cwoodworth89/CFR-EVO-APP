@@ -1,16 +1,20 @@
-## 2026-08-13T16:52:42Z
-You are Challenger 2 for Milestone 1 (Backend PostgreSQL & REST Overhaul).
+# Challenger 2 (Milestone 1) Dispatch
 
-Your assigned working directory is: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\challenger_m1_2\`
+## Mission
+Adversarially challenge and stress-test the `EVORoutingEngine` implementation in `services/gis/src/gis_service/routing_engine.py` with focus on Station 1 tactical corridor accuracy, apparatus unit parsing, and response physics.
 
-Read the verbatim user request from: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
-Also read Worker M1's handoff report at: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`
+## Reading
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\PROJECT.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\GEMINI.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`
 
-Your mission:
-Empirically challenge and stress-test the backend migration and data sync logic for Milestone 1.
-- Test legacy `streetview_overrides` fallback when `parcels` has no entry.
-- Test migration script `backend/scripts/migrate_streetview_to_parcels.py` under zero-row, single-row, and duplicate-row scenarios.
-- Verify return formats match API specifications.
-
-Write your report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\challenger_m1_2\challenge.md` and handoff report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\challenger_m1_2\handoff.md`.
-End your handoff report with a clear verdict: `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES`. Send a summary message to orchestrator when complete.
+## Testing Requirements
+1. Write and execute an empirical test script targeting:
+   - Coordinate accuracy and polygon bounds for tactical corridors A (Mariner) and B (Gordon Ave).
+   - Invariance across all apparatus types (`E1`, `L1`, `R1`, `Q5`, `WT4`, `MEDIC1`, `CHIEF1`, unknown units).
+   - Speed/ETA mathematics comparison between Emergency (Code 3) and Routine (Code 1).
+   - Memory leaks / recursion issues during high-volume queries.
+2. Confirm empirical correctness.
+3. Write your findings, empirical results, and verdict (`APPROVE` or `REJECT`) to:
+`c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\challenger_m1_2\handoff.md`

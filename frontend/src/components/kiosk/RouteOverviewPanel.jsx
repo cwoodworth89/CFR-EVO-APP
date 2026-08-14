@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
 import { RoutingOverlay } from '../RoutingOverlay';
-import { CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 
@@ -237,13 +237,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         <MapInteractivity onPan={() => setUserPanned(true)} />
         <ZoomControl position="bottomright" />
 
-        {/* CartoDB Voyager Navigation Basemap (Matches main landing page) */}
-        <TileLayer
-          attribution={BASE_LAYERS.VOYAGER.attribution}
-          url={BASE_LAYERS.VOYAGER.url}
-          subdomains={BASE_LAYERS.VOYAGER.subdomains}
-          maxZoom={22}
-        />
+        {/* Offline-First Navigation Basemap (Prioritizes local :8081 tile server with graceful online fallback) */}
+        <BaseMap style="VOYAGER" />
 
         {/* Coquitlam Municipal Cadastral Layer */}
         <CoquitlamOverlays visible={true} />

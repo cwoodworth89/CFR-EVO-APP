@@ -1,39 +1,76 @@
-# Handoff Report — Worker M2 (Frontend Street View Facade Engine & SDK Specialist)
+# Worker M2: Local Offline Map Tile Server & Leaflet Integration Handoff Report
+
+**Milestone**: Milestone 2 — Local Offline Map Tile Server & Leaflet Integration  
+**Author**: Worker M2 (`implementer`, `qa`, `specialist`)  
+**Date**: 2026-08-14T05:36:50Z  
+
+---
 
 ## 1. Observation
-- `frontend/src/apiClient.js`:
-  - Added `apiClient.parcels.lookup(query)` (`GET /api/parcels/lookup?query={query}`)
-  - Added `apiClient.parcels.saveStreetView(payload)` (`POST /api/parcels/streetview`)
-  - Added `apiClient.streetviewOverrides.get(address)` helper.
-- `frontend/src/components/kiosk/StreetViewPanel.jsx`:
-  - Fully compliant with Google Maps JS SDK (`window.google.maps.StreetViewPanorama`, `StreetViewService`).
-  - Implemented continuous camera vector tracking in `currentPovRef.current` with `{ heading, pitch, zoom, fov, lat, lng, pano_id }`.
-  - Registered all 5 event listeners: `pov_changed`, `position_changed`, `pano_changed`, `zoom_changed`, `status_changed`.
-  - Added initial load parcel lookup via `apiClient.parcels.lookup`, `apiClient.streetviewOverrides.get`, and `localStorage` (`cfr_sv_override_${cleanAddrKey}`).
-  - High-visibility `[SAVED PREFERRED VIEW]` indicator badge in HUD header title bar.
-  - "Save Preferred View" handler posts `{ clean_address, front_lat, front_lng, heading, pitch, fov, pano_id }` to `/api/parcels/streetview` and saves to `localStorage`.
-  - Added sleek dark HUD loading skeleton ("Loading Street View Facade...") until panorama tiles render.
-- Build Verification:
-  - Command: `cmd /c npm run build` (cwd: `frontend/`)
-  - Result: 0 errors, Exit code 0, 416 modules transformed.
+
+1. **Docker Compose Missing Tile & OSRM Services**:
+   - In `docker-compose.yml`, the local container stack only defined `postgres`, `mosquitto`, `ntfy`, and `api`. The offline map tile server (`cfr_tiles`) on port `8081` and OSRM emergency routing backend (`cfr_osrm`) on port `5000` were missing.
+   - The `api` service was missing healthcheck conditions for database, broker, routing, and tile container dependencies.
+
+2. **Frontend Basemap Hardcoding & Network Coupling**:
+   - In `frontend/src/apiClient.js`, `API_BASE_URL` resolved dynamically to `http://${window.location.hostname}:8000`, but there was no dynamic `TILE_BASE_URL` or tile endpoint resolver for port `8081`.
+   - In `frontend/src/components/MapConstants.js`, `BASE_LAYERS` hardcoded external cloud URLs:
+     - `GREY`: `https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png`
+     - `DARK`: `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png`
+     - `VOYAGER`: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`
+     - `OSM`: `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`
+   - In `frontend/src/components/kiosk/RouteOverviewPanel.jsx` (Lines 240–246) and `frontend/src/components/kiosk/BlockParcelPanel.jsx` (Lines 60–65), raw `<TileLayer>` components referenced `BASE_LAYERS` directly without local fallback mechanisms.
+
+---
 
 ## 2. Logic Chain
-1. *Requirement R1 (Continuous Vantage Point Capture)*: By binding listeners for `pov_changed`, `position_changed`, `pano_changed`, `zoom_changed`, and `status_changed`, every touch drag, pan, step down the road, and zoom updates `currentPovRef.current` immediately.
-2. *Requirement R2 & R3 (JS SDK Conformance & Parcel Integration)*: Adding `apiClient.parcels.lookup` and `apiClient.parcels.saveStreetView` connects the frontend camera vector saving directly to the FastAPI `/api/parcels/*` endpoints.
-3. *Requirement R4 (Lifecycle & HUD Skeleton)*: Managing `isLoading` state and attaching `status_changed` listener allows a sleek dark HUD skeleton to render during initial tile load, eliminating blank/gray canvas flashes.
-4. *Immediate Visual Feedback*: When a user clicks "Save Preferred View", writing to `localStorage` and calling `setDbOverride(payload)` immediately displays the `[SAVED PREFERRED VIEW]` badge in the HUD header.
+
+1. **Premise 1 (Zero External WAN Dependency)**: Station bay kiosks and emergency consoles must be capable of rendering basemap tiles without an external internet connection (e.g. during fiber cuts or storm events).
+2. **Premise 2 (Dynamic Host Resolution)**: Remote kiosks connect over Tailscale (`http://100.95.146.94:5173`) while developers use `localhost`. Hardcoding host IPs breaks either remote kiosks or local development. Dynamically resolving `TILE_BASE_URL` using `window.location.hostname` ensures both `http://100.95.146.94:8081` and `http://localhost:8081` resolve correctly.
+3. **Premise 3 (Local Priority with Graceful Online Fallback)**: By pointing `BASE_LAYERS.url` to the local tile server (`${TILE_BASE_URL}/services/vancouver...`) and maintaining `fallbackUrl` pointing to standard providers (CartoDB / OSM), the client prioritizes local offline tiles.
+4. **Premise 4 (Automatic Error Fallback)**: By implementing `FallbackTileLayer` (extending `L.TileLayer` in `MapLayers.jsx`), when a local tile is not found or the server is starting up, Leaflet intercepts `tile.onerror` and transparently retries against `fallbackUrl`.
+5. **Premise 5 (Centralized Kiosk UI Basemap Rendering)**: Migrating `RouteOverviewPanel.jsx` and `BlockParcelPanel.jsx` to consume `<BaseMap style="VOYAGER" />` and `<BaseMap style="GREY" />` standardizes map tile resolution and error handling across the entire kiosk HUD.
+
+---
 
 ## 3. Caveats
-- No live Google Maps API key (`VITE_GOOGLE_MAPS_API_KEY`) is active in local dev env by default; fallback embed / mock Google SDK initialization handles dev testing gracefully. Full WebGL 360° rendering requires an active key in production/kiosk `.env`.
+
+1. **MBTiles / PMTiles Dataset Mount**: The container service mounts `./backend/data/tiles` into `/tiles:ro`. To serve local offline raster/vector tiles in production, the Metro Vancouver tile dataset (`.mbtiles` / `.pmtiles`) should reside in `backend/data/tiles/` (which is excluded from Git to prevent repository bloat).
+2. **ArcGIS Satellite Imagery**: High-resolution 3D satellite imagery remains an online-only layer in `PropertySatellitePanel.jsx` and gracefully transitions to "Offline Satellite Standby" when WAN is unavailable, as satellite tile sets are multi-gigabyte.
+
+---
 
 ## 4. Conclusion
-Milestone 2 frontend tasks (R1 & R3) are fully implemented, verified via `npm run build`, and compliant with all project requirements and workspace rules.
+
+1. **Docker Compose**: Added `cfr_tiles` (`consbio/mbtileserver` on `8081:8080`) and `cfr_osrm` (`osrm/osrm-backend:v5.27.1` on `5000:5000`) with comprehensive health checks (`wget`, `curl`, `pg_isready`, `mosquitto_sub`).
+2. **API & Dynamic Resolution**: Exported `TILE_BASE_URL`, `getTileUrl()`, and `getTileLayerConfig()` in `frontend/src/apiClient.js`.
+3. **Leaflet Basemaps**: Updated `MapConstants.js` and `MapLayers.jsx` with local tile endpoints and dynamic online fallback handling.
+4. **Kiosk Panels**: Updated `RouteOverviewPanel.jsx` and `BlockParcelPanel.jsx` to consume `BaseMap`.
+5. **Build & Test Verification**: `npm run build` completed with zero errors in 2.69s; all 20 backend routing tests passed with 100% success rate.
+
+---
 
 ## 5. Verification Method
-1. Build check:
+
+To independently verify these changes:
+
+1. **Verify Frontend Asset Build**:
    ```bash
-   cmd /c npm run build
+   cd frontend
+   npm run build
+   # Confirm vite builds dist/ cleanly with 0 errors
    ```
-2. Inspect source code:
-   - Check `frontend/src/apiClient.js` for `apiClient.parcels.lookup` and `apiClient.parcels.saveStreetView`.
-   - Check `frontend/src/components/kiosk/StreetViewPanel.jsx` for all 5 SDK listeners and `[SAVED PREFERRED VIEW]` badge rendering.
+
+2. **Verify Python Routing Engine Test Suite**:
+   ```bash
+   .venv/Scripts/pytest.exe backend/tests/test_routing_engine.py
+   # 20 passed in 0.40s
+   ```
+
+3. **Verify Docker Compose Configuration**:
+   ```bash
+   docker compose config
+   ```
+
+4. **Verify Dynamic Tile Resolution in Browser**:
+   Open `http://localhost:5173` or `http://100.95.146.94:5173` in browser and verify that tile requests route to port `8081` on the matching host.

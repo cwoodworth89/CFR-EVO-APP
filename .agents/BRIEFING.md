@@ -6,7 +6,7 @@ Build and orchestrate a 100% local, containerized GIS routing (OSRM) and map til
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\
-- Orchestrator: e1e3b83e-229d-4daa-984a-1ac449027ff3
+- Orchestrator: 8147b808-c3aa-4d2c-8ba1-4653e95070ba (gen 2)
 - Victory Auditor: to be spawned on victory claim
 
 ## 🔒 Key Constraints

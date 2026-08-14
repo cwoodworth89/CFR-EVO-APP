@@ -12,6 +12,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/api/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cfr_user} -d ${POSTGRES_DB:-cfr_dispatch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   mosquitto:
     image: eclipse-mosquitto:2.0
@@ -22,6 +28,44 @@ services:
       - "9001:9001"   # MQTT over WebSockets port
     volumes:
       - ./services/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/version' -C 1 -E -i healthcheck || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  osrm:
+    image: osrm/osrm-backend:v5.27.1
+    container_name: cfr_osrm
+    restart: always
+    command: osrm-routed --algorithm mld /data/metro-vancouver.osrm
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/data/osrm:/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  tiles:
+    image: consbio/mbtileserver:latest
+    container_name: cfr_tiles
+    restart: always
+    command: -d /tiles -p 8080
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./backend/data/tiles:/tiles:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || curl -f http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   ntfy:
     image: binwiederhier/ntfy:v2.11.0
@@ -42,6 +86,7 @@ services:
       MQTT_BROKER_HOST: mosquitto
       MQTT_BROKER_PORT: 1883
       NTFY_SERVER_URL: http://ntfy:80
+      OSRM_BACKEND_URL: http://osrm:5000
       JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
       RECORDINGS_DIR: /app/backend/audio_files/recordings
     ports:
@@ -51,9 +96,16 @@ services:
       - ./backend/data:/app/backend/data
       - ./frontend/public/data:/app/frontend/public/data:ro
     depends_on:
-      - postgres
-      - mosquitto
-      - ntfy
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      osrm:
+        condition: service_healthy
+      tiles:
+        condition: service_healthy
+      ntfy:
+        condition: service_started
 
 volumes:
   postgres_data:

@@ -102,7 +102,7 @@ class TestOSRMUrlConstructionAndPriorities:
         engine = EVORoutingEngine()
         endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
         for url in endpoints:
-            assert "continue_straight=true" in url
+            assert "continue_straight=false" in url
             assert "steps=true" in url
             assert "overview=full" in url
             assert "geometries=geojson" in url
@@ -112,7 +112,7 @@ class TestOSRMUrlConstructionAndPriorities:
         with patch.dict(os.environ, {"OSRM_ROUTER_URL": "http://custom-osrm-host:5000"}):
             endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
             assert endpoints[0].startswith("http://custom-osrm-host:5000/route/v1/driving/")
-            assert "continue_straight=true" in endpoints[0]
+            assert "continue_straight=false" in endpoints[0]
 
         with patch.dict(os.environ, {"OSRM_BACKEND_URL": "http://mld-backend:5000"}):
             endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")

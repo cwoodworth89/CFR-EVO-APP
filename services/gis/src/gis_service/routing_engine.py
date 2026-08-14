@@ -92,8 +92,8 @@ class EVORoutingEngine:
         return R * c
 
     def _get_osrm_endpoints(self, loc_str: str) -> List[str]:
-        """Constructs prioritized candidate endpoints with continue_straight=true."""
-        query_params = "overview=full&geometries=geojson&continue_straight=true&steps=true"
+        """Constructs prioritized candidate endpoints with continue_straight=false for emergency vehicle U-turn flexibility."""
+        query_params = "overview=full&geometries=geojson&continue_straight=false&steps=true"
         
         disable_wan = os.environ.get("DISABLE_WAN_FALLBACK", "false").lower() in ("true", "1", "yes")
 

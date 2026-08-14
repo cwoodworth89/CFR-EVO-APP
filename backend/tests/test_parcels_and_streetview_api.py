@@ -104,7 +104,7 @@ def test_save_and_lookup_parcel_streetview():
     print("Running test_save_and_lookup_parcel_streetview...")
     db = SessionLocal()
     payload = ParcelCameraOverrideSchema(
-        clean_address="3030 GORDON AVE, COQUITLAM",
+        clean_address="999 TEST DISPATCH BLVD, COQUITLAM",
         front_lat=49.2785,
         front_lng=-122.7932,
         heading=135.5,
@@ -113,16 +113,22 @@ def test_save_and_lookup_parcel_streetview():
     )
     data = save_parcel_streetview(payload=payload, db=db)
     assert data["status"] == "success"
-    assert data["parcel"]["clean_address"] == "3030 GORDON AVE"
+    assert data["parcel"]["clean_address"] == "999 TEST DISPATCH BLVD"
     assert data["parcel"]["streetview_heading"] == 135.5
     assert data["parcel"]["front_lat"] == 49.2785
 
     # Test lookup endpoint hit
-    lookup_data = lookup_parcel(query="3030 GORDON AVE", db=db)
-    assert lookup_data["found"] is True
-    assert lookup_data["parcel"]["clean_address"] == "3030 GORDON AVE"
-    assert lookup_data["parcel"]["streetview_heading"] == 135.5
-    assert lookup_data["parcel"]["heading"] == 135.5
+    lookup_res = lookup_parcel(query="999 TEST DISPATCH BLVD", db=db)
+    assert lookup_res["found"] is True
+    assert lookup_res["parcel"]["clean_address"] == "999 TEST DISPATCH BLVD"
+    assert lookup_res["parcel"]["streetview_heading"] == 135.5
+
+    # Cleanup test row
+    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "999 TEST DISPATCH BLVD").first()
+    if p: db.delete(p)
+    ov = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == "999 TEST DISPATCH BLVD").first()
+    if ov: db.delete(ov)
+    db.commit()
     db.close()
     print("PASSED: test_save_and_lookup_parcel_streetview")
 

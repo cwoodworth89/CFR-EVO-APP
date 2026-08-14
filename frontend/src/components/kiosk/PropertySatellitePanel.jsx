@@ -58,6 +58,7 @@ const targetIcon = new L.Icon({
 export default function PropertySatellitePanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showRoadLabels, setShowRoadLabels] = useState(true);
 
   const destLat = activeCall?.lat ?? 49.2838;
   const destLng = activeCall?.lng ?? -122.7932;
@@ -85,20 +86,23 @@ export default function PropertySatellitePanel({ activeCall }) {
         maxZoom={20}
       />
 
-      {/* Road & Place Name Labels Overlay (Always On) */}
-      <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
-        maxZoom={20}
-        zIndex={500}
-      />
-
-      <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
-        maxZoom={20}
-        zIndex={501}
-      />
+      {/* Road & Place Name Labels Overlay */}
+      {showRoadLabels && (
+        <>
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+            maxNativeZoom={19}
+            maxZoom={20}
+            zIndex={500}
+          />
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
+            maxNativeZoom={19}
+            maxZoom={20}
+            zIndex={501}
+          />
+        </>
+      )}
 
       {polygonPositions && (
         <Polygon positions={polygonPositions} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />

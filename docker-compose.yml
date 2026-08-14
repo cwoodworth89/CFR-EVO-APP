@@ -40,18 +40,18 @@ services:
     container_name: cfr_osrm
     restart: always
     command: >
-      sh -c 'if [ -f /data/metro-vancouver.osrm ]; then
-        exec osrm-routed --algorithm mld /data/metro-vancouver.osrm;
+      sh -c 'if [ -f /data/british-columbia-latest.osrm.timestamp ]; then
+        exec osrm-routed --algorithm mld /data/british-columbia-latest.osrm;
       else
-        echo "OSRM dataset not yet mounted in /data/metro-vancouver.osrm. Standing by in fallback mode...";
+        echo "OSRM dataset not yet mounted in /data/british-columbia-latest.osrm. Standing by in fallback mode...";
         while true; do sleep 3600; done;
       fi'
     ports:
       - "5000:5000"
     volumes:
-      - ./backend/data/osrm:/data:ro
+      - ./backend/data/osrm:/data
     healthcheck:
-      test: ["CMD-SHELL", "if [ -f /data/metro-vancouver.osrm ]; then curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1; else exit 0; fi"]
+      test: ["CMD-SHELL", "if [ -f /data/british-columbia-latest.osrm.timestamp ]; then curl -f 'http://localhost:5000/route/v1/driving/-122.7907,49.2910;-122.7938,49.2882?overview=false' || exit 1; else exit 0; fi"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -93,6 +93,7 @@ services:
       MQTT_BROKER_PORT: 1883
       NTFY_SERVER_URL: http://ntfy:80
       OSRM_BACKEND_URL: http://osrm:5000
+      TILE_SERVER_URL: http://tiles:8080
       JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
       RECORDINGS_DIR: /app/backend/audio_files/recordings
     ports:

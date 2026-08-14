@@ -100,9 +100,10 @@ class EVORoutingEngine:
             f"http://127.0.0.1:5000/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
         ]
         
+        headers = {'User-Agent': 'CFREVOApp/1.0 (Coquitlam Fire EVO Routing)'}
         for url in endpoints:
             try:
-                resp = requests.get(url, timeout=3.5)
+                resp = requests.get(url, headers=headers, timeout=3.5)
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("code") == "Ok" and data.get("routes"):
@@ -111,8 +112,10 @@ class EVORoutingEngine:
                         lat_lngs = [[pt[1], pt[0]] for pt in coords]
                         dist_km = round(route["distance"] / 1000.0, 2)
                         return lat_lngs, dist_km
+                else:
+                    logging.warning(f"OSRM returned status {resp.status_code} for {url}")
             except Exception as e:
-                logging.debug(f"OSRM query failed for {url}: {e}")
+                logging.warning(f"OSRM query failed for {url}: {e}")
         
         return None, None
 

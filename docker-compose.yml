@@ -36,7 +36,7 @@ services:
       start_period: 5s
 
   osrm:
-    image: osrm/osrm-backend:v5.27.1
+    image: ghcr.io/project-osrm/osrm-backend:latest
     container_name: cfr_osrm
     restart: always
     command: osrm-routed --algorithm mld /data/metro-vancouver.osrm
@@ -52,7 +52,7 @@ services:
       start_period: 10s
 
   tiles:
-    image: consbio/mbtileserver:latest
+    image: ghcr.io/consbio/mbtileserver:latest
     container_name: cfr_tiles
     restart: always
     command: -d /tiles -p 8080

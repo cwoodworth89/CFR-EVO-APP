@@ -40,29 +40,30 @@ FIRE_HALLS: Dict[str, Dict[str, Any]] = {
 }
 
 def get_unit_type(unit: str) -> str:
-    """Returns human-readable apparatus type."""
+    """Returns clean, real-world apparatus type for Coquitlam Fire Rescue."""
     u = str(unit).strip().upper()
     if u.startswith('LAV'): return 'Light Attack Vehicle'
-    if u.startswith('T') or u.startswith('WT'): return 'Tanker / Tender'
-    if u.startswith('E'): return 'Engine / Pumper'
-    if u.startswith('L'): return 'Ladder / Aerial'
-    if u.startswith('R'): return 'Heavy Rescue'
+    if u.startswith('WT') or u.startswith('T'): return 'Water Tender'
+    if u.startswith('E'): return 'Engine'
+    if u.startswith('L'): return 'Ladder'
+    if u.startswith('R'): return 'Rescue'
     if u.startswith('Q'): return 'Quint'
-    if u.startswith('C') or u.startswith('B'): return 'Command Vehicle'
-    if u.startswith('S') or u.startswith('M'): return 'Specialty / Medic'
+    if u.startswith('C') or u.startswith('CAR') or u.startswith('CHIEF'): return 'Chief'
+    if u.startswith('M'): return 'Medic'
+    if u.startswith('S'): return 'Specialty'
     return 'Apparatus'
 
 def get_apparatus_profile_class(unit_str: str) -> str:
     """
     Classifies apparatus into routing profile classes:
-      - light: C (Command), M (Medic), S (Specialty), B (Battalion), LAV (Light Attack Vehicle)
-      - heavy: L (Ladder/Aerial), Q (Quint), T/WT (Tenders/Tankers)
-      - standard: E (Engine/Pumper), R (Rescue), and default fallbacks
+      - light: C / CAR / CHIEF (Chiefs 1-10), M (Medic), S (Specialty), LAV (Light Attack Vehicle)
+      - heavy: L (Ladder), Q (Quint), T / WT (Water Tender)
+      - standard: E (Engine), R (Rescue), and default fallbacks
     """
     u = str(unit_str).strip().upper()
     if u.startswith('LAV'):
         return "light"
-    if u.startswith('C') or u.startswith('M') or u.startswith('S') or u.startswith('B'):
+    if u.startswith('C') or u.startswith('CAR') or u.startswith('CHIEF') or u.startswith('M') or u.startswith('S'):
         return "light"
     if u.startswith('L') or u.startswith('Q') or u.startswith('T') or u.startswith('WT'):
         return "heavy"

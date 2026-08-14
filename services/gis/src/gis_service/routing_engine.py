@@ -187,14 +187,32 @@ class EVORoutingEngine:
         road_km = round(dist_km * road_factor, 2)
         eta_minutes = max(1, round((road_km / avg_speed_kmh) * 60 + turnout_minutes))
 
-        mid_lat = (start_lat + dest_lat) / 2.0 + (0.0015 if start_lat < dest_lat else -0.0015)
-        mid_lng = (start_lng + dest_lng) / 2.0
+        # Tactical Corridor Waypoint Injection for Hall 1 Departures
+        coordinates = [[start_lat, start_lng]]
 
-        coordinates = [
-            [start_lat, start_lng],
-            [mid_lat, mid_lng],
-            [dest_lat, dest_lng]
-        ]
+        # Check if departing from Hall 1 (Town Centre)
+        is_hall_1 = (abs(start_lat - 49.291) < 0.005 and abs(start_lng - (-122.790)) < 0.005) or (str(station_id) == "1")
+
+        if is_hall_1:
+            # Corridor A: Mariner Way / Southwest Sector (Take Guildford -> Johnson St -> Mariner to avoid Lougheed traffic medians)
+            if dest_lat < 49.280 and dest_lng < -122.800:
+                coordinates.append([49.2847, -122.7915])  # Pinetree & Guildford
+                coordinates.append([49.2845, -122.8055])  # Guildford & Johnson St
+                coordinates.append([49.2785, -122.8125])  # Johnson St & Mariner Way
+            # Corridor B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
+            elif 49.275 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780:
+                coordinates.append([49.2785, -122.7915])  # Pinetree & Lougheed
+                coordinates.append([49.2785, -122.7850])  # Lougheed & Christmas Way
+            else:
+                mid_lat = (start_lat + dest_lat) / 2.0 + (0.0015 if start_lat < dest_lat else -0.0015)
+                mid_lng = (start_lng + dest_lng) / 2.0
+                coordinates.append([mid_lat, mid_lng])
+        else:
+            mid_lat = (start_lat + dest_lat) / 2.0 + (0.0015 if start_lat < dest_lat else -0.0015)
+            mid_lng = (start_lng + dest_lng) / 2.0
+            coordinates.append([mid_lat, mid_lng])
+
+        coordinates.append([dest_lat, dest_lng])
 
         return {
             "status": "success",

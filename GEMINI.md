@@ -7,6 +7,7 @@ This rule file defines domain constraints, runtime environments, and workflow st
 ## 1. 100% Local Container Stack Architecture
 * **Primary Database**: All dispatch records, audio metadata, and MLOps metrics persist directly to containerized PostgreSQL 16 (`localhost:5432`).
 * **API Gateway**: REST operations and dispatch persistence route via FastAPI (`http://localhost:8000/api/dispatches`).
+* **Frontend API Endpoint Resolution**: All frontend components performing `fetch()` operations MUST import and use `API_BASE_URL` from [`frontend/src/apiClient.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/apiClient.js) (e.g., `fetch(\`${API_BASE_URL}/api/route?...\`)`). Never use raw relative paths (`fetch('/api/...')`) or hardcoded `localhost` strings, as remote kiosk browsers accessing the UI over Tailscale (`http://100.95.146.94:5173`) will route relative requests to the Vite static server (resulting in 404s).
 * **Real-Time Broadcast**: Station kiosks listen to Mosquitto MQTT over WebSockets on port `9001` (topic: `cfr/dispatches`).
 * **Cloud Deprecation**: Do NOT re-introduce Supabase, Firebase, or external cloud database dependencies. The system is designed to function with zero monthly costs and total offline survival.
 

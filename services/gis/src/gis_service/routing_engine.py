@@ -292,8 +292,8 @@ class EVORoutingEngine:
             if dest_lat < 49.280 and dest_lng < -122.800:
                 waypoint_pts.append([49.2845, -122.8055])  # Guildford & Johnson St
                 waypoint_pts.append([49.2785, -122.8125])  # Johnson St & Mariner Way
-            # Corridor B: Pinetree Way Main Arterial Bias (Stay on Pinetree Way down to Lougheed Hwy)
-            elif dest_lat < 49.285 and -122.798 <= dest_lng <= -122.782:
+            # Corridor B: All Southbound Calls (Stay on main arterial Pinetree Way South)
+            elif dest_lat < 49.290:
                 waypoint_pts.append([49.2820, -122.7933])  # Pinetree Way South Corridor
 
         waypoint_pts.append([dest_lat, dest_lng])

@@ -107,20 +107,29 @@ When crafting prompt instructions or configuring custom routing rules, use stand
 ### A. Core Tactical Principles:
 1. **EmTrac / Opticom Preemption Corridors**:
    - Always prefer multi-lane arterial corridors equipped with EmTrac green-light preemption (e.g. `Pinetree Way`, `Lougheed Hwy`) over shorter residential cut-throughs.
-2. **Curb-Side (Passenger-Side) Arrival Bias**:
-   - Route apparatus so the target structure arrives on the **right-hand passenger side**. This keeps firefighters and pump operators safe from oncoming traffic and avoids dragging attack lines across active roadways.
-3. **Turn Hierarchy (Controlled Lefts $\rightarrow$ Easy Rights)**:
-   - Make necessary left-hand turns at **major signalized EmTrac intersections** (e.g. `Pinetree Way → Left onto Lougheed Hwy`).
-   - Use right-hand turns for local block approaches (e.g. `Lougheed Hwy → Right onto Christmas Way → Right onto Gordon Ave`).
+2. **Barrier-Free Lane maneuverability (No Median Islands)**:
+   - **Mariner Way Corridor (Station 1 Departure)**: When responding toward Mariner Way / Ranch Park, **always take Guildford Way $\rightarrow$ Johnson St $\rightarrow$ Mariner Way**.
+   - *Reason*: Guildford/Johnson has **no center-line median islands or physical concrete barriers**, allowing heavy apparatus to cross center-lines and maneuver around stopped traffic cleanly. (Never take Pinetree $\rightarrow$ Right on Lougheed $\rightarrow$ Left on Mariner, which has dangerous traffic barriers and awkward turns).
+3. **Town Centre / Gordon Ave Corridor (Station 1 Departure)**:
+   - When responding to the Gordon Ave / Coquitlam Centre sector: **Pinetree Way South $\rightarrow$ Left onto Lougheed Hwy $\rightarrow$ Right onto Christmas Way $\rightarrow$ Right onto Gordon Ave**.
+   - *Reason*: Leverages Pinetree's synchronized rolling-green EmTrac wave down to Lougheed.
 
 ### B. Implementation via Intermediate Waypoints:
 To force an explicit tactical corridor for a target neighborhood:
 ```json
 {
-  "origin": "1300 Pinetree Way (Hall 1)",
-  "destination": "3030 Gordon Ave",
-  "waypoints": ["Lougheed Hwy & Christmas Way"],
-  "approach_bias": "right_curb"
+  "hall_1_mariner_corridor": {
+    "origin": "1300 Pinetree Way (Hall 1)",
+    "target_sector": "Mariner Way / Ranch Park",
+    "waypoints": ["Pinetree Way & Guildford Way", "Guildford Way & Johnson St", "Johnson St & Mariner Way"],
+    "reason": "Barrier-free lanes; avoids Lougheed/Mariner traffic islands"
+  },
+  "hall_1_gordon_corridor": {
+    "origin": "1300 Pinetree Way (Hall 1)",
+    "target_sector": "Gordon Ave / Town Centre",
+    "waypoints": ["Pinetree Way & Lougheed Hwy", "Lougheed Hwy & Christmas Way"],
+    "reason": "Pinetree rolling-green EmTrac wave; natural right-turn approach"
+  }
 }
 ```
 

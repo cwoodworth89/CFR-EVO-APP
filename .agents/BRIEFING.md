@@ -1,12 +1,12 @@
-# BRIEFING — 2026-08-13T23:56:15Z
+# BRIEFING — 2026-08-14T05:23:15Z
 
 ## Mission
-Overhaul CFR EVO Google Street View Facade Inspection panel & property table persistence in PostgreSQL.
+Build and orchestrate a 100% local, containerized GIS routing (OSRM) and map tile stack (PMTiles/MBTiles) for CFR EVO.
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\
-- Orchestrator: a311c797-6ec0-4de4-af31-9cefe00f589e
+- Orchestrator: e1e3b83e-229d-4daa-984a-1ac449027ff3
 - Victory Auditor: to be spawned on victory claim
 
 ## 🔒 Key Constraints
@@ -15,12 +15,12 @@ Overhaul CFR EVO Google Street View Facade Inspection panel & property table per
 - Must verify changes locally and deploy/verify on remote kiosk (100.95.146.94)
 
 ## User Context
-- **Last user request**: Complete Google Street View Facade Engine Overhaul & Property Table Persistence
+- **Last user request**: Build and orchestrate 100% local, containerized GIS routing (OSRM on :5000) and map tile stack (:8081) for CFR EVO, with automated health checks, sub-20ms routing, and kiosk verification.
 - **Pending clarifications**: none
-- **Delivered results**: [none]
+- **Delivered results**: [none yet for this round]
 
 ## Project Status
-- **Phase**: Milestone 1 Review in Progress (PostgreSQL parcels table migration & REST endpoints implemented)
+- **Phase**: in progress
 
 ## Victory Audit Status
 - **Triggered**: no
@@ -29,5 +29,3 @@ Overhaul CFR EVO Google Street View Facade Inspection panel & property table per
 
 ## Artifact Index
 - c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md — Verbatim user request record
-- c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\orchestrator_r1\progress.md — Orchestrator progress log
-- c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\orchestrator_r1\plan.md — Project plan

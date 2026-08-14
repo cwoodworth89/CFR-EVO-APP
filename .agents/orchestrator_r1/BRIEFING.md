@@ -21,11 +21,11 @@ Manage the end-to-end implementation and verification of Google Street View Faca
 - **Work items**:
   1. Survey & Feature Inventory [done]
   2. M1: PostgreSQL `parcels` Table Schema, Migration & REST Lookup/Override Endpoints (R2) [done]
-  3. M2: Frontend Street View Facade Engine JS SDK & Continuous Vantage Point Capture (R1, R3) [in-progress]
-  4. M3: HUD Loading Skeleton, Lifecycle & WebGL Flash Prevention (R4) [pending]
-  5. M4: End-to-End Automated Testing & Kiosk Remote Deployment (R5) [pending]
-- **Current phase**: 2 (Milestone Execution)
-- **Current focus**: Milestone 2 (Frontend JS SDK Conformance & Continuous Vantage Point Capture)
+  3. M2: Frontend Street View Facade Engine JS SDK & Continuous Vantage Point Capture (R1, R3) [done]
+  4. M3: HUD Loading Skeleton, Lifecycle & WebGL Flash Prevention (R4) [done]
+  5. M4: End-to-End Automated Testing & Kiosk Remote Deployment (R5) [done]
+- **Current phase**: 3 (Verification & Victory Claim)
+- **Current focus**: Succession handoff & Final Victory Claim verification.
 
 ## 🔒 Key Constraints
 - 100% local container stack architecture (PostgreSQL 16, FastAPI gateway, Mosquitto MQTT). Zero cloud DB dependencies.
@@ -68,9 +68,10 @@ Manage the end-to-end implementation and verification of Google Street View Faca
 ## Succession Status
 - Succession required: yes (threshold reached)
 - Spawn count: 20 / 20
-- Pending subagents: e65103ee-92e7-434e-88ac-97af45d26197, 8ff33308-8fa1-4729-b560-e51b3bf9b510, 03fe52c8-54f7-4008-998a-deb6a418312d, b6b153b7-8dcf-47f1-90f6-97b9293cd302
+- Pending subagents: none
 - Predecessor: none
-- Successor: not yet spawned
+- Successor spawned: 4b9b4aaf-8590-4e47-98c0-f60fb6e0732d
+- Successor generation: gen2
 
 ## Active Timers
 - Heartbeat cron: pending

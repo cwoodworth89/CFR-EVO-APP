@@ -36,3 +36,38 @@ All changes must be validated locally via automated endpoint/build tests and dep
 - [ ] Exiting and reopening the call immediately loads the saved vantage point with the `[SAVED PREFERRED VIEW]` indicator.
 - [ ] Initial panorama loading displays a dark HUD skeleton and transitions into the 360° view without blank/gray canvas screens.
 - [ ] Verified across multiple consecutive dispatch simulations on the physical kiosk display (`100.95.146.94`).
+
+## Follow-up — 2026-08-14T05:23:00Z
+
+# 100% Local Containerized GIS Routing & Map Tile Stack
+
+Build and orchestrate a 100% local, containerized GIS routing and map tile stack for CFR EVO, enabling sub-10ms offline OSRM emergency routing and local PMTiles basemap tile rendering without any external internet dependency.
+
+Working directory: c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP
+Integrity mode: demo
+
+## Requirements
+
+### R1. Local OSRM Emergency Routing Container (`cfr_osrm`)
+Provision a containerized `osrm-backend` service in `docker-compose.yml` pre-loaded with Metro Vancouver OpenStreetMap data on port `5000`. Update `services/gis/src/gis_service/routing_engine.py` to route emergency dispatch requests to `http://osrm:5000` with `continue_straight=true` for apparatus momentum preservation.
+
+### R2. Local Offline Map Tile Server (`cfr_tiles`)
+Provision a local PMTiles/MBTiles tile server container in `docker-compose.yml` serving Metro Vancouver basemap tiles on port `8081`. Update frontend Leaflet map components (`frontend/src/components/MapBoard.jsx`) to consume tile layers locally over `API_BASE_URL`.
+
+### R3. Automated Health Checks & Full-Stack Verification
+Integrate Docker Compose service health checks for `cfr_osrm` and `cfr_tiles`. Rebuild frontend assets, pull updates on the remote kiosk (`tcfire@100.95.146.94`), and verify sub-20ms route rendering and map display on the station kiosk.
+
+## Acceptance Criteria
+
+### Performance & Offline Routing
+- [ ] `GET /api/route` returns high-resolution street curve polylines (100+ coordinates) via `http://osrm:5000` with sub-20ms latency.
+- [ ] The routing engine correctly penalizes U-turns using `continue_straight=true` and respects Station 1 tactical response corridors.
+
+### Container & Infrastructure Health
+- [ ] `docker compose ps` reports `cfr_osrm` and `cfr_tiles` running in healthy states alongside `cfr_api`, `cfr_postgres`, and `cfr_mosquitto`.
+- [ ] All API fetches use `API_BASE_URL` from `frontend/src/apiClient.js` without hardcoded localhost strings.
+
+### Kiosk UX & Full-Stack Verification
+- [ ] Station kiosk display at `http://100.95.146.94:5173` renders background map tiles and emerald green emergency route overlays with zero external web requests.
+- [ ] Backend route unit tests and API gateway checks execute cleanly without errors.
+

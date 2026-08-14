@@ -1,56 +1,35 @@
-## 2026-08-13T23:48:31Z
-You are Worker M1 (Backend PostgreSQL & REST Specialist).
+# Worker M1 Dispatch: Local OSRM Emergency Routing Stack
 
-Your assigned working directory is: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\`
+## Mission Objective
+Implement the local containerized OSRM routing engine logic in `services/gis/src/gis_service/routing_engine.py` and provide comprehensive unit tests in `backend/tests/test_routing_engine.py`.
 
-Read the verbatim user request from: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
-Also review `GEMINI.md` for workspace rules and `google-imagery-streetview` skill.
+## Mandatory Reading
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\PROJECT.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\GEMINI.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\survey_explorer_1\handoff.md`
 
+## Write Ownership
+- `services/gis/src/gis_service/routing_engine.py`
+- `backend/tests/test_routing_engine.py`
+
+## Specific Requirements
+1. In `services/gis/src/gis_service/routing_engine.py`:
+   - Prioritize `OSRM_BACKEND_URL` / `OSRM_ROUTER_URL` / `OSRM_URL` env vars, followed by local container endpoints (`http://osrm:5000`, `http://127.0.0.1:5000`, `http://localhost:5000`) before public WAN fallback.
+   - Always append `continue_straight=true&steps=true` and `overview=full&geometries=geojson` to OSRM query URLs to preserve vehicle momentum and prevent illegal U-turns.
+   - Set a fast timeout (1.0s) for local queries.
+   - Preserve Station 1 tactical corridor waypoint injection (Corridor A: Mariner Way via Guildford->Johnson->Mariner; Corridor B: Gordon Ave via Pinetree->Lougheed->Christmas).
+   - Implement robust fallback to straight-line waypoints with Haversine distance if OSRM is unreachable.
+   - Avoid unhandled imports or missing dependencies.
+2. In `backend/tests/test_routing_engine.py`:
+   - Add unit tests verifying:
+     - Endpoint priority list and URL construction with `continue_straight=true`.
+     - Tactical corridor waypoint injection for Station 1 destinations (Mariner Way and Gordon Ave).
+     - Response physics (Emergency Code 3 vs Routine Code 1 speed and ETA).
+     - Fallback handling when OSRM is offline.
+     - Distance and ETA calculation accuracy.
+3. Run the test suite using Python / pytest to verify everything passes cleanly.
+4. Write your completion report to `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`.
+
+## Mandatory Integrity Warning
 DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
-
-Your Mission: Implement Milestone 1 (Backend PostgreSQL `parcels` Schema & REST Overhaul).
-
-Tasks:
-1. `backend/api/init_db.sql`: Add `CREATE TABLE IF NOT EXISTS parcels` DDL with columns:
-   - `id SERIAL PRIMARY KEY`
-   - `gis_id VARCHAR(255)` (nullable)
-   - `clean_address VARCHAR(255) UNIQUE NOT NULL`
-   - `street_number VARCHAR(50)`
-   - `street_name VARCHAR(255)`
-   - `municipality VARCHAR(100)`
-   - `parcel_lat DOUBLE PRECISION`
-   - `parcel_lng DOUBLE PRECISION`
-   - `front_lat DOUBLE PRECISION`
-   - `front_lng DOUBLE PRECISION`
-   - `streetview_heading DOUBLE PRECISION DEFAULT 0.0`
-   - `streetview_pitch DOUBLE PRECISION DEFAULT 5.0`
-   - `streetview_fov DOUBLE PRECISION DEFAULT 80.0`
-   - `lock_box_notes TEXT`
-   - `hazard_notes TEXT`
-   - `pre_plan_pdf_url TEXT`
-   - `created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`
-   - `updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`
-   Create index on `clean_address`.
-
-2. `backend/api/models.py`:
-   - Update `ParcelModel` to ensure `gis_id` is `nullable=True`.
-   - Ensure all camera vector and pre-plan fields match the schema.
-
-3. `backend/api/server.py`:
-   - Explicitly import `ParcelModel` from `models.py`.
-   - FIX CRITICAL SYNTAX ERROR in lines 721-733 (`POST /api/streetview-overrides`).
-   - Standardize `_clean_streetview_address` to cleanly handle address normalization.
-   - Implement/overhaul REST endpoints:
-     - `GET /api/parcels/lookup`: Lookup `parcels` table by cleaned query string. Fallback to `streetview_overrides`. Return `{ found: bool, parcel: dict }`.
-     - `POST /api/parcels/streetview`: Upsert camera vector (`clean_address`, `front_lat`, `front_lng`, `heading`, `pitch`, `fov`) into `parcels` table. Fallback/sync to `streetview_overrides` if needed. Return `{ status: "success", parcel: dict }`.
-     - `GET /api/streetview-overrides/{address}`: Fetch saved camera vector from `parcels` (or `streetview_overrides` fallback). Return `{ clean_address, front_lat, front_lng, heading, pitch, fov }`.
-
-4. Migration Script: Check `backend/scripts/migrate_streetview_to_parcels.py` to ensure legacy override records are backfilled.
-
-5. Test Verification:
-   - Run local test commands (e.g. `python backend/tests/test_database_integration.py` or pytest / python test runners).
-   - Verify table creation, syntax validity, and REST endpoint execution.
-
-Document all changes in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\changes.md` and handoff report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m1\handoff.md`.
-
-Update `progress.md` in your working directory as you work. Send a summary message back to orchestrator when finished.

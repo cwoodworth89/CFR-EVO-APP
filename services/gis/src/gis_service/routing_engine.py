@@ -257,9 +257,11 @@ class EVORoutingEngine:
                 waypoint_pts.append([49.2845, -122.8055])  # Guildford & Johnson St
                 waypoint_pts.append([49.2785, -122.8125])  # Johnson St & Mariner Way
             # Corridor B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
-            elif 49.275 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780:
-                waypoint_pts.append([49.2785, -122.7915])  # Pinetree & Lougheed
-                waypoint_pts.append([49.2785, -122.7850])  # Lougheed & Christmas Way
+            elif 49.270 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780:
+                waypoint_pts.append([49.2890, -122.7912])  # Pinetree Way Southbound
+                waypoint_pts.append([49.2847, -122.7915])  # Pinetree & Guildford
+                waypoint_pts.append([49.2785, -122.7912])  # Pinetree & Lougheed
+                waypoint_pts.append([49.2780, -122.7854])  # Lougheed & Christmas Way
 
         waypoint_pts.append([dest_lat, dest_lng])
 

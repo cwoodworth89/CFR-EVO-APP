@@ -238,6 +238,7 @@ class EVORoutingEngine:
 
         # Resolve detailed street network polyline via OSRM
         osrm_polyline, osrm_km = self._fetch_osrm_polyline(waypoint_pts)
+        print(f"[DEBUG_ROUTE] Waypoints: {waypoint_pts} | OSRM result count: {len(osrm_polyline) if osrm_polyline else 0}", flush=True)
 
         if osrm_polyline and len(osrm_polyline) > 2:
             final_polyline = osrm_polyline

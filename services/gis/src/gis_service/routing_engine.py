@@ -292,9 +292,11 @@ class EVORoutingEngine:
             if dest_lat < 49.280 and dest_lng < -122.800:
                 waypoint_pts.append([49.2845, -122.8055])  # Guildford & Johnson St
                 waypoint_pts.append([49.2785, -122.8125])  # Johnson St & Mariner Way
-            # Corridor B: All Southbound Calls (Stay on main arterial Pinetree Way South)
+            # Corridor B: All Southbound Calls (Lock onto Pinetree Way Main Arterial)
             elif dest_lat < 49.290:
-                waypoint_pts.append([49.2820, -122.7933])  # Pinetree Way South Corridor
+                waypoint_pts.append([49.2860, -122.7918])  # Upper Pinetree Corridor (Pinetree & Town Centre)
+                if dest_lat < 49.282:
+                    waypoint_pts.append([49.2807, -122.7934])  # Lower Pinetree Corridor (Pinetree & Lincoln)
 
         waypoint_pts.append([dest_lat, dest_lng])
 

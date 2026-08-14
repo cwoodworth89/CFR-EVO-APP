@@ -107,16 +107,27 @@ class EVORoutingEngine:
         clean_unit = str(unit).strip().upper()
         station_id = get_unit_station_id(clean_unit)
         hall = self.get_hall_location(station_id)
-
-        crow_km = self.calculate_distance_km(hall["lat"], hall["lng"], dest_lat, dest_lng)
         
+        # Resolve Fire Hall assignment based on unit prefix
+        hall_id = "1"
+        if re.match(r'^(E2|L2|R2)', clean_unit):
+            hall_id = "2"
+        elif re.match(r'^(E3|Q5|H3|HT3|S3)', clean_unit):
+            hall_id = "3"
+        elif re.match(r'^(E4|T4|LAV4)', clean_unit):
+            hall_id = "4"
+        
+        hall = self.get_hall_location(hall_id)
+        crow_km = self.calculate_distance_km(hall["lat"], hall["lng"], dest_lat, dest_lng)
+
+        # Emergency Code 3 vs Routine Code 1 response physics
         is_routine = str(response_type).lower().strip() == "routine"
         road_factor = 1.45 if is_routine else 1.35
         avg_speed_kmh = 32.0 if is_routine else 45.0
-        turnout_minutes = 0.0  # Strictly enroute drive times (turnout buffer excluded)
+        turnout_minutes = 0.0  # Strictly enroute drive times
 
         road_km = round(crow_km * road_factor, 2)
-        total_minutes = (road_km / avg_speed_kmh) * 60 + turnout_minutes
+        total_minutes = (road_km / avg_speed_kmh) * 60.0 + turnout_minutes
         eta_minutes = max(1, round(total_minutes))
 
         return {
@@ -142,9 +153,6 @@ class EVORoutingEngine:
         dest_lng: Optional[float],
         response_type: str = "emergency"
     ) -> List[Dict[str, Any]]:
-        """
-        Generates structured routing metrics for all dispatched units.
-        """
         if not dest_lat or not dest_lng or not responding_units:
             return []
 
@@ -170,9 +178,6 @@ class EVORoutingEngine:
         station_id: Optional[str] = None,
         response_type: str = "emergency"
     ) -> Dict:
-        """
-        Computes response route polyline, distance in km, and ETA in minutes.
-        """
         if start_lat is None or start_lng is None:
             hall = self.get_hall_location(station_id)
             start_lat = hall["lat"]
@@ -184,35 +189,36 @@ class EVORoutingEngine:
         avg_speed_kmh = 32.0 if is_routine else 45.0
         turnout_minutes = 0.0  # Strictly enroute drive times (turnout buffer excluded)
 
-        road_km = round(dist_km * road_factor, 2)
-        eta_minutes = max(1, round((road_km / avg_speed_kmh) * 60 + turnout_minutes))
+        fallback_road_km = round(dist_km * road_factor, 2)
 
         # Tactical Corridor Waypoint Injection for Hall 1 Departures
-        coordinates = [[start_lat, start_lng]]
-
-        # Check if departing from Hall 1 (Town Centre)
+        waypoint_pts = [[start_lat, start_lng]]
         is_hall_1 = (abs(start_lat - 49.291) < 0.005 and abs(start_lng - (-122.790)) < 0.005) or (str(station_id) == "1")
 
         if is_hall_1:
-            # Corridor A: Mariner Way / Southwest Sector (Take Guildford -> Johnson St -> Mariner to avoid Lougheed traffic medians)
+            # Corridor A: Mariner Way / Southwest Sector (Take Guildford -> Johnson St -> Mariner)
             if dest_lat < 49.280 and dest_lng < -122.800:
-                coordinates.append([49.2847, -122.7915])  # Pinetree & Guildford
-                coordinates.append([49.2845, -122.8055])  # Guildford & Johnson St
-                coordinates.append([49.2785, -122.8125])  # Johnson St & Mariner Way
+                waypoint_pts.append([49.2847, -122.7915])  # Pinetree & Guildford
+                waypoint_pts.append([49.2845, -122.8055])  # Guildford & Johnson St
+                waypoint_pts.append([49.2785, -122.8125])  # Johnson St & Mariner Way
             # Corridor B: Gordon Ave / Town Centre Sector (Pinetree South -> Lougheed -> Christmas Way -> Gordon)
             elif 49.275 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780:
-                coordinates.append([49.2785, -122.7915])  # Pinetree & Lougheed
-                coordinates.append([49.2785, -122.7850])  # Lougheed & Christmas Way
-            else:
-                mid_lat = (start_lat + dest_lat) / 2.0 + (0.0015 if start_lat < dest_lat else -0.0015)
-                mid_lng = (start_lng + dest_lng) / 2.0
-                coordinates.append([mid_lat, mid_lng])
-        else:
-            mid_lat = (start_lat + dest_lat) / 2.0 + (0.0015 if start_lat < dest_lat else -0.0015)
-            mid_lng = (start_lng + dest_lng) / 2.0
-            coordinates.append([mid_lat, mid_lng])
+                waypoint_pts.append([49.2785, -122.7915])  # Pinetree & Lougheed
+                waypoint_pts.append([49.2785, -122.7850])  # Lougheed & Christmas Way
 
-        coordinates.append([dest_lat, dest_lng])
+        waypoint_pts.append([dest_lat, dest_lng])
+
+        # Resolve detailed street network polyline via OSRM
+        osrm_polyline, osrm_km = self._fetch_osrm_polyline(waypoint_pts)
+
+        if osrm_polyline and len(osrm_polyline) > 2:
+            final_polyline = osrm_polyline
+            road_km = osrm_km or fallback_road_km
+        else:
+            final_polyline = waypoint_pts
+            road_km = fallback_road_km
+
+        eta_minutes = max(1, round((road_km / avg_speed_kmh) * 60 + turnout_minutes))
 
         return {
             "status": "success",
@@ -221,5 +227,16 @@ class EVORoutingEngine:
             "response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)",
             "origin": {"lat": start_lat, "lng": start_lng},
             "destination": {"lat": dest_lat, "lng": dest_lng},
-            "polyline": coordinates
+            "polyline": final_polyline
         }
+
+def get_unit_type(unit: str) -> str:
+    u = str(unit).strip().upper()
+    if u.startswith('E'): return 'Engine / Pumper'
+    if u.startswith('L'): return 'Ladder / Aerial'
+    if u.startswith('R'): return 'Heavy Rescue'
+    if u.startswith('Q'): return 'Quint'
+    if u.startswith('C'): return 'Command Vehicle'
+    if u.startswith('S') or u.startswith('M'): return 'Specialty / Medic'
+    if u.startswith('T') or u.startswith('LAV'): return 'Tanker / Tender'
+    return 'Apparatus'

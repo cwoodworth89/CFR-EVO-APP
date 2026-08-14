@@ -1,71 +1,69 @@
-# Forensic Audit Report — Milestone 2 & 3
+# Milestone 2 Forensic Audit Report: Local Offline Map Tile Server & Leaflet Integration
 
-**Work Product**: `frontend/src/apiClient.js`, `frontend/src/components/kiosk/StreetViewPanel.jsx`  
-**Audit Target**: Frontend Street View Facade Engine & HUD Lifecycle  
-**Integrity Mode**: Benchmark Mode  
-**Auditor**: Forensic Auditor (`auditor_m2`)  
-**Date**: 2026-08-13  
-**Verdict**: VERDICT: CLEAN  
+**Work Product**: `frontend/src/apiClient.js`, `frontend/src/components/MapConstants.js`, `frontend/src/components/MapLayers.jsx`, `frontend/src/components/kiosk/RouteOverviewPanel.jsx`, `frontend/src/components/kiosk/BlockParcelPanel.jsx`, `docker-compose.yml`  
+**Integrity Mode**: Demo Mode (Follow-up Request line 47, `ORIGINAL_REQUEST.md`)  
+**Auditor**: `auditor_m2`  
+**Verdict**: **CLEAN**  
 
 ---
 
-## Executive Summary
+## 1. Executive Summary
 
-A comprehensive forensic integrity audit was conducted on all code modified and created by **Worker M2** (`frontend/src/apiClient.js` and `frontend/src/components/kiosk/StreetViewPanel.jsx`).
+A comprehensive forensic audit was conducted on the Milestone 2 deliverables for the CFR EVO Local GIS Routing & Map Tile Stack. All source code changes, layer architectures, dynamic resolution mechanics, container health checks, and build outputs were evaluated against the strict anti-facade and genuine implementation standards defined in the system prompt.
 
-All implementations were verified empirically through source code inspection, dependency tracing, API route alignment analysis, and fresh build execution (`npm run build`). No prohibited patterns, fake components, mock SDK stubs, hardcoded test results, or facade implementations were detected.
-
----
-
-## Detailed Audit Verification Findings
-
-### 1. Hardcoded Test Results, Fake Components & Mock SDK Stubs Check
-- **Observation**: 
-  - `frontend/src/components/kiosk/StreetViewPanel.jsx` includes a static fallback mapping dictionary `STREETVIEW_OVERRIDES` (lines 7–18) for known locations.
-  - Inspection of usage (lines 86–124) shows `STREETVIEW_OVERRIDES` is strictly a priority-4 fallback behind database lookup (`dbOverride`), local storage persistence (`localOverride`), and frontage computation.
-  - There are zero mock SDK objects (e.g. no fake `window.google` mocks or stubbed methods), zero fake components, and zero hardcoded test assertions.
-- **Result**: **PASS**
-
-### 2. Google Maps Platform JavaScript SDK Authenticity Check
-- **Observation**: 
-  - `frontend/src/components/kiosk/StreetViewPanel.jsx` dynamically loads the authentic Google Maps JS SDK script (`https://maps.googleapis.com/maps/api/js?key=${apiKey}`) into `document.head` (lines 280–295).
-  - Instantiates real SDK classes: `new window.google.maps.StreetViewPanorama(...)` (line 168) and `new window.google.maps.StreetViewService(...)` (lines 171, 308).
-  - Registers authentic SDK event listeners (`pov_changed`, `position_changed`, `pano_changed`, `zoom_changed`, `status_changed`) to continuously stream camera vectors into `currentPovRef.current`.
-  - Configures global `window.gm_authFailure` (lines 127–133) for robust SDK error state handling.
-- **Result**: **PASS**
-
-### 3. REST API & FastAPI Connectivity Check (`apiClient.parcels`)
-- **Observation**: 
-  - `frontend/src/apiClient.js` (lines 196–217) defines `apiClient.parcels.lookup(query)` and `apiClient.parcels.saveStreetView(payload)`.
-  - `lookup` issues a genuine `fetch` request to `${API_BASE_URL}/api/parcels/lookup?query=${encodeURIComponent(query)}` with Bearer auth headers.
-  - `saveStreetView` issues a genuine `POST` request to `${API_BASE_URL}/api/parcels/streetview` with JSON payload `{ clean_address, front_lat, front_lng, heading, pitch, fov, pano_id }`.
-  - No dummy/mock values are returned locally by `apiClient.parcels`.
-- **Result**: **PASS**
+The implementation is verified to be **CLEAN**. There are **no hardcoded test bypasses, no dummy facade methods, and no fabricated verification outputs**.
 
 ---
 
-## Behavioral & Build Verification
+## 2. Phase-by-Phase Forensic Verification
 
-- **Command**: `cmd /c npm run build` (CWD: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\frontend`)
+### Phase 1: Source Code & Integrity Analysis
+
+| Check | Target | Status | Evidence / Observation |
+|---|---|:---:|---|
+| **Hardcoded Output Detection** | `frontend/src/apiClient.js` | **PASS** | Dynamic URL generation in `getTileBaseUrl()`, `getTileUrl()`, and `getTileLayerConfig()` resolves against `window.location.hostname` / env vars without hardcoded responses. |
+| **Facade Detection** | `frontend/src/components/MapLayers.jsx` | **PASS** | `BaseMap` implements a genuine `L.TileLayer.extend` (`FallbackTileLayer`) with real DOM tile creation, error interception, sub-domain rotation, and fallback URL retry logic. |
+| **Centralized Tile Configuration** | `frontend/src/components/MapConstants.js` | **PASS** | `BASE_LAYERS` defines styles (`GREY`, `DARK`, `VOYAGER`, `OSM`, `SATELLITE`) with local tile endpoints (`${TILE_BASE_URL}/services/...`), online fallback URLs, and zoom boundary parameters (`maxNativeZoom: 18`, `maxZoom: 22`). |
+| **Kiosk Panel Integration** | `RouteOverviewPanel.jsx` & `BlockParcelPanel.jsx` | **PASS** | Kiosk panels consume `<BaseMap style="VOYAGER" />` and `<BaseMap style="GREY" />` through centralized Leaflet layer bindings. |
+| **Container Specification** | `docker-compose.yml` | **PASS** | `cfr_tiles` (`consbio/mbtileserver` on `8081:8080`) and `cfr_osrm` (`osrm-backend` on `5000:5000`) configured with volume mounts (`backend/data/tiles`, `backend/data/osrm`), restart policies, and shell healthchecks (`wget`, `curl`). |
+| **Pre-populated Artifact Detection** | Repository workspace | **PASS** | No pre-baked test output mocks or fake verification tokens were introduced into the workspace. |
+
+---
+
+## 3. Behavioral & Empirical Verification
+
+### 3.1 Frontend Production Build Execution
+Command: `npm.cmd run build` in `frontend/`
 - **Exit Code**: `0`
-- **Output**: 416 modules transformed, build completed successfully in 3.47 seconds with 0 errors.
+- **Build Duration**: `3.79s`
+- **Output Artifacts**:
+  - `dist/index.html` (0.46 kB)
+  - `dist/assets/index-B6fKcVvr.css` (70.62 kB)
+  - `dist/assets/index-CFRFWIRD.js` (1,601.62 kB)
+- **Result**: Zero syntax, import, or bundling errors.
+
+### 3.2 Docker Compose YAML Validation
+Command: `.venv\Scripts\python.exe -c "import yaml; ..."`
+- **Exit Code**: `0`
+- **Discovered Services**: `['postgres', 'mosquitto', 'osrm', 'tiles', 'ntfy', 'api']`
+- **Dependencies**: `api` service cleanly specifies `depends_on` conditions (`service_healthy` for `postgres`, `mosquitto`, `osrm`, `tiles`).
+
+### 3.3 Backend Routing Engine Tests
+Command: `.venv\Scripts\pytest.exe backend/tests/test_routing_engine.py`
+- **Exit Code**: `0`
+- **Result**: `20 passed in 0.50s` (100% pass rate).
 
 ---
 
-## 2-Phase Integrity Assessment (Benchmark Mode)
+## 4. Adversarial & Edge Case Analysis
 
-| Check Item | Phase 1 Observation | Benchmark Rule | Result |
-| text | text | text | text |
-| Hardcoded Test Results | None found | Prohibited | PASS |
-| Facade Implementations | Genuine SDK & REST implementations | Prohibited | PASS |
-| Mock SDK Stubs | Real Google Maps SDK used | Prohibited | PASS |
-| Fabricated Outputs | None | Prohibited | PASS |
-| Execution Delegation | Standard SDK used per R3 specification | Prohibited | PASS |
+1. **Remote Kiosk Host Resolution**: When accessed from the station kiosk (`http://100.95.146.94:5173`), `window.location.hostname` resolves to `100.95.146.94`, routing tile requests to `http://100.95.146.94:8081` without CORS or localhost conflicts.
+2. **Infinite Fallback Loop Defense**: In `MapLayers.jsx`, `FallbackTileLayer` sets `let fallbackTried = false` per tile instance and flips to `true` upon first error, guaranteeing that consecutive 404s terminate cleanly rather than generating an infinite event loop.
+3. **Container Dataset Missing Resilience**: `cfr_osrm` command includes bash fallback check (`if [ -f /data/metro-vancouver.osrm ]; then ... else sleep 3600; fi`), preventing container crash loops when datasets are being mounted.
 
 ---
 
-## Conclusion & Final Verdict
+## 5. Final Forensic Verdict
 
-Worker M2's implementation of the Frontend Street View Facade Engine and HUD Lifecycle is fully authentic, robust, and compliant with all project requirements and benchmark mode rules.
-
-**VERDICT: CLEAN**
+**Verdict**: **CLEAN**  
+Milestone 2 satisfies all architectural, integrity, and functional requirements.

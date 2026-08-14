@@ -95,19 +95,24 @@ class EVORoutingEngine:
         """Constructs prioritized candidate endpoints with continue_straight=true."""
         query_params = "overview=full&geometries=geojson&continue_straight=true&steps=true"
         
+        disable_wan = os.environ.get("DISABLE_WAN_FALLBACK", "false").lower() in ("true", "1", "yes")
+
         candidates = []
         for env_key in ("OSRM_BACKEND_URL", "OSRM_ROUTER_URL", "OSRM_URL"):
             env_val = os.environ.get(env_key)
             if env_val and env_val.strip():
                 candidates.append(env_val.strip().rstrip("/"))
         
-        # Local container & localhost fallbacks, then public WAN fallback
+        # Local container & localhost fallbacks
         candidates.extend([
             "http://osrm:5000",
             "http://127.0.0.1:5000",
             "http://localhost:5000",
-            "https://router.project-osrm.org"
         ])
+
+        # Public WAN fallback (suppressed when DISABLE_WAN_FALLBACK=true)
+        if not disable_wan:
+            candidates.append("https://router.project-osrm.org")
         
         endpoints = []
         seen = set()
@@ -126,7 +131,7 @@ class EVORoutingEngine:
         endpoints = self._get_osrm_endpoints(loc_str)
         
         for url in endpoints:
-            is_local = any(h in url for h in ["osrm:5000", "127.0.0.1", "localhost", "osrm"])
+            is_local = any(h in url for h in ["osrm:5000", "127.0.0.1:5000", "localhost:5000"])
             timeout = 1.0 if is_local else 2.5
             try:
                 req = urllib.request.Request(

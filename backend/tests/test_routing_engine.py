@@ -122,6 +122,13 @@ class TestOSRMUrlConstructionAndPriorities:
             endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
             assert endpoints[0].startswith("http://osrm-url-env:5000/route/v1/driving/")
 
+    def test_osrm_disable_wan_fallback_suppression(self):
+        engine = EVORoutingEngine()
+        with patch.dict(os.environ, {"DISABLE_WAN_FALLBACK": "true"}):
+            endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
+            assert not any("router.project-osrm.org" in url for url in endpoints)
+            assert len(endpoints) == 3
+
     def test_fetch_osrm_polyline_empty_or_single_waypoint(self):
         engine = EVORoutingEngine()
         assert engine._fetch_osrm_polyline([]) == (None, None)

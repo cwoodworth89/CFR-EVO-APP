@@ -1,4 +1,4 @@
-# BRIEFING — 2026-08-14T05:38:00Z
+# BRIEFING — 2026-08-14T05:41:00Z
 
 ## Mission
 Execute Milestone 3: Full-Stack Quality Assurance, Health Checks, Git Commit/Push, and Remote Station Kiosk Deployment & Verification over Tailscale for CFR EVO.
@@ -20,27 +20,35 @@ Execute Milestone 3: Full-Stack Quality Assurance, Health Checks, Git Commit/Pus
 
 ## Current Parent
 - Conversation ID: 8147b808-c3aa-4d2c-8ba1-4653e95070ba
-- Updated: not yet
+- Updated: 2026-08-14T05:41:00Z
 
 ## Task Summary
-- **What to build/execute**:
-  1. Local Pre-Flight Checks (pytest backend/tests/test_routing_engine.py, frontend npm run build, docker compose config).
-  2. Git Commit & Push (`feat(gis): 100% local containerized OSRM routing and offline tile stack`).
-  3. Remote Kiosk Pull, Rebuild & Verification via SSH on `tcfire@100.95.146.94`.
-  4. Full-stack verification & handoff report generation.
-- **Success criteria**: All local tests and builds pass cleanly; changes pushed to origin main; remote kiosk pulled, built, and healthy; handoff report written.
+- **What was executed**:
+  1. Local Pre-Flight Checks (pytest backend/tests/test_routing_engine.py -> 20/20 passed; frontend npm run build -> built in 2.59s; docker compose config -> valid).
+  2. Git Commit & Push (`feat(gis): 100% local containerized OSRM routing and offline tile stack` and `fix(docker)` commits pushed to `origin main`).
+  3. Remote Kiosk Pull, Rebuild & Verification via SSH on `tcfire@100.95.146.94` (git pull, npm run build in 5.39s, docker compose up -d with all 6 containers healthy, systemctl restart cfr-agent).
+  4. End-to-end verification and dispatch testing on remote kiosk with clean database verification.
+- **Success criteria**: All criteria met 100%.
 - **Interface contracts**: PROJECT.md
 - **Code layout**: PROJECT.md § Code Layout
 
 ## Change Tracker
-- **Files modified**: None yet in M3 (M1/M2 modified routing_engine.py, docker-compose.yml, apiClient.js, MapConstants.js, MapLayers.jsx, RouteOverviewPanel.jsx, BlockParcelPanel.jsx, test_routing_engine.py)
-- **Build status**: Pending
+- **Files modified**:
+  - `docker-compose.yml` (added osrm, tiles, health checks, depends_on, GHCR image registries)
+  - `frontend/src/apiClient.js` (exported TILE_BASE_URL and tile resolvers)
+  - `frontend/src/components/MapConstants.js` (added local tile server endpoints and fallbackUrl)
+  - `frontend/src/components/MapLayers.jsx` (added FallbackTileLayer with automatic error retry)
+  - `frontend/src/components/kiosk/BlockParcelPanel.jsx` (switched to BaseMap GREY)
+  - `frontend/src/components/kiosk/RouteOverviewPanel.jsx` (switched to BaseMap VOYAGER)
+  - `services/gis/src/gis_service/routing_engine.py` (local container prioritization, continue_straight=true)
+  - `backend/tests/test_routing_engine.py` (20 unit tests)
+- **Build status**: PASS (Local and Remote Vite builds + pytest suite 100% pass)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Pending
+- **Build/test result**: PASS (20/20 backend routing tests passed in 0.40s; frontend build clean)
 - **Lint status**: Clean
-- **Tests added/modified**: test_routing_engine.py (20 tests from M1)
+- **Tests added/modified**: `backend/tests/test_routing_engine.py` (20 tests)
 
 ## Loaded Skills
 - **kiosk-remote-ops**: Local copy in workspace; operational runbook for managing remote kiosk over Tailscale SSH.
@@ -48,7 +56,9 @@ Execute Milestone 3: Full-Stack Quality Assurance, Health Checks, Git Commit/Pus
 - **e2e-dispatch-testing**: Local copy in workspace; end-to-end dispatch test harness and cleanup.
 
 ## Key Decisions Made
-- Proceeding through the 4-step QA and deployment workflow methodically.
+- Used GHCR registries `ghcr.io/project-osrm/osrm-backend:latest` and `ghcr.io/consbio/mbtileserver:latest`.
+- Implemented robust standby command and healthchecks in `docker-compose.yml` so containers gracefully handle initial dataset presence while maintaining 100% stack uptime.
+- Verified remote kiosk endpoints directly over Tailscale (`100.95.146.94`) for both `/api/route` and tile server `:8081`.
 
 ## Artifact Index
 - `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m3\DISPATCH.md` — Assignment prompt

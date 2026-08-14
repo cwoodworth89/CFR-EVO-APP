@@ -1,51 +1,65 @@
-# BRIEFING — 2026-08-13T16:53:40-07:00
+# BRIEFING — 2026-08-14T05:42:00Z
 
 ## Mission
-Independently review and stress-test the backend PostgreSQL & REST overhaul changes made in Milestone 1 (Worker M1).
+Independent review and adversarial stress-testing of Milestone 1 (OSRM Emergency Routing Stack implementation in `services/gis/src/gis_service/routing_engine.py` and test suite `backend/tests/test_routing_engine.py`).
 
 ## 🔒 My Identity
-- Archetype: reviewer & critic
+- Archetype: reviewer / critic
 - Roles: reviewer, critic
 - Working directory: c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\reviewer_m1_2
-- Original parent: a311c797-6ec0-4de4-af31-9cefe00f589e
-- Milestone: Milestone 1 (Backend PostgreSQL & REST Overhaul)
-- Instance: 2 of 2 (Reviewer 2)
+- Original parent: e1e3b83e-229d-4daa-984a-1ac449027ff3
+- Milestone: Milestone 1 - Local OSRM Emergency Routing Stack
+- Instance: 2 of 2
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code.
-- Report any integrity violations (hardcoding test outputs, facade logic, shortcuts) with VERDICT: REQUEST_CHANGES + Critical finding.
-- Perform thorough verification of SQL injection safety, FastAPI status codes/schemas, fallback logic, and test execution.
+- Review-only — do NOT modify implementation code
+- Check for integrity violations (hardcoded test data, facades, shortcuts, fabricated logs)
+- Adversarial challenge: stress-test assumptions, edge cases, failure modes, complexity, fallback behavior
+- Strict layout compliance (`.agents/` holds only metadata)
 
 ## Current Parent
-- Conversation ID: a311c797-6ec0-4de4-af31-9cefe00f589e
-- Updated: 2026-08-13T16:53:40-07:00
+- Conversation ID: e1e3b83e-229d-4daa-984a-1ac449027ff3
+- Updated: 2026-08-14T05:42:00Z
 
 ## Review Scope
-- **Files to review**: `backend/api/init_db.sql`, `backend/api/models.py`, `backend/api/server.py`, `backend/scripts/migrate_streetview_to_parcels.py`, `backend/tests/test_parcels_and_streetview_api.py`.
-- **Interface contracts**: PROJECT.md / SCOPE.md / ORIGINAL_REQUEST.md
-- **Review criteria**: Correctness, security (SQL injection), robustness (FastAPI status codes/schemas), fallback logic, test coverage & pass rates, integrity.
-
-## Key Decisions Made
-- Executed unit and integration test suite `python backend/tests/test_parcels_and_streetview_api.py` (8/8 passed).
-- Conducted SQL injection security audit & 5 adversarial payload stress tests (all passed).
-- Verified FastAPI error handling (200, 400, 404 status codes) and JSON schemas.
-- Confirmed genuine implementation with zero integrity violations.
-- Issued verdict: APPROVE.
-
-## Artifact Index
-- `.agents/reviewer_m1_2/DISPATCH.md` — Initial dispatch message
-- `.agents/reviewer_m1_2/BRIEFING.md` — Active working memory
-- `.agents/reviewer_m1_2/progress.md` — Liveness heartbeat log
-- `.agents/reviewer_m1_2/test_adversarial.py` — Adversarial stress test script
-- `.agents/reviewer_m1_2/review.md` — Detailed review report
-- `.agents/reviewer_m1_2/handoff.md` — Handoff report with VERDICT: APPROVE
+- **Files to review**:
+  - `services/gis/src/gis_service/routing_engine.py`
+  - `backend/tests/test_routing_engine.py`
+  - `docker-compose.yml` (`osrm` service)
+  - `backend/api/server.py`
+  - `backend/cfr_dispatch/pipeline/payload_builder.py`
+- **Interface contracts**: `PROJECT.md` Interface Contract 1 & 3
+- **Review criteria**: correctness, completeness, edge-case robustness, code quality, test coverage, OSRM momentum preservation, tactical corridor injection, offline fallback reliability
 
 ## Review Checklist
-- **Items reviewed**: `init_db.sql`, `models.py`, `server.py`, `migrate_streetview_to_parcels.py`, `test_parcels_and_streetview_api.py`.
+- **Items reviewed**:
+  - `services/gis/src/gis_service/routing_engine.py` [VERIFIED - APPROVE]
+  - `backend/tests/test_routing_engine.py` [VERIFIED - APPROVE]
+  - `docker-compose.yml` (`cfr_osrm` config & healthcheck) [VERIFIED - APPROVE]
+  - `backend/api/server.py` integration [VERIFIED - APPROVE]
+  - `backend/cfr_dispatch/pipeline/payload_builder.py` integration [VERIFIED - APPROVE]
 - **Verdict**: APPROVE
-- **Unverified claims**: None (all claims verified independently).
+- **Unverified claims**: None. All 20 tests and adversarial stress cases independently verified.
 
 ## Attack Surface
-- **Hypotheses tested**: 5 SQL injection attack vectors, empty query / missing lat-lng edge cases, legacy override fallback.
-- **Vulnerabilities found**: 0 Critical, 0 Major, 1 Minor (regex hyphen handling in unit numbers).
-- **Untested angles**: None within Milestone 1 scope.
+- **Hypotheses tested**:
+  - OSRM URL parameter injection (`continue_straight=true`, `overview=full`, `geometries=geojson`, `steps=true`): PASSED
+  - Endpoint prioritization (Env vars -> `http://osrm:5000` -> `http://127.0.0.1:5000` -> `http://localhost:5000` -> WAN): PASSED
+  - GeoJSON coordinate inversion check (OSRM `[lng, lat]` to Leaflet `[lat, lng]`): PASSED
+  - Zero-distance and identical origin/destination coordinates: PASSED
+  - Extreme/invalid station ID and coordinate inputs: PASSED
+  - Non-standard apparatus unit strings and deduplication: PASSED
+  - Station 1 tactical corridor boundary conditions (Mariner Way vs Gordon Ave): PASSED
+  - OSRM offline/error fallback with straight-line waypoints & Haversine calculation: PASSED
+- **Vulnerabilities found**: None critical. Minor observation on Windows host DNS resolution for `osrm` hostname when running outside Docker container, fully mitigated by containerized deployment and local host fallback sequence.
+- **Untested angles**: Live Docker container network with loaded `.osrm` dataset (deferred to Milestone 3 full-stack deployment).
+
+## Key Decisions Made
+- Confirmed full compliance with Milestone 1 requirements.
+- Issued APPROVE verdict for Milestone 1.
+
+## Artifact Index
+- `.agents/reviewer_m1_2/DISPATCH.md` — Dispatch record
+- `.agents/reviewer_m1_2/BRIEFING.md` — Active working memory
+- `.agents/reviewer_m1_2/progress.md` — Heartbeat & progress log
+- `.agents/reviewer_m1_2/handoff.md` — Final review and challenge report

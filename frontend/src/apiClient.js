@@ -59,7 +59,7 @@ export const getTileLayerConfig = (style = 'VOYAGER') => {
         fallbackUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
         attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
         subdomains: ['a', 'b', 'c', 'd'],
-        maxNativeZoom: 19,
+        maxNativeZoom: 18,
         maxZoom: 22,
       };
     case 'GREY':
@@ -69,7 +69,7 @@ export const getTileLayerConfig = (style = 'VOYAGER') => {
         fallbackUrl: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
         attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
         subdomains: ['a', 'b', 'c', 'd'],
-        maxNativeZoom: 19,
+        maxNativeZoom: 18,
         maxZoom: 22,
       };
     case 'OSM':
@@ -78,7 +78,7 @@ export const getTileLayerConfig = (style = 'VOYAGER') => {
         fallbackUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         attribution: '© OpenStreetMap contributors (Offline Local)',
         subdomains: ['a', 'b', 'c'],
-        maxNativeZoom: 19,
+        maxNativeZoom: 18,
         maxZoom: 22,
       };
     case 'SATELLITE':
@@ -97,7 +97,7 @@ export const getTileLayerConfig = (style = 'VOYAGER') => {
         fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
         attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
         subdomains: ['a', 'b', 'c', 'd'],
-        maxNativeZoom: 19,
+        maxNativeZoom: 18,
         maxZoom: 22,
       };
   }

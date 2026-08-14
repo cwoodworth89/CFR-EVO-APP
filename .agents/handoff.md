@@ -1,25 +1,31 @@
-# Sentinel Handoff Report
+# Sentinel Handoff Report — 100% Local GIS Routing & Map Tile Stack
 
-## Observation
-All requirements R1 through R5 for the Google Street View Facade Engine Overhaul & Property Table Persistence were completed by the implementation team and independently audited by the Victory Auditor.
+## 1. Observation
+The user requested provisioning a 100% local, offline GIS routing and map tile stack for CFR EVO, meeting:
+- R1: Local OSRM emergency routing container (`cfr_osrm`) on port 5000 with `continue_straight=true` for apparatus momentum preservation.
+- R2: Local offline map tile server (`cfr_tiles`) on port 8081 with Leaflet frontend integration and dynamic `TILE_BASE_URL` resolution.
+- R3: Docker Compose health checks, clean backend test runs, and remote kiosk deployment (`tcfire@100.95.146.94`) verification over Tailscale SSH.
 
-## Logic Chain
-1. **User Request**: Capture verbatim request to `.agents/ORIGINAL_REQUEST.md`.
-2. **Orchestration**: Dispatched Project Orchestrator (`teamwork_preview_orchestrator`) and set monitoring crons.
-3. **Execution**: Orchestrator completed Milestones 1–4, covering PostgreSQL `parcels` table schema & migrations, REST API lookup/override endpoints, React/JS SDK Street View facade engine overhaul with continuous camera vector tracking, dark HUD loading skeleton, WebGL context cleanup, and local/remote testing.
-4. **Independent Audit**: Dispatched `teamwork_preview_victory_auditor` to conduct a 3-phase audit (timeline analysis, integrity/anti-cheating check, independent test execution).
-5. **Verdict**: Victory Auditor returned `VICTORY CONFIRMED` with zero discrepancies.
-6. **Cleanup**: Canceled all monitoring crons and killed all subagents.
+## 2. Logic Chain
+1. Dispatched Project Orchestrator to decompose requirements into Milestones M1, M2, M3.
+2. Handled transient host network reconnection seamlessly via generation successor.
+3. M1 implemented OSRM container endpoint prioritization and momentum preservation in `routing_engine.py`.
+4. M2 added `cfr_tiles` (`consbio/mbtileserver`) to `docker-compose.yml`, dynamic `TILE_BASE_URL` in `apiClient.js`, and `FallbackTileLayer` in `MapLayers.jsx`.
+5. M3 integrated automated Docker health checks, pushed code to Git, deployed and tested live on remote kiosk `100.95.146.94`.
+6. Spawened independent Victory Auditor (`teamwork_preview_victory_auditor`) for a 3-phase audit (timeline analysis, cheating/facade inspection, independent test execution), which confirmed `VICTORY CONFIRMED`.
 
-## Caveats
-- Remote host testing requires Tailscale connection to `100.95.146.94` (`tcfire@100.95.146.94`).
-- Google Street View JS SDK requires valid `VITE_GOOGLE_MAPS_API_KEY` configured in `.env.local` or environment.
+## 3. Caveats
+- Base OpenStreetMap data in `/data/osrm` and basemap tiles in `/data/tiles` are mounted read-only into the containers. For new geographic regions or OSM updates, the corresponding PBF/MBTiles datasets can be dropped into those directories.
+- `FallbackTileLayer` will seamlessly fall back to public tile servers if local tile tiles are unavailable or during initial container startup.
 
-## Conclusion
-Project complete and verified end-to-end.
+## 4. Conclusion
+All requirements and acceptance criteria have been implemented, verified, audited, and deployed to production on the remote station kiosk.
 
-## Verification Method
-- Independent Victory Audit report (`.agents/victory_auditor_r1/audit_report.md`).
-- 8/8 Pytest backend tests passed.
-- Vite frontend build (`npm run build`) succeeded without warnings/errors.
-- Remote REST API query verified on physical station kiosk container (`http://100.95.146.94:8000/api/parcels/lookup?query=3030%20GORDON%20AVE`).
+## 5. Verification Method
+- Independent Victory Auditor executed:
+  - 20/20 pytest tests in `backend/tests/test_routing_engine.py` (0.38s)
+  - 25/25 total pytest tests across test suites (1.00s)
+  - Frontend production build (`npm run build`) in 2.56s with 0 errors
+  - Remote kiosk container verification: 6/6 Docker containers (`cfr_osrm`, `cfr_tiles`, `cfr_api`, `cfr_postgres`, `cfr_mosquitto`, `cfr_ntfy`) running and healthy
+  - Remote route endpoint verification: `GET /api/route` returned 2.43 km, 153 polyline points with sub-20ms latency
+  - Remote tile server verification: `GET :8081/services` returned HTTP 200 OK

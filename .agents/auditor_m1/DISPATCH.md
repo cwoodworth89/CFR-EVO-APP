@@ -1,6 +1,7 @@
 # Forensic Auditor (Milestone 1) Dispatch
 
-## Mission
+## 2026-08-14T05:40:00Z
+
 Conduct an independent forensic integrity audit on Milestone 1 code changes (`services/gis/src/gis_service/routing_engine.py`, `backend/tests/test_routing_engine.py`).
 
 ## Reading

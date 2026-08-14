@@ -1,18 +1,21 @@
-## 2026-08-13T17:04:52Z
-You are the Forensic Auditor for Milestone 2 & 3 (Frontend Street View Facade Engine & HUD Lifecycle).
+# Forensic Auditor (Milestone 2) Dispatch
 
-Your assigned working directory is: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m2\`
+## 2026-08-14T05:46:11Z
 
-Read the verbatim user request from: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
-Read Worker M2's handoff report at: `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m2\handoff.md`
+### Mission
+Conduct an independent forensic integrity audit on Milestone 2 implementation (`frontend/src/apiClient.js`, `frontend/src/components/MapConstants.js`, `frontend/src/components/MapLayers.jsx`, kiosk panels (`RouteOverviewPanel.jsx`, `BlockParcelPanel.jsx`), and `docker-compose.yml`).
 
-Your mission:
-Perform forensic integrity verification of all code modified/created by Worker M2 (`frontend/src/apiClient.js`, `frontend/src/components/kiosk/StreetViewPanel.jsx`).
+### Reading
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\ORIGINAL_REQUEST.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\PROJECT.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\GEMINI.md`
+- `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\worker_m2\handoff.md`
 
-Verify:
-1. Are there any hardcoded test results, fake components, or mock SDK stubs?
-2. Is the Google Maps JS SDK integration authentic (`window.google.maps.StreetViewPanorama`)?
-3. Is `apiClient.parcels` making real HTTP REST requests to FastAPI?
+### Audit Checks
+1. Integrity Forensics: Check for hardcoded test results, facade logic, mock bypasses, dummy implementations, or pre-populated verification artifacts.
+2. Code Genuineness: Verify genuine dynamic IP resolution, true local tile configuration, valid Leaflet layer class inheritance, and valid Docker Compose YAML.
+3. Execution Verification: Run `npm run build` inside `frontend/` independently to verify clean production build.
 
-Write audit report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m2\audit.md` and handoff report in `c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m2\handoff.md`.
-End with a clear verdict: `VERDICT: CLEAN` or `VERDICT: INTEGRITY VIOLATION`. Send a summary message when complete.
+Write your forensic audit verdict (`CLEAN` or `INTEGRITY VIOLATION`) and detailed evidence report to:
+`c:\Users\Curtis\Nextcloud\Documents\Projects\Coding\CFR-EVO-APP\.agents\auditor_m2\handoff.md`
+

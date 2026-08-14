@@ -53,9 +53,10 @@ export function BaseMap({ style, useLabelsFallback }) {
 
         cleanup();
 
+        const disableWan = String(import.meta.env.VITE_DISABLE_WAN_FALLBACK || 'false').toLowerCase() === 'true';
         const config = BASE_LAYERS[style] || BASE_LAYERS.GREY;
         let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.GREY.url || `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`);
-        let fallbackUrl = typeof config === 'object' ? config.fallbackUrl : null;
+        let fallbackUrl = disableWan ? null : (typeof config === 'object' ? config.fallbackUrl : null);
 
         if (useLabelsFallback && url && url.includes('_nolabels')) {
             url = url.replace('_nolabels', '_all');
@@ -66,31 +67,50 @@ export function BaseMap({ style, useLabelsFallback }) {
 
         const attribution = typeof config === 'object' ? config.attribution : '© OpenStreetMap contributors (Offline Local)';
         const subdomains = typeof config === 'object' ? config.subdomains : ['a', 'b', 'c', 'd'];
-        const maxNativeZoom = typeof config === 'object' ? (config.maxNativeZoom ?? 19) : 19;
+        const maxNativeZoom = typeof config === 'object' ? (config.maxNativeZoom ?? 18) : 18;
         const maxZoom = typeof config === 'object' ? (config.maxZoom ?? 22) : 22;
 
-        // Custom Leaflet TileLayer with graceful fallback support
+        // Custom Leaflet TileLayer with graceful online fallback support
         const FallbackTileLayer = L.TileLayer.extend({
             createTile: function(coords, done) {
-                const tile = L.TileLayer.prototype.createTile.call(this, coords, done);
-                if (fallbackUrl) {
-                    tile.onerror = function() {
-                        if (!tile.dataset.fallbackTried) {
-                            tile.dataset.fallbackTried = 'true';
-                            let sub = 'a';
-                            if (Array.isArray(subdomains) && subdomains.length > 0) {
-                                sub = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
-                            }
-                            const fUrl = fallbackUrl
-                                .replace('{s}', sub)
-                                .replace('{z}', coords.z)
-                                .replace('{x}', coords.x)
-                                .replace('{y}', coords.y)
-                                .replace('{r}', '');
-                            tile.src = fUrl;
-                        }
-                    };
+                const tile = document.createElement('img');
+
+                if (this.options.crossOrigin || this.options.crossOrigin === '') {
+                    tile.crossOrigin = this.options.crossOrigin === true ? '' : this.options.crossOrigin;
                 }
+
+                tile.alt = '';
+                tile.setAttribute('role', 'presentation');
+
+                let fallbackTried = false;
+
+                const onLoad = () => {
+                    done(null, tile);
+                };
+
+                const onError = (e) => {
+                    if (fallbackUrl && !fallbackTried) {
+                        fallbackTried = true;
+                        let sub = 'a';
+                        if (Array.isArray(subdomains) && subdomains.length > 0) {
+                            sub = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
+                        }
+                        const fUrl = fallbackUrl
+                            .replace('{s}', sub)
+                            .replace('{z}', coords.z)
+                            .replace('{x}', coords.x)
+                            .replace('{y}', coords.y)
+                            .replace('{r}', '');
+                        tile.src = fUrl;
+                    } else {
+                        done(e, tile);
+                    }
+                };
+
+                L.DomEvent.on(tile, 'load', onLoad);
+                L.DomEvent.on(tile, 'error', onError);
+
+                tile.src = this.getTileUrl(coords);
                 return tile;
             }
         });

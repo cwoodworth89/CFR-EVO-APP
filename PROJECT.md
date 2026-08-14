@@ -30,9 +30,9 @@
 
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | Local OSRM Emergency Routing Stack | `routing_engine.py`, `docker-compose.yml` (`osrm` service), routing unit tests | None | PLANNED |
-| 2 | Local Offline Map Tile Server & Leaflet Integration | `docker-compose.yml` (`tiles` service), `apiClient.js`, `MapConstants.js`, `MapLayers.jsx`, kiosk panels | None | PLANNED |
-| 3 | Health Checks, Full-Stack Integration & Remote Kiosk Deployment | `docker-compose.yml` health checks & dependencies, frontend build, backend test suite, remote deployment to `100.95.146.94`, live verification | M1, M2 | PLANNED |
+| 1 | Local OSRM Emergency Routing Stack | `routing_engine.py`, `docker-compose.yml` (`osrm` service), routing unit tests | None | DONE |
+| 2 | Local Offline Map Tile Server & Leaflet Integration | `docker-compose.yml` (`tiles` service), `apiClient.js`, `MapConstants.js`, `MapLayers.jsx`, kiosk panels | None | DONE |
+| 3 | Health Checks, Full-Stack Integration & Remote Kiosk Deployment | `docker-compose.yml` health checks & dependencies, frontend build, backend test suite, remote deployment to `100.95.146.94`, live verification | M1, M2 | DONE |
 
 ---
 

@@ -49,12 +49,16 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None,
         wavio.write(wav_io, full_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
         audio_bytes = wav_io.getvalue()
         
-        # Save to frontend/public/recordings/ if present
+        # Save to frontend/public/recordings/ if present (atomic write)
         try:
+            import tempfile
             frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "..", "frontend", "public", "recordings")
             os.makedirs(frontend_dir, exist_ok=True)
-            with open(os.path.join(frontend_dir, f"{dispatch_id}.wav"), "wb") as f:
-                f.write(audio_bytes)
+            target_frontend_path = os.path.join(frontend_dir, f"{dispatch_id}.wav")
+            with tempfile.NamedTemporaryFile(dir=frontend_dir, delete=False, suffix=".tmp") as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            os.replace(tmp_path, target_frontend_path)
         except Exception:
             pass
 

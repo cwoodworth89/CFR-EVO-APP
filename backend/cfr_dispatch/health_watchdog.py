@@ -8,6 +8,7 @@ import shutil
 import logging
 import requests
 import numpy as np
+from typing import Dict, Any
 
 # Ensure backend root is in sys.path
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

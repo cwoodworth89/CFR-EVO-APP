@@ -62,7 +62,7 @@ def run_dispatch_system():
     local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000")
     logging.info(f"CFR EVO Orchestrator initializing. API Gateway: {local_api_url}")
     
-    dispatch_queue = multiprocessing.Queue()
+    dispatch_queue = multiprocessing.Queue(maxsize=10)
     logging.info("Starting background worker process...")
     worker_process = multiprocessing.Process(target=background_worker_loop, args=(dispatch_queue,), daemon=True)
     worker_process.start()

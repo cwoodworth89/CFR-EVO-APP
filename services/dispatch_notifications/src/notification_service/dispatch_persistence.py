@@ -45,8 +45,11 @@ def save_audio_recording(file_bytes: bytes, file_name: str, url: str = None, key
     local_url = f"/api/audio/{file_name}"
     
     try:
-        with open(local_path, "wb") as f:
-            f.write(file_bytes)
+        import tempfile
+        with tempfile.NamedTemporaryFile(dir=recordings_dir, delete=False, suffix=".tmp") as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+        os.replace(tmp_path, local_path)
         logging.info(f"Successfully saved audio file locally to {local_path}.")
     except Exception as e:
         logging.error(f"Failed to save audio file locally: {e}")

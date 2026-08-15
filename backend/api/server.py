@@ -437,8 +437,13 @@ async def upload_audio(file: UploadFile = File(...), filename: Optional[str] = N
         
     target_path = os.path.join(RECORDINGS_DIR, save_name)
     content = await file.read()
-    with open(target_path, "wb") as f:
-        f.write(content)
+    
+    # Atomic write to prevent concurrent reads of partially uploaded audio files
+    import tempfile
+    with tempfile.NamedTemporaryFile(dir=RECORDINGS_DIR, delete=False, suffix=".tmp") as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    os.replace(tmp_path, target_path)
         
     return {
         "status": "success",

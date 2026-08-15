@@ -17,13 +17,26 @@ class DispatchSessionManager:
     Thread-safe / process-local session state manager for two-phase dispatch processing.
     Tracks preliminary Phase 1 trigger points and stores rolling execution profiles.
     """
-    def __init__(self, max_history: int = 50):
+    def __init__(self, max_history: int = 50, session_ttl_seconds: int = 600):
         self._triggered_phase_1_ids = set()
         self._phase_1_trigger_lengths = {}
         self._phase_1_candidates = {}
+        self._session_timestamps = {}
+        self._session_ttl_s = session_ttl_seconds
         self._recent_profiles = deque(maxlen=max_history)
 
+    def _evict_stale_sessions(self):
+        """Removes session entries that have exceeded TTL without Phase 2 finalization."""
+        now = time.time()
+        stale_ids = [
+            sid for sid, ts in self._session_timestamps.items()
+            if now - ts > self._session_ttl_s
+        ]
+        for sid in stale_ids:
+            self.cleanup_session(sid)
+
     def is_phase_1_triggered(self, dispatch_id: str) -> bool:
+        self._evict_stale_sessions()
         return dispatch_id in self._triggered_phase_1_ids
 
     def record_phase_1_success(
@@ -36,8 +49,10 @@ class DispatchSessionManager:
         units: list,
         target: dict
     ):
+        self._evict_stale_sessions()
         self._triggered_phase_1_ids.add(dispatch_id)
         self._phase_1_trigger_lengths[dispatch_id] = buffer_len
+        self._session_timestamps[dispatch_id] = time.time()
         self._phase_1_candidates[dispatch_id] = {
             "raw_transcript": raw_transcript,
             "transcript": transcript,
@@ -53,6 +68,7 @@ class DispatchSessionManager:
         self._triggered_phase_1_ids.discard(dispatch_id)
         self._phase_1_trigger_lengths.pop(dispatch_id, None)
         self._phase_1_candidates.pop(dispatch_id, None)
+        self._session_timestamps.pop(dispatch_id, None)
 
     def get_recent_profiles(self) -> list:
         return list(self._recent_profiles)

@@ -56,3 +56,15 @@ To prevent duplicate work, reduce AI token usage (saving credit spending), and g
    * **`performance-metrics-analyst`** (Dashboard metrics and latency stats)
 4. **Learn & Persist**: Propose updating rules in `GEMINI.md` or creating new custom skills in `.agents/skills/` when introducing recurring developer workflows.
 
+---
+
+## 5. Mandatory Sub-Agent Delegation & Model Tier Cost Enforcement
+To maximize token economy and avoid burning coordinator reasoning credits on mechanical tasks:
+1. **Coordinator Role**: The main chat acts exclusively as the **System Architect & Coordinator** (managing roadmap phases, reviewing sub-agent deliverables, making architectural trade-offs, and reporting to the user).
+2. **Mandatory Sub-Agent Invocation**: The coordinator MUST delegate implementation tasks to sub-agents via `invoke_subagent` instead of executing bulk file edits, script writing, test runners, or tile downloads in the main coordinator loop.
+3. **Model Tier Allocation Matrix**:
+   * **`Model: 'flash_lite'`**: Deterministic test runners (`feed_recorded_call.py`, `pytest`), mechanical file renames, dead code/import pruning, log parsing, and linting.
+   * **`Model: 'flash'`**: Feature engineering, database migrations, shapefile ingestion scripts, React JSX component decomposition, tile pre-caching scripts, API route development.
+   * **`Model: 'pro'`**: Deep mathematical reasoning, DSP STFT/FFT harmonic filter calculations, OSRM Lua routing profile math, LoRA quantization analysis, and complex concurrency deadlock diagnosis.
+4. **Autonomous Background Execution**: Once a sub-agent is launched with clear instructions and acceptance criteria, the coordinator MUST provide a concise update to the user and immediately end the turn, letting the sub-agent run in the background.
+

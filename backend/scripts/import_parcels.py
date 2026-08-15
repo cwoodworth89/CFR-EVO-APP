@@ -147,8 +147,9 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
         addr_gdf.set_crs(epsg=26910, inplace=True)
     
     addr_wgs84 = addr_gdf.to_crs(epsg=4326)
-    addr_gdf["lat"] = addr_wgs84.geometry.y
-    addr_gdf["lng"] = addr_wgs84.geometry.x
+    centroids = addr_wgs84.geometry.centroid
+    addr_gdf["lat"] = centroids.y
+    addr_gdf["lng"] = centroids.x
 
     # 2. Load Emergency Response Zones & Spatial Join
     logging.info("Reading Emergency Response Zones shapefile...")
@@ -169,8 +170,16 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
     zone_assigned_count = 0
     missing_zone_count = 0
 
+    def clean_str(val):
+        if val is None:
+            return None
+        s = str(val).strip()
+        if s == "" or s.lower() in ("nan", "none", "<null>"):
+            return None
+        return s
+
     for idx, row in joined.iterrows():
-        raw_addr = str(row.get("ADDRESS", "") or "").strip()
+        raw_addr = clean_str(row.get("ADDRESS"))
         if not raw_addr:
             continue
         
@@ -179,29 +188,30 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
             continue
         seen_addresses.add(raw_addr)
 
-        gis_id = str(row.get("GIS_ID", "") or "").strip() or None
-        house = str(row.get("HOUSE", "") or "").strip() or None
-        street = str(row.get("STREET", "") or "").strip() or None
-        streettype = str(row.get("STREETTYPE", "") or "").strip() or None
-        unit = str(row.get("UNIT", "") or "").strip() or None
-        unittype = str(row.get("UNITTYPE", "") or "").strip() or None
-        postal = str(row.get("POSTAL", "") or "").strip() or None
-        block = str(row.get("BLOCK", "") or "").strip() or None
-        plan = str(row.get("PLAN", "") or "").strip() or None
-        lot = str(row.get("LOT", "") or "").strip() or None
+        gis_id = clean_str(row.get("GIS_ID"))
+        house = clean_str(row.get("HOUSE"))
+        street = clean_str(row.get("STREET"))
+        streettype = clean_str(row.get("STREETTYPE"))
+        unit = clean_str(row.get("UNIT"))
+        unittype = clean_str(row.get("UNITTYPE"))
+        postal = clean_str(row.get("POSTAL"))
+        block = clean_str(row.get("BLOCK"))
+        plan = clean_str(row.get("PLAN"))
+        lot = clean_str(row.get("LOT"))
         
-        legaldesc = str(row.get("LEGALDESC", "") or "").strip().replace("\n", " ").replace("\r", " ") or None
-        plan_area = str(row.get("PLAN_AREA", "") or "").strip() or None
-        folio = str(row.get("FOLIO", "") or "").strip() or None
-        zonetype1 = str(row.get("ZONETYPE1", "") or "").strip() or None
-        zonetype2 = str(row.get("ZONETYPE2", "") or "").strip() or None
-        zonetype3 = str(row.get("ZONETYPE3", "") or "").strip() or None
-        status = str(row.get("STATUS", "") or "").strip() or "Active"
+        raw_legal = row.get("LEGALDESC")
+        legaldesc = clean_str(str(raw_legal).replace("\n", " ").replace("\r", " ")) if raw_legal is not None else None
+        plan_area = clean_str(row.get("PLAN_AREA"))
+        folio = clean_str(row.get("FOLIO"))
+        zonetype1 = clean_str(row.get("ZONETYPE1"))
+        zonetype2 = clean_str(row.get("ZONETYPE2"))
+        zonetype3 = clean_str(row.get("ZONETYPE3"))
+        status = clean_str(row.get("STATUS")) or "Active"
         
         units_raw = str(row.get("UNITS", "") or "").strip()
         units = int(units_raw) if units_raw.isdigit() else None
         
-        sc_card = str(row.get("SC_CARD", "") or "").strip() or None
+        sc_card = clean_str(row.get("SC_CARD"))
         
         extract_dt = row.get("EXTRACT_DT")
         if extract_dt is not None:

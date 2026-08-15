@@ -629,7 +629,7 @@ def lookup_parcel(query: str, db: Session = Depends(get_db)):
                 "gis_id": p.gis_id,
                 "address": p.address,
                 "clean_address": p.address,  # Backward compatibility
-                "full_address": p.full_address or p.address,
+                "full_address": p.address,
                 "house": p.house,
                 "street": p.street,
                 "streettype": p.streettype,
@@ -756,7 +756,7 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
         "gis_id": p.gis_id,
         "address": p.address,
         "clean_address": p.address,
-        "full_address": p.full_address or p.address,
+        "full_address": p.address,
         "house": p.house,
         "street": p.street,
         "streettype": p.streettype,

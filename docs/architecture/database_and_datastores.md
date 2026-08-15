@@ -14,9 +14,11 @@ graph TD
         T1["live_calls (Dispatches, Transcripts, Target JSONB, Reviews)"]
         T2["evaluation_history (WER/CER Metrics, Quality Ratings)"]
         T3["road_closures (Municipal Hazards & Detours)"]
+        T4["parcels (69,708 Civic Properties, Units, Pre-computed Zones 1..134, Tactical Pre-Plans)"]
         PG --> T1
         PG --> T2
         PG --> T3
+        PG --> T4
     end
 
     subgraph SpatialData ["2. Spatial Master Datasets (Offline Shapefiles)"]

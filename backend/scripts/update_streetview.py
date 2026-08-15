@@ -15,26 +15,14 @@ except ImportError:
         from database import SessionLocal
         from models import StreetViewOverrideModel, ParcelModel
 
-def update_override(clean_address: str, front_lat: float, front_lng: float, heading: float, pitch: float = 5.0, fov: float = 80.0):
+def update_override(address: str, front_lat: float, front_lng: float, heading: float, pitch: float = 5.0, fov: float = 80.0):
     db = SessionLocal()
     try:
-        clean_addr = clean_address.strip().upper()
-        # Update or insert in StreetViewOverrideModel
-        r = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == clean_addr).first()
-        if not r:
-            r = StreetViewOverrideModel(clean_address=clean_addr, front_lat=front_lat, front_lng=front_lng, heading=heading, pitch=pitch, fov=fov)
-            db.add(r)
-        else:
-            r.front_lat = front_lat
-            r.front_lng = front_lng
-            r.heading = heading
-            r.pitch = pitch
-            r.fov = fov
-        
-        # Also update ParcelModel if exists
+        addr = address.strip().upper()
         p = db.query(ParcelModel).filter(
-            (ParcelModel.clean_address == clean_addr) |
-            (ParcelModel.gis_id == clean_addr)
+            (ParcelModel.address == addr) |
+            (ParcelModel.address_normalized == addr.lower()) |
+            (ParcelModel.gis_id == addr)
         ).first()
         if p:
             p.front_lat = front_lat
@@ -44,10 +32,13 @@ def update_override(clean_address: str, front_lat: float, front_lng: float, head
             p.streetview_fov = fov
         else:
             p = ParcelModel(
-                gis_id=clean_addr,
-                clean_address=clean_addr,
+                gis_id=addr,
+                address=addr,
+                address_normalized=addr.lower(),
                 front_lat=front_lat,
                 front_lng=front_lng,
+                lat=front_lat,
+                lng=front_lng,
                 streetview_heading=heading,
                 streetview_pitch=pitch,
                 streetview_fov=fov
@@ -55,7 +46,7 @@ def update_override(clean_address: str, front_lat: float, front_lng: float, head
             db.add(p)
 
         db.commit()
-        print(f"SUCCESS: Saved {clean_addr} -> lat={front_lat}, lng={front_lng}, heading={heading}, pitch={pitch}, fov={fov}")
+        print(f"SUCCESS: Saved {addr} -> lat={front_lat}, lng={front_lng}, heading={heading}, pitch={pitch}, fov={fov}")
     finally:
         db.close()
 

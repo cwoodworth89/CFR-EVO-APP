@@ -80,50 +80,80 @@ CREATE TABLE IF NOT EXISTS public.dispatch_uploads (
 
 CREATE INDEX IF NOT EXISTS idx_dispatch_uploads_status ON public.dispatch_uploads (status);
 
--- 4. Create parcels Table
+-- 4. Create parcels Table (Unified 40-column master properties table)
 CREATE TABLE IF NOT EXISTS public.parcels (
-    id SERIAL PRIMARY KEY,
-    gis_id VARCHAR(255),
-    clean_address VARCHAR(255) UNIQUE NOT NULL,
-    full_address VARCHAR(255),
-    street_number VARCHAR(50),
-    street_name VARCHAR(255),
-    municipality VARCHAR(100),
-    zone_id VARCHAR(16),
-    geometry JSONB,
-    parcel_lat DOUBLE PRECISION,
-    parcel_lng DOUBLE PRECISION,
-    front_lat DOUBLE PRECISION,
-    front_lng DOUBLE PRECISION,
-    centroid_lat DOUBLE PRECISION,
-    centroid_lng DOUBLE PRECISION,
-    entrance_lat DOUBLE PRECISION,
-    entrance_lng DOUBLE PRECISION,
-    streetview_heading DOUBLE PRECISION DEFAULT 0.0,
-    streetview_pitch DOUBLE PRECISION DEFAULT 5.0,
-    streetview_fov DOUBLE PRECISION DEFAULT 80.0,
-    lock_box_notes TEXT,
-    hazard_notes TEXT,
-    pre_plan_pdf_url TEXT,
-    construction_type VARCHAR(100),
-    floor_count INTEGER,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    -- System
+    id BIGSERIAL PRIMARY KEY,
+    parcel_uuid UUID DEFAULT gen_random_uuid() NOT NULL,
+
+    -- From Addresses.shp (imported as-is)
+    gis_id VARCHAR(255),                                -- Shapefile feature ID (e.g. "!2211147")
+    address VARCHAR(255) NOT NULL,                      -- Full civic address (e.g. "318 Alderson Ave 2701")
+    house VARCHAR(50),                                  -- House number (e.g. "318")
+    street VARCHAR(255),                                -- Street name without suffix (e.g. "Alderson")
+    streettype VARCHAR(50),                             -- Street suffix (e.g. "Ave", "Crt", "Dr")
+    unit VARCHAR(50),                                   -- Unit/suite number (e.g. "2701")
+    unittype VARCHAR(50),                               -- Unit type descriptor (e.g. "Suite", "Apt")
+    postal VARCHAR(10),                                 -- Postal code (e.g. "V3K 0J1")
+    block VARCHAR(50),                                  -- Block number
+    plan VARCHAR(50),                                   -- Land title plan (e.g. "EPS10424")
+    lot VARCHAR(50),                                    -- Lot number (e.g. "213")
+    legaldesc TEXT,                                     -- Legal description (e.g. "SL 213 PID -032-268-858")
+    plan_area VARCHAR(20),                              -- Plan area code (e.g. "23")
+    folio VARCHAR(50),                                  -- BC Assessment folio number (e.g. "00594213")
+    zonetype1 VARCHAR(30),                              -- Primary municipal zoning (e.g. "RS-1", "RM-6", "C-7")
+    zonetype2 VARCHAR(30),                              -- Secondary municipal zoning
+    zonetype3 VARCHAR(30),                              -- Tertiary municipal zoning
+    status VARCHAR(20),                                 -- Address status ("Active")
+    units INTEGER,                                      -- Total unit count for building (e.g. 383)
+    sc_card VARCHAR(50),                                -- Safety card reference
+    extract_dt DATE,                                    -- Shapefile extract date
+
+    -- From Addresses.shp geometry
+    lat DOUBLE PRECISION,                               -- Latitude from shapefile point geometry
+    lng DOUBLE PRECISION,                               -- Longitude from shapefile point geometry
+
+    -- Pre-computed at import (spatial intersection with Emergency_Response_Zones.shp)
+    zone_id VARCHAR(16),                                -- Emergency response zone (1–134)
+
+    -- Computed at import
+    address_normalized VARCHAR(255),                    -- Lowercase canonical address for fuzzy matching
+
+    -- Operational (populated by firefighters / admin tools)
+    front_lat DOUBLE PRECISION,                         -- Frontage point lat (Street View anchor)
+    front_lng DOUBLE PRECISION,                         -- Frontage point lng
+    centroid_lat DOUBLE PRECISION,                      -- True geometric centroid lat
+    centroid_lng DOUBLE PRECISION,                      -- True geometric centroid lng
+    entrance_lat DOUBLE PRECISION,                      -- Building entrance lat
+    entrance_lng DOUBLE PRECISION,                      -- Building entrance lng
+    streetview_heading DOUBLE PRECISION DEFAULT 0.0,    -- Street View camera heading (degrees)
+    streetview_pitch DOUBLE PRECISION DEFAULT 5.0,      -- Street View camera pitch
+    streetview_fov DOUBLE PRECISION DEFAULT 80.0,       -- Street View camera field of view
+    lock_box_notes TEXT,                                -- Key box / lock box location
+    hazard_notes TEXT,                                  -- Hazmat, safety warnings
+    pre_plan_pdf_url TEXT,                              -- Pre-incident plan document URL
+    construction_type VARCHAR(100),                     -- Building construction class
+    floor_count INTEGER,                                -- Number of floors
+    is_pa_page BOOLEAN NOT NULL DEFAULT FALSE,          -- PA page flag
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_parcels_clean_address ON public.parcels (clean_address);
+-- Primary lookups
+CREATE UNIQUE INDEX IF NOT EXISTS idx_parcels_address ON public.parcels (address);
+CREATE INDEX IF NOT EXISTS idx_parcels_address_normalized ON public.parcels (address_normalized);
+CREATE INDEX IF NOT EXISTS idx_parcels_gis_id ON public.parcels (gis_id);
 
--- 5. Create streetview_overrides Table (legacy)
-CREATE TABLE IF NOT EXISTS public.streetview_overrides (
-    id SERIAL PRIMARY KEY,
-    clean_address VARCHAR(255) UNIQUE NOT NULL,
-    front_lat DOUBLE PRECISION NOT NULL,
-    front_lng DOUBLE PRECISION NOT NULL,
-    heading DOUBLE PRECISION DEFAULT 0.0,
-    pitch DOUBLE PRECISION DEFAULT 5.0,
-    fov DOUBLE PRECISION DEFAULT 80.0,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
+-- Dispatch-critical lookups
+CREATE INDEX IF NOT EXISTS idx_parcels_zone_id ON public.parcels (zone_id);
+CREATE INDEX IF NOT EXISTS idx_parcels_street ON public.parcels (street, streettype);
+CREATE INDEX IF NOT EXISTS idx_parcels_house_street ON public.parcels (house, street);
 
-CREATE INDEX IF NOT EXISTS idx_streetview_overrides_clean_address ON public.streetview_overrides (clean_address);
+-- Unit queries (filter building vs unit at query time)
+CREATE INDEX IF NOT EXISTS idx_parcels_unit ON public.parcels (unit) WHERE unit IS NOT NULL AND unit != '';
+
+-- Municipal zoning
+CREATE INDEX IF NOT EXISTS idx_parcels_zonetype1 ON public.parcels (zonetype1);
 

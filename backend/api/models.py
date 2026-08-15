@@ -98,18 +98,42 @@ class ParcelModel(Base):
     __tablename__ = "parcels"
     __table_args__ = {'extend_existing': True}
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    gis_id = Column(String(255), unique=True, index=True, nullable=True)
-    clean_address = Column(String(255), unique=True, index=True, nullable=False)
-    full_address = Column(String(255), nullable=True)
-    street_number = Column(String(50), nullable=True)
-    street_name = Column(String(255), nullable=True)
-    municipality = Column(String(100), nullable=True)
+    # System
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    parcel_uuid = Column(SafeUUID, default=uuid.uuid4, nullable=False)
+
+    # From Addresses.shp
+    gis_id = Column(String(255), index=True, nullable=True)
+    address = Column(String(255), unique=True, index=True, nullable=False)
+    house = Column(String(50), nullable=True)
+    street = Column(String(255), nullable=True)
+    streettype = Column(String(50), nullable=True)
+    unit = Column(String(50), index=True, nullable=True)
+    unittype = Column(String(50), nullable=True)
+    postal = Column(String(10), nullable=True)
+    block = Column(String(50), nullable=True)
+    plan = Column(String(50), nullable=True)
+    lot = Column(String(50), nullable=True)
+    legaldesc = Column(Text, nullable=True)
+    plan_area = Column(String(20), nullable=True)
+    folio = Column(String(50), nullable=True)
+    zonetype1 = Column(String(30), index=True, nullable=True)
+    zonetype2 = Column(String(30), nullable=True)
+    zonetype3 = Column(String(30), nullable=True)
+    status = Column(String(20), nullable=True)
+    units = Column(Integer, nullable=True)
+    sc_card = Column(String(50), nullable=True)
+    extract_dt = Column(DateTime, nullable=True)
+
+    # From Addresses.shp Geometry
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+
+    # Pre-computed at import
     zone_id = Column(String(16), index=True, nullable=True)
-    
-    geometry = Column(SafeJSON, nullable=True)
-    parcel_lat = Column(Float, nullable=True)
-    parcel_lng = Column(Float, nullable=True)
+    address_normalized = Column(String(255), index=True, nullable=True)
+
+    # Operational (Tactical Property & Pre-Plan Metadata)
     front_lat = Column(Float, nullable=True)
     front_lng = Column(Float, nullable=True)
     centroid_lat = Column(Float, nullable=True)
@@ -122,13 +146,14 @@ class ParcelModel(Base):
     streetview_pitch = Column(Float, server_default="5.0", default=5.0, nullable=True)
     streetview_fov = Column(Float, server_default="80.0", default=80.0, nullable=True)
 
-    # Coquitlam Tactical Property & Pre-Plan Metadata
     lock_box_notes = Column(Text, nullable=True)
     hazard_notes = Column(Text, nullable=True)
     pre_plan_pdf_url = Column(Text, nullable=True)
     construction_type = Column(String(100), nullable=True)
     floor_count = Column(Integer, nullable=True)
+    is_pa_page = Column(Boolean, server_default="false", default=False, nullable=False)
 
+    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

@@ -386,6 +386,7 @@ export default function StreetViewPanel({ activeCall }) {
     }
 
     const payload = {
+      address: cleanAddrKey,
       clean_address: cleanAddrKey,
       front_lat: saveLat,
       front_lng: saveLng,

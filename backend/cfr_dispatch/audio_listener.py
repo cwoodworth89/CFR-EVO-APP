@@ -57,12 +57,17 @@ def update_listener_heartbeat():
         logging.warning(f"Could not update listener heartbeat: {e}")
 
 def log_tone_spectral_history(dispatch_id: str, matched_tones: list | str, live_frequencies: list, is_pa_page: bool = False):
-    """Logs timestamp, matched tones, and top peak frequencies for spectral dataset tracking."""
+    """Append-only JSONL logging — no read/deserialize/rewrite cycle.
+
+    Each tone event appends a single JSON line to tone_spectral_history.jsonl.
+    This avoids the previous hot-path bottleneck where the entire history file
+    was read, deserialized, appended to, and rewritten on every tone detection.
+    """
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         data_dir = os.path.join(base_dir, "data")
         os.makedirs(data_dir, exist_ok=True)
-        log_file = os.path.join(data_dir, "tone_spectral_history.json")
+        log_file = os.path.join(data_dir, "tone_spectral_history.jsonl")
         
         freq_list = sorted(list(live_frequencies)) if live_frequencies else []
         top_5_freqs = [round(f, 2) for f in freq_list[:5]]
@@ -76,19 +81,8 @@ def log_tone_spectral_history(dispatch_id: str, matched_tones: list | str, live_
             "is_pa_page": is_pa_page
         }
         
-        history = []
-        if os.path.exists(log_file):
-            try:
-                with open(log_file, "r") as f:
-                    history = json.load(f)
-            except Exception:
-                history = []
-        history.append(entry)
-        if len(history) > 1000:
-            history = history[-1000:]
-            
-        with open(log_file, "w") as f:
-            json.dump(history, f, indent=2)
+        with open(log_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
         logging.info(f"[Spectral History] Saved tone fingerprint: Tones={matched_tones} | Top Freqs={top_5_freqs} Hz")
     except Exception as e:
         logging.warning(f"Could not write spectral history log: {e}")

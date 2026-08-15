@@ -132,7 +132,7 @@ const getHeaders = () => {
 };
 
 export const apiClient = {
-  // Auth methods matching Supabase Auth interface
+  // Auth methods for local FastAPI
   auth: {
     async getSession() {
       let token = getToken();

@@ -1,4 +1,3 @@
-google-cloud-speech
 googlemaps
 sounddevice
 librosa

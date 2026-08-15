@@ -1,5 +1,5 @@
 # backend/scripts/backtest_parser.py
-# Compares production parser against the new sequential destructive parser using Supabase ground-truth reviews
+# Compares production parser against the new sequential destructive parser using PostgreSQL ground-truth reviews
 
 import sys
 import os

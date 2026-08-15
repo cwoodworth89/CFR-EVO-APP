@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFR EVO - Database & Data Stores Architecture Map</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #0b1120;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 24px;
+    }
+    .header {
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      color: #38bdf8;
+      font-size: 24px;
+      margin: 0 0 8px 0;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      margin: 0;
+    }
+    .container {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      overflow: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+    .table-container {
+      margin-top: 32px;
+      border-collapse: collapse;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #1e293b;
+    }
+    th {
+      background: #1e293b;
+      color: #f1f5f9;
+      font-weight: 700;
+    }
+    tr:hover {
+      background: #1e293b40;
+    }
+    .badge-offline {
+      background: #065f46;
+      color: #34d399;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-removed {
+      background: #881337;
+      color: #fb7185;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧭 CFR EVO: Database & Data Stores Architecture Map</h1>
+    <p>Complete inventory of local databases, master shapefiles, and the Zero Online Fallback protocol.</p>
+  </div>
+
+  <div class="container">
+    <div class="mermaid">
+graph TD
+    subgraph PrimaryDB ["1. Primary Relational DB (PostgreSQL 16)"]
+        direction TB
+        PG[("PostgreSQL 16 (Port 5432)")]
+        T1["live_calls (Dispatches, Transcripts, Target JSONB, Reviews)"]
+        T2["evaluation_history (WER/CER Metrics, Quality Ratings)"]
+        T3["road_closures (Municipal Hazards & Detours)"]
+        PG --> T1
+        PG --> T2
+        PG --> T3
+    end
+
+    subgraph SpatialData ["2. Spatial Master Datasets (Offline Shapefiles)"]
+        direction TB
+        S1["Addresses.shp (38,000+ Coquitlam Civic Addresses & Centroids)"]
+        S2["Cadastral.shp (Parcel Property Boundary Polygon Rings)"]
+        S3["Emergency_Response_Zones.shp (1..134 Fire Grid Zones)"]
+        S4["hydrants.json (NFPA 291 Color-Coded Flow Classes)"]
+        S5["coquitlam_boundary_opt.json (1,597-vertex City Boundary)"]
+    end
+
+    subgraph RoutingGraph ["3. Offline Routing Engine"]
+        direction TB
+        R1["backend/data/osrm/ (Local OSRM Road Graph & Contraction Hierarchies)"]
+    end
+
+    subgraph Storage ["4. Persistent Audio & Offline Map Tiles"]
+        direction TB
+        A1["backend/audio_files/recordings/ (Raw Dispatch WAV Recordings)"]
+        A2["backend/data/tiles/ (Offline MapLibre / PMTiles Basemap)"]
+    end
+
+    subgraph Vocabulary ["5. Dispatch Lexicon Dictionaries"]
+        direction TB
+        V1["street_names.txt (Coquitlam Street Names & Suffix Normalization)"]
+        V2["call_types.txt (Standard Incident Types)"]
+        V3["unit_names.txt (Apparatus Abbreviations: E1, L1, R1, etc.)"]
+    end
+
+    PrimaryDB --> SpatialData
+    SpatialData --> RoutingGraph
+    RoutingGraph --> Storage
+    Storage --> Vocabulary
+    </div>
+
+    <div class="table-container">
+      <h2>🚫 Zero Online Fallback Hardening Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Subsystem</th>
+            <th>Hardened Local Offline Engine</th>
+            <th>Stripped Online Fallback</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Address Geocoding</strong></td>
+            <td><span class="badge-offline">LOCAL</span> Local <code>Addresses.shp</code> via <code>/api/gis/search</code></td>
+            <td><span class="badge-removed">STRIPPED</span> External ArcGIS REST MapServer queries</td>
+          </tr>
+          <tr>
+            <td><strong>Emergency Routing</strong></td>
+            <td><span class="badge-offline">LOCAL</span> Local containerized OSRM graph</td>
+            <td><span class="badge-removed">STRIPPED</span> Google Maps Directions API</td>
+          </tr>
+          <tr>
+            <td><strong>Speech-to-Text (STT)</strong></td>
+            <td><span class="badge-offline">LOCAL</span> Local Whisper Engine (<code>backend/models/</code>)</td>
+            <td><span class="badge-removed">STRIPPED</span> Google Cloud STT API</td>
+          </tr>
+          <tr>
+            <td><strong>Basemap Tiles</strong></td>
+            <td><span class="badge-offline">LOCAL</span> Local PMTiles / Vector tiles</td>
+            <td><span class="badge-removed">STRIPPED</span> External Mapbox / OSM CDN tile fetches</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      flowchart: {
+        curve: 'basis',
+        useMaxWidth: false
+      }
+    });
+  </script>
+</body>
+</html>

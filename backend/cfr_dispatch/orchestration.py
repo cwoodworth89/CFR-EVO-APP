@@ -5,21 +5,11 @@ import logging
 import multiprocessing
 from logging.handlers import TimedRotatingFileHandler
 
-from cfr_dispatch.config.cloud import VERBOSITY_LEVEL, ENABLE_NTFY_PUSH
+from cfr_dispatch.config.cloud import VERBOSITY_LEVEL
 from cfr_dispatch.worker import background_worker_loop, get_shared_validator
 from cfr_dispatch.audio_listener import run_audio_listener_loop
-from cfr_dispatch.stt import (
-    transcribe_audio_local,
-    transcribe_audio_file_local,
-    build_stt_bias_words,
-    get_hitl_verified_streets
-)
 from cfr_dispatch.pipeline import (
-    clean_address_string,
     build_dispatch_payload,
-    is_round_1_complete_check,
-    process_phase_1_check,
-    process_phase_2_finalize,
     process_full_dispatch
 )
 

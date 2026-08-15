@@ -20,7 +20,7 @@ for s in ["gis", "audio", "dispatch_notifications"]:
     if os.path.exists(p_container) and p_container not in sys.path:
         sys.path.insert(0, p_container)
 
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse

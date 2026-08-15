@@ -100,7 +100,7 @@ export function useKioskQueue() {
     );
   }, [triggerUpdateFlash]);
 
-  // Real-time Supabase listener
+  // Real-time MQTT dispatch listener
   useDispatchListener({
     onInsert: handleInsert,
     onUpdate: handleUpdate,

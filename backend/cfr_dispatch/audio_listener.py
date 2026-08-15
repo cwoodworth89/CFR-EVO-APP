@@ -6,7 +6,10 @@ import datetime
 import logging
 from collections import deque
 import numpy as np
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except (ImportError, OSError):
+    sd = None
 
 from cfr_dispatch.config.dsp import (
     NOISE_AMPLITUDE_THRESHOLD,
@@ -92,6 +95,10 @@ def run_audio_listener_loop(dispatch_queue):
     blocksize = 1024
     dev_idx, dev_name = resolve_audio_device(DEVICE_ID)
     logging.info(f"Targeting Audio Input Interface: [{dev_idx}] '{dev_name}'")
+
+    if sd is None:
+        logging.error("PortAudio / sounddevice library is not available in this environment. Listener loop cannot start.")
+        return
 
     with sd.InputStream(samplerate=AUDIO_SAMPLE_RATE, channels=1, blocksize=blocksize, dtype='int16', device=dev_idx) as stream:
         try:

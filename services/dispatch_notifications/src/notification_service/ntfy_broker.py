@@ -68,8 +68,12 @@ def format_unit_topics(unit_str: str) -> list[str]:
         num = "".join(filter(str.isdigit, clean)) or "1"
         base = f"chief-{num}"
 
+    topics = [base]
     secrets = get_active_secrets()
-    return [f"{base}-{s}" if s else base for s in secrets]
+    for s in secrets:
+        if s:
+            topics.append(f"{base}-{s}")
+    return topics
 
 def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None, is_test: bool = None) -> bool:
     """Posts dispatch alert to local/remote Ntfy push notification topics with audio attachments."""
@@ -158,12 +162,16 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
     
     message_body = "\n".join(lines).encode('utf-8')
 
-    target_topics = [CHIEF_MASTER_TOPIC]
+    target_topics = [CHIEF_MASTER_TOPIC, "cfr-dispatches"]
+    if topic:
+        target_topics.append(topic)
+
     secrets = get_active_secrets()
     for s in secrets:
-        target_topics.append(f"cfr-dispatches-{s}" if s else "cfr-dispatches")
-        if topic:
-            target_topics.append(f"{topic}-{s}" if s else topic)
+        if s:
+            target_topics.append(f"cfr-dispatches-{s}")
+            if topic:
+                target_topics.append(f"{topic}-{s}")
 
     if isinstance(units_list, list):
         for unit in units_list:

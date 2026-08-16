@@ -141,3 +141,13 @@ The route output generates three synchronized formats:
 1. **Interactive Leaflet/MapLibre Polyline**: Bold glowing emerald line (`#00e676`) with directional arrows.
 2. **Turn-by-Turn Cue Cards**: High-contrast, large-format instructions on the bay kiosk display (e.g., `➔ RIGHT onto David Ave in 400m`).
 3. **MDT / Mobile Tablet QR Code**: Generates a dynamic QR code on the kiosk screen. Drivers scanning with a rugged tablet or phone instantly open the live route in native Google Maps or Apple Maps.
+
+---
+
+## 8. Iterative Call-Review Calibration Protocol
+
+The emergency routing engine is designed to be tuned and calibrated continuously based on call reviews and firefighter driver feedback:
+
+1. **Review Loop**: As dispatches are reviewed in the UI or audited by analysts, flag routes that take suboptimal residential shortcuts, steep hill climbs, or awkward multi-point apparatus turns.
+2. **Profile Calibration**: Adjust OSRM Lua emergency profiles, arterial road speed weights, turn-penalty matrices, and tactical corridor waypoints based on empirical driver behavior.
+3. **Regression Testing**: Re-run historical dispatch routing benchmarks after profile adjustments to verify that fixes in one response district do not cause regressions in others.

@@ -1,86 +1,24 @@
 import os
 import json
 import logging
-import hashlib
 import requests
 import urllib.parse
-from datetime import datetime, timezone
 
 NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rstrip("/")
 if NTFY_SERVER_URL.startswith("https://"):
     NTFY_SERVER_URL = NTFY_SERVER_URL.replace("https://", "http://", 1)
 
-NTFY_TOPIC_SECRET = os.environ.get("NTFY_TOPIC_SECRET", "AUTO_MONTHLY")
-NTFY_MASTER_SALT = os.environ.get("NTFY_MASTER_SALT", "cfr_master_salt_2026")
-CHIEF_MASTER_TOPIC = os.environ.get("CHIEF_MASTER_TOPIC", "chief-master")
-
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "cfr-dispatches")
 API_BASE_URL = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
 if API_BASE_URL.startswith("https://"):
     API_BASE_URL = API_BASE_URL.replace("https://", "http://", 1)
 
-def get_monthly_secret(dt: datetime = None) -> str:
-    """Computes a deterministic 6-char monthly secret salt from year+month and master salt."""
-    if dt is None:
-        dt = datetime.now(timezone.utc)
-    date_str = dt.strftime("%Y-%m")
-    raw = f"{NTFY_MASTER_SALT}-{date_str}"
-    digest = hashlib.md5(raw.encode("utf-8")).hexdigest()[:6]
-    month_code = dt.strftime("%b%Y").lower()  # e.g. aug2026
-    return f"{month_code}-{digest}"
-
-def get_active_secrets() -> list[str]:
-    """Returns list of active topic secrets (current month + previous month during 3-day grace period)."""
-    if not NTFY_TOPIC_SECRET:
-        return [""]
-    if NTFY_TOPIC_SECRET != "AUTO_MONTHLY":
-        return [NTFY_TOPIC_SECRET]
-
-    now = datetime.now(timezone.utc)
-    current_secret = get_monthly_secret(now)
-    secrets = [current_secret]
-
-    if now.day <= 3:
-        year = now.year
-        month = now.month - 1
-        if month == 0:
-            month = 12
-            year -= 1
-        prev_dt = datetime(year, month, 1, tzinfo=timezone.utc)
-        prev_secret = get_monthly_secret(prev_dt)
-        secrets.append(prev_secret)
-
-    return secrets
-
-def format_unit_topics(unit_str: str) -> list[str]:
-    """Normalizes unit code (e.g. 'E1' -> 'engine-1') and appends active monthly secret tokens."""
-    clean = unit_str.strip().lower().replace(" ", "")
-    base = f"unit-{clean}"
-    if clean.startswith("e") or "engine" in clean:
-        num = "".join(filter(str.isdigit, clean)) or "1"
-        base = f"engine-{num}"
-    elif clean.startswith("l") or "ladder" in clean:
-        num = "".join(filter(str.isdigit, clean)) or "1"
-        base = f"ladder-{num}"
-    elif clean.startswith("r") or "rescue" in clean or "medic" in clean:
-        num = "".join(filter(str.isdigit, clean)) or "1"
-        base = f"rescue-{num}"
-    elif clean.startswith("c") or "car" in clean or "chief" in clean:
-        num = "".join(filter(str.isdigit, clean)) or "1"
-        base = f"chief-{num}"
-
-    topics = [base]
-    secrets = get_active_secrets()
-    for s in secrets:
-        if s:
-            topics.append(f"{base}-{s}")
-    return topics
 
 def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str = None, priority: str = "5", tags: str = None, is_test: bool = None) -> bool:
-    """Posts dispatch alert to local/remote Ntfy push notification topics with audio attachments."""
+    """Posts dispatch alert to local Ntfy push notification server on a single static admin topic."""
     if is_test is None:
         is_test = bool(payload.get("is_test", False))
 
-    # 1. Format Ntfy notification payload
     target = payload.get("target", {})
     address = payload.get("address") or target.get("address") or "Unknown Location"
     lat = payload.get("lat") or target.get("lat")
@@ -161,53 +99,32 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         lines.append("\n⚠️ *** THIS IS A SYSTEM TEST - NOT A REAL EMERGENCY *** ⚠️")
     
     message_body = "\n".join(lines).encode('utf-8')
+    target_topic = topic or NTFY_TOPIC
+    endpoint = f"{NTFY_SERVER_URL}/{target_topic}"
 
-    target_topics = [CHIEF_MASTER_TOPIC, "cfr-dispatches"]
-    if topic:
-        target_topics.append(topic)
+    safe_headers = {}
+    for k, v in headers.items():
+        if isinstance(v, str):
+            safe_headers[k] = v.encode("utf-8").decode("latin-1")
+        else:
+            safe_headers[k] = str(v)
 
-    secrets = get_active_secrets()
-    for s in secrets:
-        if s:
-            target_topics.append(f"cfr-dispatches-{s}")
-            if topic:
-                target_topics.append(f"{topic}-{s}")
+    if token:
+        safe_headers["Authorization"] = f"Bearer {token}"
 
-    if isinstance(units_list, list):
-        for unit in units_list:
-            unit_topics = format_unit_topics(unit)
-            target_topics.extend(unit_topics)
+    try:
+        logging.info(f"Posting dispatch notification to local Ntfy ({endpoint})...")
+        res = requests.post(endpoint, headers=safe_headers, data=message_body, timeout=5)
+        return res.status_code == 200
+    except Exception as e:
+        logging.warning(f"Could not post Ntfy alert to {endpoint}: {e}")
+        return False
 
-    ntfy_success = False
-    for t in set(target_topics):
-        endpoints = [f"{NTFY_SERVER_URL}/{t}"]
-        if not NTFY_SERVER_URL.startswith("https://ntfy.sh"):
-            endpoints.append(f"https://ntfy.sh/{t}")
-
-        safe_headers = {}
-        for k, v in headers.items():
-            if isinstance(v, str):
-                safe_headers[k] = v.encode("utf-8").decode("latin-1")
-            else:
-                safe_headers[k] = str(v)
-
-        body_bytes = message_body.encode("utf-8") if isinstance(message_body, str) else message_body
-
-        for endpoint in endpoints:
-            try:
-                logging.info(f"Posting dispatch notification to Ntfy endpoint ({endpoint})...")
-                res = requests.post(endpoint, headers=safe_headers, data=body_bytes, timeout=8)
-                if res.status_code == 200:
-                    ntfy_success = True
-            except Exception as e:
-                logging.warning(f"Could not post Ntfy alert to topic '{t}' at {endpoint}: {e}")
-
-    return ntfy_success
 
 def notify_it_alert(audit: dict, ntfy_topic: str = None, ntfy_token: str = None) -> bool:
     """Sends IT infrastructure health alert to administrative Ntfy channel."""
-    topic = ntfy_topic or os.environ.get("NTFY_TOPIC", CHIEF_MASTER_TOPIC)
-    url = f"{NTFY_SERVER_URL}/{topic}"
+    target_topic = ntfy_topic or NTFY_TOPIC
+    url = f"{NTFY_SERVER_URL}/{target_topic}"
     headers = {
         "Title": f"⚠️ CFR EVO IT Health Alert: {audit.get('status', 'Warning')}",
         "Priority": "4",

@@ -1,26 +1,5 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import SparkMD5 from 'spark-md5';
-
-const APPARATUS_LIST = [
-  { id: 'chief-master', label: '👑 CHIEF / ADMIN MASTER FEED', isMaster: true, icon: '👑', desc: 'Permanent feed (No Expiry) - All calls + Tap-to-listen audio', color: 'from-purple-600/30 to-indigo-600/20 border-purple-400 text-purple-200' },
-  { id: 'cfr-dispatches', label: 'ALL STATION CALLS', icon: '🚨', desc: 'Receive all dispatch alerts for the department', color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-300' },
-  { id: 'engine-1', label: 'ENGINE 1', icon: '🚒', desc: 'Station 1 Apparatus', color: 'from-rose-500/20 to-red-500/10 border-rose-500/40 text-rose-300' },
-  { id: 'engine-2', label: 'ENGINE 2', icon: '🚒', desc: 'Station 2 Apparatus', color: 'from-sky-500/20 to-blue-500/10 border-sky-500/40 text-sky-300' },
-  { id: 'engine-3', label: 'ENGINE 3', icon: '🚒', desc: 'Station 3 Apparatus', color: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-300' },
-  { id: 'engine-4', label: 'ENGINE 4', icon: '🚒', desc: 'Station 4 Apparatus', color: 'from-purple-500/20 to-indigo-500/10 border-purple-500/40 text-purple-300' },
-  { id: 'ladder-1', label: 'LADDER 1', icon: '🪜', desc: 'Truck 1 Aerial', color: 'from-yellow-500/20 to-amber-500/10 border-yellow-500/40 text-yellow-300' },
-  { id: 'rescue-1', label: 'RESCUE 1', icon: '🚑', desc: 'Heavy Rescue Unit', color: 'from-orange-500/20 to-red-500/10 border-orange-500/40 text-orange-300' },
-  { id: 'chief-1', label: 'CHIEF 1', icon: '🚘', desc: 'Battalion Chief Command', color: 'from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-300' },
-];
-
-const SHIFT_DURATIONS = [
-  { hours: 4, label: '4 Hours (Short Shift)' },
-  { hours: 8, label: '8 Hours (Day Shift)' },
-  { hours: 12, label: '12 Hours (Standard Shift)' },
-  { hours: 24, label: '24 Hours (Full Tour)' },
-  { hours: 0, label: '♾️ Permanent (No Expiry)' },
-];
 
 const cleanHost = (hostStr) => {
   if (!hostStr) return '';
@@ -30,71 +9,25 @@ const cleanHost = (hostStr) => {
     .replace(/\/.*$/, '');
 };
 
-const getMonthlySecretToken = () => {
-  const customSecret = import.meta.env.VITE_NTFY_TOPIC_SECRET;
-  if (customSecret && customSecret !== 'AUTO_MONTHLY') {
-    return customSecret;
-  }
-  const masterSalt = import.meta.env.VITE_NTFY_MASTER_SALT || 'cfr_master_salt_2026';
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const monthNum = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  const monthCode = `${monthNames[now.getUTCMonth()]}${year}`;
-  
-  const raw = `${masterSalt}-${year}-${monthNum}`;
-  const digest = SparkMD5.hash(raw).substring(0, 6);
-  return `${monthCode}-${digest}`;
-};
-
 export default function DriverStationSetup({ onClose }) {
-  const [selectedUnit, setSelectedUnit] = useState('chief-master');
-  const [shiftHours, setShiftHours] = useState(0);
   const [copiedTopic, setCopiedTopic] = useState(false);
   const [copiedServer, setCopiedServer] = useState(false);
-  const [serverMode, setServerMode] = useState('tailscale_ssl'); // 'tailscale_ssl' (https://cfr-mapping-tcfh.otter-sailfin.ts.net), 'cloud' (https://ntfy.sh), or 'local' (http://100.95.146.94:8080)
-  const [qrFormat, setQrFormat] = useState('app'); // 'app' (ntfy://) or 'web' (https://)
+  const [qrFormat, setQrFormat] = useState('app'); // 'app' (ntfy://) or 'web' (http://)
 
-  // Default to Tailscale IP 100.95.146.94 if available or current hostname
   const initialHost = window.location.hostname && window.location.hostname !== 'localhost' 
     ? window.location.hostname 
     : '100.95.146.94';
   const [customHostInput, setCustomHostInput] = useState(initialHost);
   const ntfyServerPort = import.meta.env.VITE_NTFY_PORT || '8080';
   
-  const selectedUnitObj = APPARATUS_LIST.find(u => u.id === selectedUnit) || APPARATUS_LIST[0];
-  
-  // Permanent master topic bypasses monthly secret rotation
-  const topicSecret = selectedUnitObj.isMaster ? '' : getMonthlySecretToken();
-  const finalTopic = topicSecret ? `${selectedUnit}-${topicSecret}` : selectedUnit;
-
+  const finalTopic = 'cfr-dispatches';
   const effectiveHost = cleanHost(customHostInput) || '100.95.146.94';
 
-  // Construct topic subscription URLs based on Server Mode
-  const isCloud = serverMode === 'cloud';
-  const isTailscaleSSL = serverMode === 'tailscale_ssl';
-  
-  const tailscaleSslHost = 'cfr-mapping-tcfh.otter-sailfin.ts.net';
-  const ntfyBaseServerUrl = isCloud 
-    ? 'https://ntfy.sh' 
-    : isTailscaleSSL 
-      ? `https://${tailscaleSslHost}` 
-      : `http://${effectiveHost}:${ntfyServerPort}`;
-      
+  const ntfyBaseServerUrl = `http://${effectiveHost}:${ntfyServerPort}`;
   const ntfyWebUrl = `${ntfyBaseServerUrl}/${finalTopic}`;
-  const ntfyDeepLink = isCloud 
-    ? `ntfy://ntfy.sh/${finalTopic}` 
-    : isTailscaleSSL 
-      ? `ntfy://${tailscaleSslHost}/${finalTopic}` 
-      : `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
-      
-  const ntfyWsUrl = isCloud 
-    ? `wss://ntfy.sh/${finalTopic}/ws` 
-    : isTailscaleSSL 
-      ? `wss://${tailscaleSslHost}/${finalTopic}/ws` 
-      : `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
+  const ntfyDeepLink = `ntfy://${effectiveHost}:${ntfyServerPort}/${finalTopic}`;
+  const ntfyWsUrl = `ws://${effectiveHost}:${ntfyServerPort}/${finalTopic}/ws`;
 
-  // QR Code payload based on user selection
   const qrPayload = qrFormat === 'app' ? ntfyDeepLink : ntfyWebUrl;
 
   const handleCopyTopic = () => {
@@ -112,13 +45,13 @@ export default function DriverStationSetup({ onClose }) {
   return (
     <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[3000] flex flex-col p-4 sm:p-6 text-slate-100 font-sans animate-in fade-in duration-200 overflow-y-auto">
       {/* Header */}
-      <div className="max-w-4xl mx-auto w-full flex justify-between items-center border-b border-slate-800 pb-4 mb-6 flex-shrink-0">
+      <div className="max-w-3xl mx-auto w-full flex justify-between items-center border-b border-slate-800 pb-4 mb-6 flex-shrink-0">
         <div>
           <h1 className="text-lg sm:text-xl font-black text-amber-400 tracking-wider flex items-center gap-2.5 select-none">
             <span>📱 DRIVER MOBILE PUSH ALERTS SETUP</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1 font-mono">
-            Low-barrier mobile alert dispatch setup for apparatus drivers. Receive loud alarms that bypass Do-Not-Disturb & silent mode.
+            Direct local Ntfy push notifications for apparatus drivers & station officers.
           </p>
         </div>
         <button
@@ -130,127 +63,20 @@ export default function DriverStationSetup({ onClose }) {
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Unit Selection & Shift Duration */}
-        <div className="md:col-span-7 flex flex-col gap-5">
-          {/* Step 1: Select Unit */}
+      <div className="max-w-3xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Server Configuration */}
+        <div className="md:col-span-6 flex flex-col gap-5">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
             <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-3 flex items-center gap-2">
-              <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-md border border-amber-500/30 text-[10px]">STEP 1</span>
-              SELECT ASSIGNED APPARATUS
+              <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-md border border-amber-500/30 text-[10px]">CONFIG</span>
+              LOCAL NTFY SERVER ENDPOINT
             </h2>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              {APPARATUS_LIST.map((unit) => {
-                const isSelected = selectedUnit === unit.id;
-                return (
-                  <button
-                    key={unit.id}
-                    type="button"
-                    onClick={() => setSelectedUnit(unit.id)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? `bg-gradient-to-r ${unit.color} ring-2 ring-amber-400/50 shadow-lg scale-[1.02]`
-                        : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-300'
-                    }`}
-                  >
-                    <span className="text-xl select-none">{unit.icon}</span>
-                    <div className="min-w-0">
-                      <div className="text-xs font-black tracking-wider leading-none">{unit.label}</div>
-                      <div className="text-[9px] text-slate-400 font-mono mt-1 truncate">{unit.desc}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Step 2: Select Shift Duration */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-3 flex items-center gap-2">
-              <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-md border border-amber-500/30 text-[10px]">STEP 2</span>
-              SELECT SHIFT DURATION
-            </h2>
-
-            <div className="grid grid-cols-2 gap-2">
-              {SHIFT_DURATIONS.map((dur) => {
-                const isSelected = shiftHours === dur.hours;
-                return (
-                  <button
-                    key={dur.hours}
-                    type="button"
-                    onClick={() => setShiftHours(dur.hours)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold font-mono transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-sky-500/20 border-sky-500/50 text-sky-300 ring-1 ring-sky-400/40'
-                        : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {dur.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Step 3: Notification Relay Server Mode */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono mb-2.5 flex items-center gap-2">
-              <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 text-[10px]">STEP 3</span>
-              SELECT NOTIFICATION SERVER
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setServerMode('tailscale_ssl')}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  serverMode === 'tailscale_ssl'
-                    ? 'bg-sky-500/20 border-sky-500/50 text-sky-300 ring-1 ring-sky-400/40'
-                    : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
-                }`}
-              >
-                <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
-                  <span>🔒 Tailscale SSL (https://...)</span>
-                </div>
-                <div className="text-[9px] text-slate-400 font-mono mt-1">Valid HTTPS certificate via Tailscale Serve. WebSockets & 0 TLS errors!</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setServerMode('cloud')}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  serverMode === 'cloud'
-                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 ring-1 ring-emerald-400/40'
-                    : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
-                }`}
-              >
-                <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
-                  <span>☁️ Public SSL (ntfy.sh)</span>
-                </div>
-                <div className="text-[9px] text-slate-400 font-mono mt-1">Public ntfy.sh relay. Trusted SSL certificate for mobile networks.</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setServerMode('local')}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  serverMode === 'local'
-                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300 ring-1 ring-purple-400/40'
-                    : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 text-slate-400'
-                }`}
-              >
-                <div className="text-xs font-black tracking-wider flex items-center gap-1.5">
-                  <span>🏠 Station Local (http://...)</span>
-                </div>
-                <div className="text-[9px] text-slate-400 font-mono mt-1">Direct unencrypted HTTP port 8080. Requires HTTP toggle in Ntfy app.</div>
-              </button>
-            </div>
-
-            {serverMode === 'local' && (
+            <div className="flex flex-col gap-3">
               <div>
-                <p className="text-[10px] text-slate-400 font-mono mb-2">
+                <label className="text-[10px] text-slate-400 font-mono block mb-1">
                   Station Hostname or Tailscale IP:
-                </p>
+                </label>
                 <input
                   type="text"
                   value={customHostInput}
@@ -259,18 +85,34 @@ export default function DriverStationSetup({ onClose }) {
                   className="w-full bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono font-bold rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
                 />
               </div>
-            )}
+
+              <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 font-mono text-[11px] space-y-1">
+                <div className="text-slate-400 text-[10px]">Active Topic:</div>
+                <div className="text-amber-400 font-bold">{finalTopic}</div>
+                <div className="text-slate-400 text-[10px] pt-1">Server URL:</div>
+                <div className="text-sky-300 font-bold truncate">{ntfyBaseServerUrl}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Setup Instructions */}
+          <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-2xl text-left text-xs text-slate-300 font-mono leading-relaxed space-y-2">
+            <div className="font-extrabold text-amber-400 uppercase text-[11px]">⚡ 30-Second Setup Guide:</div>
+            <div>1. Install the free <span className="text-white font-bold">Ntfy</span> app on your phone.</div>
+            <div>2. In Ntfy settings, ensure <span className="text-amber-300 font-bold">Use another server</span> or default server is set to <span className="text-sky-300 font-bold">{ntfyBaseServerUrl}</span>.</div>
+            <div>3. Subscribe to topic <span className="text-emerald-400 font-bold">{finalTopic}</span>.</div>
+            <div>4. Protocol: <span className="text-purple-300 font-bold">WebSockets</span> (<span className="text-slate-400">{ntfyWsUrl}</span>).</div>
           </div>
         </div>
 
-        {/* Right Column: QR Code & Mobile Connection Instructions */}
-        <div className="md:col-span-5 flex flex-col gap-5">
+        {/* Right Column: QR Code */}
+        <div className="md:col-span-6 flex flex-col gap-5">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col items-center text-center">
             <h2 className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono mb-1">
-              📱 SCAN TO PAIR DRIVER PHONE
+              📱 SCAN TO SUBSCRIBE
             </h2>
             <p className="text-[11px] text-slate-400 font-mono mb-3">
-              Scan with phone camera or Ntfy app to subscribe in 1 tap.
+              Scan with your phone camera or Ntfy app.
             </p>
 
             {/* QR Format Selector */}
@@ -312,17 +154,17 @@ export default function DriverStationSetup({ onClose }) {
             </div>
 
             <div className="text-xs font-mono font-bold text-slate-200 mb-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 w-full truncate">
-              {selectedUnitObj.label} ({shiftHours === 0 ? 'Permanent' : `${shiftHours}h Shift`})
+              {finalTopic}
             </div>
 
-            {/* Copy / Action Buttons */}
+            {/* Copy Action Buttons */}
             <div className="flex flex-col gap-2 w-full">
               <button
                 type="button"
                 onClick={handleCopyTopic}
                 className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>{copiedTopic ? '✓ TOPIC URL COPIED!' : '📋 COPY TOPIC URL (http://...)'}</span>
+                <span>{copiedTopic ? '✓ TOPIC URL COPIED!' : '📋 COPY TOPIC URL'}</span>
               </button>
 
               <button
@@ -330,23 +172,8 @@ export default function DriverStationSetup({ onClose }) {
                 onClick={handleCopyServer}
                 className="bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 py-2 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                {copiedServer ? '✓ SERVER URL COPIED!' : '📋 COPY SERVER BASE URL (http://...:8080)'}
+                {copiedServer ? '✓ SERVER URL COPIED!' : '📋 COPY SERVER BASE URL'}
               </button>
-            </div>
-
-            {/* TLS Warning Alert */}
-            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-[10px] text-amber-200 font-mono leading-relaxed w-full">
-              <span className="font-extrabold text-amber-400">⚠️ TLS / UNENCRYPTED HTTP:</span> The local Ntfy push server runs strictly on <span className="text-emerald-400 font-bold font-mono">http://</span> (Port 8080). Do <span className="text-rose-400 font-bold underline">NOT</span> use <span className="font-bold">https://</span> or HTTPS proxies, as SSL handshakes will fail with TLS packet errors.
-            </div>
-
-            {/* Quick Setup Instructions */}
-            <div className="mt-3 p-3 bg-slate-950/80 border border-slate-850 rounded-xl text-left text-[10px] text-slate-400 font-mono leading-relaxed space-y-1.5 w-full">
-              <div className="font-extrabold text-amber-400 uppercase">⚡ 30-Second Setup Guide:</div>
-              <div>1. Install free <span className="text-white font-bold">Ntfy</span> app from App Store / Play Store.</div>
-              <div>2. Tap <span className="text-white font-bold">+ Subscribe to topic</span>.</div>
-              <div>3. Server URL: <span className="text-sky-300 font-bold">{ntfyWebUrl}</span> (<span className="text-amber-400 font-bold">http://</span> plain text, Port 8080).</div>
-              <div>4. Protocol: Select <span className="text-purple-300 font-bold">WebSockets</span> (<span className="text-slate-300">{ntfyWsUrl}</span>) for low-latency alerts.</div>
-              <div>5. <span className="text-emerald-400 font-bold">Done!</span> Loud siren alerts will ring even when silent mode is ON.</div>
             </div>
           </div>
         </div>
@@ -354,3 +181,4 @@ export default function DriverStationSetup({ onClose }) {
     </div>
   );
 }
+

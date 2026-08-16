@@ -24,9 +24,10 @@ NUM_PEAKS_TO_FIND = 10
 TONE_ZSCORE_THRESHOLD = 30.0
 
 GOLDEN_FINGERPRINTS = {
-    "PA Tone":     [595.00, 647.00],
-    "Chief Tone":  [437.50, 656.25],
-    "Engine Tone": [601.56, 1351.56],
-    "Rescue Tone": [726.56, 890.62]
+    "PA Tone":               [595.00, 647.00],
+    "Chief Tone":            [440.20, 660.34],
+    "Engine Tone":           [600.00, 1350.00],
+    "Rescue Tone":           [727.09, 891.99],
+    "Dispatch Announcement": [1000.00]
 }
 

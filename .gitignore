@@ -215,5 +215,6 @@ frontend/public/recordings/
 *.flac
 *.m4a
 *.aup3
+archive/
 *.db
 *.sqlite

@@ -1,12 +1,12 @@
 // Map & Layer Constants
 import { TILE_BASE_URL, API_BASE_URL } from '../apiClient';
 
-// 🏙️ CITY CENTER & SYMMETRIC OPERATIONAL BOUNDS (Centered at Coquitlam Town Centre)
-export const COQUITLAM_CENTER = [49.2838, -122.7750];
+// 🏙️ CITY CENTER & SYMMETRIC OPERATIONAL BOUNDS (Centered at Hall 1 - Town Centre Fire Hall: -122.7907)
+export const COQUITLAM_CENTER = [49.2838, -122.7907];
 
 export const OPERATIONAL_BOUNDS = [
-  [49.0838, -123.0350], // Southwest: Symmetric regional boundary
-  [49.4838, -122.5150]  // Northeast: Symmetric regional boundary
+  [49.0838, -123.0507], // Southwest: Symmetric regional boundary
+  [49.4838, -122.5307]  // Northeast: Symmetric regional boundary
 ];
 
 // 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps via mbtileserver on port 8081)

@@ -23,7 +23,7 @@ for s in ["gis", "audio", "dispatch_notifications"]:
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
@@ -907,8 +907,12 @@ SATELLITE_TILES_DIR = os.environ.get(
 os.makedirs(SATELLITE_TILES_DIR, exist_ok=True)
 
 
+# 1x1 Transparent PNG (68 bytes) for missing/uncached tile fallbacks
+TRANSPARENT_1X1_PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
+
+
 def _serve_satellite_tile(z: int, x: int, y: int, ext: Optional[str] = None):
-    """Serve pre-cached satellite raster tiles from SATELLITE_TILES_DIR."""
+    """Serve pre-cached satellite raster tiles from SATELLITE_TILES_DIR, falling back to 1x1 transparent PNG."""
     tile_dir = os.path.join(SATELLITE_TILES_DIR, str(z), str(x))
     candidates = []
     if ext:
@@ -929,7 +933,16 @@ def _serve_satellite_tile(z: int, x: int, y: int, ext: Optional[str] = None):
                     "Access-Control-Allow-Origin": "*",
                 }
             )
-    raise HTTPException(status_code=404, detail=f"Satellite tile z={z}, x={x}, y={y} not found")
+    # Return transparent 1x1 PNG with 200 OK to prevent OpaqueResponseBlocking (ORB) browser errors
+    return Response(
+        content=TRANSPARENT_1X1_PNG,
+        media_type="image/png",
+        status_code=200,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
 
 
 @app.get("/api/tiles/satellite/{z}/{x}/{y}.png")

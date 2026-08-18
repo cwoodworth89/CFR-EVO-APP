@@ -121,6 +121,7 @@ export function BaseMap({ style, useLabelsFallback }) {
             maxNativeZoom: maxNativeZoom,
             maxZoom: maxZoom,
             noWrap: true,
+            crossOrigin: "anonymous",
         });
         tileLayer.addTo(map);
         layerRef.current = tileLayer;

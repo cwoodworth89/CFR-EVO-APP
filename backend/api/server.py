@@ -733,6 +733,42 @@ def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Sessi
     }
 
 
+@app.get("/api/parcels/bbox")
+def get_parcels_in_bbox(
+    min_lat: float = Query(...),
+    min_lng: float = Query(...),
+    max_lat: float = Query(...),
+    max_lng: float = Query(...),
+    limit: int = 500,
+    db: Session = Depends(get_db)
+):
+    """Returns local cadastral property points & house numbers within the bounding box for offline overlays."""
+    parcels = db.query(ParcelModel).filter(
+        ParcelModel.lat >= min_lat,
+        ParcelModel.lat <= max_lat,
+        ParcelModel.lng >= min_lng,
+        ParcelModel.lng <= max_lng
+    ).limit(limit).all()
+
+    return {
+        "count": len(parcels),
+        "parcels": [
+            {
+                "id": p.id,
+                "gis_id": p.gis_id,
+                "address": p.address,
+                "house": p.house,
+                "street": p.street,
+                "unit": p.unit,
+                "lat": p.lat,
+                "lng": p.lng,
+                "zone_id": p.zone_id
+            }
+            for p in parcels
+        ]
+    }
+
+
 @app.post("/api/parcels/streetview")
 def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = Depends(get_db)):
     raw_target = (payload.address or payload.clean_address or payload.gis_id or "").strip()

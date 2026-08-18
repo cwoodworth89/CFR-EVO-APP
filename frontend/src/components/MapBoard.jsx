@@ -10,7 +10,7 @@ import L from 'leaflet';
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
-import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS } from './MapConstants';
+import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
 import { apiClient } from '../apiClient';
 
 export function enrichAddressWithBuilding(targetObj) {
@@ -194,7 +194,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
 
   const markerPos = Array.isArray(closure.coordinates) && closure.coordinates.length >= 2 
     ? [parseFloat(closure.coordinates[0]), parseFloat(closure.coordinates[1])] 
-    : [49.28, -122.80];
+    : COQUITLAM_CENTER;
 
   const polylinePos = Array.isArray(closure.polyline) && closure.polyline.length > 0
     ? closure.polyline.map(pt => [parseFloat(pt[0]), parseFloat(pt[1])])
@@ -480,7 +480,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
       const newCall = dispatch.rawRecord || dispatch;
       if (newCall) {
         setActiveDispatch(newCall);
-        const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.lat || 49.28, lng: newCall.lng || -122.80 } : null);
+        const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.lat || COQUITLAM_CENTER[0], lng: newCall.lng || COQUITLAM_CENTER[1] } : null);
         if (target) {
           updateTargetAddress(target);
           if (map && target.lat && target.lng) {
@@ -1032,9 +1032,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         {/* Map Container Wrapper */}
         <div className="flex-grow h-full relative flex flex-col bg-slate-900 min-w-0">
           <MapContainer 
-              center={[49.28, -122.80]} 
+              center={COQUITLAM_CENTER} 
               zoom={12} 
-              minZoom={11}
+              minZoom={12}
               maxZoom={22}
               maxBounds={OPERATIONAL_BOUNDS}
               maxBoundsViscosity={1.0}

@@ -1,10 +1,12 @@
 // Map & Layer Constants
 import { TILE_BASE_URL, API_BASE_URL } from '../apiClient';
 
-// 🌐 REGIONAL OPERATIONAL BOUNDING BOX (Coquitlam, Port Mann Bridge / North Surrey, Port Moody, Belcarra, Burnaby, New Westminster, Pinecone Burke)
+// 🏙️ CITY CENTER & SYMMETRIC OPERATIONAL BOUNDS (Centered at Coquitlam City Hall & Town Centre Park)
+export const COQUITLAM_CENTER = [49.2838, -122.7932];
+
 export const OPERATIONAL_BOUNDS = [
-  [49.15, -123.04], // Southwest: North Surrey / New Westminster / Central Burnaby
-  [49.48, -122.60]  // Northeast: Pinecone Burke / Widgeon / Western Pitt Meadows
+  [49.0838, -123.0532], // Southwest: Symmetric regional boundary
+  [49.4838, -122.5332]  // Northeast: Symmetric regional boundary
 ];
 
 // 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps via mbtileserver on port 8081)

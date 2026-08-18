@@ -219,4 +219,18 @@ frontend/public/recordings/
 *.aup3
 archive/
 *.db
-*.sqlite
+*.sqlite
+
+# Heavy Imagery Archives & GIS Raw Raster Formats
+*.zip
+*.tar
+*.tar.gz
+*.sid
+*.sdw
+*.mrsid
+*.tif
+*.tiff
+*.las
+*.laz
+backend/data/staging/
+frontend/public/data/*.zip

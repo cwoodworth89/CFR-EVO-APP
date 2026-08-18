@@ -38,9 +38,28 @@ DEFAULT_MIN_ZOOM = 12
 DEFAULT_MAX_ZOOM = 18
 DEFAULT_WORKERS = 8
 
-ESRI_WORLD_IMAGERY_URL = (
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-)
+LAYER_SOURCES = {
+    "satellite": {
+        "url_template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        "default_dir": "satellite",
+        "default_format": "jpg",
+    },
+    "street": {
+        "url_template": "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+        "default_dir": "street",
+        "default_format": "png",
+    },
+    "street_nolabels": {
+        "url_template": "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
+        "default_dir": "street_nolabels",
+        "default_format": "png",
+    },
+    "dark_nolabels": {
+        "url_template": "https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png",
+        "default_dir": "dark_nolabels",
+        "default_format": "png",
+    },
+}
 
 USER_AGENT = "CFR-EVO/1.0 (Emergency Response Pre-Cache; Coquitlam Fire Rescue)"
 
@@ -114,9 +133,10 @@ def download_single_tile(
     force: bool = False,
     delay: float = 0.0,
     max_retries: int = 3,
+    url_template: str = LAYER_SOURCES["satellite"]["url_template"],
 ) -> Dict[str, Any]:
     """
-    Download a single satellite tile and save it to the local cache directory.
+    Download a single tile and save it to the local cache directory.
     Returns a dict with status: 'downloaded', 'cached', or 'failed'.
     """
     z, x, y = tile
@@ -150,8 +170,8 @@ def download_single_tile(
     if delay > 0:
         time.sleep(delay)
 
-    # Esri World Imagery URL: tile/{z}/{y}/{x}
-    url = ESRI_WORLD_IMAGERY_URL.format(z=z, y=y, x=x)
+    # Format URL template
+    url = url_template.format(z=z, y=y, x=x)
 
     req = urllib.request.Request(
         url,
@@ -196,6 +216,7 @@ def run_precache(
     min_zoom: int,
     max_zoom: int,
     output_dir: str,
+    layer: str = "satellite",
     tile_format: str = "jpg",
     workers: int = 8,
     force: bool = False,
@@ -205,9 +226,13 @@ def run_precache(
     """
     Executes the pre-caching workflow.
     """
+    layer_cfg = LAYER_SOURCES.get(layer, LAYER_SOURCES["satellite"])
+    url_template = layer_cfg["url_template"]
+
     print("=" * 70)
-    print(" CFR EVO SATELLITE TILE PRE-CACHING ENGINE")
+    print(f" CFR EVO MAP TILE PRE-CACHING ENGINE [{layer.upper()}]")
     print("=" * 70)
+    print(f" Layer        : {layer} ({url_template})")
     print(f" Bounding Box : Lat [{min_lat:.4f}..{max_lat:.4f}], Lon [{min_lon:.4f}..{max_lon:.4f}]")
     print(f" Zoom Range   : {min_zoom} -> {max_zoom}")
     print(f" Output Dir   : {output_dir}")
@@ -269,6 +294,8 @@ def run_precache(
                     tile_format,
                     force,
                     delay,
+                    3,
+                    url_template,
                 ): tile
                 for tile in all_tiles
             }
@@ -330,7 +357,13 @@ def run_precache(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Pre-cache satellite raster tiles for Coquitlam emergency response."
+        description="Pre-cache map raster tiles (street, street_nolabels, dark_nolabels, satellite) for Coquitlam emergency response."
+    )
+    parser.add_argument(
+        "--layer",
+        choices=["satellite", "street", "street_nolabels", "dark_nolabels"],
+        default="satellite",
+        help="Map layer to pre-cache (default: satellite)",
     )
     parser.add_argument(
         "--min-zoom",
@@ -354,13 +387,13 @@ def main():
         "--output-dir",
         type=str,
         default=None,
-        help="Output directory for tile storage (default: backend/data/tiles/satellite)",
+        help="Output directory for tile storage (default: backend/data/tiles/<layer>)",
     )
     parser.add_argument(
         "--format",
-        choices=["jpg", "png", "both"],
-        default="jpg",
-        help="File format to save on disk: jpg (default), png, or both",
+        choices=["jpg", "png", "both", "auto"],
+        default="auto",
+        help="File format to save on disk: auto (default based on layer), jpg, png, or both",
     )
     parser.add_argument(
         "--workers",
@@ -387,13 +420,17 @@ def main():
 
     args = parser.parse_args()
 
+    layer_cfg = LAYER_SOURCES.get(args.layer, LAYER_SOURCES["satellite"])
+
     # Determine default output directory relative to repository structure
     if args.output_dir is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         repo_root = os.path.dirname(script_dir)
-        output_dir = os.path.join(repo_root, "data", "tiles", "satellite")
+        output_dir = os.path.join(repo_root, "data", "tiles", layer_cfg["default_dir"])
     else:
         output_dir = os.path.abspath(args.output_dir)
+
+    tile_format = layer_cfg["default_format"] if args.format == "auto" else args.format
 
     min_lat, min_lon, max_lat, max_lon = parse_bbox(args.bbox)
 
@@ -408,7 +445,8 @@ def main():
         min_zoom=args.min_zoom,
         max_zoom=args.max_zoom,
         output_dir=output_dir,
-        tile_format=args.format,
+        layer=args.layer,
+        tile_format=tile_format,
         workers=args.workers,
         force=args.force,
         dry_run=args.dry_run,

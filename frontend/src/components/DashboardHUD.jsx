@@ -428,6 +428,10 @@ export function LeftSidebar({
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data && data.results) {
+            const userSearchedUnit = /\b(UNIT|APT|SUITE|STE|BAY|BLDG|#)\s*\w+/i.test(query) ||
+              /^\d+[-/]\s*\d+/i.test(query) ||
+              /\b(AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|BOULEVARD|CRES|CRESCENT|PL|PLACE|LANE|LN|HWY|HIGHWAY)\s+#?\s*\w+/i.test(query);
+
             const rawItems = data.results.map(f => {
               const address = f.address;
               const lat = f.lat || 0;

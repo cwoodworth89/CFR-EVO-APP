@@ -12,47 +12,47 @@ export const OPERATIONAL_BOUNDS = [
 export const BASE_LAYERS = {
   GREY: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    url: `${API_BASE_URL}/api/tiles/street_nolabels/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
   },
   DARK: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    url: `${API_BASE_URL}/api/tiles/dark_nolabels/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
   },
   SATELLITE: {
     type: 'tile',
     url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam, Esri, Maxar (100% Offline Local Cache)',
+    attribution: 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 19,
+    maxNativeZoom: 20,
     maxZoom: 22
   },
   OSM: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    url: `${API_BASE_URL}/api/tiles/street/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    attribution: '© OpenStreetMap contributors (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22
   },
   VOYAGER: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    url: `${API_BASE_URL}/api/tiles/street/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22
   }
 };

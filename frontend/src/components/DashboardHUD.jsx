@@ -589,6 +589,40 @@ export function LeftSidebar({
              <div className="p-5 flex-grow flex flex-col gap-6 overflow-y-auto">
                 {isExplore ? (
                   <>
+                     {/* Basemap View Switcher (Explore Mode Only) */}
+                     <div className="flex flex-col gap-2 bg-slate-950 p-3 border border-slate-800 rounded-xl flex-shrink-0">
+                        <div className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5 flex justify-between items-center">
+                           <span>BASEMAP VIEW</span>
+                           <span className="text-[8px] text-slate-400 font-mono">EXPLORE</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
+                           <button
+                              type="button"
+                              onClick={() => setMapStyle && setMapStyle("GREY")}
+                              className={`py-1.5 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                 mapStyle !== "SATELLITE"
+                                    ? "bg-slate-800 text-sky-400 shadow-sm border border-slate-700 font-black"
+                                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent"
+                              }`}
+                           >
+                              <span>🗺️</span>
+                              <span>Street Map</span>
+                           </button>
+                           <button
+                              type="button"
+                              onClick={() => setMapStyle && setMapStyle("SATELLITE")}
+                              className={`py-1.5 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                 mapStyle === "SATELLITE"
+                                    ? "bg-emerald-950/80 text-emerald-300 shadow-sm border border-emerald-700/80 font-black"
+                                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent"
+                              }`}
+                           >
+                              <span>🛰️</span>
+                              <span>Satellite</span>
+                           </button>
+                        </div>
+                     </div>
+
                      {/* Search & Routing Section */}
                      <div className="flex flex-col gap-3 bg-slate-950 p-4 border border-slate-800 rounded-xl flex-shrink-0">
                         <div className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">NAVIGATION SEARCH</div>

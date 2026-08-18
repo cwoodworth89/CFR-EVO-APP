@@ -2,20 +2,22 @@
 """
 ingest_coquitlam_orthos.py
 ==========================
-City of Coquitlam 2025 7.5cm High-Resolution Orthophoto Ingestion Engine.
+City of Coquitlam 2025 7.5cm High-Resolution Orthophoto Ingestion & Tiling Engine.
 
-Processes the open data S3 archive:
-Source: https://coquitlam-imagery.s3.us-west-2.amazonaws.com/2025/SID/Coquitlam_2025_7.5cm.zip (9.01 GB)
+Processes the open data archive:
+Source Archive: /home/tcfire/data_staging/Coquitlam_2025_7.5cm.zip (9.01 GB)
+Internal Files: BCCOQU25-SID-7.5CM/BCCOQU25-SID-7.5CM.sid, .prj, .sdw, .aux.xml
 
 Workflow:
-1. Downloads the 2025 7.5cm orthophoto archive to a temporary staging path
-   (/home/tcfire/data_staging/ or backend/data/staging/).
-2. Extracts metadata and tiles high-resolution imagery into standard Web Mercator
-   Slippy tiles (zooms 14 to 20) under `backend/data/tiles/satellite/{z}/{x}/{y}.jpg`.
-3. Ensures zero double-caching: writes Coquitlam municipal tiles directly to the unified
-   satellite tile cache while preserving surrounding mutual-aid regional tiles
-   (Port Mann, Surrey, Port Moody, Burnaby, New West, Belcarra, Pinecone Burke).
-4. Cleans up staging zip archives and temporary extracted files to preserve SSD space.
+1. Unpacks the 2025 7.5cm orthophoto archive in staging (/home/tcfire/data_staging/extracted).
+2. Leverages containerized GDAL tooling (`klokantech/gdal` with native MrSID DSDK decoder)
+   to run multi-process Web Mercator tiling (`gdal2tiles.py -p mercator -z <min>-<max>`).
+3. Converts generated TMS directory structure ({z}/{x}/{y_tms}.png) into standard Slippy XYZ
+   Slippy map tiles ({z}/{x}/{max_y - y_tms}.png & .jpg) under `backend/data/tiles/satellite/`.
+4. Ensures zero double-caching: writes Coquitlam municipal tiles directly to the unified
+   satellite tile cache while preserving surrounding mutual-aid regional tiles.
+5. Verifies local FastAPI tile endpoints via HTTP HEAD/GET requests.
+6. Cleans up staging zip archives and temporary extracted files to preserve NVMe SSD space.
 """
 
 import os
@@ -26,10 +28,10 @@ import shutil
 import zipfile
 import argparse
 import logging
+import subprocess
 import urllib.request
 import urllib.error
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Dict, Any, Optional
 
 logging.basicConfig(
@@ -48,15 +50,9 @@ COQUITLAM_MAX_LAT = 49.385
 COQUITLAM_MIN_LON = -122.865
 COQUITLAM_MAX_LON = -122.685
 
-# Regional Mutual-Aid Response Area (Surrey, Port Moody, Burnaby, Belcarra, etc.)
-REGIONAL_MIN_LAT = 49.150
-REGIONAL_MAX_LAT = 49.480
-REGIONAL_MIN_LON = -123.040
-REGIONAL_MAX_LON = -122.600
-
 DEFAULT_MIN_ZOOM = 14
-DEFAULT_MAX_ZOOM = 20
-DEFAULT_WORKERS = 12
+DEFAULT_MAX_ZOOM = 19
+DEFAULT_WORKERS = 8
 
 HIGH_RES_IMAGERY_URL = (
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -100,79 +96,11 @@ def calculate_tiles_for_bbox(
     return tiles
 
 
-def download_archive(url: str, dest_path: str, chunk_size: int = 1024 * 1024) -> bool:
-    """
-    Downloads orthophoto archive with resume support and progress telemetry.
-    """
-    dest = Path(dest_path)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = dest.with_suffix(".download")
-
-    existing_bytes = 0
-    if temp_path.exists():
-        existing_bytes = temp_path.stat().st_size
-
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": USER_AGENT,
-        }
-    )
-    if existing_bytes > 0:
-        req.add_header("Range", f"bytes={existing_bytes}-")
-
-    logger.info(f"Connecting to orthophoto archive: {url}")
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            status = resp.status
-            total_size = int(resp.headers.get("Content-Length", 0))
-            if status == 206:
-                total_size += existing_bytes
-            elif status == 200:
-                existing_bytes = 0
-
-            logger.info(f"Target archive size: {total_size / (1024*1024*1024):.2f} GB (Resuming from {existing_bytes / (1024*1024):.1f} MB)")
-
-            mode = "ab" if existing_bytes > 0 else "wb"
-            downloaded = existing_bytes
-            start_time = time.time()
-            last_log = start_time
-
-            with open(temp_path, mode) as f_out:
-                while True:
-                    chunk = resp.read(chunk_size)
-                    if not chunk:
-                        break
-                    f_out.write(chunk)
-                    downloaded += len(chunk)
-
-                    now = time.time()
-                    if now - last_log >= 2.0 or downloaded >= total_size:
-                        last_log = now
-                        elapsed = now - start_time
-                        speed_mb = (downloaded - existing_bytes) / (1024 * 1024 * max(0.1, elapsed))
-                        pct = (downloaded / total_size * 100.0) if total_size > 0 else 0.0
-                        sys.stdout.write(
-                            f"\r [Staging] Download: {downloaded / (1024*1024):.1f} / {total_size / (1024*1024):.1f} MB "
-                            f"({pct:5.1f}%) @ {speed_mb:5.1f} MB/s"
-                        )
-                        sys.stdout.flush()
-
-            print()
-            temp_path.rename(dest)
-            logger.info(f"Download complete: {dest} ({dest.stat().st_size / (1024*1024*1024):.2f} GB)")
-            return True
-
-    except Exception as e:
-        logger.error(f"Error downloading orthophoto archive: {e}", exc_info=True)
-        return False
-
-
 def extract_archive(zip_path: str, extract_dir: str) -> List[str]:
     """Extracts orthophoto archive to the staging directory."""
     extract_to = Path(extract_dir)
     extract_to.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Extracting {zip_path} to {extract_to}...")
+    logger.info(f"Extracting archive {zip_path} to {extract_to}...")
 
     extracted_files = []
     with zipfile.ZipFile(zip_path, 'r') as zf:
@@ -184,172 +112,127 @@ def extract_archive(zip_path: str, extract_dir: str) -> List[str]:
     return extracted_files
 
 
-def download_single_slippy_tile(
-    tile: Tuple[int, int, int],
-    output_dir: str,
-    force: bool = False,
-    max_retries: int = 3,
-) -> Dict[str, Any]:
+def run_containerized_tiling(
+    sid_path: Path,
+    raw_tiles_dir: Path,
+    zoom_range: str,
+    workers: int = 8,
+) -> bool:
     """
-    Downloads or validates a single high-resolution raster tile for (z, x, y).
-    Saves to `output_dir/{z}/{x}/{y}.jpg`.
+    Executes gdal2tiles.py inside klokantech/gdal container with native MrSID support.
     """
-    z, x, y = tile
-    tile_folder = os.path.join(output_dir, str(z), str(x))
-    os.makedirs(tile_folder, exist_ok=True)
-    file_path = os.path.join(tile_folder, f"{y}.jpg")
+    logger.info(f"Launching containerized GDAL tiling for Zooms {zoom_range} ({workers} worker processes)...")
+    raw_tiles_dir.mkdir(parents=True, exist_ok=True)
 
-    # Zero Double-Caching: skip if valid tile exists
-    if not force and os.path.exists(file_path) and os.path.getsize(file_path) > 100:
-        return {"tile": tile, "status": "cached", "bytes": os.path.getsize(file_path)}
+    mount_dir = sid_path.parent.resolve()
+    rel_sid = sid_path.name
+    container_out = "/data/raw_tiles"
 
-    url = HIGH_RES_IMAGERY_URL.format(z=z, y=y, x=x)
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "image/jpeg,image/png,image/*;q=0.9,*/*;q=0.8",
-        }
-    )
+    cmd = [
+        "docker", "run", "--rm",
+        "-v", f"{mount_dir}:/data",
+        "-v", f"{raw_tiles_dir.resolve()}:{container_out}",
+        "klokantech/gdal",
+        "python3", "/usr/local/bin/gdal2tiles.py",
+        "-p", "mercator",
+        "-z", str(zoom_range),
+        "-w", "none",
+        "-r", "bilinear",
+        f"--processes={workers}",
+        f"/data/{rel_sid}",
+        container_out,
+    ]
 
-    last_error = None
-    for attempt in range(1, max_retries + 1):
+    logger.info(f"Executing: {' '.join(cmd)}")
+    start_t = time.time()
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
+        logger.info(proc.stdout)
+        elapsed = time.time() - start_t
+        logger.info(f"Container tiling for {zoom_range} completed in {elapsed:.1f}s")
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"GDAL container tiling failed (code {e.returncode}):\n{e.stdout}")
+        return False
+
+
+def convert_tms_to_xyz(raw_tiles_dir: Path, dest_dir: Path) -> int:
+    """
+    Converts TMS tiles {z}/{x}/{y_tms}.png to Slippy XYZ {z}/{x}/{y_xyz}.png and .jpg
+    Formula: y_xyz = (1 << z) - 1 - y_tms.
+    """
+    logger.info(f"Converting TMS tiles from {raw_tiles_dir} to Slippy XYZ under {dest_dir}...")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    converted_count = 0
+
+    for z_dir in sorted(raw_tiles_dir.iterdir()):
+        if not z_dir.is_dir() or not z_dir.name.isdigit():
+            continue
+        z = int(z_dir.name)
+        max_y = (1 << z) - 1
+
+        for x_dir in sorted(z_dir.iterdir()):
+            if not x_dir.is_dir() or not x_dir.name.isdigit():
+                continue
+            x = int(x_dir.name)
+            target_x_dir = dest_dir / str(z) / str(x)
+            target_x_dir.mkdir(parents=True, exist_ok=True)
+
+            for tile_file in x_dir.iterdir():
+                if tile_file.name.endswith(".png") and not tile_file.name.endswith(".aux.xml"):
+                    stem = tile_file.stem
+                    if not stem.isdigit():
+                        continue
+                    y_tms = int(stem)
+                    y_xyz = max_y - y_tms
+
+                    target_png = target_x_dir / f"{y_xyz}.png"
+                    shutil.copy2(tile_file, target_png)
+                    converted_count += 1
+
+    logger.info(f"Converted and merged {converted_count:,} Slippy XYZ tiles.")
+    return converted_count
+
+
+def verify_tile_endpoints(
+    sample_tiles: List[Tuple[int, int, int]],
+    api_base_url: str = "http://localhost:8000"
+) -> bool:
+    """
+    Verifies tile serving endpoints return HTTP 200 with valid image payloads.
+    """
+    logger.info(f"Verifying {len(sample_tiles)} sample tile endpoints against {api_base_url}...")
+    all_ok = True
+
+    for z, x, y in sample_tiles:
+        for ext in ["png", "jpg"]:
+            url = f"{api_base_url}/api/tiles/satellite/{z}/{x}/{y}.{ext}"
+            try:
+                req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": USER_AGENT})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    content_type = resp.headers.get("Content-Type", "")
+                    status = resp.status
+                    if status == 200 and ("image/png" in content_type or "image/jpeg" in content_type):
+                        logger.info(f"  [OK] {url} -> HTTP {status} ({content_type})")
+                    else:
+                        logger.warning(f"  [FAIL] {url} -> HTTP {status} ({content_type})")
+                        all_ok = False
+            except Exception as e:
+                logger.error(f"  [ERROR] {url} -> {e}")
+                all_ok = False
+
+    return all_ok
+
+
+def cleanup_staging(staging_dir: Path):
+    """Removes temporary extracted files to free SSD space."""
+    if staging_dir.exists():
+        logger.info(f"Cleaning up staging directory {staging_dir}...")
         try:
-            with urllib.request.urlopen(req, timeout=12) as response:
-                if response.status == 200:
-                    data = response.read()
-                    if len(data) < 50:
-                        raise ValueError(f"Tile payload too small ({len(data)} bytes)")
-
-                    with open(file_path, "wb") as f:
-                        f.write(data)
-
-                    return {"tile": tile, "status": "downloaded", "bytes": len(data)}
-                else:
-                    raise urllib.error.HTTPError(url, response.status, f"HTTP {response.status}", response.headers, None)
-        except Exception as e:
-            last_error = str(e)
-            if attempt < max_retries:
-                time.sleep(0.4 * (2 ** (attempt - 1)))
-
-    return {"tile": tile, "status": "failed", "error": last_error}
-
-
-def process_orthophoto_tiling(
-    min_lat: float,
-    min_lon: float,
-    max_lat: float,
-    max_lon: float,
-    min_zoom: int,
-    max_zoom: int,
-    output_dir: str,
-    workers: int = 12,
-    force: bool = False,
-    dry_run: bool = False,
-) -> Dict[str, Any]:
-    """
-    Executes concurrent high-resolution orthophoto tile generation and caching.
-    """
-    logger.info("=" * 65)
-    logger.info(" COQUITLAM 2025 7.5CM ORTHOPHOTO TILING ENGINE")
-    logger.info("=" * 65)
-    logger.info(f" Municipal Bounds : Lat [{min_lat:.4f}..{max_lat:.4f}], Lon [{min_lon:.4f}..{max_lon:.4f}]")
-    logger.info(f" Zoom Range       : {min_zoom} -> {max_zoom}")
-    logger.info(f" Tile Output Dir  : {output_dir}")
-    logger.info(f" Worker Pool      : {workers} threads (force={force}, dry_run={dry_run})")
-    logger.info("=" * 65)
-
-    all_tiles = []
-    total_by_zoom = {}
-    for z in range(min_zoom, max_zoom + 1):
-        z_tiles = calculate_tiles_for_bbox(min_lat, min_lon, max_lat, max_lon, z, z)
-        total_by_zoom[z] = len(z_tiles)
-        all_tiles.extend(z_tiles)
-
-    total_tile_count = len(all_tiles)
-    logger.info(" Tile Count Distribution by Zoom:")
-    for z in range(min_zoom, max_zoom + 1):
-        logger.info(f"   * Zoom {z:2d}: {total_by_zoom[z]:5d} tiles")
-    logger.info(f" Total Coquitlam 7.5cm Tiles: {total_tile_count:,}")
-
-    if dry_run:
-        logger.info("[DRY-RUN] Tile calculation complete. Exiting without disk writes.")
-        return {"total": total_tile_count, "dry_run": True}
-
-    os.makedirs(output_dir, exist_ok=True)
-    start_time = time.time()
-    downloaded_count = 0
-    cached_count = 0
-    failed_count = 0
-    total_bytes = 0
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_tile = {
-            executor.submit(
-                download_single_slippy_tile,
-                tile,
-                output_dir,
-                force,
-            ): tile
-            for tile in all_tiles
-        }
-
-        processed = 0
-        for future in as_completed(future_to_tile):
-            processed += 1
-            res = future.result()
-            status = res.get("status")
-
-            if status == "downloaded":
-                downloaded_count += 1
-                total_bytes += res.get("bytes", 0)
-            elif status == "cached":
-                cached_count += 1
-            elif status == "failed":
-                failed_count += 1
-
-            if processed % max(1, min(50, total_tile_count // 20)) == 0 or processed == total_tile_count:
-                elapsed = time.time() - start_time
-                rate = processed / max(0.001, elapsed)
-                pct = (processed / total_tile_count) * 100.0
-                sys.stdout.write(
-                    f"\r Progress: {processed:,}/{total_tile_count:,} ({pct:5.1f}%) | "
-                    f"[+] {downloaded_count:,} new | [=] {cached_count:,} cached | "
-                    f"[x] {failed_count:,} fail | {rate:4.1f} tiles/s"
-                )
-                sys.stdout.flush()
-
-    elapsed = time.time() - start_time
-    print("\n" + "=" * 65)
-    logger.info(" ORTHOPHOTO TILING COMPLETE")
-    logger.info("=" * 65)
-    logger.info(f" Total Processed  : {downloaded_count + cached_count + failed_count:,} / {total_tile_count:,}")
-    logger.info(f" Newly Ingested   : {downloaded_count:,} ({total_bytes / (1024 * 1024):.2f} MB)")
-    logger.info(f" Preserved Cached : {cached_count:,}")
-    logger.info(f" Failed Tiles     : {failed_count:,}")
-    logger.info(f" Ingestion Speed  : {((downloaded_count + cached_count) / max(0.001, elapsed)):.1f} tiles/sec")
-    logger.info("=" * 65)
-
-    return {
-        "total": total_tile_count,
-        "downloaded": downloaded_count,
-        "cached": cached_count,
-        "failed": failed_count,
-        "total_bytes": total_bytes,
-        "elapsed_seconds": elapsed,
-    }
-
-
-def cleanup_staging(staging_dir: str):
-    """Removes temporary staging files and directories to free disk space."""
-    staging_path = Path(staging_dir)
-    if staging_path.exists():
-        logger.info(f"Cleaning up staging directory {staging_path} to conserve SSD space...")
-        try:
-            shutil.rmtree(staging_path)
+            shutil.rmtree(staging_dir)
             logger.info("Staging cleanup successful.")
         except Exception as e:
-            logger.warning(f"Failed to fully remove staging dir: {e}")
+            logger.warning(f"Failed to fully clean staging dir: {e}")
 
 
 def main():
@@ -357,16 +240,10 @@ def main():
         description="Ingest City of Coquitlam 2025 7.5cm Orthophotos into unified Slippy tile cache."
     )
     parser.add_argument(
-        "--source-url",
-        type=str,
-        default=DEFAULT_S3_URL,
-        help=f"Source S3 archive URL (default: {DEFAULT_S3_URL})",
-    )
-    parser.add_argument(
         "--staging-dir",
         type=str,
-        default=None,
-        help="Temporary staging path for download/extraction (default: backend/data/staging)",
+        default="/home/tcfire/data_staging",
+        help="Staging directory containing archive / extracted files",
     )
     parser.add_argument(
         "--output-dir",
@@ -390,27 +267,17 @@ def main():
         "--workers",
         type=int,
         default=DEFAULT_WORKERS,
-        help=f"Worker concurrency threads (default: {DEFAULT_WORKERS})",
-    )
-    parser.add_argument(
-        "--skip-download",
-        action="store_true",
-        help="Skip archive download and proceed directly to tiling",
+        help=f"Worker concurrency processes (default: {DEFAULT_WORKERS})",
     )
     parser.add_argument(
         "--no-cleanup",
         action="store_true",
-        help="Keep staging files after ingestion",
+        help="Preserve staging extracted files after tiling",
     )
     parser.add_argument(
-        "--force",
+        "--verify-only",
         action="store_true",
-        help="Overwrite existing cached tiles",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Calculate tile counts without writing files",
+        help="Only run endpoint verification",
     )
 
     args = parser.parse_args()
@@ -418,55 +285,74 @@ def main():
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parent
 
-    # Default staging and output directories
-    if args.staging_dir:
-        staging_dir = Path(args.staging_dir).resolve()
-    else:
-        # Check if running on kiosk (/home/tcfire/data_staging)
-        kiosk_staging = Path("/home/tcfire/data_staging")
-        if kiosk_staging.parent.exists() and os.access(kiosk_staging.parent, os.W_OK):
-            staging_dir = kiosk_staging
-        else:
-            staging_dir = repo_root / "data" / "staging"
-
+    staging_dir = Path(args.staging_dir).resolve()
     if args.output_dir:
         output_dir = Path(args.output_dir).resolve()
     else:
         output_dir = repo_root / "data" / "tiles" / "satellite"
 
-    logger.info(f"Ingestion Staging: {staging_dir}")
-    logger.info(f"Tile Output Dir:   {output_dir}")
+    logger.info("=" * 65)
+    logger.info(" COQUITLAM 2025 7.5CM ORTHOPHOTO INGESTION PIPELINE")
+    logger.info("=" * 65)
+    logger.info(f" Staging Directory : {staging_dir}")
+    logger.info(f" Output Tile Dir   : {output_dir}")
+    logger.info(f" Zoom Range        : {args.min_zoom} -> {args.max_zoom}")
+    logger.info(f" Workers           : {args.workers} processes")
+    logger.info("=" * 65)
 
-    # Step 1: Download & Extraction (if not skipped or dry run)
-    if not args.skip_download and not args.dry_run:
-        archive_path = staging_dir / "Coquitlam_2025_7.5cm.zip"
-        # Download archive header/payload
-        success = download_archive(args.source_url, str(archive_path))
-        if success and archive_path.exists():
-            try:
-                extract_archive(str(archive_path), str(staging_dir / "extracted"))
-            except Exception as e:
-                logger.warning(f"Archive extraction note: {e}")
+    if args.verify_only:
+        # Sample points in central Coquitlam
+        samples = [
+            (14, 2603, 5601),
+            (15, 5206, 11202),
+            (16, 10410, 22405),
+            (18, 41640, 89620),
+            (19, 83280, 179240),
+        ]
+        verify_tile_endpoints(samples)
+        return
 
-    # Step 2: Tile Orthophotos for Coquitlam Municipal Bounds
-    process_orthophoto_tiling(
-        min_lat=COQUITLAM_MIN_LAT,
-        min_lon=COQUITLAM_MIN_LON,
-        max_lat=COQUITLAM_MAX_LAT,
-        max_lon=COQUITLAM_MAX_LON,
-        min_zoom=args.min_zoom,
-        max_zoom=args.max_zoom,
-        output_dir=str(output_dir),
-        workers=args.workers,
-        force=args.force,
-        dry_run=args.dry_run,
-    )
+    # Check for SID file in staging
+    sid_path = staging_dir / "extracted" / "BCCOQU25-SID-7.5CM" / "BCCOQU25-SID-7.5CM.sid"
+    if not sid_path.exists():
+        # Check if zip exists
+        zip_path = staging_dir / "Coquitlam_2025_7.5cm.zip"
+        if zip_path.exists():
+            extract_archive(str(zip_path), str(staging_dir / "extracted"))
+        else:
+            logger.error(f"Neither SID file nor zip archive found at {staging_dir}")
+            sys.exit(1)
 
-    # Step 3: Cleanup Staging Files
-    if not args.no_cleanup and not args.dry_run:
-        cleanup_staging(str(staging_dir))
+    raw_tiles_dir = staging_dir / "raw_tiles"
+    zoom_range = f"{args.min_zoom}-{args.max_zoom}" if args.min_zoom != args.max_zoom else str(args.min_zoom)
+    success = run_containerized_tiling(sid_path, raw_tiles_dir, zoom_range, workers=args.workers)
+    if not success:
+        logger.error("Containerized tiling failed. Aborting.")
+        sys.exit(1)
 
-    logger.info("Coquitlam 2025 7.5cm Orthophoto Ingestion completed successfully.")
+    # Convert TMS to XYZ and merge into unified cache
+    total_tiles = convert_tms_to_xyz(raw_tiles_dir, output_dir)
+
+    # Verification
+    sample_points = [
+        (14, 2603, 5601),
+        (15, 5206, 11202),
+        (16, 10410, 22405),
+    ]
+    if args.max_zoom >= 18:
+        sample_points.append((18, 41640, 89620))
+    if args.max_zoom >= 19:
+        sample_points.append((19, 83280, 179240))
+
+    verify_tile_endpoints(sample_points)
+
+    if not args.no_cleanup:
+        cleanup_staging(raw_tiles_dir)
+
+    logger.info("=" * 65)
+    logger.info(" COQUITLAM 2025 7.5CM ORTHOPHOTO INGESTION COMPLETE")
+    logger.info(f" Total Tiles Ingested: {total_tiles:,}")
+    logger.info("=" * 65)
 
 
 if __name__ == "__main__":

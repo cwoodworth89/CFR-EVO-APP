@@ -394,21 +394,35 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
   }, [targetAddress, homeHall, routeCoordinates, activeDispatch, routingConfig]);
 
   const [userPanned, setUserPanned] = useState(false);
+  const [isOffDefault, setIsOffDefault] = useState(false);
 
-  // Track map zoom level for automatic zoom-threshold basemap switching (Voyager <= 14, Cadastral > 14)
+  // Track zoom level & map movement off default center/zoom
   useEffect(() => {
     if (!map) return;
-    const updateZoom = () => setCurrentZoom(map.getZoom());
+    const updateMapState = () => {
+      const zoom = map.getZoom();
+      setCurrentZoom(zoom);
+      const center = map.getCenter();
+      const latDiff = Math.abs(center.lat - COQUITLAM_CENTER[0]);
+      const lngDiff = Math.abs(center.lng - COQUITLAM_CENTER[1]);
+      const zoomDiff = Math.abs(zoom - 12);
+      
+      // Off default if panned > ~300m or zoomed away from 12
+      const offDefault = latDiff > 0.003 || lngDiff > 0.003 || zoomDiff > 0.15;
+      setIsOffDefault(offDefault);
+    };
+
     const onUserGesture = (e) => {
       if (e && e.originalEvent) {
         setUserPanned(true);
       }
     };
-    map.on('zoomend', updateZoom);
+
+    map.on('zoomend moveend', updateMapState);
     map.on('dragstart zoomstart touchstart', onUserGesture);
-    updateZoom();
+    updateMapState();
     return () => {
-      map.off('zoomend', updateZoom);
+      map.off('zoomend moveend', updateMapState);
       map.off('dragstart zoomstart touchstart', onUserGesture);
     };
   }, [map]);
@@ -1239,21 +1253,23 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               </span>
             </div>
 
-            <button
-              onClick={() => {
-                setUserPanned(false);
-                if (map) {
-                  map.flyTo(COQUITLAM_CENTER, 12, { animate: true, duration: 0.8 });
-                }
-              }}
-              title="Reset view to Coquitlam City Center (Zoom 12)"
-              className="px-3 py-1.5 rounded-lg bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 group"
-            >
-              <svg className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>Reset View</span>
-            </button>
+            {isOffDefault && (
+              <button
+                onClick={() => {
+                  setUserPanned(false);
+                  if (map) {
+                    map.flyTo(COQUITLAM_CENTER, 12, { animate: true, duration: 0.8 });
+                  }
+                }}
+                title="Reset view to Coquitlam City Center (Zoom 12)"
+                className="px-3 py-1.5 rounded-lg bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 group animate-in fade-in slide-in-from-top-1 duration-200"
+              >
+                <svg className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Reset View</span>
+              </button>
+            )}
           </div>
 
           {/* Floating Re-Center Button when user pans or zooms */}

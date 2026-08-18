@@ -270,6 +270,12 @@ def main():
         help=f"Worker concurrency processes (default: {DEFAULT_WORKERS})",
     )
     parser.add_argument(
+        "--convert-dir",
+        type=str,
+        default=None,
+        help="Directly convert a TMS folder to Slippy XYZ in output-dir without re-tiling",
+    )
+    parser.add_argument(
         "--no-cleanup",
         action="store_true",
         help="Preserve staging extracted files after tiling",
@@ -290,6 +296,18 @@ def main():
         output_dir = Path(args.output_dir).resolve()
     else:
         output_dir = repo_root / "data" / "tiles" / "satellite"
+
+    if args.convert_dir:
+        conv_path = Path(args.convert_dir).resolve()
+        logger.info(f"Direct conversion mode: {conv_path} -> {output_dir}")
+        total = convert_tms_to_xyz(conv_path, output_dir)
+        sample_points = [
+            (14, 2603, 5601),
+            (15, 5206, 11202),
+            (16, 10410, 22405),
+        ]
+        verify_tile_endpoints(sample_points)
+        return
 
     logger.info("=" * 65)
     logger.info(" COQUITLAM 2025 7.5CM ORTHOPHOTO INGESTION PIPELINE")

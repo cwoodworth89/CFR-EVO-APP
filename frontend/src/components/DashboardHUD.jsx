@@ -422,53 +422,25 @@ export function LeftSidebar({
 
     setLoading(true);
     const delayDebounce = setTimeout(() => {
-      const upperQuery = query.toUpperCase().replace(/'/g, "''");
-      const encodedWhere = encodeURIComponent(`UPPER(ADDRESS) LIKE '%${upperQuery}%'`);
-      const url = `https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/15/query?where=${encodedWhere}&outFields=ADDRESS&returnGeometry=true&outSR=4326&resultRecordCount=25&f=json`;
+      const url = `${API_BASE_URL}/api/parcels/search?q=${encodeURIComponent(query)}&limit=25`;
 
       fetch(url)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          if (data && data.features) {
-            const userSearchedUnit = /\b(UNIT|APT|SUITE|STE|BAY|BLDG|#)\s*\w+/i.test(query) ||
-              /^\d+[-/]\s*\d+/i.test(query) ||
-              /\b(AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|BOULEVARD|CRES|CRESCENT|PL|PLACE|LANE|LN|HWY|HIGHWAY)\s+#?\s*\w+/i.test(query);
-
-            const rawItems = data.features.map(f => {
-              const address = f.attributes.ADDRESS;
-              const geom = f.geometry;
-              let lat = 0;
-              let lng = 0;
-              let rings = null;
-              if (geom && geom.rings && geom.rings.length > 0) {
-                rings = geom.rings;
-                // Calculate center (centroid) of the first ring
-                const ring = geom.rings[0];
-                let latSum = 0;
-                let lngSum = 0;
-                ring.forEach(pt => {
-                  lngSum += pt[0];
-                  latSum += pt[1];
-                });
-                lat = latSum / ring.length;
-                lng = lngSum / ring.length;
-              }
-              let front_lat = lat;
-              let front_lng = lng;
-              if (rings) {
-                const frontage = calculateParcelFrontagePoint(rings, address);
-                if (frontage) {
-                  front_lat = frontage.front_lat;
-                  front_lng = frontage.front_lng;
-                }
-              }
+          if (data && data.results) {
+            const rawItems = data.results.map(f => {
+              const address = f.address;
+              const lat = f.lat || 0;
+              const lng = f.lng || 0;
+              const front_lat = f.front_lat || lat;
+              const front_lng = f.front_lng || lng;
               return {
                 address,
                 lat,
                 lng,
                 front_lat,
                 front_lng,
-                rings
+                zone_id: f.zone_id
               };
             });
 

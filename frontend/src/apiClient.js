@@ -31,76 +31,24 @@ export const TILE_BASE_URL = getTileBaseUrl();
  * @param {string} [style='voyager'] - Basemap style ('voyager', 'dark', 'grey', 'light', 'osm', 'satellite')
  * @returns {string} Fully resolved tile URL
  */
-export const getTileUrl = (z = '{z}', x = '{x}', y = '{y}', style = 'voyager') => {
-  const normalizedStyle = (style || 'voyager').toLowerCase();
-  if (normalizedStyle === 'satellite') {
-    return `${API_BASE_URL}/api/tiles/satellite/${z}/${x}/${y}.png`;
-  }
-  if (normalizedStyle === 'dark') {
-    return `${TILE_BASE_URL}/services/vancouver_dark/tiles/${z}/${x}/${y}.png`;
-  }
-  if (normalizedStyle === 'grey' || normalizedStyle === 'light') {
-    return `${TILE_BASE_URL}/services/vancouver_light/tiles/${z}/${x}/${y}.png`;
-  }
-  return `${TILE_BASE_URL}/services/vancouver/tiles/${z}/${x}/${y}.png`;
+export const getTileUrl = (style = 'SATELLITE', z = 12, x = 0, y = 0) => {
+  return `${API_BASE_URL}/api/tiles/satellite/${z}/${x}/${y}.png`;
 };
 
 /**
- * Returns a complete tile layer configuration for Leaflet, including local URL,
- * fallback online URL, attribution, and zoom levels.
+ * Returns a complete tile layer configuration for Leaflet, strictly serving from
+ * local containerized disk cache with zero external WAN dependencies.
  * @param {string} style - Basemap style key ('GREY', 'DARK', 'VOYAGER', 'OSM', 'SATELLITE')
  */
-export const getTileLayerConfig = (style = 'VOYAGER') => {
-  const normalized = (style || 'VOYAGER').toUpperCase();
-  switch (normalized) {
-    case 'DARK':
-      return {
-        url: `${TILE_BASE_URL}/services/vancouver_dark/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-        attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-        subdomains: ['a', 'b', 'c', 'd'],
-        maxNativeZoom: 18,
-        maxZoom: 22,
-      };
-    case 'GREY':
-    case 'LIGHT':
-      return {
-        url: `${TILE_BASE_URL}/services/vancouver_light/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-        attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-        subdomains: ['a', 'b', 'c', 'd'],
-        maxNativeZoom: 18,
-        maxZoom: 22,
-      };
-    case 'OSM':
-      return {
-        url: `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: '© OpenStreetMap contributors (Offline Local)',
-        subdomains: ['a', 'b', 'c'],
-        maxNativeZoom: 18,
-        maxZoom: 22,
-      };
-    case 'SATELLITE':
-      return {
-        url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Esri, Maxar, Earthstar Geographics (Offline Local Cache)',
-        subdomains: ['a', 'b', 'c'],
-        maxNativeZoom: 18,
-        maxZoom: 22,
-      };
-    case 'VOYAGER':
-    default:
-      return {
-        url: `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-        subdomains: ['a', 'b', 'c', 'd'],
-        maxNativeZoom: 18,
-        maxZoom: 22,
-      };
-  }
+export const getTileLayerConfig = (style = 'SATELLITE') => {
+  return {
+    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'City of Coquitlam, Esri, Maxar (100% Offline Local Cache)',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 19,
+    maxZoom: 22,
+  };
 };
 
 

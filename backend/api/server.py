@@ -669,6 +669,36 @@ def lookup_parcel(query: str, db: Session = Depends(get_db)):
     return {"found": False, "parcel": None}
 
 
+@app.get("/api/parcels/search")
+def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Session = Depends(get_db)):
+    """Fast local autocomplete search against 65,400 ingested municipal parcels."""
+    clean_q = q.strip().lower()
+    results = db.query(ParcelModel).filter(
+        (ParcelModel.address_normalized.ilike(f"%{clean_q}%")) |
+        (ParcelModel.address.ilike(f"%{clean_q}%"))
+    ).limit(limit).all()
+
+    return {
+        "count": len(results),
+        "results": [
+            {
+                "id": p.id,
+                "address": p.address,
+                "house": p.house,
+                "street": p.street,
+                "streettype": p.streettype,
+                "unit": p.unit,
+                "zone_id": p.zone_id,
+                "lat": p.lat,
+                "lng": p.lng,
+                "front_lat": p.front_lat or p.lat,
+                "front_lng": p.front_lng or p.lng,
+            }
+            for p in results
+        ]
+    }
+
+
 @app.post("/api/parcels/streetview")
 def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = Depends(get_db)):
     raw_target = (payload.address or payload.clean_address or payload.gis_id or "").strip()

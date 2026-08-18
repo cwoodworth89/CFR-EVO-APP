@@ -132,56 +132,15 @@ export function BaseMap({ style, useLabelsFallback }) {
     return null;
 }
 
-// 🏗️ COQUITLAM ROADS/PARCELS
+// 🏗️ COQUITLAM ROADS/PARCELS (Rendered via local vector layers & parcels table)
 export function CoquitlamOverlays({ visible, onLoadError }) {
-    const map = useMap();
-    useEffect(() => {
-      if (!visible) return;
-      
-      const overlayLayer = dynamicMapLayer({
-          url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer",
-          opacity: 0.9,
-          layers: [0, 1, 16], // Roads, Addresses, Parcels
-          f: 'image'
-      });
-
-      if (onLoadError) {
-          overlayLayer.on('requesterror', (err) => {
-              console.warn("Coquitlam Cadastral map server is inaccessible. Triggering standard basemap labels fallback.", err);
-              onLoadError();
-          });
-      }
-
-      overlayLayer.addTo(map);
-
-      return () => { 
-          overlayLayer.off('requesterror');
-          map.removeLayer(overlayLayer);
-      };
-    }, [map, visible, onLoadError]);
-    
+    // Legacy ArcGIS DynamicServices replaced with local vector parcel & zone layers
     return null;
 }
 
-// 🚒 FIRE ZONES (Official City of Coquitlam GIS Layer)
+// 🚒 FIRE ZONES (Rendered via local zones.json layer)
 export function FireZonesLayer({ visible, pane }) {
-    const map = useMap();
-    useEffect(() => {
-      if (!visible) return;
-      
-      const layer = dynamicMapLayer({
-          url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Planning/MapServer",
-          layers: [6], 
-          opacity: 0.85,
-          f: 'image',
-          pane: pane || 'underlayPane'
-      }).addTo(map);
-
-      return () => { 
-          map.removeLayer(layer);
-      };
-    }, [map, visible, pane]);
-    
+    // Legacy ArcGIS DynamicServices replaced with local zones.json
     return null;
 }
 

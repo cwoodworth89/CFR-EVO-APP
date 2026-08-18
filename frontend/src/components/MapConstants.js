@@ -7,52 +7,52 @@ export const OPERATIONAL_BOUNDS = [
   [49.48, -122.60]  // Northeast: Pinecone Burke / Widgeon / Western Pitt Meadows
 ];
 
-// 🗺️ BASE LAYERS (Clean no-label basemaps for Coquitlam municipal vector overlays)
-// Prioritizes local containerized offline tile server (:8081) with graceful online fallback
+// 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps)
+// Serves directly from containerized local disk cache via API_BASE_URL with zero WAN dependencies
 export const BASE_LAYERS = {
   GREY: {
     type: 'tile',
-    url: `${TILE_BASE_URL}/services/vancouver_light/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 18,
+    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 19,
     maxZoom: 22,
   },
   DARK: {
     type: 'tile',
-    url: `${TILE_BASE_URL}/services/vancouver_dark/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 18,
+    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 19,
     maxZoom: 22,
   },
   SATELLITE: {
     type: 'tile',
     url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'Esri, Maxar (100% Offline Local Cache)',
+    attribution: 'City of Coquitlam, Esri, Maxar (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 19,
     maxZoom: 22
   },
   OSM: {
     type: 'tile',
-    url: `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '© OpenStreetMap contributors (Offline Local)',
+    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'City of Coquitlam (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 18,
+    maxNativeZoom: 19,
     maxZoom: 22
   },
   VOYAGER: {
     type: 'tile',
-    url: `${TILE_BASE_URL}/services/vancouver/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxNativeZoom: 18,
+    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'City of Coquitlam (100% Offline Local Cache)',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 19,
     maxZoom: 22
   }
 };

@@ -15,7 +15,7 @@ if root_dir not in sys.path:
 
 try:
     from api.database import SessionLocal, engine, Base
-    from api.models import ParcelModel, StreetViewOverrideModel
+    from api.models import ParcelModel
     from api.server import (
         _clean_streetview_address,
         lookup_parcel,
@@ -28,7 +28,7 @@ try:
     from scripts.migrate_streetview_to_parcels import migrate_overrides
 except ModuleNotFoundError:
     from backend.api.database import SessionLocal, engine, Base
-    from backend.api.models import ParcelModel, StreetViewOverrideModel
+    from backend.api.models import ParcelModel
     from backend.api.server import (
         _clean_streetview_address,
         lookup_parcel,
@@ -58,14 +58,14 @@ def test_address_normalization():
 def test_parcel_model_nullable_gis_id():
     print("Running test_parcel_model_nullable_gis_id...")
     db = SessionLocal()
-    existing = db.query(ParcelModel).filter(ParcelModel.clean_address == "100 TEST ST").first()
+    existing = db.query(ParcelModel).filter(ParcelModel.address == "100 TEST ST").first()
     if existing:
         db.delete(existing)
         db.commit()
 
     p = ParcelModel(
         gis_id=None,
-        clean_address="100 TEST ST",
+        address="100 TEST ST",
         front_lat=49.28,
         front_lng=-122.79,
         streetview_heading=180.0,
@@ -81,7 +81,7 @@ def test_parcel_model_nullable_gis_id():
 
     assert p.id is not None
     assert p.gis_id is None
-    assert p.clean_address == "100 TEST ST"
+    assert p.address == "100 TEST ST"
     assert p.streetview_heading == 180.0
     assert p.lock_box_notes == "Keybox at North entrance"
     
@@ -124,10 +124,8 @@ def test_save_and_lookup_parcel_streetview():
     assert lookup_res["parcel"]["streetview_heading"] == 135.5
 
     # Cleanup test row
-    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "999 TEST DISPATCH BLVD").first()
+    p = db.query(ParcelModel).filter(ParcelModel.address == "999 TEST DISPATCH BLVD").first()
     if p: db.delete(p)
-    ov = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == "999 TEST DISPATCH BLVD").first()
-    if ov: db.delete(ov)
     db.commit()
     db.close()
     print("PASSED: test_save_and_lookup_parcel_streetview")
@@ -153,7 +151,7 @@ def test_streetview_overrides_endpoint():
     assert override["front_lat"] == 49.29
 
     # Cleanup
-    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "888 MIGRATION ST").first()
+    p = db.query(ParcelModel).filter(ParcelModel.address == "888 MIGRATION ST").first()
     if p:
         db.delete(p)
         db.commit()
@@ -179,11 +177,12 @@ def test_legacy_post_streetview_overrides():
     assert res["parcel"]["front_lat"] == 49.25
 
     # Cleanup
-    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "777 OVERRIDE RD").first()
+    p = db.query(ParcelModel).filter(ParcelModel.address == "777 OVERRIDE RD").first()
     if p:
         db.delete(p)
         db.commit()
     db.close()
+    print("PASSED: test_legacy_post_streetview_overrides")
 def test_get_parcels_in_bbox():
     print("Running test_get_parcels_in_bbox...")
     db = SessionLocal()

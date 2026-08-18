@@ -59,10 +59,10 @@ export function BaseMap({ style, useLabelsFallback }) {
         let fallbackUrl = disableWan ? null : (typeof config === 'object' ? config.fallbackUrl : null);
 
         if (useLabelsFallback && url && url.includes('_nolabels')) {
-            url = url.replace('_nolabels', '_all');
+            url = url.replace('_nolabels', '');
         }
         if (useLabelsFallback && fallbackUrl && fallbackUrl.includes('_nolabels')) {
-            fallbackUrl = fallbackUrl.replace('_nolabels', '_all');
+            fallbackUrl = fallbackUrl.replace('_nolabels', '');
         }
 
         const attribution = typeof config === 'object' ? config.attribution : '© OpenStreetMap contributors (Offline Local)';

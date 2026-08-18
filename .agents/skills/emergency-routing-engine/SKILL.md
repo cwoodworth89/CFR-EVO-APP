@@ -151,3 +151,26 @@ The emergency routing engine is designed to be tuned and calibrated continuously
 1. **Review Loop**: As dispatches are reviewed in the UI or audited by analysts, flag routes that take suboptimal residential shortcuts, steep hill climbs, or awkward multi-point apparatus turns.
 2. **Profile Calibration**: Adjust OSRM Lua emergency profiles, arterial road speed weights, turn-penalty matrices, and tactical corridor waypoints based on empirical driver behavior.
 3. **Regression Testing**: Re-run historical dispatch routing benchmarks after profile adjustments to verify that fixes in one response district do not cause regressions in others.
+
+---
+
+## 9. LiDAR-Based Topographic Slope & Apparatus Hill-Grade Routing Penalties (Future Roadmap)
+
+Coquitlam features extreme topography across Westwood Plateau, Burke Mountain, Chineside, and Austin Heights with roadway grades exceeding $15\% - 25\%$. Future iterations of the routing engine will leverage municipal LiDAR elevation models (DEM) to dynamically calculate slope penalties:
+
+### A. Mathematical Incline/Decline Calculation
+For each street edge $(u, v)$ in the routing graph:
+$$\text{Grade } (\%) = \left( \frac{z_v - z_u}{\text{Distance}_{u,v}} \right) \times 100$$
+
+### B. Heavy Apparatus Slope Penalty Matrix:
+| Road Grade $(\%)$ | Direction | OSRM Speed Adjustment | Operational EVO Rationale |
+| :--- | :--- | :---: | :--- |
+| **$0\% - 6\%$** | Flat / Mild | `1.0x` (Unrestricted) | Normal Code 3 emergency response speed profile |
+| **$7\% - 12\%$** | Downhill | `0.80x` (-20% speed) | Early engine braking; transmission retarder engagement |
+| **$7\% - 12\%$** | Uphill | `0.75x` (-25% speed) | Torque-limited heavy apparatus climb rate |
+| **$13\% - 18\%$** | Downhill | `0.55x` (-45% speed) | **Severe Brake Fade Prevention**: Caps 50,000 lb engines at $\le 35\text{ km/h}$ |
+| **$13\% - 18\%$** | Uphill | `0.50x` (-50% speed) | Low-gear torque crawl (realistic turnout ETA calculation) |
+| **$> 18\%$** | Any | `0.30x` (+ Severe Route Weight Penalty) | **Avoided by Pathfinding**: Disincentivizes steep residential chutes unless target address is directly on that segment |
+
+### C. Low-Gradient Arterial Biasing
+The OSRM routing profile will actively favor engineered switchback arterials (e.g. *Johnson St*, *Pinetree Way*, *David Ave*) over sheer vertical residential hillside climbs, protecting vehicle brakes and powertrain longevity.

@@ -14,6 +14,27 @@ Furthermore, it doubles as a geographical training simulator, helping drivers me
 
 ---
 
+## 🏛️ 100% Offline Survival, $0 Subscription-Free & Municipal Data Authority
+
+CFR EVO is purpose-built with a strict **Zero-Cloud, Zero-Subscription, Total Offline Disaster Resilience** architecture. In the event of major storms, cellular network outages, or severed fiber-optic WAN connections, the station kiosks and response routing remain **100% fully functional**.
+
+### 1. Zero Monthly Cost ($0 Subscription-Free Stack)
+* **No Cloud Databases**: Completely independent of Supabase, Firebase, AWS RDS, or external backends. All dispatches, call audio, and historical telemetry persist strictly to a local containerized PostgreSQL 16 instance.
+* **No Recurring Geocoding/Routing Fees**: All address lookups, parcel searches, and multi-unit apparatus turn-by-turn routes run locally via spatial SQL indexes and an offline Open Source Routing Machine (OSRM) container—eliminating paid Google Maps Platform routing fees on hot dispatch paths.
+* **Local Machine Learning**: Faster-Whisper automatic speech recognition (STT) runs directly on the station server CPU/GPU with zero external cloud API dependencies.
+
+### 2. Authoritative City of Coquitlam Municipal Open Data
+The system directly ingests and standardizes authoritative municipal geospatial datasets under the **Open Government Licence – City of Coquitlam**:
+* **65,400 Clean Property Parcels (`public.parcels`)**: Ingested directly from City of Coquitlam `Cadastral.shp` and `Addresses.shp`, with pre-computed point-in-polygon spatial links to active emergency response zones.
+* **118 Active Emergency Response Zones (Zones 1–134)**: Official `Emergency_Response_Zones.shp` boundary polygons used for automatic apparatus district identification and driver territory training.
+* **City of Coquitlam 2025 7.5cm Aerial Orthophotography**: High-resolution airborne orthophotos (7.5 cm / 3 inches per pixel) pre-cached locally into Slippy raster tiles on the kiosk SSD for sub-decimeter tactical roofline and driveway clarity.
+* **NFPA 291 Fire Hydrant Registry**: Complete municipal hydrant database color-coded by flow rate (AA: Blue $\ge 1500$ GPM, A: Green $1000-1499$ GPM, B: Orange $500-999$ GPM, C: Red $< 500$ GPM) with immediate nearest-hydrant routing.
+* **3D Building Footprints & LiDAR Profiles**: Municipal `Buildings.shp` layers containing LiDAR-derived `HEIGHT`, `MIN_ELEVATION`, and `MAX_ELEVATION` attributes for tactical building height profiling and Ladder 1/3 aerial reach validation.
+* **Municipal Road Hazards & Railway Crossings**: Real-time road closure ingestion and CP/CN railway corridor hazard warnings.
+* **Verified Fire Hall Apron Coordinates**: Accurate GPS coordinates for Town Centre Fire Hall (Hall 1), Mariner (Hall 2), Austin Heights (Hall 3), and Burke Mountain (Hall 4).
+
+---
+
 ## ⚡ System Architecture (Containerized Local Stack v2.0)
 
 The entire system runs on a containerized, self-contained local stack hosted on the station server via **Docker Compose**, eliminating cloud database costs and external network dependencies.

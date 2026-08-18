@@ -4,12 +4,18 @@ This rule file defines domain constraints, runtime environments, and workflow st
 
 ---
 
-## 1. 100% Local Container Stack Architecture
-* **Primary Database**: All dispatch records, audio metadata, and MLOps metrics persist directly to containerized PostgreSQL 16 (`localhost:5432`).
-* **API Gateway**: REST operations and dispatch persistence route via FastAPI (`http://localhost:8000/api/dispatches`).
+## 1. 100% Local Container Stack, $0 Subscription-Free & Municipal Open Data Architecture
+* **Total Offline Survival**: The entire system (STT audio transcription, geocoding, turn-by-turn apparatus routing, GIS spatial queries, tile serving, and WebSocket dispatches) MUST function 100% offline without requiring internet/WAN connectivity.
+* **$0 Monthly Costs (Cloud Deprecation)**: Do NOT re-introduce Supabase, Firebase, AWS RDS, or external cloud database dependencies. All dispatches, audio recordings, and MLOps metrics persist directly to containerized PostgreSQL 16 (`localhost:5432`). Zero recurring SaaS or geocoding API fees.
+* **Authoritative Municipal Open Data Authority**: All parcel maps, zone polygons, hydrants, building footprints, and orthophotos are sourced directly from the City of Coquitlam Open Data Portal under the Open Government Licence:
+  - 65,400 clean property parcels (`public.parcels` from `Cadastral.shp` + `Addresses.shp`)
+  - 118 active emergency response zones (zones 1–134, `Emergency_Response_Zones.shp`)
+  - City of Coquitlam 2025 7.5cm aerial orthophotos pre-cached locally on the kiosk SSD
+  - NFPA 291 color-coded fire hydrants with GPM ratings (`hydrants.json`)
+  - 3D building footprints with LiDAR-derived heights (`Buildings.shp`)
+* **API Gateway & Routing**: REST operations and dispatch persistence route via FastAPI (`http://localhost:8000/api/dispatches`). Apparatus turn-by-turn routing routes via local OSRM (`http://localhost:5000`).
 * **Frontend API Endpoint Resolution**: All frontend components performing `fetch()` operations MUST import and use `API_BASE_URL` from [`frontend/src/apiClient.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/apiClient.js) (e.g., `fetch(\`${API_BASE_URL}/api/route?...\`)`). Never use raw relative paths (`fetch('/api/...')`) or hardcoded `localhost` strings, as remote kiosk browsers accessing the UI over Tailscale (`http://100.95.146.94:5173`) will route relative requests to the Vite static server (resulting in 404s).
 * **Real-Time Broadcast**: Station kiosks listen to Mosquitto MQTT over WebSockets on port `9001` (topic: `cfr/dispatches`).
-* **Cloud Deprecation**: Do NOT re-introduce Supabase, Firebase, or external cloud database dependencies. The system is designed to function with zero monthly costs and total offline survival.
 
 ---
 

@@ -34,7 +34,7 @@ export const TILE_BASE_URL = getTileBaseUrl();
 export const getTileUrl = (z = '{z}', x = '{x}', y = '{y}', style = 'voyager') => {
   const normalizedStyle = (style || 'voyager').toLowerCase();
   if (normalizedStyle === 'satellite') {
-    return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+    return `${API_BASE_URL}/api/tiles/satellite/${z}/${x}/${y}.png`;
   }
   if (normalizedStyle === 'dark') {
     return `${TILE_BASE_URL}/services/vancouver_dark/tiles/${z}/${x}/${y}.png`;
@@ -83,9 +83,9 @@ export const getTileLayerConfig = (style = 'VOYAGER') => {
       };
     case 'SATELLITE':
       return {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
         fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Esri, Maxar, Earthstar Geographics',
+        attribution: 'Esri, Maxar, Earthstar Geographics (Offline Local Cache)',
         subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 18,
         maxZoom: 22,

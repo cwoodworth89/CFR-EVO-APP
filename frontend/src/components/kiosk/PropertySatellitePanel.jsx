@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { API_BASE_URL } from '../../apiClient';
 
 function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
   const map = useMap();
@@ -80,8 +81,8 @@ export default function PropertySatellitePanel({ activeCall }) {
     >
       {/* High-Resolution Satellite Basemap */}
       <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
+        url={`${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`}
+        maxNativeZoom={18}
         maxZoom={20}
       />
 

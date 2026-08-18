@@ -1,7 +1,7 @@
 // Adversarial Test Harness for Tile Layer and Dynamic Resolution
 // Tests TILE_BASE_URL, getTileUrl, getTileLayerConfig, FallbackTileLayer mechanics
 
-const assert = require('assert');
+import assert from 'node:assert';
 
 let passedTests = 0;
 let failedTests = 0;
@@ -36,10 +36,10 @@ function resolveApiBaseUrl(envVar, hostname) {
   return `http://${host}:8000`;
 }
 
-function getTileUrlPure(tileBaseUrl, z = '{z}', x = '{x}', y = '{y}', style = 'voyager') {
+function getTileUrlPure(tileBaseUrl, z = '{z}', x = '{x}', y = '{y}', style = 'voyager', apiBaseUrl = 'http://localhost:8000') {
   const normalizedStyle = (style || 'voyager').toLowerCase();
   if (normalizedStyle === 'satellite') {
-    return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+    return `${apiBaseUrl}/api/tiles/satellite/${z}/${x}/${y}.png`;
   }
   if (normalizedStyle === 'dark') {
     return `${tileBaseUrl}/services/vancouver_dark/tiles/${z}/${x}/${y}.png`;
@@ -50,7 +50,7 @@ function getTileUrlPure(tileBaseUrl, z = '{z}', x = '{x}', y = '{y}', style = 'v
   return `${tileBaseUrl}/services/vancouver/tiles/${z}/${x}/${y}.png`;
 }
 
-function getTileLayerConfigPure(tileBaseUrl, style = 'VOYAGER') {
+function getTileLayerConfigPure(tileBaseUrl, style = 'VOYAGER', apiBaseUrl = 'http://localhost:8000') {
   const normalized = (style || 'VOYAGER').toUpperCase();
   switch (normalized) {
     case 'DARK':
@@ -83,9 +83,9 @@ function getTileLayerConfigPure(tileBaseUrl, style = 'VOYAGER') {
       };
     case 'SATELLITE':
       return {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        url: `${apiBaseUrl}/api/tiles/satellite/{z}/{x}/{y}.png`,
         fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Esri, Maxar, Earthstar Geographics',
+        attribution: 'Esri, Maxar, Earthstar Geographics (Offline Local Cache)',
         subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 18,
         maxZoom: 22,
@@ -159,10 +159,9 @@ runTest('getTileUrl: grey/light style normalization', () => {
   assert.strictEqual(urlLight, 'http://localhost:8081/services/vancouver_light/tiles/12/100/200.png');
 });
 
-runTest('getTileUrl: satellite style uses ArcGIS z/y/x schema', () => {
-  const url = getTileUrlPure('http://localhost:8081', 16, 500, 600, 'satellite');
-  // Note ArcGIS uses {z}/{y}/{x}
-  assert.strictEqual(url, 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/16/600/500');
+runTest('getTileUrl: satellite style uses local API_BASE_URL endpoint', () => {
+  const url = getTileUrlPure('http://localhost:8081', 16, 500, 600, 'satellite', 'http://localhost:8000');
+  assert.strictEqual(url, 'http://localhost:8000/api/tiles/satellite/16/500/600.png');
 });
 
 runTest('getTileUrl: fallback to vancouver for unrecognized style', () => {

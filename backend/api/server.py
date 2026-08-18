@@ -899,6 +899,63 @@ def get_calculated_route(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Local Satellite Tiles Cache Directory
+SATELLITE_TILES_DIR = os.environ.get(
+    "SATELLITE_TILES_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "tiles", "satellite")
+)
+os.makedirs(SATELLITE_TILES_DIR, exist_ok=True)
+
+
+def _serve_satellite_tile(z: int, x: int, y: int, ext: Optional[str] = None):
+    """Serve pre-cached satellite raster tiles from SATELLITE_TILES_DIR."""
+    tile_dir = os.path.join(SATELLITE_TILES_DIR, str(z), str(x))
+    candidates = []
+    if ext:
+        norm_ext = ext.lower().lstrip(".")
+        media = "image/png" if norm_ext == "png" else "image/jpeg"
+        candidates.append((os.path.join(tile_dir, f"{y}.{norm_ext}"), media))
+    candidates.append((os.path.join(tile_dir, f"{y}.jpg"), "image/jpeg"))
+    candidates.append((os.path.join(tile_dir, f"{y}.png"), "image/png"))
+    candidates.append((os.path.join(tile_dir, f"{y}.jpeg"), "image/jpeg"))
+
+    for file_path, media_type in candidates:
+        if os.path.isfile(file_path):
+            return FileResponse(
+                path=file_path,
+                media_type=media_type,
+                headers={
+                    "Cache-Control": "public, max-age=604800",
+                    "Access-Control-Allow-Origin": "*",
+                }
+            )
+    raise HTTPException(status_code=404, detail=f"Satellite tile z={z}, x={x}, y={y} not found")
+
+
+@app.get("/api/tiles/satellite/{z}/{x}/{y}.png")
+def get_satellite_tile_png(z: int, x: int, y: int):
+    """Serve satellite tile as PNG."""
+    return _serve_satellite_tile(z, x, y, ext="png")
+
+
+@app.get("/api/tiles/satellite/{z}/{x}/{y}.jpg")
+def get_satellite_tile_jpg(z: int, x: int, y: int):
+    """Serve satellite tile as JPG."""
+    return _serve_satellite_tile(z, x, y, ext="jpg")
+
+
+@app.get("/api/tiles/satellite/{z}/{x}/{y}.jpeg")
+def get_satellite_tile_jpeg(z: int, x: int, y: int):
+    """Serve satellite tile as JPEG."""
+    return _serve_satellite_tile(z, x, y, ext="jpeg")
+
+
+@app.get("/api/tiles/satellite/{z}/{x}/{y}")
+def get_satellite_tile_default(z: int, x: int, y: int):
+    """Serve satellite tile without file extension."""
+    return _serve_satellite_tile(z, x, y, ext=None)
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "8000"))

@@ -194,6 +194,8 @@ agent/data/Property_Information/
 backend/data/Property_Information/
 agent/data/Emergency_Response_Zones/
 backend/data/Emergency_Response_Zones/
+backend/data/tiles/
+data/tiles/
 scratch/
 temp_dispatch_*.wav
 temp_dispatch_full.wav

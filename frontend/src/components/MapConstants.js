@@ -1,5 +1,5 @@
 // Map & Layer Constants
-import { TILE_BASE_URL } from '../apiClient';
+import { TILE_BASE_URL, API_BASE_URL } from '../apiClient';
 
 // 🗺️ BASE LAYERS (Clean no-label basemaps for Coquitlam municipal vector overlays)
 // Prioritizes local containerized offline tile server (:8081) with graceful online fallback
@@ -24,9 +24,9 @@ export const BASE_LAYERS = {
   },
   SATELLITE: {
     type: 'tile',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
     fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Esri, Maxar, Earthstar Geographics',
+    attribution: 'Esri, Maxar, Earthstar Geographics (Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 18,
     maxZoom: 22

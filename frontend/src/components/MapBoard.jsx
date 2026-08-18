@@ -39,12 +39,23 @@ export function enrichAddressWithBuilding(targetObj) {
 }
 
 import { RoutingOverlay } from './RoutingOverlay';
-import DispatchReview from './DispatchReview';
-import DriverStationSetup from './DriverStationSetup';
 import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
 import StreetViewPanel from './kiosk/StreetViewPanel';
-import EVORoutingConfigModal from './EVORoutingConfigModal';
 import { calculateEVORouteMetrics, DEFAULT_ROUTING_CONFIG } from '../utils/EVORoutingEngine';
+
+// Lazy-load heavy administrative and configuration modals to reduce initial kiosk bundle size
+const DispatchReview = React.lazy(() => import('./DispatchReview'));
+const DriverStationSetup = React.lazy(() => import('./DriverStationSetup'));
+const EVORoutingConfigModal = React.lazy(() => import('./EVORoutingConfigModal'));
+
+const ModalLoadingFallback = () => (
+  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[2000] flex items-center justify-center select-none font-mono">
+    <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 px-5 py-3 rounded-2xl text-slate-300 text-xs shadow-2xl">
+      <span className="animate-spin border-2 border-sky-400 border-t-transparent h-4 w-4 rounded-full"></span>
+      <span>Loading Interface...</span>
+    </div>
+  </div>
+);
 import { sanitizeAddress } from '../utils/addressUtils';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 
@@ -1341,26 +1352,30 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         )}
       </div>
 
-      {appMode === "ADMIN_DISPATCHES" && (
-        <DispatchReview 
-          onClose={() => startMode("EXPLORE")} 
-          onSimulateCall={onSimulateCall}
-        />
-      )}
+      <React.Suspense fallback={<ModalLoadingFallback />}>
+        {appMode === "ADMIN_DISPATCHES" && (
+          <DispatchReview 
+            onClose={() => startMode("EXPLORE")} 
+            onSimulateCall={onSimulateCall}
+          />
+        )}
 
-      {appMode === "DRIVER_SETUP" && (
-        <DriverStationSetup 
-          onClose={() => startMode("EXPLORE")} 
-        />
-      )}
+        {appMode === "DRIVER_SETUP" && (
+          <DriverStationSetup 
+            onClose={() => startMode("EXPLORE")} 
+          />
+        )}
 
-      {/* EVO Routing Engine Tuning Configuration Modal */}
-      <EVORoutingConfigModal 
-        isOpen={showRoutingConfigModal}
-        onClose={() => setShowRoutingConfigModal(false)}
-        config={routingConfig}
-        setConfig={setRoutingConfig}
-      />
+        {/* EVO Routing Engine Tuning Configuration Modal */}
+        {showRoutingConfigModal && (
+          <EVORoutingConfigModal 
+            isOpen={showRoutingConfigModal}
+            onClose={() => setShowRoutingConfigModal(false)}
+            config={routingConfig}
+            setConfig={setRoutingConfig}
+          />
+        )}
+      </React.Suspense>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../apiClient";
 
 export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }) {
   const [metricsSummary, setMetricsSummary] = useState(null);
@@ -19,7 +20,7 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
 
   const fetchMetrics = async () => {
     try {
-      const res = await fetch("/api/metrics/summary");
+      const res = await fetch(`${API_BASE_URL}/api/metrics/summary`);
       if (res.ok) {
         const data = await res.json();
         setMetricsSummary(data);

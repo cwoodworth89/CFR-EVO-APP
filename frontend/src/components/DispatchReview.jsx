@@ -2,55 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { apiClient, API_BASE_URL } from '../apiClient';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import SystemMetricsPanel from './admin/SystemMetricsPanel';
-
-// Helper to format timestamps to Pacific Time matching database and local logs
-const formatTimestampPT = (ts) => {
-  if (!ts) return '';
-  try {
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return ts;
-    // Format to YYYY-MM-DD HH:MM:SS in Pacific Time (America/Los_Angeles)
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    
-    const parts = formatter.formatToParts(d);
-    const partMap = {};
-    parts.forEach(p => { partMap[p.type] = p.value; });
-    
-    return `${partMap.year}-${partMap.month}-${partMap.day} ${partMap.hour}:${partMap.minute}:${partMap.second}`;
-  } catch (e) {
-    try {
-      const d = new Date(ts);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-    } catch (err) {
-      return ts;
-    }
-  }
-};
-
-const TALK_GROUPS = [
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10 Combined Response",
-  "Combined Venue Port Mann",
-  "Combined Venue Transit System"
-];
-
-const toTitleCase = (str) => {
-  if (!str) return '';
-  return str.replace(/\b\w/g, c => c.toUpperCase());
-};
+import ReviewTable, { getCallTones } from './review/ReviewTable';
+import VerificationSidebar, { toTitleCase } from './review/VerificationSidebar';
 
 export default function DispatchReview({ onClose, onSimulateCall }) {
   const [calls, setCalls] = useState([]);
@@ -75,6 +28,11 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
 
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [unitFilter, setUnitFilter] = useState('all');
+  const [toneFilter, setToneFilter] = useState('all');
+
   // Form states for ground truth corrections
   const [verifiedTranscript, setVerifiedTranscript] = useState('');
   const [verifiedAddress, setVerifiedAddress] = useState('');
@@ -92,6 +50,12 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
   const [stage1Open, setStage1Open] = useState(false);
   const [stage2Open, setStage2Open] = useState(false);
   const [stage3Open, setStage3Open] = useState(false);
+
+  const [audioSignedUrl, setAudioSignedUrl] = useState(null);
+  const prevSelectedCallIdRef = useRef(null);
+  const prevAudioUrlRef = useRef(null);
+  const audioRef = useRef(null);
+  const formContainerRef = useRef(null);
 
   // Load calls from local FastAPI gateway
   const fetchCalls = async () => {
@@ -184,61 +148,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     }
   });
 
-  const [audioSignedUrl, setAudioSignedUrl] = useState(null);
-  const prevSelectedCallIdRef = React.useRef(null);
-  const prevAudioUrlRef = useRef(null);
-  const audioRef = useRef(null);
-  const formContainerRef = useRef(null);
-  const transcriptTextareaRef = useRef(null);
-
-  const adjustTranscriptHeight = () => {
-    if (transcriptTextareaRef.current) {
-      const el = transcriptTextareaRef.current;
-      el.style.height = 'auto';
-      const scrollH = el.scrollHeight;
-      // Minimum height ~140px (~6 full visible lines), max failsafe ~320px
-      const targetH = Math.min(Math.max(scrollH, 140), 320);
-      el.style.height = `${targetH}px`;
-    }
-  };
-
-
-  const deriveTonesFromUnitsList = (units) => {
-    const derived = [];
-    units.forEach(u => {
-      const lowerUnit = u.trim().toLowerCase();
-      if (lowerUnit.startsWith('e') || lowerUnit.includes('engine')) {
-        derived.push('engine');
-      }
-      if (lowerUnit.startsWith('m') || lowerUnit.startsWith('r') || lowerUnit.includes('medic') || lowerUnit.includes('rescue')) {
-        derived.push('rescue');
-      }
-      if (lowerUnit.startsWith('c') || lowerUnit.includes('car') || lowerUnit.includes('chief')) {
-        derived.push('chief');
-      }
-    });
-    return derived;
-  };
-
-  const getCallTones = (call) => {
-    if (!call) return [];
-    const dbTones = (call.target?.tone_name || '')
-      .split(',')
-      .map(t => {
-        const clean = t.trim().toLowerCase();
-        if (clean.includes('chief')) return 'chief';
-        if (clean.includes('engine')) return 'engine';
-        if (clean.includes('rescue')) return 'rescue';
-        return clean;
-      })
-      .filter(Boolean);
-    const units = (call.verified_units && call.verified_units.length > 0)
-      ? call.verified_units
-      : (call.responding_units || []);
-    const derived = deriveTonesFromUnitsList(units);
-    return Array.from(new Set([...dbTones, ...derived]));
-  };
-
   // Update form fields & fetch secure signed audio URL when selectedCall changes
   useEffect(() => {
     if (selectedCall) {
@@ -255,7 +164,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
         setQualityRating(selectedCall.quality_rating || 'PENDING');
         setReviewNotes(selectedCall.target?.review_notes || selectedCall.review_notes || '');
 
-        
         // Auto-default training checkbox: false for < 35s audio_duration, true otherwise
         const defaultInclude = selectedCall.audio_duration !== undefined && selectedCall.audio_duration !== null 
           ? selectedCall.audio_duration >= 35.0 
@@ -300,20 +208,8 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     }
   }, [selectedCall?.id, selectedCall?.audio_url]);
 
-  // Dynamic auto-expand height for Ground-Truth Transcript textarea
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      adjustTranscriptHeight();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [verifiedTranscript, selectedCall]);
-
   const handleSelectCall = (call) => {
     setSelectedCall(call);
-  };
-
-  const handleQuickRate = (rating) => {
-    setQualityRating(rating);
   };
 
   const handlePrefillDefaults = () => {
@@ -329,7 +225,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     setVerifiedUnits(displayUnits.join(', '));
   };
 
-  const prefillField = (fieldType) => {
+  const handlePrefillField = (fieldType) => {
     if (!selectedCall) return;
     switch (fieldType) {
       case 'transcript':
@@ -359,29 +255,44 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     }
   };
 
-  const handleInputKeyDown = (e, fieldType) => {
-    if ((e.ctrlKey && e.code === 'Space') || (e.altKey && e.key === 'Enter')) {
-      e.preventDefault();
-      prefillField(fieldType);
-    }
-  };
+  // Filtered calls list based on search query and status/unit/tone filters
+  const filteredCalls = calls.filter((c) => {
+    const query = searchQuery.toLowerCase();
+    const address = (c.target?.address || c.address || '').toLowerCase();
+    const incident = (c.incident_type || '').toLowerCase();
+    const id = (c.dispatch_id || '').toLowerCase();
+    const transcript = (c.raw_transcript || '').toLowerCase();
+    const matchesQuery = !query || address.includes(query) || incident.includes(query) || id.includes(query) || transcript.includes(query);
+    if (!matchesQuery) return false;
 
-  const handleToneToggle = (tone) => {
-    setVerifiedTones(prev =>
-      prev.includes(tone)
-        ? prev.filter(t => t !== tone)
-        : [...prev, tone]
-    );
-  };
+    // Status Filter
+    if (statusFilter === 'needs_review' && c.feedback_submitted) return false;
+    if (statusFilter === 'fine_tuned' && !c.feedback_submitted) return false;
+    if (statusFilter === 'low_confidence' && ((c.confidence_score ?? 100) >= 80)) return false;
+
+    // Tone Filter
+    if (toneFilter !== 'all') {
+      const callTones = getCallTones(c);
+      if (!callTones.includes(toneFilter)) return false;
+    }
+
+    // Unit Filter
+    if (unitFilter !== 'all') {
+      const units = (c.verified_units && c.verified_units.length > 0) ? c.verified_units : (c.responding_units || []);
+      const matchesUnit = units.some(u => u.toLowerCase().includes(unitFilter.toLowerCase()));
+      if (!matchesUnit) return false;
+    }
+
+    return true;
+  });
 
   const handleSubmitReview = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!selectedCall) return;
 
     setSubmitting(true);
     setSuccessMsg('');
 
-    // Parse units back to array
     const unitsArray = verifiedUnits
       .split(',')
       .map((u) => u.trim())
@@ -427,15 +338,13 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
 
       if (nextCall) {
         setSelectedCall(nextCall);
-        // Reset form container scroll to top
         if (formContainerRef.current) {
           formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        // Auto-play audio recording after brief delay for state settlement
         setTimeout(() => {
           if (audioRef.current) {
             audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(e => console.warn('Audio auto-play prevented:', e));
+            audioRef.current.play().catch(err => console.warn('Audio auto-play prevented:', err));
           }
         }, 300);
       } else {
@@ -448,7 +357,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       setSubmitting(false);
     }
   };
-
 
   const handleDeleteCall = async (id, dispatchId) => {
     if (!window.confirm(`Are you sure you want to permanently delete dispatch ${dispatchId}?`)) {
@@ -464,48 +372,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       console.error('Error deleting dispatch:', err);
       alert('Failed to delete dispatch.');
     }
-  };
-
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [unitFilter, setUnitFilter] = useState('all');
-  const [toneFilter, setToneFilter] = useState('all');
-
-  // Filtered calls list based on search query and status/unit/tone filters
-  const filteredCalls = calls.filter((c) => {
-    const query = searchQuery.toLowerCase();
-    const address = (c.target?.address || c.address || '').toLowerCase();
-    const incident = (c.incident_type || '').toLowerCase();
-    const id = (c.dispatch_id || '').toLowerCase();
-    const transcript = (c.raw_transcript || '').toLowerCase();
-    const matchesQuery = !query || address.includes(query) || incident.includes(query) || id.includes(query) || transcript.includes(query);
-    if (!matchesQuery) return false;
-
-    // Status Filter
-    if (statusFilter === 'needs_review' && c.feedback_submitted) return false;
-    if (statusFilter === 'fine_tuned' && !c.feedback_submitted) return false;
-    if (statusFilter === 'low_confidence' && ((c.confidence_score ?? 100) >= 80)) return false;
-
-    // Tone Filter
-    if (toneFilter !== 'all') {
-      const callTones = getCallTones(c);
-      if (!callTones.includes(toneFilter)) return false;
-    }
-
-    // Unit Filter
-    if (unitFilter !== 'all') {
-      const units = (c.verified_units && c.verified_units.length > 0) ? c.verified_units : (c.responding_units || []);
-      const matchesUnit = units.some(u => u.toLowerCase().includes(unitFilter.toLowerCase()));
-      if (!matchesUnit) return false;
-    }
-
-    return true;
-  });
-
-
-  const getConfidenceColor = (score) => {
-    if (score >= 80) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-    if (score >= 40) return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
   };
 
   const handleLogin = async (e) => {
@@ -528,12 +394,13 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
     }
   };
 
+  // Login Modal
   if (!session) {
     return (
       <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex items-center justify-center p-6 text-slate-100 font-sans animate-in fade-in duration-200">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-left border-sky-500/20">
           <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-sm font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
               🛡️ ADMIN DASHBOARD LOGIN
             </h3>
             <button 
@@ -546,7 +413,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
           </div>
           
           <p className="text-[11px] text-slate-400 leading-relaxed font-mono">
-            Please enter your administrator username and password to access live dispatch data.
+            Please enter your administrator credentials to access station dispatch review and telemetry data.
           </p>
 
           {loginError && (
@@ -589,7 +456,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
             <button
               type="submit"
               disabled={loginLoading}
-              className="mt-2 bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-3 px-6 rounded-xl w-full shadow-lg transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="mt-2 bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-3 px-6 rounded-xl w-full shadow-lg transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 font-mono"
             >
               {loginLoading ? (
                 <>
@@ -605,8 +472,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
       </div>
     );
   }
-
-
 
   return (
     <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[2000] flex flex-col p-6 text-slate-100 font-sans animate-in fade-in duration-200">
@@ -633,7 +498,6 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
                 DB Error
               </span>
             )}
-            {/* Listener Status Badge */}
             {listenerStatus === 'online' && (
               <span 
                 className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250 cursor-help"
@@ -660,7 +524,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
             )}
           </h1>
           <p className="text-xs text-slate-400 mt-1 font-mono">
-            Provide ground-truth feedback, edit location anomalies, check audio quality, and review STT performance.
+            Provide ground-truth feedback, verify locations and tones, check audio quality, and review STT performance.
           </p>
         </div>
         <div className="flex gap-3 items-center">
@@ -670,14 +534,14 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
               await apiClient.auth.signOut();
               setSession(null);
             }}
-            className="bg-rose-950/45 border border-rose-900/40 hover:border-rose-500 hover:text-white text-rose-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
+            className="bg-rose-950/45 border border-rose-900/40 hover:border-rose-500 hover:text-white text-rose-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md font-mono"
           >
             🚪 LOG OUT
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
+            className="bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-400 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md font-mono"
           >
             ✕ CLOSE DASHBOARD
           </button>
@@ -715,887 +579,71 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
           <SystemMetricsPanel dispatches={calls} evaluations={evalHistory} />
         </div>
       ) : (
-        /* Main Grid */
+        /* Main Grid: Modular ReviewTable + VerificationSidebar */
         <div className="flex-grow flex gap-5 min-h-0 w-full overflow-hidden">
-          {/* Left Column: Dispatches Table List */}
-          <div className="flex-grow flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden">
-            <div className="flex justify-between items-center gap-4 mb-4 flex-shrink-0">
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-300">
-                Captured Dispatches ({filteredCalls.length})
-              </h2>
-            <input
-              type="text"
-              placeholder="Search by ID, Address, Incident..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-white rounded-lg px-3 py-1.5 text-xs focus:outline-none placeholder-slate-600 w-72 transition-all font-mono"
-            />
-          </div>
-          
-          {/* Status & Metadata Filter Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3 bg-slate-950/60 p-2 border border-slate-850 rounded-xl">
-            <div className="flex items-center gap-1">
-              {[
-                { id: 'all', label: 'All Dispatches' },
-                { id: 'needs_review', label: '⏳ Needs HITL Review' },
-                { id: 'low_confidence', label: '⚠️ Low Confidence' },
-                { id: 'fine_tuned', label: '✅ Verified' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase font-mono transition-all cursor-pointer ${
-                    statusFilter === tab.id
-                      ? 'bg-sky-500 text-slate-950 shadow-md font-black'
-                      : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-850'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          <ReviewTable
+            calls={calls}
+            filteredCalls={filteredCalls}
+            selectedCall={selectedCall}
+            onSelectCall={handleSelectCall}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            toneFilter={toneFilter}
+            setToneFilter={setToneFilter}
+            unitFilter={unitFilter}
+            setUnitFilter={setUnitFilter}
+            loading={loading}
+            dbStatus={dbStatus}
+            dbError={dbError}
+            onRetryFetch={fetchCalls}
+            onSimulateCall={onSimulateCall}
+            onDeleteCall={handleDeleteCall}
+          />
 
-            <div className="flex items-center gap-2 text-[10px] font-mono">
-              <select
-                value={toneFilter}
-                onChange={(e) => setToneFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-2 py-1 focus:outline-none cursor-pointer"
-              >
-                <option value="all">All Tones</option>
-                <option value="engine">Engine</option>
-                <option value="rescue">Rescue</option>
-                <option value="chief">Chief</option>
-              </select>
-
-              <select
-                value={unitFilter}
-                onChange={(e) => setUnitFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-2 py-1 focus:outline-none cursor-pointer"
-              >
-                <option value="all">All Units</option>
-                <option value="engine">Engine Units</option>
-                <option value="rescue">Rescue Units</option>
-                <option value="chief">Chief Units</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Table Container */}
-          <div className="flex-grow overflow-auto pr-1">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-2">
-                <span className="flex h-4 w-4 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-sky-500"></span>
-                </span>
-                <span className="text-[10px] font-bold font-mono tracking-widest uppercase mt-2">Fetching dispatch logs...</span>
-              </div>
-            ) : dbStatus === 'disconnected' ? (
-              <div className="flex flex-col items-center justify-center py-16 px-4 bg-rose-950/20 border border-rose-900/30 rounded-2xl text-center">
-                <span className="text-3xl mb-2">⚠️</span>
-                <h3 className="font-extrabold text-rose-455 uppercase text-xs tracking-wider">Database Connection Failed</h3>
-                <p className="text-xs text-slate-400 mt-2 max-w-md font-mono leading-relaxed">
-                  Could not load dispatches from Local Database API. Ensure your local FastAPI Gateway is running on port 8000 and PostgreSQL container is healthy.
-                </p>
-
-                {dbError && (
-                  <div className="mt-4 p-3 bg-slate-950/80 border border-slate-850 text-[10px] text-rose-400 font-mono rounded-lg max-w-lg overflow-x-auto text-left select-text">
-                    Error Details: {dbError}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={fetchCalls}
-                  className="mt-5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/35 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
-                >
-                  Retry Connection
-                </button>
-              </div>
-            ) : filteredCalls.length === 0 ? (
-              <div className="text-center py-20 text-slate-500 text-xs italic">
-                No dispatches found in the database.
-              </div>
-            ) : (
-              <div className="min-w-[800px]">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono sticky top-0 z-10">
-                      <th className="py-2.5 px-3 w-[18%] bg-slate-900">Date / Dispatch ID</th>
-                      <th className="py-2.5 px-3 w-[10%] text-center bg-slate-900">Tones</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
-                      <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Training Status</th>
-                      <th className="py-2.5 px-3 w-[28%] bg-slate-900">System Prefills</th>
-                      <th className="py-2.5 px-3 text-right w-[11%] bg-slate-900">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCalls.map((call) => {
-                      const isSelected = selectedCall?.id === call.id;
-                      const rowTones = getCallTones(call);
-                      return (
-                        <tr
-                          key={call.id}
-                          onClick={() => handleSelectCall(call)}
-                          className={`border-b border-slate-850 hover:bg-slate-800/40 transition-all cursor-pointer text-xs ${
-                            isSelected ? 'bg-slate-800/70 border-sky-500/40 shadow-sm' : ''
-                          }`}
-                        >
-                          <td className="py-3 px-3 font-mono">
-                            <div className="text-slate-200 font-bold">{formatTimestampPT(call.timestamp)}</div>
-                            <div className="text-[9.5px] text-sky-400 font-medium mt-0.5">
-                              ID: {call.dispatch_id}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1 justify-center items-center font-mono text-[9px] font-extrabold">
-                              <span
-                                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                  rowTones.includes('chief')
-                                    ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.3)] font-black'
-                                    : 'bg-slate-900/60 border-slate-850 text-slate-600'
-                                }`}
-                                title={rowTones.includes('chief') ? 'Chief Tone Captured' : 'Chief Tone Not Captured'}
-                              >
-                                C
-                              </span>
-                              <span
-                                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                  rowTones.includes('engine')
-                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)] font-black'
-                                    : 'bg-slate-900/60 border-slate-850 text-slate-600'
-                                }`}
-                                title={rowTones.includes('engine') ? 'Engine Tone Captured' : 'Engine Tone Not Captured'}
-                              >
-                                E
-                              </span>
-                              <span
-                                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                  rowTones.includes('rescue')
-                                    ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.3)] font-black'
-                                    : 'bg-slate-900/60 border-slate-850 text-slate-600'
-                                }`}
-                                title={rowTones.includes('rescue') ? 'Rescue Tone Captured' : 'Rescue Tone Not Captured'}
-                              >
-                                R
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            {call.confidence_score !== undefined && call.confidence_score !== null ? (
-                              <span className={`text-[11px] font-mono font-bold ${call.confidence_score >= 90 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {call.confidence_score >= 90 ? '🟢 Yes' : '🔴 No'} ({Math.round(call.confidence_score)}%)
-                              </span>
-                            ) : (
-                              <span className="text-slate-500 font-mono text-[10px]">N/A</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            {call.feedback_submitted ? (
-                              <span className="text-[11px] text-emerald-400 font-extrabold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
-                                🟢 YES
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-slate-500 font-extrabold uppercase tracking-wider bg-slate-800/50 border border-slate-750 px-1.5 py-0.5 rounded font-mono">
-                                🔴 NO
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            {!call.feedback_submitted ? (
-                              <span className="text-slate-500 font-mono text-[10.5px]">—</span>
-                            ) : call.model_updated ? (
-                              <span className="text-[11px] text-emerald-400 font-extrabold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
-                                🟢 Fine-Tuned
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse font-mono" title="Queued for next model retuning run">
-                                🟡 QUEUED
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 max-w-[15rem] truncate text-slate-300">
-                            <div className="font-extrabold text-white text-[11px] truncate">
-                              {call.feedback_submitted && call.verified_incident ? (
-                                <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
-                                  {call.verified_incident}
-                                </span>
-                              ) : (
-                                call.incident_type
-                              )}
-                            </div>
-                            <div className="text-[10px] truncate mt-0.5 flex items-center gap-0.5">
-                              {call.target?.map_coords_accurate === true ? (
-                                <span className="text-emerald-400 font-extrabold" title="Map Coordinates Verified Accurate">📍✔️ </span>
-                              ) : call.target?.map_coords_accurate === false ? (
-                                <span className="text-rose-455 font-extrabold" title="Map Coordinates Flagged Inaccurate">📍⚠️ </span>
-                              ) : (
-                                <span className="text-slate-500" title="Map Coordinates Unverified">📍 </span>
-                              )}
-                              {call.feedback_submitted && call.verified_address ? (
-                                <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
-                                  {call.verified_address}
-                                </span>
-                              ) : (
-                                call.target?.address || call.address || 'Unknown Address'
-                              )}
-                            </div>
-                            <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-                              Units: {call.feedback_submitted && call.verified_units && call.verified_units.length > 0 ? (
-                                <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
-                                  {call.verified_units.join(', ')}
-                                </span>
-                              ) : (
-                                call.responding_units?.join(', ') || 'None'
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1.5 justify-end items-center">
-                              {typeof onSimulateCall === 'function' && (
-                                <button
-                                  onClick={() => onSimulateCall(call)}
-                                  className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-3 py-1 rounded-lg text-[10px] border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer shadow"
-                                  title="Simulate this registered dispatch in Kiosk Mode"
-                                >
-                                  🚀 SIMULATE
-                                </button>
-                              )}
-
-                              <button
-                                onClick={() => handleDeleteCall(call.id, call.dispatch_id)}
-                                className="bg-rose-950/30 hover:bg-rose-900/20 text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded text-[10px] border border-rose-900/20 transition-all cursor-pointer flex items-center justify-center"
-                                title="Delete dispatch entry"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <VerificationSidebar
+            selectedCall={selectedCall}
+            audioSignedUrl={audioSignedUrl}
+            audioRef={audioRef}
+            verifiedTranscript={verifiedTranscript}
+            setVerifiedTranscript={setVerifiedTranscript}
+            verifiedAddress={verifiedAddress}
+            setVerifiedAddress={setVerifiedAddress}
+            verifiedIncident={verifiedIncident}
+            setVerifiedIncident={setVerifiedIncident}
+            verifiedUnits={verifiedUnits}
+            setVerifiedUnits={setVerifiedUnits}
+            verifiedSubaddress={verifiedSubaddress}
+            setVerifiedSubaddress={setVerifiedSubaddress}
+            verifiedTalkgroup={verifiedTalkgroup}
+            setVerifiedTalkgroup={setVerifiedTalkgroup}
+            verifiedMapGrid={verifiedMapGrid}
+            setVerifiedMapGrid={setVerifiedMapGrid}
+            verifiedTones={verifiedTones}
+            setVerifiedTones={setVerifiedTones}
+            qualityRating={qualityRating}
+            setQualityRating={setQualityRating}
+            reviewNotes={reviewNotes}
+            setReviewNotes={setReviewNotes}
+            includeInTraining={includeInTraining}
+            setIncludeInTraining={setIncludeInTraining}
+            stage1Open={stage1Open}
+            setStage1Open={setStage1Open}
+            stage2Open={stage2Open}
+            setStage2Open={setStage2Open}
+            stage3Open={stage3Open}
+            setStage3Open={setStage3Open}
+            submitting={submitting}
+            successMsg={successMsg}
+            onSubmitReview={handleSubmitReview}
+            onPrefillDefaults={handlePrefillDefaults}
+            onPrefillField={handlePrefillField}
+            onSimulateCall={onSimulateCall}
+            formContainerRef={formContainerRef}
+          />
         </div>
-
-        {/* Right Column: Corrections Form Panel */}
-        <div className="w-[28rem] bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col overflow-y-auto flex-shrink-0">
-          {!selectedCall ? (
-            <div className="flex-grow flex flex-col items-center justify-center text-center text-slate-500 p-6">
-              <span className="text-4xl mb-3">🛡️</span>
-              <h3 className="font-bold text-slate-305 text-xs uppercase tracking-wider">Select a Dispatch</h3>
-              <p className="text-xs text-slate-400 mt-2 max-w-[240px] leading-relaxed">
-                Click any dispatch on the table to review its details, listen to audio, and input verified ground-truth corrections.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmitReview} className="flex-grow flex flex-col gap-4 text-left">
-              <div className="border-b border-slate-800 pb-3 flex justify-between items-center flex-shrink-0">
-                <div>
-                  <h3 className="font-black text-white text-sm uppercase tracking-wide">
-                    Review: {selectedCall.dispatch_id}
-                  </h3>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-[10px] text-slate-400 font-mono">Confidence:</span>
-                    <span className={`text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                      selectedCall.confidence_score >= 80 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                      selectedCall.confidence_score >= 40 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                    }`}>
-                      {selectedCall.confidence_score !== undefined && selectedCall.confidence_score !== null ? `${Math.round(selectedCall.confidence_score)}%` : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                {typeof onSimulateCall === 'function' && (
-                  <button
-                    type="button"
-                    onClick={() => onSimulateCall(selectedCall)}
-                    className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 shadow border border-amber-500/40 cursor-pointer"
-                    title="Simulate this dispatch call in Kiosk Mode"
-                  >
-                    🚀 SIMULATE CALL
-                  </button>
-                )}
-              </div>
-
-              {/* Success Notification */}
-              {successMsg && (
-                <div className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl p-3 text-xs font-semibold animate-in zoom-in duration-150">
-                  {successMsg}
-                </div>
-              )}
-
-              {/* Scrollable Fields */}
-              <div ref={formContainerRef} className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1">
-                {/* Audio Player in Details Form */}
-                {selectedCall.audio_url && (
-                  <div className="flex flex-col gap-1 bg-slate-950 p-3 border border-slate-850 rounded-xl">
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase font-mono flex justify-between items-center">
-                      <span>🎙️ Dispatch Recording</span>
-                      <span className="text-sky-400">{selectedCall.audio_duration ? `${selectedCall.audio_duration}s` : ''}</span>
-                    </span>
-                    {audioSignedUrl ? (
-                      <div className="flex items-center gap-2 mt-2">
-                        <audio
-                          ref={audioRef}
-                          src={audioSignedUrl}
-                          controls
-                          preload="auto"
-                          className="w-full focus:outline-none animate-in fade-in duration-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (audioRef.current) {
-                              const newTime = Math.max(0, audioRef.current.currentTime - 5);
-                              audioRef.current.currentTime = newTime;
-                              if (audioRef.current.paused) {
-                                audioRef.current.play().catch(() => {});
-                              }
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-mono font-extrabold whitespace-nowrap transition-all cursor-pointer shadow-md active:scale-95"
-                          title="Skip back 5 seconds"
-                        >
-                          ⏪ -5s
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-slate-500 font-mono mt-2 py-1.5 italic animate-pulse text-center">
-                        Retrieving secure audio link...
-                      </div>
-                    )}
-                  </div>
-                )}
-
-
-                {/* 3-Stage Pipeline Flow Timeline */}
-                <div className="flex flex-col gap-3 mt-2">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                    Pipeline Execution Flow
-                  </span>
-
-                  <div className="relative border-l border-slate-800 pl-4 ml-2 flex flex-col gap-4">
-                    {/* Stage 1: Raw STT Output */}
-                    <div className="relative">
-                      {/* Timeline Dot */}
-                      <span className="absolute -left-[21px] top-1.5 flex h-2 w-2 rounded-full bg-slate-500 border border-slate-900 ring-4 ring-slate-950"></span>
-                      
-                      <div className="flex flex-col gap-1 bg-slate-950 border border-slate-850 rounded-xl p-3 shadow-inner">
-                        <div 
-                          onClick={() => setStage1Open(!stage1Open)} 
-                          className="flex justify-between items-center cursor-pointer select-none"
-                        >
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide font-mono flex items-center gap-1.5">
-                            <span className="text-[8px] transition-transform duration-100">{stage1Open ? '▼' : '▶'}</span>
-                            Stage 1: Raw STT Output
-                          </span>
-                          {(selectedCall.raw_transcript === "[Transcription Failed]" || !selectedCall.raw_transcript) && (
-                            <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/20 tracking-wider">
-                              FAILED
-                            </span>
-                          )}
-                        </div>
-                        {stage1Open && (
-                          <div className="text-[11px] text-slate-400 font-mono italic mt-2 pt-2 border-t border-slate-850/50 leading-relaxed select-text select-all">
-                            {selectedCall.raw_transcript || 'No transcript text captured'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stage 2: Extracted Metadata */}
-                    <div className="relative">
-                      {/* Timeline Dot */}
-                      <span className="absolute -left-[21px] top-1.5 flex h-2 w-2 rounded-full bg-sky-500 border border-slate-900 ring-4 ring-slate-950"></span>
-                      
-                      <div className="flex flex-col gap-2 bg-sky-950/10 border border-sky-900/20 rounded-xl p-3 shadow-inner">
-                        <div 
-                          onClick={() => setStage2Open(!stage2Open)} 
-                          className="flex justify-between items-center cursor-pointer select-none"
-                        >
-                          <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wide font-mono flex items-center gap-1.5">
-                            <span className="text-[8px] transition-transform duration-100">{stage2Open ? '▼' : '▶'}</span>
-                            Stage 2: Extracted Metadata
-                          </span>
-                        </div>
-                        
-                        {stage2Open && (
-                          <div className="flex flex-wrap gap-2 pt-2 border-t border-sky-900/20">
-                            {/* Incident Type Badge */}
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Incident</span>
-                              <span className="text-[10px] font-bold text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                {selectedCall.incident_type || 'Unknown'}
-                              </span>
-                            </div>
-
-                            {/* Address Badge */}
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Address</span>
-                              <span className="text-[10px] font-bold text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg flex items-center gap-1 max-w-[15rem] truncate" title={selectedCall.target?.address || selectedCall.address}>
-                                📍 {selectedCall.target?.address || selectedCall.address || 'Unknown'}
-                              </span>
-                            </div>
-
-                            {/* Units Badge */}
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Units</span>
-                              <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                {selectedCall.responding_units?.join(', ') || 'None'}
-                              </span>
-                            </div>
-
-                            {/* Coordinates Badge */}
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Coordinates</span>
-                              <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                {selectedCall.target?.lat && selectedCall.target?.lng 
-                                  ? `${selectedCall.target.lat.toFixed(4)}, ${selectedCall.target.lng.toFixed(4)}`
-                                  : 'Null'}
-                              </span>
-                            </div>
-
-                            {/* Subaddress Badge */}
-                            {selectedCall.target?.subaddress && (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Subaddress</span>
-                                <span className="text-[10px] font-bold text-sky-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                  🏢 {toTitleCase(selectedCall.target.subaddress)}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Cross Roads Badge */}
-                            {selectedCall.target?.intersection && (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Cross Roads</span>
-                                <span className="text-[10px] font-bold text-amber-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                  🔀 {selectedCall.target.intersection}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Calculated Response ETAs & Road Distances */}
-                            {selectedCall.routing_metrics && selectedCall.routing_metrics.length > 0 && (
-                              <div className="col-span-full flex flex-col gap-1.5 mt-2 bg-slate-950/90 border border-slate-800 p-2.5 rounded-xl">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
-                                  <span>⏱️</span>
-                                  <span>Calculated Emergency Vehicle Response ETAs (Home Hall Origins)</span>
-                                </span>
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedCall.routing_metrics.map((m, mIdx) => (
-                                    <div key={mIdx} className="flex items-center gap-2 bg-slate-900 border border-sky-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono shadow-sm">
-                                      <span className="text-white font-bold">{m.unit}</span>
-                                      <span className="text-slate-400">({m.hall_name || `Hall ${m.origin_hall}`})</span>
-                                      <span className="text-sky-300 font-bold bg-sky-950 px-1.5 py-0.5 rounded border border-sky-800/60">
-                                        ⏱️ ~{m.eta_minutes} min ({m.road_distance_km || m.distance_km} km)
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Talk Group Badge */}
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Talk Group</span>
-                              <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                📻 {selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || 'None'}
-                              </span>
-                            </div>
-
-                            {/* Map Grid Badge */}
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Map Grid</span>
-                              <span className="text-[10px] font-mono text-white bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
-                                🗺️ {selectedCall.target?.verified_map_grid || selectedCall.target?.map_grid || 'None'}
-                              </span>
-                            </div>
-
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stage 3: Standardized Template Reconstruction */}
-                    <div className="relative">
-                      {/* Timeline Dot */}
-                      <span className="absolute -left-[21px] top-1.5 flex h-2 w-2 rounded-full bg-emerald-500 border border-slate-900 ring-4 ring-slate-950"></span>
-                      
-                      <div className="flex flex-col gap-1 bg-emerald-950/20 border border-emerald-900/30 rounded-xl p-3 shadow-inner">
-                        <div 
-                          onClick={() => setStage3Open(!stage3Open)} 
-                          className="flex justify-between items-center cursor-pointer select-none"
-                        >
-                          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wide font-mono flex items-center gap-1.5">
-                            <span className="text-[8px] transition-transform duration-100">{stage3Open ? '▼' : '▶'}</span>
-                            Stage 3: Standardized Template Reconstruction
-                          </span>
-                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tracking-wider">
-                            HOMOPHONES RESOLVED
-                          </span>
-                        </div>
-                        {stage3Open && (
-                          <div className="text-[11px] text-slate-300 font-mono mt-2 pt-2 border-t border-emerald-900/30 leading-relaxed select-text select-all">
-                            {selectedCall.sanitized_transcript || selectedCall.raw_transcript || 'No text'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Verified Ground-Truth Transcript (Positioned directly under Pipeline Execution Flow) */}
-                <div className="flex flex-col gap-1.5 bg-slate-950/60 p-3 border border-slate-850 rounded-xl">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-sky-400 font-extrabold uppercase font-mono tracking-wider">
-                      📝 Verified Ground-Truth Transcript
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handlePrefillDefaults}
-                      className="text-[9px] font-bold text-sky-400 hover:text-sky-300 bg-sky-950/40 border border-sky-900/30 px-2 py-0.5 rounded cursor-pointer transition-all hover:bg-sky-900/30"
-                      title="Prefill transcript, address, incident type, and units using system-extracted data"
-                    >
-                      📋 Prefill All Fields
-                    </button>
-                  </div>
-                  <textarea
-                    ref={transcriptTextareaRef}
-                    rows={6}
-                    placeholder={selectedCall.sanitized_transcript || selectedCall.raw_transcript || "Enter confirmed transcript... (Ctrl+Space to prefill)"}
-                    value={verifiedTranscript}
-                    onChange={(e) => {
-                      setVerifiedTranscript(e.target.value);
-                      adjustTranscriptHeight();
-                    }}
-                    onKeyDown={(e) => {
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                      handleInputKeyDown(e, 'transcript');
-                    }}
-                    onDoubleClick={() => prefillField('transcript')}
-                    className="w-full min-h-[140px] max-h-[320px] bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono leading-relaxed overflow-y-auto"
-                  />
-                </div>
-
-                {/* 1. Captured Dispatch Tone (HITL Verification & Backfill) */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                    Captured Dispatch Tone
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToneToggle('chief')}
-                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        verifiedTones.includes('chief')
-                          ? 'bg-sky-500/20 border-sky-500/50 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.2)] font-black'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      🔵 Chief
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToneToggle('engine')}
-                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        verifiedTones.includes('engine')
-                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)] font-black'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      🟡 Engine
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToneToggle('rescue')}
-                      className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
-                        verifiedTones.includes('rescue')
-                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-black'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      🔴 Rescue
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Responding Units */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Units
-                    </label>
-                    <span 
-                      onClick={() => prefillField('units')}
-                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[150px] cursor-pointer transition-colors" 
-                      title="Click, double-click input, or press Ctrl+Space to import"
-                    >
-                      Sys: {selectedCall.responding_units?.join(', ') || 'None'} 📥
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={verifiedUnits}
-                    onChange={(e) => setVerifiedUnits(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                      handleInputKeyDown(e, 'units');
-                    }}
-                    onDoubleClick={() => prefillField('units')}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                    placeholder={(selectedCall.responding_units || []).join(', ') || "e.g. E1, L1"}
-                  />
-                </div>
-
-                {/* 3. Incident Type */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Incident Type
-                    </label>
-                    <span 
-                      onClick={() => prefillField('incident')}
-                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold cursor-pointer transition-colors" 
-                      title="Click, double-click input, or press Ctrl+Space to import"
-                    >
-                      System: {selectedCall.incident_type || 'Unknown'} 📥
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={verifiedIncident}
-                    onChange={(e) => setVerifiedIncident(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                      handleInputKeyDown(e, 'incident');
-                    }}
-                    onDoubleClick={() => prefillField('incident')}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder={selectedCall.incident_type || "e.g. Structure Fire"}
-                  />
-                </div>
-
-                {/* 4. Location Input */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Address / Location
-                    </label>
-                    <span 
-                      onClick={() => prefillField('address')}
-                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
-                      title="Click, double-click input, or press Ctrl+Space to import"
-                    >
-                      System: {selectedCall.target?.address || selectedCall.address || 'Unknown'} 📥
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={verifiedAddress}
-                    onChange={(e) => setVerifiedAddress(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                      handleInputKeyDown(e, 'address');
-                    }}
-                    onDoubleClick={() => prefillField('address')}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder={selectedCall.target?.address || selectedCall.address || "e.g. 2648 Sandstone Cres"}
-                  />
-                </div>
-
-                {/* 5. Subaddress Input */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
-                      Verified Subaddress / Unit / Business
-                    </label>
-                    <span 
-                      onClick={() => prefillField('subaddress')}
-                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
-                      title="Click, double-click input, or press Ctrl+Space to import"
-                    >
-                      System: {toTitleCase(selectedCall.target?.subaddress) || 'None'} 📥
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={verifiedSubaddress}
-                    onChange={(e) => setVerifiedSubaddress(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                      handleInputKeyDown(e, 'subaddress');
-                    }}
-                    onDoubleClick={() => prefillField('subaddress')}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-                    placeholder={toTitleCase(selectedCall.target?.subaddress) || "None"}
-                  />
-                </div>
-
-                {/* 6. Talk Group and Map Grid (Side-by-Side) */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Talk Group / Channel */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Talk Group">
-                        Verified Talk Group
-                      </label>
-                      <span 
-                        onClick={() => prefillField('talkgroup')}
-                        className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[70px] cursor-pointer transition-colors" 
-                        title="Click or press Ctrl+Space to import"
-                      >
-                        Sys: {selectedCall.target?.radio_channel || 'None'} 📥
-                      </span>
-                    </div>
-                    <select
-                      value={verifiedTalkgroup}
-                      onChange={(e) => setVerifiedTalkgroup(e.target.value)}
-                      onKeyDown={(e) => {
-                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                        handleInputKeyDown(e, 'talkgroup');
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
-                    >
-                      <option value="">-- No Channel --</option>
-                      {TALK_GROUPS.map(tg => (
-                        <option key={tg} value={tg}>{tg}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Map Grid */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono truncate" title="Verified Map Grid">
-                        Verified Map Grid
-                      </label>
-                      <span 
-                        onClick={() => prefillField('map_grid')}
-                        className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[70px] cursor-pointer transition-colors" 
-                        title="Click, double-click input, or press Ctrl+Space to import"
-                      >
-                        Sys: {selectedCall.target?.map_grid || 'Unknown'} 📥
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      value={verifiedMapGrid}
-                      onChange={(e) => setVerifiedMapGrid(e.target.value)}
-                      onKeyDown={(e) => {
-                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e); return; }
-                        handleInputKeyDown(e, 'map_grid');
-                      }}
-                      onDoubleClick={() => prefillField('map_grid')}
-                      className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                      placeholder={selectedCall.target?.map_grid || "e.g. 92"}
-                    />
-                  </div>
-                </div>
-
-                {/* 1. HITL Quality Rating Selector */}
-                <div className="flex flex-col gap-1.5 bg-slate-950 p-3 border border-slate-850 rounded-xl flex-shrink-0 mt-1.5">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                    HITL Quality Rating
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRate('PERFECT')}
-                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
-                        qualityRating === 'PERFECT'
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm font-mono'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
-                      }`}
-                    >
-                      🟢 Perfect
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRate('OPERATIONAL')}
-                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
-                        qualityRating === 'OPERATIONAL'
-                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm font-mono'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
-                      }`}
-                    >
-                      🟡 Operational
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRate('FAILED')}
-                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer text-center ${
-                        qualityRating === 'FAILED'
-                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-sm font-mono'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 font-mono'
-                      }`}
-                    >
-                      🔴 Failed
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. HITL Review Notes / Agent Notes */}
-                <div className="flex flex-col gap-1.5 mt-1.5">
-                  <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">
-                    📝 Review Notes / Agent Feedback
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none placeholder:text-slate-600 font-sans"
-                    placeholder="Enter human review notes, error explanations, or observations for AI agent review..."
-                  />
-                </div>
-
-                {/* 3. Whisper Training Dataset Opt-In */}
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-850 p-3 rounded-xl mt-1.5">
-                  <input
-                    type="checkbox"
-                    id="include_in_training"
-                    checked={includeInTraining}
-                    onChange={(e) => setIncludeInTraining(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-800 bg-slate-900 text-sky-500 focus:ring-sky-500 cursor-pointer"
-                  />
-                  <label htmlFor="include_in_training" className="text-[10px] text-slate-300 font-extrabold uppercase font-mono cursor-pointer select-none">
-                    Include in Whisper training dataset?
-                  </label>
-                  {selectedCall.audio_duration !== undefined && selectedCall.audio_duration < 35.0 && (
-                    <span className="text-[8px] text-rose-455 font-bold uppercase tracking-wider ml-auto animate-pulse" title="This call is under 35 seconds and appears to be cut off, so it is automatically excluded from Whisper training by default.">
-                      ⚠️ Cut-Off Default
-                    </span>
-                  )}
-                </div>
-
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-3 border-t border-slate-800 mt-auto flex-shrink-0">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3 px-6 rounded-xl w-full shadow-lg transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <>
-                      <span className="animate-spin border-2 border-black border-t-transparent h-4 w-4 rounded-full"></span>
-                      SUBMITTING...
-                    </>
-                  ) : (
-                    'SUBMIT VERIFICATION'
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    )}
-  </div>
-);
+      )}
+    </div>
+  );
 }

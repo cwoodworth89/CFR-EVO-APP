@@ -1056,13 +1056,14 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               className="bg-slate-900" zoomControl={false} ref={setMap}
           >
             <BaseMap 
-              style={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER" : "GREY"} 
+              style={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels || targetAddress) ? "VOYAGER" : "GREY"} 
               useLabelsFallback={false} 
             />
             
             <CoquitlamOverlays 
-                visible={showLabels && !cadastralError} 
+                visible={showLabels} 
                 onLoadError={() => setCadastralError(true)} 
+                onLoadSuccess={() => setCadastralError(false)}
             />
             
             {/* Hydrants Visual GIS Overlay */}

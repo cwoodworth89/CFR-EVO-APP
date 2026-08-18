@@ -739,33 +739,81 @@ def get_parcels_in_bbox(
     min_lng: float = Query(...),
     max_lat: float = Query(...),
     max_lng: float = Query(...),
-    limit: int = 500,
+    limit: int = 1000,
+    dedupe: bool = True,
     db: Session = Depends(get_db)
 ):
-    """Returns local cadastral property points & house numbers within the bounding box for offline overlays."""
-    parcels = db.query(ParcelModel).filter(
+    """Returns local cadastral property points, zoning & house numbers within the bounding box for offline overlays."""
+    fetch_limit = min(max(1, limit), 2500)
+    
+    query = db.query(ParcelModel).filter(
         ParcelModel.lat >= min_lat,
         ParcelModel.lat <= max_lat,
         ParcelModel.lng >= min_lng,
         ParcelModel.lng <= max_lng
-    ).limit(limit).all()
-
-    return {
-        "count": len(parcels),
-        "parcels": [
+    )
+    
+    if dedupe:
+        # Order by unit NULLs first so base building record takes precedence
+        query = query.order_by(ParcelModel.unit.nullsfirst(), ParcelModel.id.asc())
+        raw_parcels = query.limit(fetch_limit * 2).all()
+        
+        seen_keys = {}
+        deduped = []
+        for p in raw_parcels:
+            key = f"{p.house or ''}|{p.street or ''}|{p.streettype or ''}"
+            if not p.house and not p.street:
+                key = f"{round(p.lat or 0, 5)}|{round(p.lng or 0, 5)}"
+                
+            if key in seen_keys:
+                seen_keys[key]["units"] = (seen_keys[key]["units"] or 1) + 1
+                continue
+                
+            street_full = f"{p.street or ''} {p.streettype or ''}".strip()
+            item = {
+                "id": p.id,
+                "gis_id": p.gis_id,
+                "address": p.address,
+                "house": p.house,
+                "street": street_full or p.street,
+                "unit": p.unit,
+                "units": p.units or 1,
+                "zonetype1": p.zonetype1,
+                "lot": p.lot,
+                "plan": p.plan,
+                "lat": p.lat,
+                "lng": p.lng,
+                "zone_id": p.zone_id
+            }
+            seen_keys[key] = item
+            deduped.append(item)
+            if len(deduped) >= fetch_limit:
+                break
+        result_parcels = deduped
+    else:
+        raw_parcels = query.limit(fetch_limit).all()
+        result_parcels = [
             {
                 "id": p.id,
                 "gis_id": p.gis_id,
                 "address": p.address,
                 "house": p.house,
-                "street": p.street,
+                "street": f"{p.street or ''} {p.streettype or ''}".strip() or p.street,
                 "unit": p.unit,
+                "units": p.units or 1,
+                "zonetype1": p.zonetype1,
+                "lot": p.lot,
+                "plan": p.plan,
                 "lat": p.lat,
                 "lng": p.lng,
                 "zone_id": p.zone_id
             }
-            for p in parcels
+            for p in raw_parcels
         ]
+
+    return {
+        "count": len(result_parcels),
+        "parcels": result_parcels
     }
 
 

@@ -267,6 +267,15 @@ export const apiClient = {
       }
     },
 
+    async fetchBbox(minLat, minLng, maxLat, maxLng, limit = 1000) {
+      const res = await fetch(
+        `${API_BASE_URL}/api/parcels/bbox?min_lat=${minLat}&min_lng=${minLng}&max_lat=${maxLat}&max_lng=${maxLng}&limit=${limit}&dedupe=true`,
+        { headers: getHeaders() }
+      );
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    },
+
     async saveStreetView(payload) {
       const res = await fetch(`${API_BASE_URL}/api/parcels/streetview`, {
         method: 'POST',

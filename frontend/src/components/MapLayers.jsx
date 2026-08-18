@@ -131,9 +131,197 @@ export function BaseMap({ style, useLabelsFallback }) {
     return null;
 }
 
-// 🏗️ COQUITLAM ROADS/PARCELS & CIVIC ADDRESSES (100% Offline via PostgreSQL & FastAPI + ESRI Fallback)
-export function CoquitlamOverlays({ visible, onLoadError }) {
-    return null;
+// 🏛️ COQUITLAM CADASTRAL PARCEL & CIVIC ADDRESS OVERLAY (100% Offline Local Authority)
+export function CadastralDetailCard({ parcel }) {
+  if (!parcel) return null;
+  const { address, house, street, zone_id, zonetype1, units, lot, plan, gis_id } = parcel;
+
+  return (
+    <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-xl shadow-2xl font-mono text-left" style={{ minWidth: '190px', maxWidth: '250px' }}>
+      <div className="flex justify-between items-center gap-2 border-b border-slate-850 pb-1.5">
+        <span className="text-[9px] text-amber-400 font-mono uppercase tracking-wider font-bold">🏛️ CADASTRAL PARCEL</span>
+        {zone_id && (
+          <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-sky-950 text-sky-300 border border-sky-800">
+            Zone {zone_id}
+          </span>
+        )}
+      </div>
+      <h3 className="font-bold text-xs text-white mt-1.5 leading-tight">{address || `${house || ''} ${street || ''}`}</h3>
+      {street && (
+        <p className="text-[9.5px] text-slate-400 font-mono mt-0.5 font-semibold">
+          House #{house} • {street}
+        </p>
+      )}
+      {zonetype1 && (
+        <div className="mt-1.5 pt-1 border-t border-slate-850 flex justify-between items-center text-[10px]">
+          <span className="text-slate-400 font-sans font-medium">Zoning Type</span>
+          <span className="text-amber-300 font-mono font-bold">{zonetype1}</span>
+        </div>
+      )}
+      {units > 1 && (
+        <div className="mt-1 flex justify-between items-center text-[10px]">
+          <span className="text-slate-400 font-sans font-medium">Total Units</span>
+          <span className="text-emerald-400 font-mono font-bold">{units} Units</span>
+        </div>
+      )}
+      {(lot || plan) && (
+        <div className="mt-1 pt-1 border-t border-slate-850/60 flex justify-between items-center text-[9px] text-slate-400 font-mono">
+          <span>Lot / Plan</span>
+          <span className="text-slate-300 font-bold">{lot ? `Lot ${lot}` : ''} {plan ? `Plan ${plan}` : ''}</span>
+        </div>
+      )}
+      {gis_id && (
+        <div className="mt-0.5 flex justify-between items-center text-[8.5px] text-slate-500 font-mono">
+          <span>GIS ID</span>
+          <span>{gis_id}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const CADASTRAL_LABEL_CACHE = {};
+
+const createCadastralLabelIcon = (house, isSmall = false) => {
+  const key = `${house}-${isSmall ? 'sm' : 'lg'}`;
+  if (!CADASTRAL_LABEL_CACHE[key]) {
+    const cls = isSmall ? 'cadastral-house-number cadastral-house-number-sm' : 'cadastral-house-number';
+    CADASTRAL_LABEL_CACHE[key] = L.divIcon({
+      className: 'cadastral-label-icon-container',
+      html: `<span class="${cls}">${house}</span>`,
+      iconSize: [36, 14],
+      iconAnchor: [18, 7],
+      popupAnchor: [0, -7]
+    });
+  }
+  return CADASTRAL_LABEL_CACHE[key];
+};
+
+export function CoquitlamOverlays({ visible, onLoadError, onLoadSuccess, targetCoords, minZoom = 14 }) {
+  const map = useMap();
+  const [zoom, setZoom] = React.useState(map ? map.getZoom() : 12);
+  const [parcels, setParcels] = React.useState([]);
+  const canvasRenderer = React.useMemo(() => L.canvas({ padding: 0.5 }), []);
+  const activeReqRef = useRef(0);
+
+  // Track map zoom and viewport movements
+  useEffect(() => {
+    if (!visible) return;
+
+    const handleMapChange = () => {
+      setZoom(map.getZoom());
+    };
+
+    map.on('zoomend', handleMapChange);
+    map.on('moveend', handleMapChange);
+    handleMapChange();
+
+    return () => {
+      map.off('zoomend', handleMapChange);
+      map.off('moveend', handleMapChange);
+    };
+  }, [map, visible]);
+
+  // Fetch bounding box parcels from local PostgreSQL FastAPI authority
+  useEffect(() => {
+    if (!visible || zoom < minZoom) {
+      setParcels([]);
+      return;
+    }
+
+    const reqId = ++activeReqRef.current;
+    const bounds = map.getBounds();
+    const padLat = (bounds.getNorth() - bounds.getSouth()) * 0.20;
+    const padLng = (bounds.getEast() - bounds.getWest()) * 0.20;
+
+    const minLat = bounds.getSouth() - padLat;
+    const maxLat = bounds.getNorth() + padLat;
+    const minLng = bounds.getWest() - padLng;
+    const maxLng = bounds.getEast() + padLng;
+
+    const limit = zoom >= 17 ? 1200 : zoom >= 15 ? 800 : 400;
+    const url = `${API_BASE_URL}/api/parcels/bbox?min_lat=${minLat}&min_lng=${minLng}&max_lat=${maxLat}&max_lng=${maxLng}&limit=${limit}&dedupe=true`;
+
+    fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        if (reqId !== activeReqRef.current) return;
+        if (data && Array.isArray(data.parcels)) {
+          setParcels(data.parcels);
+          if (typeof onLoadSuccess === 'function') {
+            onLoadSuccess();
+          }
+        } else {
+          setParcels([]);
+        }
+      })
+      .catch(err => {
+        if (reqId !== activeReqRef.current) return;
+        console.warn("Failed to load local cadastral parcels:", err);
+        setParcels([]);
+        if (typeof onLoadError === 'function') {
+          onLoadError(err);
+        }
+      });
+  }, [map, visible, zoom, minZoom, onLoadError, onLoadSuccess]);
+
+  if (!visible || zoom < minZoom || parcels.length === 0) return null;
+
+  const isSmall = zoom < 16;
+  const showCenterDots = zoom >= 16;
+
+  return (
+    <>
+      {/* High-Performance Parcel Center Dots (Canvas Renderer) */}
+      {showCenterDots && parcels.map((p) => {
+        if (!p.lat || !p.lng) return null;
+        return (
+          <CircleMarker
+            key={`p-dot-${p.id}`}
+            center={[p.lat, p.lng]}
+            radius={2.5}
+            renderer={canvasRenderer}
+            pathOptions={{
+              color: '#0284c7',
+              fillColor: '#38bdf8',
+              fillOpacity: 0.85,
+              weight: 1
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -6]} className="!bg-transparent !border-0 !p-0 !shadow-none">
+              <CadastralDetailCard parcel={p} />
+            </Tooltip>
+            <Popup className="cadastral-popup">
+              <CadastralDetailCard parcel={p} />
+            </Popup>
+          </CircleMarker>
+        );
+      })}
+
+      {/* Crisp Municipal House Number Markers (Typography Overlay) */}
+      {parcels.map((p) => {
+        if (!p.lat || !p.lng || !p.house) return null;
+        return (
+          <Marker
+            key={`p-num-${p.id}`}
+            position={[p.lat, p.lng]}
+            icon={createCadastralLabelIcon(p.house, isSmall)}
+            interactive={true}
+          >
+            <Tooltip direction="top" offset={[0, -8]} className="!bg-transparent !border-0 !p-0 !shadow-none">
+              <CadastralDetailCard parcel={p} />
+            </Tooltip>
+            <Popup className="cadastral-popup">
+              <CadastralDetailCard parcel={p} />
+            </Popup>
+          </Marker>
+        );
+      })}
+    </>
+  );
 }
 
 // 🚒 FIRE ZONES (Rendered via local zones.json layer)

@@ -10,11 +10,19 @@ This rule file defines domain constraints, runtime environments, and workflow st
 * **Authoritative Municipal Open Data Authority**: All parcel maps, zone polygons, hydrants, building footprints, and orthophotos are sourced directly from the City of Coquitlam Open Data Portal under the Open Government Licence:
   - 65,400 clean property parcels (`public.parcels` from `Cadastral.shp` + `Addresses.shp`)
   - 118 active emergency response zones (zones 1–134, `Emergency_Response_Zones.shp`)
-  - City of Coquitlam 2025 7.5cm aerial orthophotos pre-cached locally on the kiosk SSD
+  - City of Coquitlam 2025 7.5cm aerial orthophotos pre-cached locally on the kiosk SSD in SQLite MBTiles archives (sub-decimeter clarity for rooflines, hydrants, and driveways across Z12–Z20)
   - NFPA 291 color-coded fire hydrants with GPM ratings (`hydrants.json`)
   - 3D building footprints with LiDAR-derived heights (`Buildings.shp`)
+* **Centralized Offline Tile Architecture (`cfr_tiles` on Port 8081)**:
+  - Base layers and high-resolution orthophotos are served directly by `mbtileserver` (`ghcr.io/consbio/mbtileserver:latest`) on port `8081` mounting `backend/data/tiles/`.
+  - **OpenStreetMap Slippy Map Specification Compliance**: All MBTiles archives conform to standard Slippy XYZ Web Mercator (`EPSG:3857`) with top-left origin (`{z}/{x}/{y}`), eliminating TMS Y-inversion overhead at runtime.
+  - Base layer endpoints:
+    - SATELLITE: `http://${window.location.hostname}:8081/services/satellite/tiles/{z}/{x}/{y}.jpg` (Z12–Z20 zoom depth)
+    - VOYAGER / OSM (Street): `http://${window.location.hostname}:8081/services/street/tiles/{z}/{x}/{y}.png`
+    - GREY / DARK (No-Labels): `http://${window.location.hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png`
+  - All layers maintain `fallbackUrl: null` for 100% offline integrity with zero external CDN/WAN asset leaks.
 * **API Gateway & Routing**: REST operations and dispatch persistence route via FastAPI (`http://localhost:8000/api/dispatches`). Apparatus turn-by-turn routing routes via local OSRM (`http://localhost:5000`).
-* **Frontend API Endpoint Resolution**: All frontend components performing `fetch()` operations MUST import and use `API_BASE_URL` from [`frontend/src/apiClient.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/apiClient.js) (e.g., `fetch(\`${API_BASE_URL}/api/route?...\`)`). Never use raw relative paths (`fetch('/api/...')`) or hardcoded `localhost` strings, as remote kiosk browsers accessing the UI over Tailscale (`http://100.95.146.94:5173`) will route relative requests to the Vite static server (resulting in 404s).
+* **Frontend API Endpoint Resolution**: All frontend components performing `fetch()` operations MUST import and use `API_BASE_URL` and `TILE_BASE_URL` from [`frontend/src/apiClient.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/apiClient.js) (e.g., `fetch(\`${API_BASE_URL}/api/route?...\`)`). Never use raw relative paths (`fetch('/api/...')`) or hardcoded `localhost` strings, as remote kiosk browsers accessing the UI over Tailscale (`http://100.95.146.94:5173`) will route relative requests to the Vite static server (resulting in 404s).
 * **Real-Time Broadcast**: Station kiosks listen to Mosquitto MQTT over WebSockets on port `9001` (topic: `cfr/dispatches`).
 
 ---

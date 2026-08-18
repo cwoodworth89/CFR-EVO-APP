@@ -7,12 +7,12 @@ export const OPERATIONAL_BOUNDS = [
   [49.48, -122.60]  // Northeast: Pinecone Burke / Widgeon / Western Pitt Meadows
 ];
 
-// 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps)
-// Serves directly from containerized local disk cache via API_BASE_URL with zero WAN dependencies
+// 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps via mbtileserver on port 8081)
+// Serves directly from containerized local MBTiles server (cfr_tiles) with zero WAN dependencies
 export const BASE_LAYERS = {
   GREY: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/street_nolabels/{z}/{x}/{y}.png`,
+    url: `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
@@ -21,7 +21,7 @@ export const BASE_LAYERS = {
   },
   DARK: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/dark_nolabels/{z}/{x}/{y}.png`,
+    url: `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
@@ -30,7 +30,7 @@ export const BASE_LAYERS = {
   },
   SATELLITE: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    url: `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
@@ -39,7 +39,7 @@ export const BASE_LAYERS = {
   },
   OSM: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/street/{z}/{x}/{y}.png`,
+    url: `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
@@ -48,7 +48,7 @@ export const BASE_LAYERS = {
   },
   VOYAGER: {
     type: 'tile',
-    url: `${API_BASE_URL}/api/tiles/street/{z}/{x}/{y}.png`,
+    url: `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],

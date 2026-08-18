@@ -36,67 +36,64 @@ function resolveApiBaseUrl(envVar, hostname) {
   return `http://${host}:8000`;
 }
 
-function getTileUrlPure(tileBaseUrl, z = '{z}', x = '{x}', y = '{y}', style = 'voyager', apiBaseUrl = 'http://localhost:8000') {
-  const normalizedStyle = (style || 'voyager').toLowerCase();
-  if (normalizedStyle === 'satellite') {
-    return `${apiBaseUrl}/api/tiles/satellite/${z}/${x}/${y}.png`;
+function getTileUrlPure(tileBaseUrl, z = '{z}', x = '{x}', y = '{y}', style = 'SATELLITE', apiBaseUrl = 'http://localhost:8000') {
+  const normalizedStyle = (style || 'SATELLITE').toUpperCase();
+  if (normalizedStyle === 'SATELLITE') {
+    return `${tileBaseUrl}/services/satellite/tiles/${z}/${x}/${y}.jpg`;
   }
-  if (normalizedStyle === 'dark') {
-    return `${tileBaseUrl}/services/vancouver_dark/tiles/${z}/${x}/${y}.png`;
+  if (normalizedStyle === 'GREY' || normalizedStyle === 'DARK' || normalizedStyle === 'LIGHT') {
+    return `${tileBaseUrl}/services/street_nolabels/tiles/${z}/${x}/${y}.png`;
   }
-  if (normalizedStyle === 'grey' || normalizedStyle === 'light') {
-    return `${tileBaseUrl}/services/vancouver_light/tiles/${z}/${x}/${y}.png`;
-  }
-  return `${tileBaseUrl}/services/vancouver/tiles/${z}/${x}/${y}.png`;
+  return `${tileBaseUrl}/services/street/tiles/${z}/${x}/${y}.png`;
 }
 
-function getTileLayerConfigPure(tileBaseUrl, style = 'VOYAGER', apiBaseUrl = 'http://localhost:8000') {
-  const normalized = (style || 'VOYAGER').toUpperCase();
+function getTileLayerConfigPure(tileBaseUrl, style = 'SATELLITE', apiBaseUrl = 'http://localhost:8000') {
+  const normalized = (style || 'SATELLITE').toUpperCase();
   switch (normalized) {
     case 'DARK':
       return {
-        url: `${tileBaseUrl}/services/vancouver_dark/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-        attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-        subdomains: ['a', 'b', 'c', 'd'],
+        url: `${tileBaseUrl}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
+        fallbackUrl: null,
+        attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
+        subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 18,
         maxZoom: 22,
       };
     case 'GREY':
     case 'LIGHT':
       return {
-        url: `${tileBaseUrl}/services/vancouver_light/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-        attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-        subdomains: ['a', 'b', 'c', 'd'],
+        url: `${tileBaseUrl}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
+        fallbackUrl: null,
+        attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
+        subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 18,
         maxZoom: 22,
       };
     case 'OSM':
       return {
-        url: `${tileBaseUrl}/services/vancouver/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: '© OpenStreetMap contributors (Offline Local)',
+        url: `${tileBaseUrl}/services/street/tiles/{z}/{x}/{y}.png`,
+        fallbackUrl: null,
+        attribution: '© OpenStreetMap contributors (100% Offline Local Cache)',
         subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 18,
         maxZoom: 22,
       };
     case 'SATELLITE':
       return {
-        url: `${apiBaseUrl}/api/tiles/satellite/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Esri, Maxar, Earthstar Geographics (Offline Local Cache)',
+        url: `${tileBaseUrl}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
+        fallbackUrl: null,
+        attribution: 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)',
         subdomains: ['a', 'b', 'c'],
-        maxNativeZoom: 18,
+        maxNativeZoom: 20,
         maxZoom: 22,
       };
     case 'VOYAGER':
     default:
       return {
-        url: `${tileBaseUrl}/services/vancouver/tiles/{z}/{x}/{y}.png`,
-        fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        attribution: '© OpenStreetMap contributors & Carto (Offline Local)',
-        subdomains: ['a', 'b', 'c', 'd'],
+        url: `${tileBaseUrl}/services/street/tiles/{z}/{x}/{y}.png`,
+        fallbackUrl: null,
+        attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
+        subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 18,
         maxZoom: 22,
       };
@@ -142,47 +139,47 @@ runTest('TILE_BASE_URL: strips trailing slash from env override', () => {
 });
 
 // --- SUITE 2: getTileUrl Generation ---
-runTest('getTileUrl: default style (voyager) with template placeholders', () => {
+runTest('getTileUrl: default style (satellite) with template placeholders', () => {
   const url = getTileUrlPure('http://localhost:8081');
-  assert.strictEqual(url, 'http://localhost:8081/services/vancouver/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
 });
 
 runTest('getTileUrl: concrete coordinates for dark style', () => {
   const url = getTileUrlPure('http://100.95.146.94:8081', 14, 2620, 5710, 'dark');
-  assert.strictEqual(url, 'http://100.95.146.94:8081/services/vancouver_dark/tiles/14/2620/5710.png');
+  assert.strictEqual(url, 'http://100.95.146.94:8081/services/street_nolabels/tiles/14/2620/5710.png');
 });
 
 runTest('getTileUrl: grey/light style normalization', () => {
   const urlGrey = getTileUrlPure('http://localhost:8081', 12, 100, 200, 'grey');
   const urlLight = getTileUrlPure('http://localhost:8081', 12, 100, 200, 'LIGHT');
-  assert.strictEqual(urlGrey, 'http://localhost:8081/services/vancouver_light/tiles/12/100/200.png');
-  assert.strictEqual(urlLight, 'http://localhost:8081/services/vancouver_light/tiles/12/100/200.png');
+  assert.strictEqual(urlGrey, 'http://localhost:8081/services/street_nolabels/tiles/12/100/200.png');
+  assert.strictEqual(urlLight, 'http://localhost:8081/services/street_nolabels/tiles/12/100/200.png');
 });
 
-runTest('getTileUrl: satellite style uses local API_BASE_URL endpoint', () => {
-  const url = getTileUrlPure('http://localhost:8081', 16, 500, 600, 'satellite', 'http://localhost:8000');
-  assert.strictEqual(url, 'http://localhost:8000/api/tiles/satellite/16/500/600.png');
+runTest('getTileUrl: satellite style uses mbtileserver satellite endpoint', () => {
+  const url = getTileUrlPure('http://localhost:8081', 16, 500, 600, 'satellite');
+  assert.strictEqual(url, 'http://localhost:8081/services/satellite/tiles/16/500/600.jpg');
 });
 
-runTest('getTileUrl: fallback to vancouver for unrecognized style', () => {
+runTest('getTileUrl: fallback to street for unrecognized style', () => {
   const url = getTileUrlPure('http://localhost:8081', 10, 1, 2, 'UNKNOWN_TERRAIN');
-  assert.strictEqual(url, 'http://localhost:8081/services/vancouver/tiles/10/1/2.png');
+  assert.strictEqual(url, 'http://localhost:8081/services/street/tiles/10/1/2.png');
 });
 
 // --- SUITE 3: getTileLayerConfig Structure & Zoom Constraints ---
 runTest('getTileLayerConfig: VOYAGER layer config', () => {
   const config = getTileLayerConfigPure('http://100.95.146.94:8081', 'VOYAGER');
-  assert.strictEqual(config.url, 'http://100.95.146.94:8081/services/vancouver/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(config.fallbackUrl, 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
+  assert.strictEqual(config.url, 'http://100.95.146.94:8081/services/street/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(config.fallbackUrl, null);
   assert.strictEqual(config.maxNativeZoom, 18);
   assert.strictEqual(config.maxZoom, 22);
-  assert.deepStrictEqual(config.subdomains, ['a', 'b', 'c', 'd']);
+  assert.deepStrictEqual(config.subdomains, ['a', 'b', 'c']);
 });
 
 runTest('getTileLayerConfig: DARK layer config', () => {
   const config = getTileLayerConfigPure('http://100.95.146.94:8081', 'DARK');
-  assert.strictEqual(config.url, 'http://100.95.146.94:8081/services/vancouver_dark/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(config.fallbackUrl, 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png');
+  assert.strictEqual(config.url, 'http://100.95.146.94:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(config.fallbackUrl, null);
   assert.strictEqual(config.maxNativeZoom, 18);
   assert.strictEqual(config.maxZoom, 22);
 });
@@ -190,15 +187,15 @@ runTest('getTileLayerConfig: DARK layer config', () => {
 runTest('getTileLayerConfig: GREY/LIGHT layer config', () => {
   const configGrey = getTileLayerConfigPure('http://localhost:8081', 'GREY');
   const configLight = getTileLayerConfigPure('http://localhost:8081', 'LIGHT');
-  assert.strictEqual(configGrey.url, 'http://localhost:8081/services/vancouver_light/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(configLight.url, 'http://localhost:8081/services/vancouver_light/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(configGrey.fallbackUrl, 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png');
+  assert.strictEqual(configGrey.url, 'http://localhost:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(configLight.url, 'http://localhost:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(configGrey.fallbackUrl, null);
 });
 
 runTest('getTileLayerConfig: OSM layer config', () => {
   const config = getTileLayerConfigPure('http://localhost:8081', 'OSM');
-  assert.strictEqual(config.url, 'http://localhost:8081/services/vancouver/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(config.fallbackUrl, 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+  assert.strictEqual(config.url, 'http://localhost:8081/services/street/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(config.fallbackUrl, null);
   assert.deepStrictEqual(config.subdomains, ['a', 'b', 'c']);
 });
 
@@ -206,9 +203,9 @@ runTest('getTileLayerConfig: default fallback for null/undefined/empty string', 
   const configNull = getTileLayerConfigPure('http://localhost:8081', null);
   const configUndef = getTileLayerConfigPure('http://localhost:8081', undefined);
   const configEmpty = getTileLayerConfigPure('http://localhost:8081', '');
-  assert.strictEqual(configNull.url, 'http://localhost:8081/services/vancouver/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(configUndef.url, 'http://localhost:8081/services/vancouver/tiles/{z}/{x}/{y}.png');
-  assert.strictEqual(configEmpty.url, 'http://localhost:8081/services/vancouver/tiles/{z}/{x}/{y}.png');
+  assert.strictEqual(configNull.url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
+  assert.strictEqual(configUndef.url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
+  assert.strictEqual(configEmpty.url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
 });
 
 // --- SUITE 4: Fallback URL Construction & Subdomain Hashing ---

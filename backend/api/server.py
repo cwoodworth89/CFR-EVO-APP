@@ -6,6 +6,7 @@ import threading
 import ipaddress
 import re
 import sys
+import urllib.request
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta, timezone
 
@@ -962,7 +963,10 @@ def get_calculated_route(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Local Map Tiles Cache Directory
+# MBTiles Server Forwarder Base URL (internal container service http://tiles:8080 or host http://127.0.0.1:8081)
+TILE_SERVER_URL = os.environ.get("TILE_SERVER_URL", "http://tiles:8080").rstrip("/")
+
+# Local Map Tiles Cache Directory (Legacy loose-file fallback)
 TILES_BASE_DIR = os.environ.get(
     "TILES_DIR",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "tiles")
@@ -975,19 +979,57 @@ TRANSPARENT_1X1_PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\
 
 
 def _serve_tile(layer: str, z: int, x: int, y: int, ext: Optional[str] = None):
-    """Serve pre-cached raster tiles from TILES_BASE_DIR/{layer}, falling back to 1x1 transparent PNG."""
+    """Forward tile requests to mbtileserver, falling back to local files or 1x1 transparent PNG."""
     clean_layer = re.sub(r"[^a-zA-Z0-9_-]", "", layer)
+    file_ext = (ext.lower().lstrip(".") if ext else ("jpg" if clean_layer == "satellite" else "png"))
+
+    # 1. Forward request to containerized mbtileserver
+    target_url = f"{TILE_SERVER_URL}/services/{clean_layer}/tiles/{z}/{x}/{y}.{file_ext}"
+    try:
+        req = urllib.request.Request(target_url, headers={"User-Agent": "CFR-EVO-Gateway"})
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            if resp.status == 200:
+                content = resp.read()
+                media_type = resp.headers.get_content_type() or f"image/{'jpeg' if file_ext in ['jpg', 'jpeg'] else 'png'}"
+                return Response(
+                    content=content,
+                    media_type=media_type,
+                    status_code=200,
+                    headers={
+                        "Cache-Control": "public, max-age=604800",
+                        "Access-Control-Allow-Origin": "*",
+                    }
+                )
+    except Exception:
+        # If mbtileserver internal hostname fails (e.g. outside docker), try host fallback on 127.0.0.1:8081
+        if "tiles:8080" in TILE_SERVER_URL:
+            try:
+                fallback_url = f"http://127.0.0.1:8081/services/{clean_layer}/tiles/{z}/{x}/{y}.{file_ext}"
+                req = urllib.request.Request(fallback_url, headers={"User-Agent": "CFR-EVO-Gateway"})
+                with urllib.request.urlopen(req, timeout=1.5) as resp:
+                    if resp.status == 200:
+                        content = resp.read()
+                        media_type = resp.headers.get_content_type() or f"image/{'jpeg' if file_ext in ['jpg', 'jpeg'] else 'png'}"
+                        return Response(
+                            content=content,
+                            media_type=media_type,
+                            status_code=200,
+                            headers={
+                                "Cache-Control": "public, max-age=604800",
+                                "Access-Control-Allow-Origin": "*",
+                            }
+                        )
+            except Exception:
+                pass
+
+    # 2. Check local loose-file cache if present (legacy support)
     layer_dir = os.path.join(TILES_BASE_DIR, clean_layer)
     tile_dir = os.path.join(layer_dir, str(z), str(x))
-    candidates = []
-    if ext:
-        norm_ext = ext.lower().lstrip(".")
-        media = "image/png" if norm_ext == "png" else "image/jpeg"
-        candidates.append((os.path.join(tile_dir, f"{y}.{norm_ext}"), media))
-    candidates.append((os.path.join(tile_dir, f"{y}.png"), "image/png"))
-    candidates.append((os.path.join(tile_dir, f"{y}.jpg"), "image/jpeg"))
-    candidates.append((os.path.join(tile_dir, f"{y}.jpeg"), "image/jpeg"))
-
+    candidates = [
+        (os.path.join(tile_dir, f"{y}.{file_ext}"), f"image/{'jpeg' if file_ext in ['jpg', 'jpeg'] else 'png'}"),
+        (os.path.join(tile_dir, f"{y}.png"), "image/png"),
+        (os.path.join(tile_dir, f"{y}.jpg"), "image/jpeg"),
+    ]
     for file_path, media_type in candidates:
         if os.path.isfile(file_path):
             return FileResponse(
@@ -998,7 +1040,8 @@ def _serve_tile(layer: str, z: int, x: int, y: int, ext: Optional[str] = None):
                     "Access-Control-Allow-Origin": "*",
                 }
             )
-    # Return transparent 1x1 PNG with 200 OK to prevent OpaqueResponseBlocking (ORB) browser errors
+
+    # 3. Return transparent 1x1 PNG with 200 OK to prevent OpaqueResponseBlocking (ORB) browser errors
     return Response(
         content=TRANSPARENT_1X1_PNG,
         media_type="image/png",

@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import { UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, STATIONS as STATIONS_LIST } from './MapConstants';
 import { sanitizeAddress, calculateParcelFrontagePoint } from '../utils/addressUtils';
-import { API_BASE_URL } from '../apiClient';
+import { API_BASE_URL, TILE_BASE_URL } from '../apiClient';
 
 
 export function Header({ 
@@ -151,7 +151,9 @@ function SatelliteMiniMap({ lat, lng }) {
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          url={`${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`}
+          url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
+          maxNativeZoom={20}
+          maxZoom={22}
         />
         <Marker position={position} icon={miniTargetIcon} />
       </MapContainer>

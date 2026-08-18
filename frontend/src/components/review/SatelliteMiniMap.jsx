@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { API_BASE_URL } from '../../apiClient';
+import { API_BASE_URL, TILE_BASE_URL } from '../../apiClient';
 
 function MiniMapAutoCenter({ lat, lng, polygonPositions }) {
   const map = useMap();
@@ -84,9 +84,9 @@ export default function SatelliteMiniMap({
         >
           {/* Local Pre-Cached High-Res Satellite Tiles */}
           <TileLayer
-            url={`${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`}
-            maxNativeZoom={18}
-            maxZoom={20}
+            url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
+            maxNativeZoom={20}
+            maxZoom={22}
           />
 
           {polygonPositions && (

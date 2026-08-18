@@ -161,3 +161,34 @@ backend/data/lidar/
   * DTM bare-earth raster queries determine parcel immersion risk during spring freshet and king tides.
   * Access roads with bare-earth elevations $\le 2.2\text{m}$ GVD are dynamically flagged when hydrological freshet warnings are broadcast.
 
+---
+
+## 7. Centralized MBTiles Architecture & Slippy Map Standard (`cfr_tiles` Port 8081)
+
+CFR EVO eliminates external map CDN dependencies (Mapbox, Carto, Google Maps, ArcGIS Online) by serving all raster and vector basemaps directly from containerized SQLite MBTiles archives on port `8081` (`ghcr.io/consbio/mbtileserver:latest`).
+
+```
+backend/data/tiles/
+├── satellite.mbtiles         # City of Coquitlam 2025 7.5cm orthophotos (Z12–Z20, Slippy XYZ)
+├── street.mbtiles            # Full street & reference basemap with road labels
+└── street_nolabels.mbtiles   # Clean tactical basemap for high-contrast HUD overlays
+```
+
+### 7.1 OpenStreetMap Slippy Map Specification Compliance
+* **Projection**: Standard Web Mercator (`EPSG:3857` / Spherical Mercator).
+* **Coordinate Origin**: Top-left origin convention ($x=0, y=0$ at Northwest quadrant), matching the OpenStreetMap Slippy Map standard (`{z}/{x}/{y}`).
+* **TMS Inversion Elimination**: MBTiles archives are generated and served directly in standard Slippy format, removing runtime TMS $y$-coordinate flipping ($y_{\text{TMS}} = 2^z - 1 - y_{\text{XYZ}}$).
+* **Base Layer Endpoints**:
+  - `http://${window.location.hostname}:8081/services/satellite/tiles/{z}/{x}/{y}.jpg`
+  - `http://${window.location.hostname}:8081/services/street/tiles/{z}/{x}/{y}.png`
+  - `http://${window.location.hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png`
+
+### 7.2 City of Coquitlam 7.5cm Aerial Orthophoto Pyramid (Z12–Z20)
+* **Resolution**: Sub-decimeter (7.5 cm / ~3 inches ground sampling distance per pixel).
+* **Zoom Depth Range**:
+  - **Z12–Z15**: Regional context across Coquitlam, Port Moody, Burnaby, and Pitt Meadows.
+  - **Z16–Z18**: Tactical approach view, street network, and property parcel boundaries.
+  - **Z19–Z20**: High-resolution structure level for identifying rooflines, building entrances, driveways, fence lines, and fire hydrant connections.
+* **$0 Subscription-Free Guarantee**: Stored 100% locally on NVMe SSD storage with `fallbackUrl: null`, ensuring 100% disaster resilience with zero recurring API or tile-serving costs.
+
+

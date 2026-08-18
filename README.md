@@ -27,7 +27,8 @@ CFR EVO is purpose-built with a strict **Zero-Cloud, Zero-Subscription, Total Of
 The system directly ingests and standardizes authoritative municipal geospatial datasets under the **Open Government Licence – City of Coquitlam**:
 * **65,400 Clean Property Parcels (`public.parcels`)**: Ingested directly from City of Coquitlam `Cadastral.shp` and `Addresses.shp`, with pre-computed point-in-polygon spatial links to active emergency response zones.
 * **118 Active Emergency Response Zones (Zones 1–134)**: Official `Emergency_Response_Zones.shp` boundary polygons used for automatic apparatus district identification and driver territory training.
-* **City of Coquitlam 2025 7.5cm Aerial Orthophotography**: High-resolution airborne orthophotos (7.5 cm / 3 inches per pixel) pre-cached locally into Slippy raster tiles on the kiosk SSD for sub-decimeter tactical roofline and driveway clarity.
+* **City of Coquitlam 2025 7.5cm Aerial Orthophotography (Z12–Z20)**: High-resolution airborne orthophotos (7.5 cm / 3 inches per pixel) pre-cached locally into SQLite MBTiles archives on the kiosk SSD for sub-decimeter tactical roofline, driveway, and hydrant clarity.
+* **Centralized MBTiles Server (`cfr_tiles` on Port 8081)**: Fast, offline tile serving powered by `ghcr.io/consbio/mbtileserver:latest`. Strictly adheres to the **OpenStreetMap Slippy Map Specification** (XYZ Web Mercator `EPSG:3857`, top-left origin) across all base layers (`satellite`, `street`, `street_nolabels`).
 * **NFPA 291 Fire Hydrant Registry**: Complete municipal hydrant database color-coded by flow rate (AA: Blue $\ge 1500$ GPM, A: Green $1000-1499$ GPM, B: Orange $500-999$ GPM, C: Red $< 500$ GPM) with immediate nearest-hydrant routing.
 * **3D Building Footprints & LiDAR Profiles**: Municipal `Buildings.shp` layers containing LiDAR-derived `HEIGHT`, `MIN_ELEVATION`, and `MAX_ELEVATION` attributes for tactical building height profiling and Ladder 1/3 aerial reach validation.
 * **Municipal Road Hazards & Railway Crossings**: Real-time road closure ingestion and CP/CN railway corridor hazard warnings.
@@ -43,14 +44,19 @@ The entire system runs on a containerized, self-contained local stack hosted on 
 flowchart TB
     subgraph Hall1Master [Hall 1 Master Station Server - Docker Compose]
         subgraph Containers [Docker Container Stack]
-            PG[(PostgreSQL 16 DB\nlive_calls, eval_history)]
-            API[FastAPI Gateway\nREST API & Auth]
+            PG[(PostgreSQL 16 DB\nlive_calls, eval_history\nPort 5432)]
+            API[FastAPI Gateway\nREST API & Auth\nPort 8000]
             MQTT[Mosquitto MQTT Broker\nTCP 1883 & WebSockets 9001]
+            TILES[MBTiles Tile Server\nSlippy XYZ EPSG:3857\nPort 8081]
+            OSRM[OSRM Routing Engine\nApparatus Routing\nPort 5000]
+            NTFY[Ntfy Push Server\nEmergency Alerts\nPort 8080]
             STORAGE[(Local Audio Storage\n/backend/audio_files/recordings)]
         end
         API <-->|SQL Connection| PG
         API -->|Static File Serving| STORAGE
         API -->|Publish Dispatch Alerts| MQTT
+        API -->|Route Inquiries| OSRM
+        API -->|Push Alerts| NTFY
     end
 
     subgraph StationKiosks [Multi-Station Kiosk Displays]
@@ -78,6 +84,12 @@ flowchart TB
     MQTT <-->|MQTT WebSockets - Port 9001| K3
     MQTT <-->|MQTT WebSockets - Port 9001| K4
     MQTT <-->|WebSockets / PWA Push| PWA
+
+    %% Direct Tile & REST queries
+    TILES <-->|XYZ Tiles - Port 8081| K1
+    TILES <-->|XYZ Tiles - Port 8081| K2
+    TILES <-->|XYZ Tiles - Port 8081| K3
+    TILES <-->|XYZ Tiles - Port 8081| K4
 
     API <-->|REST Queries & Static Audio| K1
     API <-->|REST Queries & Static Audio| K2

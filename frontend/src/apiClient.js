@@ -28,25 +28,47 @@ export const TILE_BASE_URL = getTileBaseUrl();
  * @param {string|number} z - Zoom level or template placeholder '{z}'
  * @param {string|number} x - X coordinate or template placeholder '{x}'
  * @param {string|number} y - Y coordinate or template placeholder '{y}'
- * @param {string} [style='voyager'] - Basemap style ('voyager', 'dark', 'grey', 'light', 'osm', 'satellite')
+ * @param {string} [style='SATELLITE'] - Basemap style ('SATELLITE', 'VOYAGER', 'OSM', 'GREY', 'DARK')
  * @returns {string} Fully resolved tile URL
  */
 export const getTileUrl = (style = 'SATELLITE', z = 12, x = 0, y = 0) => {
-  return `${API_BASE_URL}/api/tiles/satellite/${z}/${x}/${y}.png`;
+  const s = (style || 'SATELLITE').toUpperCase();
+  if (s === 'SATELLITE') {
+    return `${TILE_BASE_URL}/services/satellite/tiles/${z}/${x}/${y}.jpg`;
+  }
+  if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
+    return `${TILE_BASE_URL}/services/street_nolabels/tiles/${z}/${x}/${y}.png`;
+  }
+  return `${TILE_BASE_URL}/services/street/tiles/${z}/${x}/${y}.png`;
 };
 
 /**
  * Returns a complete tile layer configuration for Leaflet, strictly serving from
  * local containerized disk cache with zero external WAN dependencies.
- * @param {string} style - Basemap style key ('GREY', 'DARK', 'VOYAGER', 'OSM', 'SATELLITE')
+ * @param {string} style - Basemap style key ('GREY', 'DARK', 'LIGHT', 'VOYAGER', 'OSM', 'SATELLITE')
  */
 export const getTileLayerConfig = (style = 'SATELLITE') => {
+  const s = (style || 'SATELLITE').toUpperCase();
+  let url = `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`;
+  let maxNativeZoom = 18;
+  let attribution = '© OpenStreetMap contributors (100% Offline Local Cache)';
+  
+  if (s === 'SATELLITE') {
+    url = `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`;
+    maxNativeZoom = 20;
+    attribution = 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)';
+  } else if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
+    url = `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`;
+    maxNativeZoom = 18;
+    attribution = '© OpenStreetMap contributors & Carto (100% Offline Local Cache)';
+  }
+
   return {
-    url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
+    url,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam, Esri, Maxar (100% Offline Local Cache)',
+    attribution,
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 19,
+    maxNativeZoom,
     maxZoom: 22,
   };
 };

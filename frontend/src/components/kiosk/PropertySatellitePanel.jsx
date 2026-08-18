@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
-import { API_BASE_URL } from '../../apiClient';
+import { API_BASE_URL, TILE_BASE_URL } from '../../apiClient';
 
 function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
   const map = useMap();
@@ -81,9 +81,9 @@ export default function PropertySatellitePanel({ activeCall }) {
     >
       {/* High-Resolution Satellite Basemap */}
       <TileLayer
-        url={`${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`}
-        maxNativeZoom={18}
-        maxZoom={20}
+        url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
+        maxNativeZoom={20}
+        maxZoom={22}
       />
 
       {/* Road & Place Name Labels Overlay */}

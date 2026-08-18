@@ -10,7 +10,7 @@ import L from 'leaflet';
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
-import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS } from './MapConstants';
+import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS } from './MapConstants';
 import { apiClient } from '../apiClient';
 
 export function enrichAddressWithBuilding(targetObj) {
@@ -1093,8 +1093,10 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           <MapContainer 
               center={[49.28, -122.80]} 
               zoom={12} 
-              minZoom={12}
+              minZoom={11}
               maxZoom={22}
+              maxBounds={OPERATIONAL_BOUNDS}
+              maxBoundsViscosity={1.0}
               style={{ height: "100%", width: "100%" }} 
               className="bg-slate-900" zoomControl={false} ref={setMap}
           >

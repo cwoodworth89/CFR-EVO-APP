@@ -1,6 +1,12 @@
 // Map & Layer Constants
 import { TILE_BASE_URL, API_BASE_URL } from '../apiClient';
 
+// 🌐 REGIONAL OPERATIONAL BOUNDING BOX (Coquitlam, Port Mann Bridge / North Surrey, Port Moody, Belcarra, Burnaby, New Westminster, Pinecone Burke)
+export const OPERATIONAL_BOUNDS = [
+  [49.15, -123.04], // Southwest: North Surrey / New Westminster / Central Burnaby
+  [49.48, -122.60]  // Northeast: Pinecone Burke / Widgeon / Western Pitt Meadows
+];
+
 // 🗺️ BASE LAYERS (Clean no-label basemaps for Coquitlam municipal vector overlays)
 // Prioritizes local containerized offline tile server (:8081) with graceful online fallback
 export const BASE_LAYERS = {
@@ -25,8 +31,8 @@ export const BASE_LAYERS = {
   SATELLITE: {
     type: 'tile',
     url: `${API_BASE_URL}/api/tiles/satellite/{z}/{x}/{y}.png`,
-    fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Esri, Maxar, Earthstar Geographics (Offline Local Cache)',
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'Esri, Maxar (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 18,
     maxZoom: 22

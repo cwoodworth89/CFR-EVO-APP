@@ -26,11 +26,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Dict, Any, Optional
 
 # Default Bounding Box for Coquitlam Emergency Response Area
-# Latitude: 49.20 to 49.38, Longitude: -122.92 to -122.70
-DEFAULT_MIN_LAT = 49.20
-DEFAULT_MAX_LAT = 49.38
-DEFAULT_MIN_LON = -122.92
-DEFAULT_MAX_LON = -122.70
+# Regional Operational Response Bounding Box:
+# Lat: 49.15 (Port Mann / North Surrey) -> 49.48 (Pinecone Burke / Widgeon)
+# Lon: -123.04 (Burnaby / New Westminster / Belcarra) -> -122.60 (Pitt Meadows / Pitt River)
+DEFAULT_MIN_LAT = 49.15
+DEFAULT_MAX_LAT = 49.48
+DEFAULT_MIN_LON = -123.04
+DEFAULT_MAX_LON = -122.60
 
 DEFAULT_MIN_ZOOM = 12
 DEFAULT_MAX_ZOOM = 18

@@ -34,7 +34,7 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: 'Esri, Maxar (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 18,
+    maxNativeZoom: 19,
     maxZoom: 22
   },
   OSM: {

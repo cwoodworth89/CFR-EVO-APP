@@ -208,12 +208,13 @@ def verify_tile_endpoints(
         for ext in ["png", "jpg"]:
             url = f"{api_base_url}/api/tiles/satellite/{z}/{x}/{y}.{ext}"
             try:
-                req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": USER_AGENT})
+                req = urllib.request.Request(url, method="GET", headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     content_type = resp.headers.get("Content-Type", "")
                     status = resp.status
-                    if status == 200 and ("image/png" in content_type or "image/jpeg" in content_type):
-                        logger.info(f"  [OK] {url} -> HTTP {status} ({content_type})")
+                    data = resp.read(1024)
+                    if status == 200 and ("image/png" in content_type or "image/jpeg" in content_type) and len(data) > 0:
+                        logger.info(f"  [OK] {url} -> HTTP {status} ({content_type}, {len(data)} bytes verified)")
                     else:
                         logger.warning(f"  [FAIL] {url} -> HTTP {status} ({content_type})")
                         all_ok = False

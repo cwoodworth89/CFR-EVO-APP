@@ -98,3 +98,66 @@ Hydrants within a 500-meter radius of the incident are retrieved and color-coded
 ```powershell
 .\.venv\Scripts\python.exe -c "from gis_service import CoquitlamDataValidator; from cfr_dispatch.worker import get_shared_validator; v = get_shared_validator(); hydrants = v.find_nearest_hydrants(49.2781, -122.8123, max_results=3); print(hydrants)"
 ```
+
+---
+
+## 6. LiDAR 3D Spatial Intelligence & Topography Engine
+
+CFR EVO integrates point-cloud LiDAR data, Digital Surface Models (DSM), and Digital Elevation Models (DEM/DTM) to provide tactical 3D spatial awareness for apparatus dispatch, tactical positioning, and route computation.
+
+```
+backend/data/lidar/
+├── dtm/                          # Bare-earth Digital Terrain Model (1m raster, EPSG:26910)
+├── dsm/                          # Digital Surface Model including canopy & structures (1m raster)
+└── nDSM/                         # Normalized DSM (nDSM = DSM - DTM) representing height above ground
+```
+
+### 6.1 Building Height Extraction & Aerial Apparatus Reach Validation
+* **Formula**: $\text{Structure Height } (H_{\text{bldg}}) = \text{DSM}_{\text{roof}} - \text{DTM}_{\text{ground}}$
+* **Aerial Apparatus Dispatch Validation**:
+  * **Ladder 1 & Ladder 3** (105-foot / 32m aerial reach, maximum operational scrub height: ~28m / 92ft considering setback angle and outrigger deployment).
+  * Structures with $H_{\text{bldg}} \ge 12.0\text{m}$ ($\sim 4$ storeys, e.g., high-density developments in City Centre, Burquitlam, and Lougheed Corridor) automatically trigger mandatory Ladder company dispatch assignments and outrigger placement clearance alerts in the CAD payload.
+* **Setback & Scrub Envelope Calculation**:
+  ```python
+  def validate_aerial_reach(building_height_m: float, setback_distance_m: float, max_reach_m: float = 32.0) -> dict:
+      """Calculates aerial reach vector and operating angle for Ladder 1/3."""
+      diagonal_reach = (building_height_m**2 + setback_distance_m**2) ** 0.5
+      reach_ratio = diagonal_reach / max_reach_m
+      return {
+          "required_reach_m": round(diagonal_reach, 2),
+          "reach_ratio": round(reach_ratio, 2),
+          "ladder_feasible": reach_ratio <= 0.85,  # 85% safety threshold under operational NFPA envelope
+          "setback_m": setback_distance_m,
+          "height_m": building_height_m
+      }
+  ```
+
+### 6.2 Topographic Slope Calculations & Apparatus Route Biasing
+* **Westwood Plateau & Burke Mountain Grade Hazards**:
+  * Topographic slopes across Burke Mountain (Coast Meridian Rd, David Ave, Harper Rd) and Westwood Plateau (Plateau Blvd, Parkway Blvd) feature grades ranging from **15% to 25%** ($\sim 8.5^\circ - 14.0^\circ$).
+  * Heavy apparatus (Tenders, 40,000+ lb Engine 1/2/3/4, Aerial Ladders) face severe brake thermal fade, transmission retarder limits, and uphill acceleration penalties on sustained $\ge 12\%$ grades.
+* **OSRM / Emergency Route Grade Penalties**:
+  * Slope $(\%) = \frac{\Delta \text{Elevation}}{\text{Run}} \times 100$
+  * The routing engine biases against routes with $>15\%$ downhill gradients for heavy units, favoring gentler arterial switchbacks unless primary access is physically impossible.
+
+### 6.3 Overhead Wire & Tree Canopy Clearance in Residential Cul-de-Sacs
+* **Vertical Clearance Envelope**:
+  * Full NFPA vertical clearance requires $\ge 4.15\text{m}$ (13.6 ft) for front-line Engines and Ladders.
+  * Point cloud classification filters return returns between $3.5\text{m}$ and $6.0\text{m}$ within the street right-of-way (ROW) buffer ($8\text{m}$ corridor).
+* **Cul-de-Sac Chokepoint Detection**:
+  * In heavily wooded cul-de-sacs (e.g., Chineside, Harbour Chines, Ranch Park, Westwood Plateau), mature Western Redcedar and Douglas Fir branch overgrowth combined with low-hanging telecommunications/power service drops are flagged as apparatus clearance warnings (`FLAG_OVERHEAD_OBSTRUCTION`).
+
+### 6.4 Wildland-Urban Interface (WUI) Fuel Canopy Density Modeling
+* **Northern Interface Boundary**:
+  * The northern municipal boundary adjoins Pinecone Burke Provincial Park, Eagle Mountain, and Coquitlam Watershed forests.
+* **Canopy Fuel Bulk Density (CBD) & Crown Base Height (CBH)**:
+  * LiDAR returns above $2.0\text{m}$ calculate Canopy Cover Percentage ($\text{CC}\%$) and Crown Volume within $30\text{m}$ and $100\text{m}$ defensible space buffers around residential property parcel lines.
+  * Structures with $\text{CC} > 60\%$ within $30\text{m}$ of natural forest interface are assigned elevated FireSmart wildfire hazard ratings on CAD dispatch.
+
+### 6.5 Floodplain Ground Bare-Earth Elevation Mapping
+* **Hydrological Inundation Zones**:
+  * Lowland areas along the Fraser River (Maillardville / Colony Farm / Fraser Mills), Coquitlam River corridor, and Pitt River floodplain lie at bare-earth elevations below $4.0\text{m}$ Geodetic Datum (CGVD28/CGVD2013).
+* **Freshet & Extreme High Tide Routing**:
+  * DTM bare-earth raster queries determine parcel immersion risk during spring freshet and king tides.
+  * Access roads with bare-earth elevations $\le 2.2\text{m}$ GVD are dynamically flagged when hydrological freshet warnings are broadcast.
+

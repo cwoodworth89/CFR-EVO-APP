@@ -40,25 +40,13 @@ function MiniMapAutoCenter({ lat, lng, polygonPositions }) {
   return null;
 }
 
-const miniTargetIcon = L.divIcon({
-  className: 'custom-mini-target-icon',
-  html: `<div style="
-    background-color: #f59e0b;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-    font-size: 11px;
-    box-sizing: border-box;
-    color: white;
-  ">🎯</div>`,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-  popupAnchor: [0, -10]
+const miniTargetIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [20, 32],
+  iconAnchor: [10, 32],
+  popupAnchor: [1, -28],
+  shadowSize: [32, 32]
 });
 
 export default function SatelliteMiniMap({

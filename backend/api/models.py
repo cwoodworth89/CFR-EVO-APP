@@ -10,7 +10,6 @@ except ModuleNotFoundError:
 SafeJSON = JSON().with_variant(JSONB(), "postgresql")
 SafeArray = JSON().with_variant(PG_ARRAY(String), "postgresql")
 SafeUUID = String(36).with_variant(UUID(as_uuid=True), "postgresql")
-SafeBigInt = BigInteger().with_variant(Integer, "sqlite")
 
 class LiveCallModel(Base):
     __tablename__ = "live_calls"
@@ -95,27 +94,13 @@ class RoadClosureModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-class StreetViewOverrideModel(Base):
-    __tablename__ = "streetview_overrides"
-    __table_args__ = {'extend_existing': True}
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    clean_address = Column(String(255), unique=True, index=True, nullable=False)
-    front_lat = Column(Float, nullable=True)
-    front_lng = Column(Float, nullable=True)
-    heading = Column(Float, nullable=True)
-    pitch = Column(Float, nullable=True)
-    fov = Column(Float, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
 class ParcelModel(Base):
     __tablename__ = "parcels"
     __table_args__ = {'extend_existing': True}
 
     # System
-    id = Column(SafeBigInt, primary_key=True, index=True, autoincrement=True)
-    parcel_uuid = Column(SafeUUID, default=lambda: str(uuid.uuid4()), nullable=False)
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    parcel_uuid = Column(SafeUUID, default=uuid.uuid4, nullable=False)
 
     # From Addresses.shp
     gis_id = Column(String(255), index=True, nullable=True)

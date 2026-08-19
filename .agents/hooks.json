@@ -1,6 +1,16 @@
 {
   "safety-guard": {
-    "enabled": false,
-    "PreToolUse": []
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys, json; data=json.load(sys.stdin); cmd=data.get('toolCall',{}).get('args',{}).get('CommandLine',''); blocked=['docker compose down -v', 'DROP DATABASE', 'systemctl poweroff', 'systemctl reboot']; match=any(b.lower() in cmd.lower() for b in blocked); print(json.dumps({'decision': 'deny', 'reason': 'Destructive operation blocked by safety-guard hook'} if match else {'decision': 'allow'}))\""
+          }
+        ]
+      }
+    ]
   }
 }

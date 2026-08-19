@@ -56,11 +56,11 @@ def is_allowed_network(client_ip_str: str) -> bool:
 
 try:
     from backend.api.database import get_db, engine, Base, SessionLocal
-    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel, StreetViewOverrideModel
+    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel
     from backend.api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 except ModuleNotFoundError:
     from api.database import get_db, engine, Base, SessionLocal
-    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel, StreetViewOverrideModel
+    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel
     from api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 
 # Ensure database tables exist
@@ -730,98 +730,6 @@ def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Sessi
             }
             for p in results
         ]
-    }
-
-
-@app.get("/api/parcels/bbox")
-def get_parcels_in_bbox(
-    min_lat: float = Query(...),
-    min_lng: float = Query(...),
-    max_lat: float = Query(...),
-    max_lng: float = Query(...),
-    limit: int = 1000,
-    dedupe: bool = True,
-    db: Session = Depends(get_db)
-):
-    """Returns local cadastral property points, zoning & house numbers within the bounding box for offline overlays."""
-    fetch_limit = min(max(1, limit), 2500)
-    
-    query = db.query(ParcelModel).filter(
-        ParcelModel.lat >= min_lat,
-        ParcelModel.lat <= max_lat,
-        ParcelModel.lng >= min_lng,
-        ParcelModel.lng <= max_lng
-    )
-    
-    if dedupe:
-        # Order by unit NULLs first so base building record takes precedence
-        query = query.order_by(ParcelModel.unit.nullsfirst(), ParcelModel.id.asc())
-        raw_parcels = query.limit(fetch_limit * 2).all()
-        
-        seen_keys = {}
-        deduped = []
-        for p in raw_parcels:
-            key = f"{p.house or ''}|{p.street or ''}|{p.streettype or ''}"
-            if not p.house and not p.street:
-                key = f"{round(p.lat or 0, 5)}|{round(p.lng or 0, 5)}"
-                
-            if key in seen_keys:
-                seen_keys[key]["units"] = (seen_keys[key]["units"] or 1) + 1
-                continue
-                
-            street_full = f"{p.street or ''} {p.streettype or ''}".strip()
-            item = {
-                "id": p.id,
-                "gis_id": p.gis_id,
-                "address": p.address,
-                "house": p.house,
-                "street": street_full or p.street,
-                "unit": p.unit,
-                "units": p.units or 1,
-                "zonetype1": p.zonetype1,
-                "lot": p.lot,
-                "plan": p.plan,
-                "lat": p.lat,
-                "lng": p.lng,
-                "front_lat": p.front_lat,
-                "front_lng": p.front_lng,
-                "centroid_lat": p.centroid_lat,
-                "centroid_lng": p.centroid_lng,
-                "zone_id": p.zone_id
-            }
-            seen_keys[key] = item
-            deduped.append(item)
-            if len(deduped) >= fetch_limit:
-                break
-        result_parcels = deduped
-    else:
-        raw_parcels = query.limit(fetch_limit).all()
-        result_parcels = [
-            {
-                "id": p.id,
-                "gis_id": p.gis_id,
-                "address": p.address,
-                "house": p.house,
-                "street": f"{p.street or ''} {p.streettype or ''}".strip() or p.street,
-                "unit": p.unit,
-                "units": p.units or 1,
-                "zonetype1": p.zonetype1,
-                "lot": p.lot,
-                "plan": p.plan,
-                "lat": p.lat,
-                "lng": p.lng,
-                "front_lat": p.front_lat,
-                "front_lng": p.front_lng,
-                "centroid_lat": p.centroid_lat,
-                "centroid_lng": p.centroid_lng,
-                "zone_id": p.zone_id
-            }
-            for p in raw_parcels
-        ]
-
-    return {
-        "count": len(result_parcels),
-        "parcels": result_parcels
     }
 
 

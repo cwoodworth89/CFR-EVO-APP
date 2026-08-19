@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { BaseMap, HydrantsLayer, CoquitlamOverlays, getParcelBoundaryCoordinates } from '../MapLayers';
+import { BaseMap, HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 
 function StableAutoCenterAndResize({ lat, lng, callKey }) {
@@ -28,25 +28,13 @@ function StableAutoCenterAndResize({ lat, lng, callKey }) {
   return null;
 }
 
-const targetIcon = L.divIcon({
-  className: 'custom-target-icon',
-  html: `<div style="
-    background-color: #4f46e5;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    font-size: 13px;
-    box-sizing: border-box;
-    color: white;
-  ">🎯</div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-  popupAnchor: [0, -12]
+const targetIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 
 export default function BlockParcelPanel({ activeCall }) {
@@ -56,7 +44,11 @@ export default function BlockParcelPanel({ activeCall }) {
   const destLng = activeCall?.lng ?? -122.7932;
   const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || `${destLat},${destLng}`);
 
-  const polygonPositions = getParcelBoundaryCoordinates(activeCall);
+  const polygonPositions = activeCall?.rings && activeCall.rings.length > 0
+    ? (Array.isArray(activeCall.rings[0][0])
+        ? activeCall.rings.map(ring => ring.map(([lng, lat]) => [lat, lng]))
+        : [activeCall.rings.map(([lng, lat]) => [lat, lng])])
+    : null;
 
   const renderMapContent = () => (
     <MapContainer

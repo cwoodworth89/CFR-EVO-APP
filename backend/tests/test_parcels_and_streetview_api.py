@@ -15,7 +15,7 @@ if root_dir not in sys.path:
 
 try:
     from api.database import SessionLocal, engine, Base
-    from api.models import ParcelModel
+    from api.models import ParcelModel, StreetViewOverrideModel
     from api.server import (
         _clean_streetview_address,
         lookup_parcel,
@@ -28,7 +28,7 @@ try:
     from scripts.migrate_streetview_to_parcels import migrate_overrides
 except ModuleNotFoundError:
     from backend.api.database import SessionLocal, engine, Base
-    from backend.api.models import ParcelModel
+    from backend.api.models import ParcelModel, StreetViewOverrideModel
     from backend.api.server import (
         _clean_streetview_address,
         lookup_parcel,
@@ -58,14 +58,14 @@ def test_address_normalization():
 def test_parcel_model_nullable_gis_id():
     print("Running test_parcel_model_nullable_gis_id...")
     db = SessionLocal()
-    existing = db.query(ParcelModel).filter(ParcelModel.address == "100 TEST ST").first()
+    existing = db.query(ParcelModel).filter(ParcelModel.clean_address == "100 TEST ST").first()
     if existing:
         db.delete(existing)
         db.commit()
 
     p = ParcelModel(
         gis_id=None,
-        address="100 TEST ST",
+        clean_address="100 TEST ST",
         front_lat=49.28,
         front_lng=-122.79,
         streetview_heading=180.0,
@@ -81,7 +81,7 @@ def test_parcel_model_nullable_gis_id():
 
     assert p.id is not None
     assert p.gis_id is None
-    assert p.address == "100 TEST ST"
+    assert p.clean_address == "100 TEST ST"
     assert p.streetview_heading == 180.0
     assert p.lock_box_notes == "Keybox at North entrance"
     
@@ -124,8 +124,10 @@ def test_save_and_lookup_parcel_streetview():
     assert lookup_res["parcel"]["streetview_heading"] == 135.5
 
     # Cleanup test row
-    p = db.query(ParcelModel).filter(ParcelModel.address == "999 TEST DISPATCH BLVD").first()
+    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "999 TEST DISPATCH BLVD").first()
     if p: db.delete(p)
+    ov = db.query(StreetViewOverrideModel).filter(StreetViewOverrideModel.clean_address == "999 TEST DISPATCH BLVD").first()
+    if ov: db.delete(ov)
     db.commit()
     db.close()
     print("PASSED: test_save_and_lookup_parcel_streetview")
@@ -151,7 +153,7 @@ def test_streetview_overrides_endpoint():
     assert override["front_lat"] == 49.29
 
     # Cleanup
-    p = db.query(ParcelModel).filter(ParcelModel.address == "888 MIGRATION ST").first()
+    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "888 MIGRATION ST").first()
     if p:
         db.delete(p)
         db.commit()
@@ -177,118 +179,12 @@ def test_legacy_post_streetview_overrides():
     assert res["parcel"]["front_lat"] == 49.25
 
     # Cleanup
-    p = db.query(ParcelModel).filter(ParcelModel.address == "777 OVERRIDE RD").first()
+    p = db.query(ParcelModel).filter(ParcelModel.clean_address == "777 OVERRIDE RD").first()
     if p:
         db.delete(p)
         db.commit()
     db.close()
     print("PASSED: test_legacy_post_streetview_overrides")
-def test_get_parcels_in_bbox():
-    print("Running test_get_parcels_in_bbox...")
-    db = SessionLocal()
-    
-    # Insert test parcels with various attributes
-    p1 = ParcelModel(
-        gis_id="!TEST01",
-        address="1001 TEST BBOX AVE",
-        house="1001",
-        street="TEST BBOX AVE",
-        streettype="AVE",
-        unit="101",
-        units=1,
-        zonetype1="RM-3",
-        lot="1",
-        plan="LMS999",
-        lat=49.2850,
-        lng=-122.7950,
-        zone_id="83"
-    )
-    p2 = ParcelModel(
-        gis_id="!TEST01",
-        address="1001 TEST BBOX AVE 102",
-        house="1001",
-        street="TEST BBOX AVE",
-        streettype="AVE",
-        unit="102",
-        units=1,
-        zonetype1="RM-3",
-        lot="1",
-        plan="LMS999",
-        lat=49.2850,
-        lng=-122.7950,
-        zone_id="83"
-    )
-    p3 = ParcelModel(
-        gis_id="!TEST02",
-        address="1005 TEST BBOX AVE",
-        house="1005",
-        street="TEST BBOX AVE",
-        streettype="AVE",
-        unit=None,
-        units=1,
-        zonetype1="RS-1",
-        lot="2",
-        plan="LMS999",
-        lat=49.2860,
-        lng=-122.7940,
-        zone_id="83"
-    )
-    db.add_all([p1, p2, p3])
-    db.commit()
-
-    try:
-        from api.server import get_parcels_in_bbox
-    except ModuleNotFoundError:
-        from backend.api.server import get_parcels_in_bbox
-
-    # 1. Bbox query covering all test points with dedupe=True
-    res_dedupe = get_parcels_in_bbox(
-        min_lat=49.2800,
-        min_lng=-122.8000,
-        max_lat=49.2900,
-        max_lng=-122.7900,
-        limit=100,
-        dedupe=True,
-        db=db
-    )
-    assert res_dedupe["count"] >= 2
-    test_parcels = [p for p in res_dedupe["parcels"] if "TEST BBOX AVE" in (p.get("street") or "")]
-    assert len(test_parcels) == 2  # p1 and p2 deduped into 1, plus p3
-    multi_unit = next(p for p in test_parcels if p["house"] == "1001")
-    assert multi_unit["units"] >= 2
-    assert multi_unit["zonetype1"] == "RM-3"
-
-    # 2. Bbox query with dedupe=False
-    res_raw = get_parcels_in_bbox(
-        min_lat=49.2800,
-        min_lng=-122.8000,
-        max_lat=49.2900,
-        max_lng=-122.7900,
-        limit=100,
-        dedupe=False,
-        db=db
-    )
-    test_raw = [p for p in res_raw["parcels"] if "TEST BBOX AVE" in (p.get("street") or "")]
-    assert len(test_raw) == 3
-
-    # 3. Out of bounds query
-    res_empty = get_parcels_in_bbox(
-        min_lat=40.0,
-        min_lng=-130.0,
-        max_lat=40.1,
-        max_lng=-129.9,
-        limit=100,
-        dedupe=True,
-        db=db
-    )
-    assert res_empty["count"] == 0
-    assert len(res_empty["parcels"]) == 0
-
-    # Cleanup
-    db.query(ParcelModel).filter(ParcelModel.street == "TEST BBOX AVE").delete()
-    db.commit()
-    db.close()
-    print("PASSED: test_get_parcels_in_bbox")
 
 if __name__ == "__main__":
     print("\n--- Running Milestone 1 Parcels & Street View Test Harness ---")
@@ -298,6 +194,4 @@ if __name__ == "__main__":
     test_save_and_lookup_parcel_streetview()
     test_streetview_overrides_endpoint()
     test_legacy_post_streetview_overrides()
-    test_get_parcels_in_bbox()
-    print("\n[SUCCESS] ALL PARCELS & CADASTRAL OVERLAY TESTS PASSED SUCCESSFULLY!\n")
-
+    print("\n[SUCCESS] ALL MILESTONE 1 TESTS PASSED SUCCESSFULLY!\n")

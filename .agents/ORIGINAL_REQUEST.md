@@ -1,31 +1,29 @@
 # Original User Request
 
-## 2026-08-19T00:24:51Z
+## 2026-08-14T17:06:05Z
 
-This is a single self-contained fix; keep it small and focused.
-Root-cause diagnosis and clean restoration of the authentic Coquitlam Cadastral property/address overlay layer, ensuring 100% local offline operation with zero synthetic black-box badges or ad-hoc visual hacks.
+Comprehensive multi-agent architectural review and validation for the CFR EVO v1.0.0 Feature Freeze, Component Decomposition, Model Tier Cost Allocation, and 100% Offline Emergency Dispatch Kiosk Hardening.
 
 Working directory: c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP
 Integrity mode: development
 
 ## Requirements
 
-### R1. Root Cause Architecture Diagnosis
-Investigate why the authentic municipal Cadastral overlay (property parcel boundary polygons, zoning, and address numbering) failed to display in the UI, auditing MapLayers.jsx, MapBoard.jsx, DashboardHUD.jsx, and local GIS endpoints.
+### R1. Multi-Perspective Architectural Review
+Evaluate the v1.0.0 Implementation Plan across Backend/DSP, Frontend/Kiosk Ergonomics, GIS/Master Properties, and MLOps/Whisper Training. Identify potential edge cases, architectural bottlenecks, and risk areas before code execution.
 
-### R2. Authentic Cadastral Vector Layer Restoration
-Restore the authentic municipal Cadastral overlay using local offline GIS authority (local shapefiles, PostgreSQL/FastAPI vector endpoints, or vector MBTiles), rendering clean, thin parcel boundary lines and crisp numeric labels matching standard municipal GIS specifications.
-- Must NOT introduce ad-hoc DivIcon black badges or clumsy visual overrides.
-- Must operate 100% offline without relying on external WAN servers.
+### R2. Model Tier & AI Credit Optimization Strategy
+Assign every phase and task to the optimal model tier:
+- **Flash-Lite / Flash (Low Effort)**: Deterministic test runners (backtest_parser.py, orphan scans), dead code pruning, terminology renames (Simulate -> Review), and batch test looping.
+- **Flash (Medium/High Effort)**: Component decomposition into sub-folders (ReviewTable, AudioWaveformPlayer, VerificationSidebar), SQL schema definitions, and browser visual inspection.
+- **Pro (High Reasoning)**: PA Golden Fingerprint FFT harmonic analysis, Street View atan2 vantage vector math, OSRM Lua profile road weighting, and LoRA attention adapter fine-tuning.
 
-### R3. Toggle Contract & Cross-Basemap Integration
-Ensure the Cadastral overlay toggle operates cleanly and deterministically across all basemap modes (Street with labels, Street no-labels, and 7.5cm Satellite) from Zoom 14 through Zoom 20.
+### R3. Zero-Online-Fallback & Offline Verification Guardrails
+Validate that all runtime geocoding, emergency routing, and speech-to-text operations function 100% offline against local PostgreSQL and containerized OSRM without remote internet dependencies (except add-on Street View/Satellite PiPs).
 
 ## Acceptance Criteria
 
-### Visual & Functional Standards
-- [ ] No synthetic black box DivIcon badges or clumsy CSS artifacts exist anywhere in the application.
-- [ ] Authentic property parcel boundary line polygons render cleanly over the basemap when Cadastral/Labels is enabled.
-- [ ] Civic address numbers and street names display with crisp, legible municipal typography.
-- [ ] 100% offline operation: no external internet requests made to external ArcGIS servers during runtime.
-- [ ] Production frontend build passes (npm run build) with zero errors or unresolved symbol warnings.
+### Architectural Feasibility & Review Package
+- [ ] Every phase (Phase 0 to Phase 5) is reviewed with actionable feedback from specialized engineering perspectives.
+- [ ] A definitive model allocation matrix assigns each task to Flash-Lite, Flash, or Pro.
+- [ ] Verification rubrics confirm zero online fallbacks and strict local data authority.

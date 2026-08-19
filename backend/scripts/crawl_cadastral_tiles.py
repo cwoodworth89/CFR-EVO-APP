@@ -1,0 +1,487 @@
+#!/usr/bin/env python3
+"""
+crawl_cadastral_tiles.py
+========================
+Pre-caches the City of Coquitlam ArcGIS Cadastral MapServer overlay into
+a local `cadastral.mbtiles` SQLite archive for 100% offline emergency dispatch mapping.
+
+Features:
+- Converts Slippy XYZ tile coordinates to Web Mercator (EPSG:3857) bounding boxes
+- Fetches transparent PNG32 tiles for layers [0: Road Labels, 1: Address Labels, 16: Parcels]
+- Writes directly to standard MBTiles SQLite format (tiles & metadata tables)
+- Uses Slippy XYZ -> TMS coordinate conversion for MBTiles spec compliance
+- Multi-threaded worker pool with configurable thread-safe rate-limiting
+- Resumable: automatically skips tiles already present in the SQLite archive
+- Real-time ETA, throughput (tiles/s), and progress reporting
+"""
+
+import os
+import sys
+import math
+import time
+import sqlite3
+import argparse
+import logging
+import threading
+import urllib.parse
+import urllib.request
+import urllib.error
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Tuple, Dict, Any, Optional, Set
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S"
+)
+logger = logging.getLogger("cadastral_crawler")
+
+# Default Municipal Operational Bounds (City of Coquitlam)
+DEFAULT_MIN_LAT = 49.22
+DEFAULT_MAX_LAT = 49.35
+DEFAULT_MIN_LON = -122.92
+DEFAULT_MAX_LON = -122.72
+
+MAPSERVER_EXPORT_URL = (
+    "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/export"
+)
+
+USER_AGENT = "CFR-EVO/1.0 (Coquitlam Fire Rescue Offline Cadastral Tile Crawler)"
+
+# EPSG:3857 Web Mercator constants
+ORIGIN_SHIFT = 20037508.342789244  # Earth circumference / 2 in Web Mercator meters
+
+
+class RateLimiter:
+    """Thread-safe pacing limiter to prevent overwhelming municipal servers."""
+    def __init__(self, min_interval_sec: float):
+        self.min_interval = max(0.0, min_interval_sec)
+        self.lock = threading.Lock()
+        self.last_request_time = 0.0
+
+    def wait(self):
+        if self.min_interval <= 0:
+            return
+        with self.lock:
+            now = time.time()
+            elapsed = now - self.last_request_time
+            if elapsed < self.min_interval:
+                time.sleep(self.min_interval - elapsed)
+            self.last_request_time = time.time()
+
+
+def deg2num(lat_deg: float, lon_deg: float, zoom: int) -> Tuple[int, int]:
+    """Convert WGS84 lat/lon to Slippy map tile X, Y coordinates."""
+    lat_rad = math.radians(lat_deg)
+    n = 1 << zoom
+    x = int((lon_deg + 180.0) / 360.0 * n)
+    y = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+    x = max(0, min(x, n - 1))
+    y = max(0, min(y, n - 1))
+    return (x, y)
+
+
+def tile_to_web_mercator_bbox(z: int, x: int, y: int) -> Tuple[float, float, float, float]:
+    """
+    Convert Slippy map tile coordinates (z, x, y) to Web Mercator (EPSG:3857) bounding box.
+    Returns (west, south, east, north) in Web Mercator meters.
+    """
+    n = 1 << z
+    tile_size = (ORIGIN_SHIFT * 2.0) / n
+    west = -ORIGIN_SHIFT + x * tile_size
+    east = -ORIGIN_SHIFT + (x + 1) * tile_size
+    north = ORIGIN_SHIFT - y * tile_size
+    south = ORIGIN_SHIFT - (y + 1) * tile_size
+    return (west, south, east, north)
+
+
+def calculate_tiles(min_lat: float, min_lon: float, max_lat: float, max_lon: float, z: int) -> List[Tuple[int, int, int]]:
+    """Calculate all Slippy tile coordinates (z, x, y) for a bounding box at zoom z."""
+    x_nw, y_nw = deg2num(max_lat, min_lon, z)
+    x_se, y_se = deg2num(min_lat, max_lon, z)
+    x_min, x_max = min(x_nw, x_se), max(x_nw, x_se)
+    y_min, y_max = min(y_nw, y_se), max(y_nw, y_se)
+
+    tiles = []
+    for x in range(x_min, x_max + 1):
+        for y in range(y_min, y_max + 1):
+            tiles.append((z, x, y))
+    return tiles
+
+
+def init_mbtiles_db(
+    db_path: str,
+    min_zoom: int,
+    max_zoom: int,
+    bounds: Tuple[float, float, float, float]
+) -> sqlite3.Connection:
+    """Initialize an MBTiles SQLite database with metadata and tiles schema."""
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    cur = conn.cursor()
+
+    cur.execute("PRAGMA journal_mode = WAL;")
+    cur.execute("PRAGMA synchronous = NORMAL;")
+    cur.execute("PRAGMA cache_size = -64000;")  # 64MB RAM cache
+
+    cur.execute("CREATE TABLE IF NOT EXISTS metadata (name text, value text);")
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS tiles ("
+        "  zoom_level integer, "
+        "  tile_column integer, "
+        "  tile_row integer, "
+        "  tile_data blob"
+        ");"
+    )
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS tile_index "
+        "ON tiles (zoom_level, tile_column, tile_row);"
+    )
+
+    west, south, east, north = bounds
+    metadata = {
+        "name": "cadastral",
+        "type": "overlay",
+        "version": "1.0",
+        "description": "City of Coquitlam ArcGIS Cadastral MapServer Offline Tile Cache (Roads, Addresses, Parcels)",
+        "format": "png",
+        "bounds": f"{west},{south},{east},{north}",
+        "minzoom": str(min_zoom),
+        "maxzoom": str(max_zoom),
+        "center": f"{(west + east) / 2.0:.5f},{(south + north) / 2.0:.5f},{min_zoom}",
+    }
+    for k, v in metadata.items():
+        cur.execute("INSERT OR REPLACE INTO metadata (name, value) VALUES (?, ?);", (k, v))
+
+    conn.commit()
+    return conn
+
+
+def get_existing_tile_keys(conn: sqlite3.Connection) -> Set[Tuple[int, int, int]]:
+    """Return set of existing (zoom_level, tile_column, tile_row) in the MBTiles database."""
+    cur = conn.cursor()
+    cur.execute("SELECT zoom_level, tile_column, tile_row FROM tiles;")
+    return set(cur.fetchall())
+
+
+def download_cadastral_tile(
+    tile: Tuple[int, int, int],
+    rate_limiter: RateLimiter,
+    layers: str = "show:0,1,16",
+    tile_size: str = "256,256",
+    max_retries: int = 3
+) -> Optional[Tuple[int, int, int, bytes]]:
+    """
+    Download a single transparent PNG32 tile from ArcGIS Cadastral MapServer.
+    Converts Slippy y -> TMS tile_row: tile_row = (1 << z) - 1 - y.
+    Returns (z, x, tile_row, tile_data) or None if failed.
+    """
+    z, x, y = tile
+    y_tms = (1 << z) - 1 - y
+
+    west, south, east, north = tile_to_web_mercator_bbox(z, x, y)
+    bbox_str = f"{west:.4f},{south:.4f},{east:.4f},{north:.4f}"
+
+    params = {
+        "bbox": bbox_str,
+        "bboxSR": "3857",
+        "imageSR": "3857",
+        "size": tile_size,
+        "format": "png32",
+        "transparent": "true",
+        "layers": layers,
+        "f": "image"
+    }
+
+    url = f"{MAPSERVER_EXPORT_URL}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "image/png,image/*;q=0.9,*/*;q=0.8"
+        }
+    )
+
+    for attempt in range(1, max_retries + 1):
+        rate_limiter.wait()
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                if resp.status == 200:
+                    data = resp.read()
+                    # Verify PNG signature (89 50 4E 47 0D 0A 1A 0A) and minimum byte size
+                    if len(data) >= 50 and data[:8] == b'\x89PNG\r\n\x1a\n':
+                        return (z, x, y_tms, data)
+                    elif b"error" in data[:200].lower():
+                        logger.debug(f"ArcGIS returned error message for tile {tile}: {data[:120]}")
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+                time.sleep(1.0 * (2 ** (attempt - 1)))
+            else:
+                logger.debug(f"HTTPError {e.code} for tile {tile}")
+        except Exception as e:
+            if attempt < max_retries:
+                time.sleep(0.5 * (2 ** (attempt - 1)))
+            else:
+                logger.debug(f"Exception fetching tile {tile}: {e}")
+
+    return None
+
+
+def format_duration(seconds: float) -> str:
+    """Format seconds into HH:MM:SS string."""
+    seconds = int(seconds)
+    hrs = seconds // 3600
+    mins = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hrs:02d}:{mins:02d}:{secs:02d}"
+
+
+def crawl_cadastral(
+    output_file: str,
+    min_zoom: int = 14,
+    max_zoom: int = 20,
+    min_lat: float = DEFAULT_MIN_LAT,
+    max_lat: float = DEFAULT_MAX_LAT,
+    min_lon: float = DEFAULT_MIN_LON,
+    max_lon: float = DEFAULT_MAX_LON,
+    delay_sec: float = 0.2,
+    workers: int = 8,
+    layers: str = "show:0,1,16",
+    tile_size: str = "256,256",
+    dry_run: bool = False
+):
+    """Main execution function to crawl and compile cadastral.mbtiles."""
+    bounds = (min_lon, min_lat, max_lon, max_lat)
+
+    logger.info("=" * 75)
+    logger.info(" COQUITLAM CADASTRAL MAPSERVER OFFLINE MBTILES CRAWLER")
+    logger.info("=" * 75)
+    logger.info(f" Target MBTiles : {output_file}")
+    logger.info(f" Zoom Range     : {min_zoom} -> {max_zoom}")
+    logger.info(f" Bounding Box   : Lon [{min_lon}, {max_lon}], Lat [{min_lat}, {max_lat}]")
+    logger.info(f" Layers         : {layers}")
+    logger.info(f" Workers / Delay: {workers} concurrent workers | {delay_sec * 1000:.0f}ms delay (~{1.0/delay_sec:.1f} req/s)")
+    logger.info("=" * 75)
+
+    # 1. Calculate tile grid per zoom level
+    zoom_tile_map: Dict[int, List[Tuple[int, int, int]]] = {}
+    total_grid_tiles = 0
+
+    for z in range(min_zoom, max_zoom + 1):
+        z_tiles = calculate_tiles(min_lat, min_lon, max_lat, max_lon, z)
+        zoom_tile_map[z] = z_tiles
+        total_grid_tiles += len(z_tiles)
+        logger.info(f"  * Zoom {z:>2}: {len(z_tiles):>7,} tiles")
+
+    logger.info(f" Total Grid Tiles: {total_grid_tiles:,}")
+    logger.info("-" * 75)
+
+    if dry_run:
+        logger.info("Dry run requested. Exiting without downloading.")
+        return
+
+    # 2. Initialize or connect to MBTiles database
+    conn = init_mbtiles_db(output_file, min_zoom, max_zoom, bounds)
+    existing_keys = get_existing_tile_keys(conn)
+    logger.info(f" Existing cached tiles in MBTiles: {len(existing_keys):,}")
+
+    # 3. Filter missing tiles to download
+    tiles_to_download: List[Tuple[int, int, int]] = []
+    for z in range(min_zoom, max_zoom + 1):
+        for t in zoom_tile_map[z]:
+            tz, tx, ty = t
+            t_tms = (1 << tz) - 1 - ty
+            if (tz, tx, t_tms) not in existing_keys:
+                tiles_to_download.append(t)
+
+    logger.info(f" Missing tiles to download: {len(tiles_to_download):,}")
+
+    if not tiles_to_download:
+        logger.info("All cadastral tiles are already cached in the MBTiles archive!")
+        conn.close()
+        return
+
+    # 4. Multi-threaded download with rate-limiting
+    rate_limiter = RateLimiter(min_interval_sec=delay_sec)
+    start_time = time.time()
+    downloaded = 0
+    failed = 0
+    batch = []
+    cur = conn.cursor()
+    total_missing = len(tiles_to_download)
+
+    logger.info(f"Starting crawl of {total_missing:,} tiles...")
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_tile = {
+            executor.submit(
+                download_cadastral_tile,
+                t,
+                rate_limiter,
+                layers,
+                tile_size
+            ): t
+            for t in tiles_to_download
+        }
+
+        for future in as_completed(future_to_tile):
+            res = future.result()
+            if res is not None:
+                batch.append(res)
+                downloaded += 1
+                if len(batch) >= 100:
+                    cur.executemany(
+                        "INSERT OR REPLACE INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?);",
+                        batch
+                    )
+                    conn.commit()
+                    batch = []
+            else:
+                failed += 1
+
+            total_done = downloaded + failed
+            if total_done % 25 == 0 or total_done == total_missing:
+                elapsed = time.time() - start_time
+                rate = total_done / elapsed if elapsed > 0 else 0.0
+                remaining_tiles = total_missing - total_done
+                eta_sec = remaining_tiles / rate if rate > 0 else 0.0
+                pct = (total_done / total_missing) * 100.0
+
+                sys.stdout.write(
+                    f"\r Progress: {total_done:,}/{total_missing:,} ({pct:5.1f}%) | "
+                    f"[+] {downloaded:,} ok | [x] {failed:,} fail | "
+                    f"{rate:4.1f} tiles/s | ETA: {format_duration(eta_sec)}"
+                )
+                sys.stdout.flush()
+
+    # Commit any remaining batched tiles
+    if batch:
+        cur.executemany(
+            "INSERT OR REPLACE INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?);",
+            batch
+        )
+        conn.commit()
+
+    total_elapsed = time.time() - start_time
+    print(
+        f"\nCrawl phase completed in {format_duration(total_elapsed)} "
+        f"({downloaded:,} ok, {failed:,} failed, {downloaded/total_elapsed:.1f} tiles/s)."
+    )
+
+    # 5. Summary & verification
+    cur.execute("SELECT zoom_level, count(*) FROM tiles GROUP BY zoom_level ORDER BY zoom_level;")
+    zoom_stats = cur.fetchall()
+
+    logger.info("=" * 75)
+    logger.info(" CADASTRAL MBTILES SUMMARY")
+    logger.info("=" * 75)
+    total_db_tiles = 0
+    for z, cnt in zoom_stats:
+        total_db_tiles += cnt
+        logger.info(f"  * Zoom {z:>2}: {cnt:>7,} tiles")
+
+    file_size_mb = os.path.getsize(output_file) / (1024 * 1024)
+    logger.info(f" Total Tiles in Archive : {total_db_tiles:,}")
+    logger.info(f" Final Archive File Size: {file_size_mb:.2f} MB")
+    logger.info("=" * 75)
+
+    conn.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Pre-crawl City of Coquitlam ArcGIS Cadastral MapServer overlay into offline MBTiles archive."
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Target MBTiles output path (default: backend/data/tiles/cadastral.mbtiles)"
+    )
+    parser.add_argument(
+        "--min-zoom",
+        type=int,
+        default=14,
+        help="Minimum zoom level (default: 14)"
+    )
+    parser.add_argument(
+        "--max-zoom",
+        type=int,
+        default=20,
+        help="Maximum zoom level (default: 20)"
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0.2,
+        help="Minimum delay between requests in seconds (default: 0.2s = 200ms)"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="Number of concurrent worker threads (default: 8)"
+    )
+    parser.add_argument(
+        "--bbox",
+        type=str,
+        default=f"{DEFAULT_MIN_LON},{DEFAULT_MIN_LAT},{DEFAULT_MAX_LON},{DEFAULT_MAX_LAT}",
+        help=f"Bounding box as west,south,east,north (default: {DEFAULT_MIN_LON},{DEFAULT_MIN_LAT},{DEFAULT_MAX_LON},{DEFAULT_MAX_LAT})"
+    )
+    parser.add_argument(
+        "--layers",
+        type=str,
+        default="show:0,1,16",
+        help="ArcGIS MapServer layers to export (default: show:0,1,16 for Road Labels, Address Labels, Parcels)"
+    )
+    parser.add_argument(
+        "--size",
+        type=str,
+        default="256,256",
+        help="Tile image size in pixels (default: 256,256)"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Calculate and report tile counts without downloading"
+    )
+
+    args = parser.parse_args()
+
+    # Parse bbox
+    try:
+        parts = [float(p.strip()) for p in args.bbox.split(",")]
+        if len(parts) != 4:
+            raise ValueError("Bounding box must have 4 float values: west,south,east,north")
+        west, south, east, north = parts
+    except Exception as e:
+        logger.error(f"Invalid --bbox argument: {e}")
+        sys.exit(1)
+
+    # Determine output path
+    if args.output:
+        out_path = Path(args.output).resolve()
+    else:
+        script_dir = Path(__file__).resolve().parent
+        repo_root = script_dir.parent
+        out_path = repo_root / "data" / "tiles" / "cadastral.mbtiles"
+
+    crawl_cadastral(
+        output_file=str(out_path),
+        min_zoom=args.min_zoom,
+        max_zoom=args.max_zoom,
+        min_lat=south,
+        max_lat=north,
+        min_lon=west,
+        max_lon=east,
+        delay_sec=args.delay,
+        workers=args.workers,
+        layers=args.layers,
+        tile_size=args.size,
+        dry_run=args.dry_run
+    )
+
+
+if __name__ == "__main__":
+    main()

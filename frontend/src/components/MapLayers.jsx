@@ -2,7 +2,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Marker, CircleMarker, Tooltip, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { dynamicMapLayer } from 'esri-leaflet';
 import * as turf from '@turf/turf';
 import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 import { TILE_BASE_URL } from '../apiClient';
@@ -132,33 +131,20 @@ export function BaseMap({ style, useLabelsFallback }) {
     return null;
 }
 
-// 🏗️ COQUITLAM ROADS/PARCELS
+// 🏗️ COQUITLAM ROADS/PARCELS (100% Offline Local MBTiles overlay via mbtileserver on port 8081)
 export function CoquitlamOverlays({ visible, onLoadError }) {
     const map = useMap();
     useEffect(() => {
       if (!visible) return;
       
-      const overlayLayer = dynamicMapLayer({
-          url: "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer",
-          opacity: 0.9,
-          layers: [0, 1, 16], // Roads, Addresses, Parcels
-          f: 'image'
-      });
-
-      if (onLoadError) {
-          overlayLayer.on('requesterror', (err) => {
-              console.warn("Coquitlam Cadastral map server is inaccessible. Triggering standard basemap labels fallback.", err);
-              onLoadError();
-          });
-      }
-
+      const overlayLayer = L.tileLayer(
+          `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
+          { transparent: true, opacity: 0.9, maxNativeZoom: 20, maxZoom: 22 }
+      );
       overlayLayer.addTo(map);
 
-      return () => { 
-          overlayLayer.off('requesterror');
-          map.removeLayer(overlayLayer);
-      };
-    }, [map, visible, onLoadError]);
+      return () => { map.removeLayer(overlayLayer); };
+    }, [map, visible]);
     
     return null;
 }

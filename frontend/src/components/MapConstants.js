@@ -56,6 +56,24 @@ export const BASE_LAYERS = {
     subdomains: ['a', 'b', 'c'],
     maxNativeZoom: 18,
     maxZoom: 22
+  },
+  CADASTRAL: {
+    type: 'tile',
+    url: `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
+    fallbackUrl: null, // 100% pure offline local pre-cached tiles
+    attribution: 'City of Coquitlam Cadastral (100% Offline Local Cache)',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 20,
+    maxZoom: 22
+  }
+};
+
+export const OVERLAY_LAYERS = {
+  CADASTRAL: {
+    url: `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
+    fallbackUrl: null,
+    maxNativeZoom: 20,
+    maxZoom: 22,
   }
 };
 

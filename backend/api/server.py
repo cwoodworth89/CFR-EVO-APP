@@ -56,11 +56,11 @@ def is_allowed_network(client_ip_str: str) -> bool:
 
 try:
     from backend.api.database import get_db, engine, Base, SessionLocal
-    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel
+    from backend.api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel, StreetViewOverrideModel
     from backend.api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 except ModuleNotFoundError:
     from api.database import get_db, engine, Base, SessionLocal
-    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel
+    from api.models import LiveCallModel, EvaluationHistoryModel, DispatchUploadModel, RoadClosureModel, ParcelModel, StreetViewOverrideModel
     from api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
 
 # Ensure database tables exist
@@ -783,6 +783,10 @@ def get_parcels_in_bbox(
                 "plan": p.plan,
                 "lat": p.lat,
                 "lng": p.lng,
+                "front_lat": p.front_lat,
+                "front_lng": p.front_lng,
+                "centroid_lat": p.centroid_lat,
+                "centroid_lng": p.centroid_lng,
                 "zone_id": p.zone_id
             }
             seen_keys[key] = item
@@ -806,6 +810,10 @@ def get_parcels_in_bbox(
                 "plan": p.plan,
                 "lat": p.lat,
                 "lng": p.lng,
+                "front_lat": p.front_lat,
+                "front_lng": p.front_lng,
+                "centroid_lat": p.centroid_lat,
+                "centroid_lng": p.centroid_lng,
                 "zone_id": p.zone_id
             }
             for p in raw_parcels

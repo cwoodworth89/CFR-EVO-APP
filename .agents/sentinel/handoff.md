@@ -1,34 +1,37 @@
-# Sentinel Handoff Report — CFR EVO v1.0.0 Architectural Review & Validation
+# Sentinel Final Handoff Report
 
 ## 1. Observation
-- The project orchestrator dispatched four exploratory subagents across Backend/DSP, Frontend/Kiosk Ergonomics, GIS/Master Properties, and MLOps/STT.
-- The team produced the Master Architectural Review Package across Phases 0–5, the Model Tier Cost Allocation Matrix (33 discrete tasks), and the Zero-Online-Fallback Offline Verification Rubrics.
-- Quality gates were validated by an adversarial challenger and forensic auditor.
-- Independent Victory Auditor `d940fb13-baf3-4311-8838-de9cb07ec907` independently audited the codebase, verified empirical builds, executed tests, and issued a verdict of **VICTORY CONFIRMED**.
+- **Original User Request**: Single self-contained fix to diagnose and cleanly restore the authentic Coquitlam Cadastral property/address overlay layer with 100% offline local GIS operation, zero synthetic black-box badges or ad-hoc visual hacks.
+- **Routing Decision**: Routed to SWE Light (`teamwork_preview_swe`) based on explicit single self-contained scope.
+- **Execution & Reviews**: Orchestrator executed full SWE Light cycle including implementation, 3 adversarial review rounds, and a refinement round.
+- **Independent Victory Audit**:
+  - Audit Round 1: `VICTORY REJECTED` due to test runner syntax and backend import issues.
+  - Audit Round 2: `VICTORY CONFIRMED` (`teamwork_preview_victory_auditor`, conversation `8dc55421-1a00-458b-9ba7-0c41a7f05871`).
+  - Independent Execution Results:
+    - `node frontend/test_tile_layer_adversarial.js`: 42/42 passed (0 failures).
+    - `python backend/tests/test_parcels_and_streetview_api.py`: 7/7 passed (0 failures).
+    - `npm run build` in `frontend/`: Clean build in 3.07s (0 errors, 0 warnings).
 
 ## 2. Logic Chain
-1. **R1 Multi-Perspective Architectural Review**:
-   - Backend/DSP: Verified continuous streaming loop, dynamic RMS baseline noise gating (`deque(maxlen=50)`), 5th-order Butterworth HPF ($f_c=300\text{ Hz}$), Hamming window FFT Z-score peak spotter ($Z \ge 30.0$), Station PA paging tone interception (`595/647 Hz`), two-phase dispatch slicing (Phase 1 TTA < 15s, Phase 2 full verification), and dynamic `sys.path` injection.
-   - Frontend/Kiosk Ergonomics: Validated 10-foot apparatus bay wall-mounted display ergonomics (70px primary address, high-contrast badges, dual-tone chime) vs workstation console. Decomposed `DispatchReview.jsx` (1,602 lines) into modular subcomponents under `frontend/src/components/review/`. Identified Rule 1 relative `fetch()` remediation requirements.
-   - GIS, Properties & Routing: Verified $O(1)$ in-memory hash geocoding over 69,708 records (`Addresses.shp`), subaddress stripping, Riverview/Gordon overrides, parcel boundary rings, 3,381 NFPA 291 hydrants in Turf.js RAM (<1ms bbox query), containerized OSRM MLD engine (:5000) with `continue_straight=true` momentum preservation, Station 1 Southbound Apron offset (`49.2905, -122.7915`) + tactical corridor injection, Street View Great Circle `atan2` vantage math, and road closure ray-casting PIP.
-   - MLOps & Whisper STT: Verified Whisper base/tiny fine-tuning with PEFT LoRA ($r=32$, $\alpha=64$), weight merging, CTranslate2 `int8` CPU quantization (<1.5s latency, ~180MB RAM), ground-truth dataset curation with `<35s` cutoff filter and double-round transcript duplication for $>25\text{s}$ broadcasts, SMMR & symmetric Levenshtein WER/CER regression backtesting, phonetic homophone regex sanitization, and Google Colab zero-cost training loop.
-2. **R2 Model Tier Cost Allocation Matrix**:
-   - 33 discrete tasks classified across 6 phases.
-   - 12 Flash-Lite tasks (36.4%): Deterministic test runners, relative `fetch()` fixes, dead code pruning, static dictionaries (~95% cost reduction).
-   - 14 Flash tasks (42.4%): Modular component decomposition, React hooks, SQL schemas, spatial Turf.js bbox filtering (~75% cost reduction).
-   - 7 Pro tasks (21.2%): FFT harmonic DSP, `atan2` vantage geometry, PEFT LoRA attention fine-tuning, OSRM kinematics & trajectory modeling, two-phase audio slicing async state machine.
-   - **Net AI Credit Savings**: **~72.4%** reduction vs an unoptimized Pro baseline.
-3. **R3 Zero-Online-Fallback Offline Verification Rubrics**:
-   - Explicit pass/fail offline verification criteria defined for Phase 0 through Phase 5, strictly enforcing local PostgreSQL 16, Mosquitto MQTT, OSRM MLD container, local shapefiles/GeoJSON, and local CTranslate2 `int8` models with zero remote runtime cloud dependencies.
+1. Original request recorded verbatim in `.agents/ORIGINAL_REQUEST.md`.
+2. SWE Light Orchestrator identified root cause in `MapLayers.jsx` and `MapBoard.jsx`, restored clean Canvas-rendered vector parcel boundary polygons (`#0284c7`), transparent container labels with crisp municipal drop shadows (`.cadastral-house-number`), and established cross-basemap compatibility (GREY, DARK, VOYAGER, OSM, SATELLITE).
+3. 100% offline local compliance enforced: all external ArcGIS/Esri URLs eliminated; data served via local MBTiles (`:8081`) and local PostgreSQL 16 (`:5432`).
+4. An adversarial test runner defect caught in Victory Audit Round 1 was remediated in Round 5.
+5. Independent Victory Audit Round 2 independently executed the entire test suite and frontend build, confirming 100% compliance with zero facade implementations or visual hacks.
 
 ## 3. Caveats
-- Git-ignored binary models (`backend/models/`) and shapefiles (`backend/data/`) must be transferred to the remote kiosk via `scp` during full deployment.
-- Street View and Satellite PiP features gracefully degrade to offline SVG/Canvas building footprint blueprints when internet is unavailable.
+- When deploying to the physical kiosk (`cfr-mapping-tcfh` via Tailscale SSH), run `git pull && cd frontend && npm run build` to reflect the latest compiled assets.
+- Parcel data covers City of Coquitlam municipal bounds (65,400+ properties); external neighboring municipalities (Port Coquitlam / Burnaby) naturally do not contain Coquitlam cadastral data.
 
 ## 4. Conclusion
-All requirements (R1, R2, R3) are comprehensively fulfilled, verified, and audited with empirical build verification. The v1.0.0 implementation roadmap is ready for execution.
+The authentic Coquitlam Cadastral property and address overlay layer has been completely restored, verified offline, and independently audited.
+**Verdict: VICTORY CONFIRMED.**
 
 ## 5. Verification Method
-- Independent victory audit confirmed via `teamwork_preview_victory_auditor`.
-- Frontend production build verified (`npm run build` -> 0 errors, 2.72s).
-- Full forensic integrity audit against repository source code and GEMINI.md workspace rules.
+- Independent Test Execution:
+  - `node frontend/test_tile_layer_adversarial.js` (42/42 passed)
+  - `python backend/tests/test_parcels_and_streetview_api.py` (7/7 passed)
+  - `npm run build` in `frontend/` (Clean build in ~3.0s)
+- Deliverable artifacts:
+  - `.agents/swe_1/handoff.md`
+  - `.agents/sentinel_victory_auditor_r2/handoff.md`

@@ -1056,7 +1056,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
               className="bg-slate-900" zoomControl={false} ref={setMap}
           >
             <BaseMap 
-              style={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels || targetAddress) ? "VOYAGER" : "GREY"} 
+              style={mapStyle || (appMode === "TRAINING_ZONES" || appMode === "KIOSK_VIEW" ? "DARK" : "GREY")} 
               useLabelsFallback={false} 
             />
             

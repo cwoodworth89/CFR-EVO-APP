@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { BaseMap, HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
+import { BaseMap, HydrantsLayer, CoquitlamOverlays, getParcelBoundaryCoordinates } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 
 function StableAutoCenterAndResize({ lat, lng, callKey }) {
@@ -56,11 +56,7 @@ export default function BlockParcelPanel({ activeCall }) {
   const destLng = activeCall?.lng ?? -122.7932;
   const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || `${destLat},${destLng}`);
 
-  const polygonPositions = activeCall?.rings && activeCall.rings.length > 0
-    ? (Array.isArray(activeCall.rings[0][0])
-        ? activeCall.rings.map(ring => ring.map(([lng, lat]) => [lat, lng]))
-        : [activeCall.rings.map(([lng, lat]) => [lat, lng])])
-    : null;
+  const polygonPositions = getParcelBoundaryCoordinates(activeCall);
 
   const renderMapContent = () => (
     <MapContainer

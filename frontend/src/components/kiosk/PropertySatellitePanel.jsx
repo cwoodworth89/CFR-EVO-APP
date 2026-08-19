@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { BaseMap, CoquitlamOverlays } from '../MapLayers';
 import { API_BASE_URL, TILE_BASE_URL } from '../../apiClient';
 
 function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
@@ -47,17 +47,28 @@ function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
   return null;
 }
 
-const targetIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+const targetIcon = L.divIcon({
+  className: 'custom-target-icon',
+  html: `<div style="
+    background-color: #f59e0b;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    font-size: 13px;
+    box-sizing: border-box;
+    color: white;
+  ">🎯</div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -12]
 });
 
 export default function PropertySatellitePanel({ activeCall }) {
-  const isOnline = useOnlineStatus();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const destLat = activeCall?.lat ?? 49.2838;
@@ -74,31 +85,16 @@ export default function PropertySatellitePanel({ activeCall }) {
     <MapContainer
       center={[destLat, destLng]}
       zoom={16.5}
-      maxZoom={20}
+      maxZoom={22}
       className="w-full h-full z-0"
       zoomControl={true}
       attributionControl={false}
     >
-      {/* High-Resolution Satellite Basemap */}
-      <TileLayer
-        url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
-        maxNativeZoom={20}
-        maxZoom={22}
-      />
+      {/* High-Resolution 7.5cm Satellite Basemap (Local MBTiles Server on Port 8081) */}
+      <BaseMap style="SATELLITE" />
 
-      {/* Road & Place Name Labels Overlay */}
-      <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
-        maxZoom={20}
-        zIndex={500}
-      />
-      <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
-        maxZoom={20}
-        zIndex={501}
-      />
+      {/* Authentic Coquitlam Cadastral Parcels & Civic Address Labels */}
+      <CoquitlamOverlays visible={true} minZoom={14} />
 
       {polygonPositions && (
         <Polygon positions={polygonPositions} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />
@@ -119,7 +115,6 @@ export default function PropertySatellitePanel({ activeCall }) {
         <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
           <span>🛰️</span>
           <span>Property Satellite View</span>
-          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
         </div>
 
         <button
@@ -131,20 +126,12 @@ export default function PropertySatellitePanel({ activeCall }) {
           <span className="hidden sm:inline">Expand</span>
         </button>
 
-        {isOnline ? (
-          <div className="w-full h-full relative z-0">
-            {renderMapContent()}
-            <div className="absolute bottom-1.5 left-2 text-[9px] text-slate-400 font-mono bg-slate-950/80 backdrop-blur px-2 py-0.5 rounded border border-slate-800/80 z-[1000] pointer-events-none opacity-80">
-              WGS84: {destLat.toFixed(5)}, {destLng.toFixed(5)}
-            </div>
+        <div className="w-full h-full relative z-0">
+          {renderMapContent()}
+          <div className="absolute bottom-1.5 left-2 text-[9px] text-slate-400 font-mono bg-slate-950/80 backdrop-blur px-2 py-0.5 rounded border border-slate-800/80 z-[1000] pointer-events-none opacity-80">
+            WGS84: {destLat.toFixed(5)}, {destLng.toFixed(5)}
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
-            <span className="text-2xl">🗺️</span>
-            <p className="text-xs font-semibold">Offline Satellite Standby</p>
-            <span className="text-[10px] text-slate-500">WAN Offline</span>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Popout Full-Screen Modal */}

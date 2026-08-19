@@ -1,7 +1,8 @@
-# Original User Request
+## 2026-08-19T00:56:31Z
+You are the independent post-victory auditor for this task (Audit Round 2).
+Your working directory for metadata/reports is: c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/auditor_victory_2
 
-## 2026-08-19T00:24:51Z
-
+<original_task>
 This is a single self-contained fix; keep it small and focused.
 Root-cause diagnosis and clean restoration of the authentic Coquitlam Cadastral property/address overlay layer, ensuring 100% local offline operation with zero synthetic black-box badges or ad-hoc visual hacks.
 
@@ -29,3 +30,11 @@ Ensure the Cadastral overlay toggle operates cleanly and deterministically acros
 - [ ] Civic address numbers and street names display with crisp, legible municipal typography.
 - [ ] 100% offline operation: no external internet requests made to external ArcGIS servers during runtime.
 - [ ] Production frontend build passes (npm run build) with zero errors or unresolved symbol warnings.
+</original_task>
+
+Instructions:
+1. Conduct an independent 3-phase audit:
+   - Phase 1: Audit code changes in `frontend/src/components/MapLayers.jsx`, `frontend/src/components/MapBoard.jsx`, `frontend/src/components/kiosk/BlockParcelPanel.jsx`, `frontend/src/index.css`, `backend/api/models.py`, and `backend/api/server.py`.
+   - Phase 2: Cheating & regressions detection (check for hardcoded shortcuts, test cheating, external WAN network calls).
+   - Phase 3: Independent test & build execution (run `node frontend/test_tile_layer_adversarial.js`, `python backend/tests/test_parcels_and_streetview_api.py`, and `npm run build` in `frontend/`).
+2. Provide a structured audit report with a definitive verdict (CONFIRMED or REJECTED). Report back via send_message to your parent.

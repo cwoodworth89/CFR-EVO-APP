@@ -79,25 +79,20 @@ export default function PropertySatellitePanel({ activeCall }) {
       zoomControl={true}
       attributionControl={false}
     >
-      {/* High-Resolution Satellite Basemap */}
+      {/* High-Resolution 100% Local Self-Hosted Satellite Basemap (Z12–Z20) */}
       <TileLayer
         url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
         maxNativeZoom={20}
         maxZoom={22}
       />
 
-      {/* Road & Place Name Labels Overlay */}
+      {/* 100% Local Municipal Cadastral & Address Labels Overlay (Z14–Z20) */}
       <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
-        maxZoom={20}
+        url={`${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`}
+        maxNativeZoom={20}
+        maxZoom={22}
+        opacity={0.9}
         zIndex={500}
-      />
-      <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={19}
-        maxZoom={20}
-        zIndex={501}
       />
 
       {polygonPositions && (
@@ -119,7 +114,7 @@ export default function PropertySatellitePanel({ activeCall }) {
         <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
           <span>🛰️</span>
           <span>Property Satellite View</span>
-          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
+          <span className="bg-emerald-950/80 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] border border-emerald-800/50">100% Local</span>
         </div>
 
         <button
@@ -131,20 +126,12 @@ export default function PropertySatellitePanel({ activeCall }) {
           <span className="hidden sm:inline">Expand</span>
         </button>
 
-        {isOnline ? (
-          <div className="w-full h-full relative z-0">
-            {renderMapContent()}
-            <div className="absolute bottom-1.5 left-2 text-[9px] text-slate-400 font-mono bg-slate-950/80 backdrop-blur px-2 py-0.5 rounded border border-slate-800/80 z-[1000] pointer-events-none opacity-80">
-              WGS84: {destLat.toFixed(5)}, {destLng.toFixed(5)}
-            </div>
+        <div className="w-full h-full relative z-0">
+          {renderMapContent()}
+          <div className="absolute bottom-1.5 left-2 text-[9px] text-slate-400 font-mono bg-slate-950/80 backdrop-blur px-2 py-0.5 rounded border border-slate-800/80 z-[1000] pointer-events-none opacity-80">
+            WGS84: {destLat.toFixed(5)}, {destLng.toFixed(5)}
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
-            <span className="text-2xl">🗺️</span>
-            <p className="text-xs font-semibold">Offline Satellite Standby</p>
-            <span className="text-[10px] text-slate-500">WAN Offline</span>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Popout Full-Screen Modal */}

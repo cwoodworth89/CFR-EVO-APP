@@ -13,7 +13,7 @@ function AutoFitBounds({ origin, destination, userPanned, callKey }) {
   const lastKeyRef = useRef(null);
 
   useEffect(() => {
-    if (!map || !origin || !destination) return;
+    if (!map || !origin || !destination || destination.lat == null || destination.lng == null) return;
 
     const currentKey = callKey || `${destination.lat},${destination.lng}`;
     const callChanged = lastKeyRef.current !== currentKey;
@@ -58,9 +58,19 @@ function MapInteractivity({ onPan }) {
   return null;
 }
 
-// Destination Target Icon
+// Destination Target Icon (Gold)
 const destIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// Alternate Candidate Target Icon (Sky Blue)
+const altCandidateIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
@@ -74,21 +84,58 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     lng: -122.79072561861948,
     name: 'Hall 1 (1300 Pinetree Way)'
   };
-  const destLat = activeCall?.lat ?? 49.2838;
-  const destLng = activeCall?.lng ?? -122.7932;
-  const destination = { lat: destLat, lng: destLng };
+
+  // Extract raw candidates if present (e.g. dual junction ambiguity)
+  const rawCandidates = (activeCall?.candidates && Array.isArray(activeCall.candidates) && activeCall.candidates.length > 1)
+    ? activeCall.candidates
+    : (activeCall?.target?.candidates && Array.isArray(activeCall.target.candidates) && activeCall.target.candidates.length > 1)
+    ? activeCall.target.candidates
+    : null;
+
+  const candidates = useMemo(() => {
+    if (!rawCandidates) return null;
+    return rawCandidates.map((c, i) => ({
+      lat: c.lat ?? c.y ?? null,
+      lng: c.lng ?? c.x ?? null,
+      label: c.label || c.address || c.intersection || c.name || `Junction ${i + 1}`,
+      raw: c
+    })).filter(c => c.lat != null && c.lng != null);
+  }, [rawCandidates]);
+
+  const [selectedCandidateIdx, setSelectedCandidateIdx] = useState(0);
+
+  const callKey = activeCall?.dispatch_id || activeCall?.id || (activeCall?.address ? activeCall.address : 'active-call');
+
+  // Automatically reset state whenever the active call changes
+  useEffect(() => {
+    setUserPanned(false);
+    setSelectedCandidateIdx(0);
+  }, [callKey]);
+
+  const activeCandidate = (candidates && candidates.length > selectedCandidateIdx)
+    ? candidates[selectedCandidateIdx]
+    : null;
+
+  const rawDestLat = activeCandidate
+    ? activeCandidate.lat
+    : (activeCall?.lat ?? activeCall?.target?.lat ?? null);
+
+  const rawDestLng = activeCandidate
+    ? activeCandidate.lng
+    : (activeCall?.lng ?? activeCall?.target?.lng ?? null);
+
+  const hasValidCoords = rawDestLat != null && rawDestLng != null &&
+    !isNaN(Number(rawDestLat)) && !isNaN(Number(rawDestLng)) &&
+    (Number(rawDestLat) !== 0 || Number(rawDestLng) !== 0);
+
+  const destLat = hasValidCoords ? Number(rawDestLat) : null;
+  const destLng = hasValidCoords ? Number(rawDestLng) : null;
+  const destination = hasValidCoords ? { lat: destLat, lng: destLng } : null;
 
   const [routeInfo, setRouteInfo] = useState(null);
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
-
-  const callKey = activeCall?.dispatch_id || activeCall?.id || (activeCall?.address ? activeCall.address : `${destLat},${destLng}`);
-
-  // Automatically reset userPanned whenever the active call changes so new dispatches auto-center
-  useEffect(() => {
-    setUserPanned(false);
-  }, [callKey]);
 
   const handleRouteCalculated = (coordinates) => {
     if (coordinates && coordinates.length > 1) {
@@ -102,40 +149,110 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     }
   };
 
+  // Dynamic responding units resolution
+  const unitsToRoute = useMemo(() => {
+    const units = activeCall?.responding_units ||
+      activeCall?.verified_units ||
+      activeCall?.units ||
+      activeCall?.raw_units ||
+      activeCall?.target?.responding_units ||
+      activeCall?.target?.units;
+
+    if (Array.isArray(units) && units.length > 0) return units;
+    if (typeof units === 'string' && units.trim().length > 0) {
+      return units.split(',').map((u) => u.trim()).filter(Boolean);
+    }
+    return ['SQ1', 'E1', 'L1'];
+  }, [activeCall]);
+
   const routeMetrics = useMemo(() => {
+    if (!hasValidCoords) return null;
     return calculateEVORouteMetrics({
       originCoords: [origin.lat, origin.lng],
       targetCoords: [destLat, destLng],
-      dispatchedUnits: ['SQ1', 'E1', 'L1']
+      dispatchedUnits: unitsToRoute
     });
-  }, [origin, destLat, destLng]);
+  }, [origin, destLat, destLng, hasValidCoords, unitsToRoute]);
 
   const handleRecenter = () => {
     setUserPanned(false);
     if (mapInstance) {
-      const bounds = L.latLngBounds(
-        [origin.lat, origin.lng],
-        [destination.lat, destination.lng]
-      );
-      const containerSize = mapInstance.getSize();
-      const w = containerSize.x || 800;
-      const h = containerSize.y || 600;
+      if (hasValidCoords && destination) {
+        const bounds = L.latLngBounds(
+          [origin.lat, origin.lng],
+          [destination.lat, destination.lng]
+        );
+        const containerSize = mapInstance.getSize();
+        const w = containerSize.x || 800;
+        const h = containerSize.y || 600;
 
-      const padTop = Math.max(45, Math.round(h * 0.12));
-      const padBottom = Math.max(35, Math.round(h * 0.08));
-      const padSide = Math.max(35, Math.round(w * 0.08));
+        const padTop = Math.max(45, Math.round(h * 0.12));
+        const padBottom = Math.max(35, Math.round(h * 0.08));
+        const padSide = Math.max(35, Math.round(w * 0.08));
 
-      mapInstance.fitBounds(bounds, {
-        paddingTopLeft: [padSide, padTop],
-        paddingBottomRight: [padSide, padBottom],
-        maxZoom: 17,
-        animate: true
-      });
+        mapInstance.fitBounds(bounds, {
+          paddingTopLeft: [padSide, padTop],
+          paddingBottomRight: [padSide, padBottom],
+          maxZoom: 17,
+          animate: true
+        });
+      } else {
+        mapInstance.setView([origin.lat, origin.lng], 13, { animate: true });
+      }
     }
   };
 
+  const targetAddressDisplay = activeCandidate?.label || activeCall?.address || activeCall?.target?.address || 'Target';
+
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
+      {/* Interactive Dual Junction Ambiguity Banner */}
+      {candidates && candidates.length > 1 && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1001] bg-slate-950/95 border-2 border-amber-500 rounded-2xl shadow-2xl p-2.5 px-4 backdrop-blur-md flex flex-col items-center gap-2 max-w-[90%] sm:max-w-xl animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 text-amber-400 font-mono text-xs font-black tracking-wider uppercase">
+            <span>⚠️</span>
+            <span>DUAL JUNCTION AMBIGUITY ({candidates.length} JUNCTIONS IN AREA)</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            {candidates.map((cand, idx) => {
+              const isSelected = idx === selectedCandidateIdx;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setSelectedCandidateIdx(idx);
+                    setUserPanned(false);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer border ${
+                    isSelected
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 ring-2 ring-amber-400 font-black'
+                      : 'bg-slate-900 hover:bg-slate-800 text-sky-400 border-slate-700 hover:border-sky-500'
+                  }`}
+                >
+                  <span>[{idx + 1}]</span>
+                  <span>{cand.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* High-Visibility Amber Warning Box for Unresolved Incident Location */}
+      {!hasValidCoords && (
+        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 animate-pulse">
+          <span className="text-3xl">⚠️</span>
+          <div>
+            <h4 className="text-sm font-black tracking-wider text-amber-300 uppercase font-mono">
+              UNRESOLVED INCIDENT LOCATION — ROUTING PAUSED
+            </h4>
+            <p className="text-xs font-mono text-amber-100/90 mt-0.5">
+              Address: &quot;{activeCall?.address || activeCall?.target?.address || 'Unknown'}&quot;
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Option A: Collapsible Left Dispatch Details & ETAs Panel */}
       <div className="absolute top-3 left-3 z-[1000] w-72 sm:w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
         {/* Panel Header Toggle Bar */}
@@ -148,7 +265,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
             <div>
               <h3 className="text-xs font-black text-white uppercase tracking-wider">Dispatch Details & ETAs</h3>
               <p className="text-[10px] font-bold text-emerald-400 font-mono">
-                From {origin.name ? origin.name.split(' (')[0] : 'Hall 1'} → {activeCall?.address || 'Target'}
+                From {origin.name ? origin.name.split(' (')[0] : 'Hall 1'} → {targetAddressDisplay}
               </p>
             </div>
           </div>
@@ -194,6 +311,12 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
                   </div>
                 </div>
               ))}
+
+              {!hasValidCoords && (
+                <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[10px] font-mono text-center">
+                  ⚠️ Routing paused — awaiting location
+                </div>
+              )}
             </div>
 
             {/* Hydrant & Tactical Notes Bar */}
@@ -224,7 +347,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       )}
 
       <MapContainer
-        center={[destLat, destLng]}
+        center={hasValidCoords ? [destLat, destLng] : [origin.lat, origin.lng]}
         zoom={13}
         className="w-full h-full z-0"
         zoomControl={false}
@@ -247,18 +370,70 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         <StationsLayer visible={true} />
 
         {/* Live OSRM Emergency Response Routing Overlay */}
-        <RoutingOverlay
-          from={[origin.lat, origin.lng]}
-          to={[destLat, destLng]}
-          onRouteCalculated={handleRouteCalculated}
-        />
+        {hasValidCoords && (
+          <RoutingOverlay
+            from={[origin.lat, origin.lng]}
+            to={[destLat, destLng]}
+            onRouteCalculated={handleRouteCalculated}
+          />
+        )}
 
-        <Marker position={[destLat, destLng]} icon={destIcon}>
-          <Popup>Target Destination: {activeCall?.address}</Popup>
-        </Marker>
+        {/* Candidate or Single Target Markers */}
+        {hasValidCoords && (
+          candidates && candidates.length > 1 ? (
+            candidates.map((cand, idx) => {
+              const isSelected = idx === selectedCandidateIdx;
+              return (
+                <Marker
+                  key={idx}
+                  position={[cand.lat, cand.lng]}
+                  icon={isSelected ? destIcon : altCandidateIcon}
+                  eventHandlers={{
+                    click: () => {
+                      setSelectedCandidateIdx(idx);
+                      setUserPanned(false);
+                    }
+                  }}
+                >
+                  <Popup>
+                    <div className="font-mono text-xs">
+                      <div className="font-bold text-amber-500 uppercase">
+                        {isSelected ? '★ Active Destination' : 'Alternate Candidate'} [{idx + 1}]
+                      </div>
+                      <div className="text-slate-900 mt-0.5">{cand.label}</div>
+                      {!isSelected && (
+                        <button
+                          onClick={() => {
+                            setSelectedCandidateIdx(idx);
+                            setUserPanned(false);
+                          }}
+                          className="mt-1.5 px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold cursor-pointer"
+                        >
+                          Switch Route Here
+                        </button>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })
+          ) : (
+            <Marker position={[destLat, destLng]} icon={destIcon}>
+              <Popup>Target Destination: {activeCall?.address || 'Incident Location'}</Popup>
+            </Marker>
+          )
+        )}
 
-        <AutoFitBounds origin={origin} destination={destination} userPanned={userPanned} callKey={callKey} />
+        {hasValidCoords && (
+          <AutoFitBounds
+            origin={origin}
+            destination={destination}
+            userPanned={userPanned}
+            callKey={`${callKey}-${selectedCandidateIdx}`}
+          />
+        )}
       </MapContainer>
     </div>
   );
 }
+

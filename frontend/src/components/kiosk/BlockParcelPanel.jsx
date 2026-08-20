@@ -3,6 +3,7 @@ import { MapContainer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { BaseMap, HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
+import { isWithinCoquitlam } from '../../utils/addressUtils';
 
 function StableAutoCenterAndResize({ lat, lng, callKey }) {
   const map = useMap();
@@ -40,15 +41,66 @@ const targetIcon = new L.Icon({
 export default function BlockParcelPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const destLat = activeCall?.lat ?? 49.2838;
-  const destLng = activeCall?.lng ?? -122.7932;
-  const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || `${destLat},${destLng}`);
+  const rawDestLat = activeCall?.lat ?? activeCall?.target?.lat ?? null;
+  const rawDestLng = activeCall?.lng ?? activeCall?.target?.lng ?? null;
+
+  const hasCoords = rawDestLat != null && rawDestLng != null &&
+    !isNaN(Number(rawDestLat)) && !isNaN(Number(rawDestLng)) &&
+    (Number(rawDestLat) !== 0 || Number(rawDestLng) !== 0);
+
+  const destLat = hasCoords ? Number(rawDestLat) : null;
+  const destLng = hasCoords ? Number(rawDestLng) : null;
+  const inCoquitlam = hasCoords ? isWithinCoquitlam(destLat, destLng) : false;
+
+  const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || (hasCoords ? `${destLat},${destLng}` : 'cadastral-panel'));
 
   const polygonPositions = activeCall?.rings && activeCall.rings.length > 0
     ? (Array.isArray(activeCall.rings[0][0])
         ? activeCall.rings.map(ring => ring.map(([lng, lat]) => [lat, lng]))
         : [activeCall.rings.map(([lng, lat]) => [lat, lng])])
     : null;
+
+  // Tier 1 Error State: Location Unresolved
+  if (!hasCoords) {
+    return (
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-amber-400 flex items-center gap-1.5 shadow">
+          <span>📦</span>
+          <span>Cadastral Block & Hydrants</span>
+        </div>
+        <div className="w-14 h-14 rounded-2xl bg-amber-950/40 border border-amber-700/50 flex items-center justify-center text-2xl mb-3 shadow-inner">
+          ⚠️
+        </div>
+        <h4 className="text-sm font-black uppercase tracking-wider text-amber-400 font-mono">
+          LOCATION UNRESOLVED
+        </h4>
+        <p className="text-xs text-slate-400 font-mono mt-1 max-w-xs leading-relaxed">
+          Coordinates awaiting operator verification.
+        </p>
+      </div>
+    );
+  }
+
+  // Tier 2 Error State: Not Available Outside of City
+  if (!inCoquitlam) {
+    return (
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-sky-400 flex items-center gap-1.5 shadow">
+          <span>📦</span>
+          <span>Cadastral Block & Hydrants</span>
+        </div>
+        <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center text-2xl mb-3 shadow-inner">
+          🌐
+        </div>
+        <h4 className="text-sm font-black uppercase tracking-wider text-slate-200 font-mono">
+          NOT AVAILABLE OUTSIDE OF CITY
+        </h4>
+        <p className="text-xs text-slate-400 font-mono mt-1 max-w-xs leading-relaxed">
+          7.5cm Orthophotos &amp; Cadastral Parcels Cover City of Coquitlam Only.
+        </p>
+      </div>
+    );
+  }
 
   const renderMapContent = () => (
     <MapContainer
@@ -132,3 +184,4 @@ export default function BlockParcelPanel({ activeCall }) {
     </>
   );
 }
+

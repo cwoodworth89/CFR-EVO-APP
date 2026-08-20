@@ -87,3 +87,15 @@ To maximize token economy and avoid burning coordinator reasoning credits on mec
    * **`Model: 'pro'`**: Deep mathematical reasoning, DSP STFT/FFT harmonic filter calculations, OSRM Lua routing profile math, LoRA quantization analysis, and complex concurrency deadlock diagnosis.
 4. **Autonomous Background Execution**: Once a sub-agent is launched with clear instructions and acceptance criteria, the coordinator MUST provide a concise update to the user and immediately end the turn, letting the sub-agent run in the background.
 
+---
+
+## 6. Universal Address Normalization, Error Banner & Two-Tier Out-of-Bounds Standard
+* **No Silent Coordinate Fallbacks**: Kiosk HUD panels and mapping components MUST NEVER silently fall back to default station/city coordinates (e.g. `49.2838, -122.7932` or `49.27305, -122.88452`) when coordinates are missing or unresolved.
+* **Two-Tier Out-of-Bounds & Standby Protocol**:
+  - **Tier 1 (Location Unresolved / Missing Coordinates)**: If coordinates are null, NaN, or 0, suppress routing lines and display a high-visibility amber standby card (`⚠️ LOCATION UNRESOLVED — Coordinates awaiting operator verification` / `⚠️ UNRESOLVED INCIDENT LOCATION — ROUTING PAUSED`).
+  - **Tier 2 (Out-of-Bounds Coordinates)**: If coordinates fall outside the authoritative City of Coquitlam spatial bounding box (`lat < 49.20 || lat > 49.39 || lng < -122.92 || lng > -122.70` via `isWithinCoquitlam(lat, lng)`), display: `🌐 NOT AVAILABLE OUTSIDE OF CITY — 7.5cm Orthophotos & Cadastral Parcels Cover City of Coquitlam Only.`
+* **Dual Junction & Ambiguity Handling**: When `activeCall.is_ambiguous` or `candidates.length > 1`:
+  - Display an interactive tactical candidate selector banner at the top of the route map (`⚠️ DUAL JUNCTION AMBIGUITY (N JUNCTIONS IN AREA)`).
+  - Plot distinct markers for each candidate location (Active candidate: Gold, Alternate candidates: Sky Blue).
+  - Enable one-touch switching so tapping candidate buttons or map markers immediately recalculates OSRM apparatus routes and updates destination targets in real time.
+* **Canonical Address Normalization**: Standardize unit designations (`#105`, `Unit B`, `Suite 200`, `105-3000`), street suffix canonicalization (`AVE`, `ST`, `RD`, `DR`, `HWY`, `BLVD`, `WAY`, `CRT`, `PL`, `LN`, `CRES`), and intersection separators (` & `) across frontend and backend utilities (`frontend/src/utils/addressUtils.js`).

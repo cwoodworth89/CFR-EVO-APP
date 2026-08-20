@@ -16,7 +16,7 @@ export default function StreetViewPanel({ activeCall }) {
   const containerRef = useRef(null);
   const modalContainerRef = useRef(null);
   const panoramaRef = useRef(null);
-  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1, fov: 80, lat: 49.2838, lng: -122.7932, pano_id: '' });
+  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1, fov: 80, lat: null, lng: null, pano_id: '' });
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
 
@@ -67,17 +67,27 @@ export default function StreetViewPanel({ activeCall }) {
   // Priority: 1. DB Override -> 2. Local Storage -> 3. Target parcel centroid -> 4. Fallback
   const activeOverride = dbOverride || localOverride;
 
-  const rawFrontLat = activeOverride ? (activeOverride.lat ?? activeOverride.front_lat) : (activeCall?.lat ?? activeCall?.front_lat ?? activeCall?.target?.lat ?? 49.2838);
-  const rawFrontLng = activeOverride ? (activeOverride.lng ?? activeOverride.front_lng) : (activeCall?.lng ?? activeCall?.front_lng ?? activeCall?.target?.lng ?? -122.7932);
+  const rawFrontLat = activeOverride
+    ? (activeOverride.lat ?? activeOverride.front_lat)
+    : (activeCall?.lat ?? activeCall?.front_lat ?? activeCall?.target?.lat ?? null);
+  const rawFrontLng = activeOverride
+    ? (activeOverride.lng ?? activeOverride.front_lng)
+    : (activeCall?.lng ?? activeCall?.front_lng ?? activeCall?.target?.lng ?? null);
 
-  const frontLat = parseFloat(rawFrontLat) || 49.2838;
-  const frontLng = parseFloat(rawFrontLng) || -122.7932;
+  const hasCoords = rawFrontLat != null && rawFrontLng != null &&
+    !isNaN(parseFloat(rawFrontLat)) && !isNaN(parseFloat(rawFrontLng)) &&
+    (parseFloat(rawFrontLat) !== 0 || parseFloat(rawFrontLng) !== 0);
 
-  const targetLat = parseFloat(activeCall?.lat ?? activeCall?.target?.lat ?? frontLat);
-  const targetLng = parseFloat(activeCall?.lng ?? activeCall?.target?.lng ?? frontLng);
+  const frontLat = hasCoords ? parseFloat(rawFrontLat) : null;
+  const frontLng = hasCoords ? parseFloat(rawFrontLng) : null;
+
+  const rawTargetLat = activeCall?.lat ?? activeCall?.target?.lat ?? frontLat;
+  const rawTargetLng = activeCall?.lng ?? activeCall?.target?.lng ?? frontLng;
+  const targetLat = rawTargetLat != null ? parseFloat(rawTargetLat) : frontLat;
+  const targetLng = rawTargetLng != null ? parseFloat(rawTargetLng) : frontLng;
 
   let initialHeading = activeOverride ? parseFloat(activeOverride.heading ?? activeOverride.streetview_heading ?? 0) : 0;
-  if (!activeOverride && (frontLat !== targetLat || frontLng !== targetLng)) {
+  if (!activeOverride && hasCoords && targetLat != null && targetLng != null && (frontLat !== targetLat || frontLng !== targetLng)) {
     const dLng = (targetLng - frontLng) * (Math.PI / 180);
     const targetLatRad = targetLat * (Math.PI / 180);
     const frontLatRad = frontLat * (Math.PI / 180);
@@ -94,6 +104,7 @@ export default function StreetViewPanel({ activeCall }) {
 
   // Initialize camera vector in ref
   useEffect(() => {
+    if (!hasCoords) return;
     currentPovRef.current = {
       heading: initialHeading,
       pitch: initialPitch,
@@ -103,7 +114,8 @@ export default function StreetViewPanel({ activeCall }) {
       lng: frontLng,
       pano_id: initialPanoId
     };
-  }, [initialHeading, initialPitch, initialZoom, initialFov, frontLat, frontLng, initialPanoId]);
+  }, [initialHeading, initialPitch, initialZoom, initialFov, frontLat, frontLng, initialPanoId, hasCoords]);
+
 
   // Global auth failure handler
   useEffect(() => {
@@ -413,9 +425,11 @@ export default function StreetViewPanel({ activeCall }) {
     }
   };
 
-  const embedStreetViewUrl = apiKey
-    ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}`
-    : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
+  const embedStreetViewUrl = hasCoords
+    ? (apiKey
+        ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}`
+        : `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${frontLng}!3d${frontLat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`)
+    : '';
 
   const renderContent = (isModal = false) => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
@@ -498,6 +512,28 @@ export default function StreetViewPanel({ activeCall }) {
       </div>
     </div>
   );
+
+  // Standby Error State: Awaiting Valid Coordinates
+  if (!hasCoords) {
+    return (
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-indigo-400 flex items-center gap-2 shadow">
+          <span>📷</span>
+          <span>Google Street View 360°</span>
+        </div>
+        <div className="w-14 h-14 rounded-2xl bg-indigo-950/40 border border-indigo-700/50 flex items-center justify-center text-2xl mb-3 shadow-inner">
+          📷
+        </div>
+        <h4 className="text-sm font-black uppercase tracking-wider text-indigo-300 font-mono">
+          Street View Standby
+        </h4>
+        <p className="text-xs text-slate-400 font-mono mt-1 max-w-xs leading-relaxed">
+          Awaiting Valid Coordinates
+        </p>
+      </div>
+    );
+  }
+
 
   return (
     <>

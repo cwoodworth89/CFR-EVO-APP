@@ -22,6 +22,7 @@ from gis_service.routing_engine import (
     get_unit_station_id,
     get_apparatus_profile_class,
 )
+from gis_service.geocoder import CoquitlamDataValidator
 
 
 class TestFireHallsAndApparatusMapping:
@@ -473,6 +474,76 @@ class TestOSRMResponsesAndFallback:
             assert res["origin"]["lng"] == custom_lng
             assert res["destination"]["lat"] == dest_lat
             assert res["destination"]["lng"] == dest_lng
+
+
+class TestMunicipalIntersectionAuthorityAndDisambiguation:
+    @classmethod
+    def setup_class(cls):
+        intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
+        cls.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
+
+    def __init__(self):
+        intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
+        self.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
+
+    def test_single_intersection_resolution(self):
+        # 1. Christmas Way and Westwood St -> (49.27832, -122.79354)
+        res = self.validator.get_coordinates("Christmas Way and Westwood St")
+        assert res is not None
+        assert abs(res["lat"] - 49.27832) < 0.0001
+        assert abs(res["lng"] - (-122.79354)) < 0.0001
+        assert res["is_ambiguous"] is False
+
+        # Inverted street order
+        res_inv = self.validator.get_coordinates("Westwood St & Christmas Way")
+        assert res_inv is not None
+        assert abs(res_inv["lat"] - 49.27832) < 0.0001
+        assert abs(res_inv["lng"] - (-122.79354)) < 0.0001
+
+    def test_multi_junction_grid_disambiguation(self):
+        # 2. Lougheed Hwy & Mariner Way with Grid 74 -> south interchange
+        res_74 = self.validator.get_coordinates("Lougheed Hwy & Mariner Way", target_map_grid="74")
+        assert res_74 is not None
+        assert abs(res_74["lat"] - 49.23852) < 0.0001
+        assert abs(res_74["lng"] - (-122.81224)) < 0.0001
+        assert res_74["grid"] == "74"
+        assert res_74["is_ambiguous"] is False
+
+        # 3. Lougheed Hwy & Mariner Way with Grid 62 -> north split
+        res_62 = self.validator.get_coordinates("Lougheed Hwy & Mariner Way", target_map_grid=62)
+        assert res_62 is not None
+        assert abs(res_62["lat"] - 49.24415) < 0.0001
+        assert abs(res_62["lng"] - (-122.81682)) < 0.0001
+        assert res_62["grid"] == "62"
+        assert res_62["is_ambiguous"] is False
+
+    def test_multi_junction_missing_grid_ambiguity(self):
+        # 4. Ambiguity detection when Grid is missing
+        res_ambig = self.validator.get_coordinates("Lougheed Hwy & Mariner Way")
+        assert res_ambig is not None
+        assert res_ambig["is_ambiguous"] is True
+        assert len(res_ambig["candidates"]) == 2
+        # Primary candidate coordinates returned
+        assert abs(res_ambig["lat"] - 49.23852) < 0.0001
+        assert abs(res_ambig["lng"] - (-122.81224)) < 0.0001
+
+    def test_other_major_intersections(self):
+        # Austin Ave & Nelson St
+        res_austin = self.validator.get_coordinates("Austin Ave & Nelson St")
+        assert res_austin is not None
+        assert abs(res_austin["lat"] - 49.24804) < 0.0001
+        assert abs(res_austin["lng"] - (-122.86546)) < 0.0001
+
+        # Pinetree Way & Guildford Way
+        res_pinetree = self.validator.get_coordinates("Pinetree Way & Guildford Way")
+        assert res_pinetree is not None
+        assert abs(res_pinetree["lat"] - 49.28624) < 0.0001
+        assert abs(res_pinetree["lng"] - (-122.79321)) < 0.0001
+
+        # Validation existence checks
+        score, name = self.validator.validate_address_exists("Christmas Way and Westwood St")
+        assert score >= 80
+        assert name == "Christmas Way & Westwood St"
 
 
 if __name__ == "__main__":

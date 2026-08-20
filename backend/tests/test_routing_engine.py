@@ -482,7 +482,7 @@ class TestMunicipalIntersectionAuthorityAndDisambiguation:
         intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
         cls.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
 
-    def __init__(self):
+    def setup_method(self):
         intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
         self.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
 

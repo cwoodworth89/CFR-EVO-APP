@@ -3,32 +3,36 @@ import React from 'react';
 export default function SimulationControl({ onRunSimulation, onUpdateSimulation, onExitSimulation, isSimulationActive }) {
   const samplePhase1Call = {
     id: 'sim-' + Date.now(),
+    dispatch_id: 'DISP-SIM-001',
     address: '428 Nelson St',
     subaddress: 'Apt 302',
     intersection: 'Nelson St & Austin Ave',
-    lat: 49.27305,
-    lng: -122.88452,
+    lat: 49.24804,
+    lng: -122.86546,
+    responding_units: ['E3', 'Q5'],
     incident_type: 'STRUCTURE FIRE - FIRST ALARM',
     priority_code: 1,
     verify_location: false,
     map_grid: 'H-12',
-    radio_channel: 'TAC-2',
-    tone_name: 'Station 1 Tones',
+    radio_channel: '10 Combined Response',
+    tone_name: 'Station 3 Tones',
     created_at: new Date().toISOString()
   };
 
   const samplePhase2Update = {
     id: samplePhase1Call.id,
+    dispatch_id: samplePhase1Call.dispatch_id,
     address: '428 Nelson St',
     subaddress: 'Apt 302',
     intersection: 'Nelson St & Austin Ave',
-    lat: 49.27305,
-    lng: -122.88452,
+    lat: 49.24804,
+    lng: -122.86546,
+    responding_units: ['E3', 'Q5'],
     incident_type: 'STRUCTURE FIRE - VERIFIED',
     priority_code: 1,
     verify_location: true,
     map_grid: 'H-12',
-    radio_channel: 'TAC-2',
+    radio_channel: '10 Combined Response',
     created_at: new Date().toISOString()
   };
 

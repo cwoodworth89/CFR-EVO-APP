@@ -27,19 +27,34 @@ function App() {
     // Track that we originated from Admin Dispatch Review panel
     setReturnMode('ADMIN_DISPATCHES');
 
+    const targetAddr = (call.verified_address || call.target?.address || call.address || '').toUpperCase();
+    let fallbackLat = 49.2838;
+    let fallbackLng = -122.7907;
+
+    if (targetAddr.includes('CHRISTMAS') && targetAddr.includes('WESTWOOD')) {
+      fallbackLat = 49.2783;
+      fallbackLng = -122.7935;
+    }
+
+    const units = (call.verified_units && call.verified_units.length > 0)
+      ? call.verified_units
+      : (call.responding_units && call.responding_units.length > 0 ? call.responding_units : []);
+
     const mockCall = {
       id: call.id || 'sim-' + Date.now(),
+      dispatch_id: call.dispatch_id || ('DISP-SIM-' + Date.now()),
       address: call.verified_address || call.target?.address || call.address || 'Simulated Address',
       subaddress: call.target?.subaddress || '',
       intersection: call.target?.intersection || '',
-      lat: call.target?.lat ?? call.lat ?? 49.27305,
-      lng: call.target?.lng ?? call.lng ?? -122.88452,
+      lat: call.target?.lat ?? call.lat ?? fallbackLat,
+      lng: call.target?.lng ?? call.lng ?? fallbackLng,
       rings: call.target?.rings || call.rings || [],
       incident_type: call.verified_incident || call.incident_type || 'SIMULATED DISPATCH',
+      responding_units: units,
       priority_code: call.priority_code || 1,
       verify_location: call.verify_location ?? (call.confidence_score ? call.confidence_score >= 90 : true),
       map_grid: call.target?.verified_map_grid || call.target?.map_grid || '',
-      radio_channel: call.target?.verified_talkgroup || call.target?.radio_channel || '',
+      radio_channel: call.target?.verified_talkgroup || call.target?.radio_channel || '10 Combined Response',
       tone_name: call.target?.tone_name || '',
       isSimulated: true,
       created_at: new Date().toISOString()

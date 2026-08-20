@@ -1,6 +1,4 @@
 import React, { useRef, useEffect } from 'react';
-import AudioWaveformPlayer from './AudioWaveformPlayer';
-import SatelliteMiniMap from './SatelliteMiniMap';
 
 export const TALK_GROUPS = [
   "5",
@@ -157,23 +155,26 @@ export default function VerificationSidebar({
 
         {/* Scrollable Form Content */}
         <div ref={formContainerRef} className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1">
-          {/* Audio Waveform Player */}
+          {/* Simple Clean Native Audio Player */}
           {selectedCall.audio_url && (
-            <AudioWaveformPlayer
-              audioSignedUrl={audioSignedUrl}
-              audioDuration={selectedCall.audio_duration}
-              audioRef={audioRef}
-            />
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 shadow-inner">
+              <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                <span className="flex items-center gap-1.5 text-sky-400 font-bold">
+                  <span>🎙️</span>
+                  <span>DISPATCH AUDIO RECORDING</span>
+                </span>
+                {selectedCall.audio_duration && (
+                  <span className="text-slate-500 font-bold">{selectedCall.audio_duration.toFixed(1)}s</span>
+                )}
+              </div>
+              <audio
+                ref={audioRef}
+                controls
+                src={audioSignedUrl || selectedCall.audio_url}
+                className="w-full h-8 rounded accent-sky-500 bg-slate-900"
+              />
+            </div>
           )}
-
-          {/* Mini Satellite Map View */}
-          <SatelliteMiniMap
-            lat={destLat}
-            lng={destLng}
-            address={displayAddress}
-            rings={rings}
-            height="130px"
-          />
 
           {/* 3-Stage Pipeline Flow Timeline */}
           <div className="flex flex-col gap-3 mt-1">

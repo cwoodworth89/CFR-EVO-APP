@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, JSON, ARRAY, Numeric, func
+from sqlalchemy.orm import synonym
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY as PG_ARRAY
 import uuid
+
 
 try:
     from api.database import Base
@@ -94,17 +96,33 @@ class RoadClosureModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+
+class StreetViewOverrideModel(Base):
+    __tablename__ = "streetview_overrides"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    clean_address = Column(String, unique=True, index=True, nullable=False)
+    front_lat = Column(Float, nullable=False)
+    front_lng = Column(Float, nullable=False)
+    heading = Column(Float, default=0.0)
+    pitch = Column(Float, default=5.0)
+    fov = Column(Float, default=80.0)
+
+
 class ParcelModel(Base):
     __tablename__ = "parcels"
     __table_args__ = {'extend_existing': True}
 
+
     # System
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
-    parcel_uuid = Column(SafeUUID, default=uuid.uuid4, nullable=False)
+    parcel_uuid = Column(SafeUUID, default=lambda: str(uuid.uuid4()), nullable=False)
 
     # From Addresses.shp
     gis_id = Column(String(255), index=True, nullable=True)
     address = Column(String(255), unique=True, index=True, nullable=False)
+    clean_address = synonym('address')
     house = Column(String(50), nullable=True)
     street = Column(String(255), nullable=True)
     streettype = Column(String(50), nullable=True)

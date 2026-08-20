@@ -42,9 +42,27 @@ except Exception as db_err:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+
+def ensure_sqlite_compatibility():
+    """Ensures SQLite fallback tables have any recently added columns."""
+    if engine.dialect.name == "sqlite":
+        try:
+            with engine.connect() as conn:
+                res = conn.exec_driver_sql("PRAGMA table_info(live_calls);").fetchall()
+                cols = [r[1] for r in res]
+                if cols and "routing_metrics" not in cols:
+                    conn.exec_driver_sql("ALTER TABLE live_calls ADD COLUMN routing_metrics JSON;")
+        except Exception:
+            pass
+
+
+ensure_sqlite_compatibility()
+
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+

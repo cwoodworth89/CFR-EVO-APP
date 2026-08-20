@@ -2,9 +2,14 @@ import os
 import sys
 import math
 import json
-import pytest
+import unittest
 from unittest.mock import patch, MagicMock
 from urllib.error import URLError, HTTPError
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
 
 # Ensure sibling service path is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../services/gis/src")))
@@ -12,6 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from gis_service.routing_engine import (
     EVORoutingEngine,
     FIRE_HALLS,
+    APPARATUS_TIERS,
     get_unit_type,
     get_unit_station_id,
     get_apparatus_profile_class,
@@ -31,74 +37,103 @@ class TestFireHallsAndApparatusMapping:
         assert "1300 Pinetree Way" in hall1["address"]
         assert abs(hall1["lat"] - 49.291) < 0.01
         assert abs(hall1["lng"] - (-122.790)) < 0.01
+        assert "southbound_apron" in hall1
+        assert hall1["southbound_apron"]["lat"] == 49.2905
+        assert hall1["southbound_apron"]["lng"] == -122.7915
 
         hall2 = FIRE_HALLS["2"]
         assert hall2["id"] == 2
         assert "Mariner" in hall2["name"]
+        assert "775 Mariner Way" in hall2["address"]
 
         hall3 = FIRE_HALLS["3"]
         assert hall3["id"] == 3
         assert "Austin Heights" in hall3["name"]
+        assert "438 Nelson Street" in hall3["address"]
 
         hall4 = FIRE_HALLS["4"]
         assert hall4["id"] == 4
         assert "Burke Mountain" in hall4["name"]
+        assert "3501 David Ave" in hall4["address"]
 
     def test_get_unit_type(self):
+        assert get_unit_type("SQ1") == "Squad"
+        assert get_unit_type("SQ4") == "Squad"
+        assert get_unit_type("SQUAD2") == "Squad"
         assert get_unit_type("E1") == "Engine"
         assert get_unit_type("E4") == "Engine"
+        assert get_unit_type("PUMPER1") == "Engine"
         assert get_unit_type("L1") == "Ladder"
         assert get_unit_type("L2") == "Ladder"
+        assert get_unit_type("TOWER1") == "Ladder"
+        assert get_unit_type("PLATFORM4") == "Ladder"
         assert get_unit_type("R1") == "Rescue"
         assert get_unit_type("R2") == "Rescue"
         assert get_unit_type("Q5") == "Quint"
         assert get_unit_type("C1") == "Chief"
         assert get_unit_type("C10") == "Chief"
         assert get_unit_type("CAR2") == "Chief"
+        assert get_unit_type("COMMAND1") == "Chief"
         assert get_unit_type("M1") == "Medic"
         assert get_unit_type("S3") == "Specialty"
         assert get_unit_type("T4") == "Water Tender"
         assert get_unit_type("WT4") == "Water Tender"
+        assert get_unit_type("TANKER2") == "Water Tender"
         assert get_unit_type("LAV4") == "Light Attack Vehicle"
         assert get_unit_type("UNKNOWN99") == "Apparatus"
 
     def test_get_apparatus_profile_class(self):
+        # Light apparatus (5 tons)
+        assert get_apparatus_profile_class("SQ1") == "light"
+        assert get_apparatus_profile_class("SQ4") == "light"
         assert get_apparatus_profile_class("LAV4") == "light"
         assert get_apparatus_profile_class("C1") == "light"
         assert get_apparatus_profile_class("C10") == "light"
+        assert get_apparatus_profile_class("CAR1") == "light"
         assert get_apparatus_profile_class("M1") == "light"
         assert get_apparatus_profile_class("S3") == "light"
 
-        assert get_apparatus_profile_class("E1") == "standard"
-        assert get_apparatus_profile_class("E4") == "standard"
-        assert get_apparatus_profile_class("R1") == "standard"
+        # General apparatus (22 tons)
+        assert get_apparatus_profile_class("E1") == "general"
+        assert get_apparatus_profile_class("E4") == "general"
+        assert get_apparatus_profile_class("R1") == "general"
+        assert get_apparatus_profile_class("R4") == "general"
+        assert get_apparatus_profile_class("Q5") == "general"
+        assert get_apparatus_profile_class("PUMPER2") == "general"
 
+        # Heavy apparatus (35 tons)
         assert get_apparatus_profile_class("L1") == "heavy"
-        assert get_apparatus_profile_class("Q5") == "heavy"
+        assert get_apparatus_profile_class("L4") == "heavy"
         assert get_apparatus_profile_class("T4") == "heavy"
         assert get_apparatus_profile_class("WT4") == "heavy"
+        assert get_apparatus_profile_class("TOWER1") == "heavy"
 
     def test_get_unit_station_id(self):
         assert get_unit_station_id("E1") == "1"
         assert get_unit_station_id("L1") == "1"
         assert get_unit_station_id("R1") == "1"
+        assert get_unit_station_id("SQ1") == "1"
         assert get_unit_station_id("M1") == "1"
         assert get_unit_station_id("C10") == "1"
+        assert get_unit_station_id("C1") == "1"
 
         assert get_unit_station_id("E2") == "2"
         assert get_unit_station_id("L2") == "2"
         assert get_unit_station_id("R2") == "2"
+        assert get_unit_station_id("SQ2") == "2"
 
         assert get_unit_station_id("E3") == "3"
         assert get_unit_station_id("Q5") == "3"
         assert get_unit_station_id("H3") == "3"
         assert get_unit_station_id("HT3") == "3"
         assert get_unit_station_id("S3") == "3"
+        assert get_unit_station_id("SQ3") == "3"
 
         assert get_unit_station_id("E4") == "4"
         assert get_unit_station_id("T4") == "4"
         assert get_unit_station_id("WT4") == "4"
         assert get_unit_station_id("LAV4") == "4"
+        assert get_unit_station_id("SQ4") == "4"
 
         # Fallback to default hall 1
         assert get_unit_station_id("CHIEF") == "1"
@@ -107,7 +142,6 @@ class TestFireHallsAndApparatusMapping:
 class TestOSRMUrlConstructionAndPriorities:
     def test_osrm_default_endpoints_ordering(self):
         engine = EVORoutingEngine()
-        # Ensure no env var override
         with patch.dict(os.environ, {}, clear=True):
             endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
             assert len(endpoints) >= 4
@@ -120,7 +154,7 @@ class TestOSRMUrlConstructionAndPriorities:
         engine = EVORoutingEngine()
         endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
         for url in endpoints:
-            assert "continue_straight=false" in url
+            assert "continue_straight=true" in url
             assert "steps=true" in url
             assert "overview=full" in url
             assert "geometries=geojson" in url
@@ -130,7 +164,7 @@ class TestOSRMUrlConstructionAndPriorities:
         with patch.dict(os.environ, {"OSRM_ROUTER_URL": "http://custom-osrm-host:5000"}):
             endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
             assert endpoints[0].startswith("http://custom-osrm-host:5000/route/v1/driving/")
-            assert "continue_straight=false" in endpoints[0]
+            assert "continue_straight=true" in endpoints[0]
 
         with patch.dict(os.environ, {"OSRM_BACKEND_URL": "http://mld-backend:5000"}):
             endpoints = engine._get_osrm_endpoints("-122.790,49.291;-122.785,49.278")
@@ -153,10 +187,10 @@ class TestOSRMUrlConstructionAndPriorities:
         assert engine._fetch_osrm_polyline([[49.2910, -122.7907]]) == (None, None)
 
 
-class TestTacticalCorridors:
-    def test_station_1_mariner_corridor_injection(self):
+class TestPhase1RouteFindingAndAprons:
+    def test_pure_osrm_pathfinding_no_intermediate_corridor_injections(self):
+        """Verifies that route finding does NOT inject brittle bounding box waypoints."""
         engine = EVORoutingEngine()
-        # Destination in Mariner Way / Southwest Sector: dest_lat < 49.280 and dest_lng < -122.800
         dest_lat = 49.2650
         dest_lng = -122.8150
 
@@ -168,115 +202,155 @@ class TestTacticalCorridors:
                 station_id="1"
             )
 
-            # Check that _fetch_osrm_polyline was called with the injected corridor points
             mock_osrm.assert_called_once()
             called_waypoints = mock_osrm.call_args[0][0]
 
-            assert len(called_waypoints) == 5  # start, 3 corridor waypoints, dest
-            # Start is Hall 1
-            assert abs(called_waypoints[0][0] - FIRE_HALLS["1"]["lat"]) < 0.001
-            # Corridor A: Guildford -> Johnson -> Mariner
-            assert called_waypoints[1] == [49.2847, -122.7915]  # Pinetree & Guildford
-            assert called_waypoints[2] == [49.2845, -122.8055]  # Guildford & Johnson St
-            assert called_waypoints[3] == [49.2785, -122.8125]  # Johnson St & Mariner Way
-            # Destination
-            assert called_waypoints[4] == [dest_lat, dest_lng]
+            # Exactly 2 waypoints: departure apron and destination
+            assert len(called_waypoints) == 2
+            assert called_waypoints[0] == [49.2905, -122.7915]
+            assert called_waypoints[1] == [dest_lat, dest_lng]
 
-    def test_station_1_gordon_corridor_injection(self):
+    def test_station_1_southbound_apron_departure(self):
+        """Southbound calls (dest_lat < 49.290) depart from Hall 1 Southbound Apron."""
         engine = EVORoutingEngine()
-        # Destination in Gordon Ave / Town Centre Sector: 49.275 <= dest_lat <= 49.285 and -122.795 <= dest_lng <= -122.780
+        dest_lat = 49.2850
+        dest_lng = -122.7930
+
+        with patch.object(engine, "_fetch_osrm_polyline", return_value=(None, None)) as mock_osrm:
+            res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
+            called_waypoints = mock_osrm.call_args[0][0]
+            assert called_waypoints[0] == [49.2905, -122.7915]
+            assert res["origin"] == {"lat": 49.2905, "lng": -122.7915}
+
+    def test_station_1_northbound_departure(self):
+        """Northbound calls (dest_lat >= 49.290) depart from Hall 1 main station front."""
+        engine = EVORoutingEngine()
+        dest_lat = 49.3100
+        dest_lng = -122.7800
+
+        with patch.object(engine, "_fetch_osrm_polyline", return_value=(None, None)) as mock_osrm:
+            res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
+            called_waypoints = mock_osrm.call_args[0][0]
+            assert abs(called_waypoints[0][0] - FIRE_HALLS["1"]["lat"]) < 0.0001
+            assert abs(called_waypoints[0][1] - FIRE_HALLS["1"]["lng"]) < 0.0001
+
+    def test_route_1300_pinetree_to_428_nelson_st(self):
+        """Key verification: 1300 Pinetree Way (Hall 1) to 428 Nelson St."""
+        engine = EVORoutingEngine()
+        dest_lat = 49.24803974681661
+        dest_lng = -122.86546062387211
+
+        with patch.object(engine, "_fetch_osrm_polyline") as mock_osrm:
+            mock_osrm.return_value = (
+                [[49.2905, -122.7915], [49.2700, -122.8200], [49.2480, -122.8655]],
+                9.42
+            )
+            res = engine.calculate_route(
+                dest_lat=dest_lat,
+                dest_lng=dest_lng,
+                station_id="1",
+                response_type="emergency"
+            )
+
+            mock_osrm.assert_called_once()
+            called_waypoints = mock_osrm.call_args[0][0]
+            assert len(called_waypoints) == 2
+            assert called_waypoints[0] == [49.2905, -122.7915]
+            assert called_waypoints[1] == [dest_lat, dest_lng]
+            assert res["status"] == "success"
+            assert res["distance_km"] == 9.42
+            assert res["eta_minutes"] >= 1
+
+    def test_route_hall_1_to_2968_glen_dr(self):
+        """Key verification: Hall 1 to 2968 Glen Dr."""
+        engine = EVORoutingEngine()
+        dest_lat = 49.2800
+        dest_lng = -122.7930
+
+        with patch.object(engine, "_fetch_osrm_polyline") as mock_osrm:
+            mock_osrm.return_value = ([[49.2905, -122.7915], [49.2800, -122.7930]], 1.45)
+            res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
+            assert res["status"] == "success"
+            assert res["distance_km"] == 1.45
+            assert res["origin"] == {"lat": 49.2905, "lng": -122.7915}
+
+    def test_route_hall_2_to_1475_pipeline_rd(self):
+        """Key verification: Hall 2 (Mariner) to 1475 Pipeline Rd."""
+        engine = EVORoutingEngine()
+        dest_lat = 49.3095
+        dest_lng = -122.7661
+
+        with patch.object(engine, "_fetch_osrm_polyline") as mock_osrm:
+            mock_osrm.return_value = (None, None)
+            res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="2")
+            called_waypoints = mock_osrm.call_args[0][0]
+            assert len(called_waypoints) == 2
+            assert abs(called_waypoints[0][0] - FIRE_HALLS["2"]["lat"]) < 0.0001
+            assert abs(called_waypoints[0][1] - FIRE_HALLS["2"]["lng"]) < 0.0001
+
+
+class TestPhase2ApparatusDynamicsAndETAs:
+    def test_3_tier_apparatus_physics_and_speeds(self):
+        engine = EVORoutingEngine()
         dest_lat = 49.2785
         dest_lng = -122.7850
 
-        with patch.object(engine, "_fetch_osrm_polyline") as mock_osrm:
-            mock_osrm.return_value = (None, None)
-            res = engine.calculate_route(
-                dest_lat=dest_lat,
-                dest_lng=dest_lng,
-                station_id="1"
-            )
+        # Tier 1: Light Apparatus (5 tons) - SQ1, M1, C1
+        m_sq1 = engine.calculate_unit_metrics("SQ1", dest_lat, dest_lng, response_type="emergency")
+        assert m_sq1["apparatus_class"] == "light"
+        assert m_sq1["speed_kmh"] == 52.0
+        m_sq1_routine = engine.calculate_unit_metrics("SQ1", dest_lat, dest_lng, response_type="routine")
+        assert m_sq1_routine["speed_kmh"] == 38.0
 
-            mock_osrm.assert_called_once()
-            called_waypoints = mock_osrm.call_args[0][0]
+        # Tier 2: General Apparatus (22 tons) - E1, R1, Q5
+        m_e1 = engine.calculate_unit_metrics("E1", dest_lat, dest_lng, response_type="emergency")
+        assert m_e1["apparatus_class"] == "general"
+        assert m_e1["speed_kmh"] == 45.0
+        m_q5 = engine.calculate_unit_metrics("Q5", dest_lat, dest_lng, response_type="emergency")
+        assert m_q5["apparatus_class"] == "general"
+        assert m_q5["speed_kmh"] == 45.0
 
-            assert len(called_waypoints) == 4  # start, 2 corridor waypoints, dest
-            assert abs(called_waypoints[0][0] - FIRE_HALLS["1"]["lat"]) < 0.001
-            # Corridor B: Pinetree -> Lougheed -> Christmas Way
-            assert called_waypoints[1] == [49.2785, -122.7915]  # Pinetree & Lougheed
-            assert called_waypoints[2] == [49.2785, -122.7850]  # Lougheed & Christmas Way
-            assert called_waypoints[3] == [dest_lat, dest_lng]
+        # Tier 3: Heavy Apparatus (35 tons) - L1, T4, WT4
+        m_l1 = engine.calculate_unit_metrics("L1", dest_lat, dest_lng, response_type="emergency")
+        assert m_l1["apparatus_class"] == "heavy"
+        assert m_l1["speed_kmh"] == 38.0
+        m_t4 = engine.calculate_unit_metrics("T4", dest_lat, dest_lng, response_type="emergency")
+        assert m_t4["apparatus_class"] == "heavy"
+        assert m_t4["speed_kmh"] == 38.0
+        m_t4_routine = engine.calculate_unit_metrics("T4", dest_lat, dest_lng, response_type="routine")
+        assert m_t4_routine["speed_kmh"] == 28.0
 
-    def test_non_hall_1_no_corridor_injection(self):
-        engine = EVORoutingEngine()
-        dest_lat = 49.2650
-        dest_lng = -122.8150
-
-        with patch.object(engine, "_fetch_osrm_polyline") as mock_osrm:
-            mock_osrm.return_value = (None, None)
-            res = engine.calculate_route(
-                dest_lat=dest_lat,
-                dest_lng=dest_lng,
-                station_id="4"
-            )
-
-            mock_osrm.assert_called_once()
-            called_waypoints = mock_osrm.call_args[0][0]
-            assert len(called_waypoints) == 2  # Only start and dest
-
-
-class TestResponsePhysicsAndETAs:
     def test_code3_vs_code1_physics(self):
         engine = EVORoutingEngine()
         dest_lat = 49.2622
         dest_lng = -122.8174
 
-        with patch.object(engine, "_fetch_osrm_polyline") as mock_osrm:
-            mock_osrm.return_value = (None, None)
-
-            # Emergency (Code 3)
+        with patch.object(engine, "_fetch_osrm_polyline", return_value=(None, None)):
             res_code3 = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, response_type="emergency")
-            # Routine (Code 1)
             res_code1 = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, response_type="routine")
 
             assert res_code3["response_mode"] == "Emergency (Code 3)"
             assert res_code1["response_mode"] == "Routine (Code 1)"
-
-            # Code 3 road factor is 1.35 vs Code 1 is 1.45 (shorter fallback road km)
             assert res_code3["distance_km"] <= res_code1["distance_km"]
-
-            # Code 3 speed is 45 km/h vs Code 1 is 32 km/h (faster ETA)
             assert res_code3["eta_minutes"] <= res_code1["eta_minutes"]
 
-    def test_unit_metrics_calculation(self):
+    def test_unit_metrics_with_osrm_road_distance(self):
         engine = EVORoutingEngine()
         dest_lat = 49.2785
         dest_lng = -122.7850
 
-        metric_e1 = engine.calculate_unit_metrics("E1", dest_lat, dest_lng, response_type="emergency")
-        assert metric_e1["unit"] == "E1"
-        assert metric_e1["origin_hall"] == 1
-        assert metric_e1["speed_kmh"] == 45.0
-        assert metric_e1["road_distance_km"] > 0
+        metric_e1 = engine.calculate_unit_metrics(
+            "E1", dest_lat, dest_lng, response_type="emergency", road_distance_km=3.5
+        )
+        assert metric_e1["road_distance_km"] == 3.5
         assert metric_e1["eta_minutes"] >= 1
-
-        metric_q5 = engine.calculate_unit_metrics("Q5", dest_lat, dest_lng, response_type="emergency")
-        assert metric_q5["unit"] == "Q5"
-        assert metric_q5["origin_hall"] == 3  # Austin Heights Hall 3
-        assert metric_q5["unit_type"] == "Quint"
-
-        metric_t4 = engine.calculate_unit_metrics("T4", dest_lat, dest_lng, response_type="routine")
-        assert metric_t4["unit"] == "T4"
-        assert metric_t4["origin_hall"] == 4  # Burke Mountain Hall 4
-        assert metric_t4["speed_kmh"] == 32.0
 
     def test_haversine_distance_calculation(self):
         engine = EVORoutingEngine()
-        # Distance between Hall 1 (49.2911, -122.7907) and Hall 2 (49.2622, -122.8175)
         d = engine.calculate_distance_km(
             FIRE_HALLS["1"]["lat"], FIRE_HALLS["1"]["lng"],
             FIRE_HALLS["2"]["lat"], FIRE_HALLS["2"]["lng"]
         )
-        # Expected distance is ~3.7 - 3.8 km
         assert 3.5 <= d <= 4.0
 
 
@@ -307,7 +381,6 @@ class TestOSRMResponsesAndFallback:
 
             assert res["status"] == "success"
             assert res["distance_km"] == 2.54
-            # Coordinates returned should be converted to [lat, lng]
             assert res["polyline"][0] == [49.2910, -122.7907]
             assert res["polyline"][-1] == [49.2785, -122.7850]
             assert len(res["polyline"]) == 3
@@ -320,9 +393,8 @@ class TestOSRMResponsesAndFallback:
             assert res["status"] == "success"
             assert res["distance_km"] > 0
             assert res["eta_minutes"] >= 1
-            # When offline, returns injected corridor waypoints as straight-line polyline
-            assert len(res["polyline"]) >= 2
-            assert res["origin"]["lat"] == FIRE_HALLS["1"]["lat"]
+            assert len(res["polyline"]) == 2
+            assert res["origin"]["lat"] == 49.2905  # Hall 1 southbound apron
             assert res["destination"]["lat"] == 49.2785
 
     def test_osrm_malformed_json_fallback(self):
@@ -335,7 +407,7 @@ class TestOSRMResponsesAndFallback:
 
             res = engine.calculate_route(dest_lat=49.2785, dest_lng=-122.7850, station_id="1")
             assert res["status"] == "success"
-            assert len(res["polyline"]) >= 2
+            assert len(res["polyline"]) == 2
 
     def test_osrm_error_status_code_fallback(self):
         engine = EVORoutingEngine()
@@ -346,38 +418,39 @@ class TestOSRMResponsesAndFallback:
 
             res = engine.calculate_route(dest_lat=49.2785, dest_lng=-122.7850, station_id="1")
             assert res["status"] == "success"
-            assert len(res["polyline"]) >= 2
+            assert len(res["polyline"]) == 2
 
     def test_calculate_units_routing_multi_units(self):
         engine = EVORoutingEngine()
-        units = ["E1", "L1", "Q5", "T4", "R2"]
+        units = ["E1", "L1", "Q5", "T4", "R2", "SQ3", "M1"]
         dest_lat = 49.2785
         dest_lng = -122.7850
 
         results = engine.calculate_units_routing(units, dest_lat, dest_lng, response_type="emergency")
-        assert len(results) == 5
+        assert len(results) == 7
         unit_names = [r["unit"] for r in results]
         assert "E1" in unit_names
         assert "Q5" in unit_names
         assert "T4" in unit_names
         assert "R2" in unit_names
+        assert "SQ3" in unit_names
+        assert "M1" in unit_names
 
-        # Verify hall mappings
         hall_by_unit = {r["unit"]: r["origin_hall"] for r in results}
         assert hall_by_unit["E1"] == 1
         assert hall_by_unit["L1"] == 1
         assert hall_by_unit["Q5"] == 3
         assert hall_by_unit["T4"] == 4
         assert hall_by_unit["R2"] == 2
+        assert hall_by_unit["SQ3"] == 3
+        assert hall_by_unit["M1"] == 1
 
     def test_calculate_units_routing_edge_cases(self):
         engine = EVORoutingEngine()
-        # Empty units or missing coords
         assert engine.calculate_units_routing([], 49.2785, -122.7850) == []
         assert engine.calculate_units_routing(["E1"], None, -122.7850) == []
         assert engine.calculate_units_routing(["E1"], 49.2785, None) == []
 
-        # Deduplication of identical units
         res = engine.calculate_units_routing(["E1", "E1", "E1"], 49.2785, -122.7850)
         assert len(res) == 1
         assert res[0]["unit"] == "E1"
@@ -400,3 +473,24 @@ class TestOSRMResponsesAndFallback:
             assert res["origin"]["lng"] == custom_lng
             assert res["destination"]["lat"] == dest_lat
             assert res["destination"]["lng"] == dest_lng
+
+
+if __name__ == "__main__":
+    if pytest is not None:
+        sys.exit(pytest.main(["-v", __file__]))
+    else:
+        suite = unittest.TestSuite()
+        for name, cls in list(globals().items()):
+            if isinstance(cls, type) and name.startswith("Test"):
+                for method_name in dir(cls):
+                    if method_name.startswith("test_"):
+                        def make_test(c, m):
+                            def test_func(self):
+                                getattr(c(), m)()
+                            return test_func
+                        setattr(cls, f"unittest_{method_name}", make_test(cls, method_name))
+                        case = unittest.FunctionTestCase(lambda c=cls, m=method_name: getattr(c(), m)())
+                        suite.addTest(case)
+        runner = unittest.TextTestRunner(verbosity=2)
+        result = runner.run(suite)
+        sys.exit(0 if result.wasSuccessful() else 1)

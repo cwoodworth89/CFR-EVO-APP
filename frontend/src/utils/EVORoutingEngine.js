@@ -6,9 +6,13 @@ export const APPARATUS_TIERS = {
   LIGHT: {
     key: 'LIGHT',
     name: '⚡ LIGHT APPARATUS',
-    subtitle: 'Medic, Squad (SQ1-4), Command Car, LAV',
+    subtitle: 'Medic, Squad (SQ1-4), Command Car, LAV, Specialty',
     weightTons: 5,
-    speedFactor: 1.25,        // Agile, fast acceleration/braking
+    speedCode3KmH: 52.0,
+    speedCode1KmH: 38.0,
+    roadFactorCode3: 1.25,
+    roadFactorCode1: 1.35,
+    speedFactor: 1.155,       // Agile, fast acceleration/braking
     turnPenaltySec: 3,        // 3 seconds per 90-degree turn
     uphillDragFactor: 1.05,   // Minimal speed loss on steep climbs
     downhillSpeedCapKm: null, // Uncapped standard response
@@ -17,8 +21,12 @@ export const APPARATUS_TIERS = {
   GENERAL: {
     key: 'GENERAL',
     name: '🚒 GENERAL APPARATUS',
-    subtitle: 'Engine (E1-4), Rescue (R1-4), Quint (Q1-4), Pumper',
+    subtitle: 'Engine (E1-4), Rescue (R1-4), Quint (Q5), Pumper',
     weightTons: 22,
+    speedCode3KmH: 45.0,
+    speedCode1KmH: 32.0,
+    roadFactorCode3: 1.35,
+    roadFactorCode1: 1.45,
     speedFactor: 1.00,        // Standard baseline
     turnPenaltySec: 5,        // 5 seconds per 90-degree turn
     uphillDragFactor: 1.30,   // Moderate speed loss on steep climbs
@@ -28,9 +36,13 @@ export const APPARATUS_TIERS = {
   HEAVY: {
     key: 'HEAVY',
     name: '🚚 HEAVY APPARATUS',
-    subtitle: 'Ladder (L1, L4), Tower Platform, Tender (T1-4)',
+    subtitle: 'Ladder (L1-4), Tower Platform, Water Tender (T1-4, WT4)',
     weightTons: 35,
-    speedFactor: 0.80,        // Heavy inertia
+    speedCode3KmH: 38.0,
+    speedCode1KmH: 28.0,
+    roadFactorCode3: 1.45,
+    roadFactorCode1: 1.55,
+    speedFactor: 0.844,       // Heavy inertia
     turnPenaltySec: 8,        // 8 seconds per 90-degree turn
     uphillDragFactor: 1.65,   // High hill-climb drag (Burke Mtn, Westwood Plateau)
     downhillSpeedCapKm: 50,   // 50 km/h safety braking cap on steep descents
@@ -52,12 +64,12 @@ export function classifyApparatusUnit(unitStr) {
   if (!unitStr) return APPARATUS_TIERS.GENERAL;
   const clean = unitStr.trim().toUpperCase();
 
-  // ⚡ LIGHT APPARATUS: Squad, Medic, Command Car, LAV
-  if (/\b(SQ|SQUAD|M|MEDIC|CAR|LAV|CHIEF|COMMAND)\d*\b/i.test(clean)) {
+  // ⚡ LIGHT APPARATUS: Squad, Medic, Command Car, LAV, Specialty
+  if (/\b(SQ|SQUAD|M|MEDIC|CAR|LAV|CHIEF|COMMAND|S|SPECIALTY)\d*\b/i.test(clean)) {
     return APPARATUS_TIERS.LIGHT;
   }
-  // 🚚 HEAVY APPARATUS: Ladder, Tower, Tender
-  if (/\b(L|LADDER|T|TENDER|TOWER|PLATFORM)\d*\b/i.test(clean)) {
+  // 🚚 HEAVY APPARATUS: Ladder, Tower, Tender, WT
+  if (/\b(L|LADDER|T|TENDER|WT|TANKER|TOWER|PLATFORM)\d*\b/i.test(clean)) {
     return APPARATUS_TIERS.HEAVY;
   }
   // 🚒 GENERAL APPARATUS: Engine, Rescue, Quint, Pumper
@@ -135,7 +147,7 @@ export function calculateEVORouteMetrics({
     const tier = classifyApparatusUnit(unitStr);
     
     // Base average response speed (km/h) with EMTRAC green-wave preemption
-    let baseSpeedKm = 52.0 * tier.speedFactor;
+    let baseSpeedKm = tier.speedCode3KmH || 45.0;
 
     // Apply rush hour preemption reduction
     if (isRushHour && config.emtracPreemptionEnabled) {

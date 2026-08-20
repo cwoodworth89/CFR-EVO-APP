@@ -386,6 +386,10 @@ def crawl_cadastral(
     logger.info(f" Final Archive File Size: {file_size_mb:.2f} MB")
     logger.info("=" * 75)
 
+    # Checkpoint WAL and convert journal mode to DELETE for read-only container mount compatibility
+    cur.execute("PRAGMA wal_checkpoint(FULL);")
+    cur.execute("PRAGMA journal_mode = DELETE;")
+    conn.commit()
     conn.close()
 
 

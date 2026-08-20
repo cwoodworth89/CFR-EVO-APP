@@ -477,14 +477,22 @@ class TestOSRMResponsesAndFallback:
 
 
 class TestMunicipalIntersectionAuthorityAndDisambiguation:
+    validator = None
+
     @classmethod
     def setup_class(cls):
         intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
         cls.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
 
     def setup_method(self):
-        intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
-        self.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
+        if self.validator is None:
+            intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
+            self.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
+
+    def setUp(self):
+        if self.validator is None:
+            intersections_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/gis/intersections.json"))
+            self.validator = CoquitlamDataValidator(intersections_json_path=intersections_path)
 
     def test_single_intersection_resolution(self):
         # 1. Christmas Way and Westwood St -> (49.27832, -122.79354)
@@ -556,11 +564,18 @@ if __name__ == "__main__":
                 for method_name in dir(cls):
                     if method_name.startswith("test_"):
                         def make_test(c, m):
-                            def test_func(self):
-                                getattr(c(), m)()
+                            def test_func(self=None):
+                                if hasattr(c, "setup_class"):
+                                    c.setup_class()
+                                inst = c()
+                                if hasattr(inst, "setUp"):
+                                    inst.setUp()
+                                elif hasattr(inst, "setup_method"):
+                                    inst.setup_method()
+                                getattr(inst, m)()
                             return test_func
                         setattr(cls, f"unittest_{method_name}", make_test(cls, method_name))
-                        case = unittest.FunctionTestCase(lambda c=cls, m=method_name: getattr(c(), m)())
+                        case = unittest.FunctionTestCase(make_test(cls, method_name))
                         suite.addTest(case)
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)

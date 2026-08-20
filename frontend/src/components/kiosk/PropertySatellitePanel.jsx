@@ -86,15 +86,6 @@ export default function PropertySatellitePanel({ activeCall }) {
         maxZoom={22}
       />
 
-      {/* 100% Local Municipal Cadastral & Address Labels Overlay (Z14–Z20) */}
-      <TileLayer
-        url={`${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`}
-        maxNativeZoom={20}
-        maxZoom={22}
-        opacity={0.9}
-        zIndex={500}
-      />
-
       {polygonPositions && (
         <Polygon positions={polygonPositions} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />
       )}

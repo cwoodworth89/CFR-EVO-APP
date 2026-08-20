@@ -48,3 +48,15 @@ This document tracks feature requests, operational enhancements, and future idea
   - $O(1)$ instant execution with zero runtime spatial calculation overhead.
   - Safe pass-through fallback ensures zero risk of forced false matches.
 
+---
+
+### 3. 🏷️ Isolated Target Property Address Badge on Satellite PIP View
+* **Description**: On the high-resolution 7.5cm Satellite Picture-in-Picture (PIP) and expanded modal views, render an isolated, high-contrast civic address number badge directly centered on the dispatched target parcel polygon (without loading the entire municipal cadastral grid or surrounding street line overlays).
+* **Key Concept**:
+  - Keep the base aerial orthophoto 100% clean and uncluttered (zero surrounding cadastral lines or neighboring lot numbers).
+  - Extract the house number from `activeCall.address` and render a lightweight, glowing Leaflet DivIcon badge (e.g. `📍 428`) centered on the target parcel centroid.
+* **Benefits**:
+  - Instant target property identification for apparatus operators during nighttime arrival and rooftop/driveway size-up.
+  - Preserves maximum visual contrast of high-resolution 7.5cm aerial imagery.
+
+

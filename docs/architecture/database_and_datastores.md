@@ -35,10 +35,18 @@ graph TD
         R1["backend/data/osrm/ (Local OSRM Road Graph & Contraction Hierarchies)"]
     end
 
-    subgraph Storage ["4. Persistent Audio & Offline Map Tiles"]
+    subgraph Storage ["4. Persistent Audio & Offline MBTiles Tile Server"]
         direction TB
         A1["backend/audio_files/recordings/ (Raw Dispatch WAV Recordings)"]
-        A2["backend/data/tiles/ (Offline MapLibre / PMTiles Basemap)"]
+        A2["cfr_tiles / mbtileserver (Port 8081, mounted from backend/data/tiles/)"]
+        M1["satellite.mbtiles (Z12–Z20 7.5cm Aerial Orthophotos)"]
+        M2["street.mbtiles (Z12–Z18 Carto Voyager Basemap)"]
+        M3["street_nolabels.mbtiles (Z12–Z18 Tactical Grey Basemap)"]
+        M4["cadastral.mbtiles (Z14–Z20 Municipal Parcel & Address Overlay)"]
+        A2 --> M1
+        A2 --> M2
+        A2 --> M3
+        A2 --> M4
     end
 
     subgraph Vocabulary ["5. Dispatch Lexicon Dictionaries"]
@@ -62,9 +70,11 @@ To guarantee total offline resilience and prevent masked errors, the system enfo
 
 | Component | Hardened Offline Engine | Removed Online Fallback |
 | :--- | :--- | :--- |
-| **Address Geocoding** | Local `Addresses.shp` via `/api/gis/search` | ❌ External ArcGIS REST MapServer queries |
-| **Emergency Routing** | Local containerized OSRM graph | ❌ Google Maps Directions API |
+| **Address Geocoding** | Local `Addresses.shp` & PostgreSQL `public.parcels` via `/api/gis/search` | ❌ External ArcGIS REST MapServer queries |
+| **Emergency Routing** | Local containerized OSRM graph (Port 5000) | ❌ Google Maps Directions API |
 | **Speech-to-Text (STT)** | Local Whisper engine (`backend/models/`) | ❌ Google Cloud STT API |
-| **Map Basemap** | Local vector tiles (`/tiles/`) | ❌ Remote Mapbox / OSM CDN tile fetches |
+| **Map Basemaps & Imagery** | Local MBTiles server (`cfr_tiles:8081` - Satellite, Street, Grey) | ❌ Remote Mapbox / OSM CDN tile fetches |
+| **Cadastral & Property Overlay** | Local MBTiles server (`cadastral.mbtiles` on `cfr_tiles:8081`) | ❌ External ArcGIS MapServer `/export` queries |
 
 *The only allowed online network calls are the optional visual PiP augmentations (Google Street View panorama & Satellite photo).*
+

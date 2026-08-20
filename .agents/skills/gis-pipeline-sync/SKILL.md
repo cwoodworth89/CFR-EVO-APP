@@ -41,12 +41,16 @@ Verify that CAD boundary slicing matches Coquitlam Emergency Response Zones ($1 
 
 ## 4. MBTiles Packaging & Slippy XYZ Pyramid Pipeline
 
-All offline base layers are packaged into monolithic SQLite MBTiles archives hosted under `backend/data/tiles/` for serving via `cfr_tiles` (port 8081).
+All offline base layers and property overlays are packaged into monolithic SQLite MBTiles archives hosted under `backend/data/tiles/` for serving via `cfr_tiles` (`ghcr.io/consbio/mbtileserver:latest` on port 8081).
+
+> [!IMPORTANT]
+> **SQLite WAL Mode Read-Only Lock Constraint**:
+> Because `cfr_tiles` mounts `backend/data/tiles/` as **read-only (`:ro`)**, all scripts compiling `.mbtiles` archives must execute `PRAGMA wal_checkpoint(FULL)` and `PRAGMA journal_mode = DELETE` before closing the database to avoid `SQLITE_CANTOPEN` errors.
 
 ### 4.1 Orthophoto Ingestion (7.5cm City of Coquitlam ECW / MrSID / GeoTIFF)
 Tiling pipeline generates standard **OpenStreetMap Slippy XYZ** tiles (`EPSG:3857`, top-left origin) across zoom levels **Z12 through Z20**:
 ```powershell
-python backend/scripts/ingest_coquitlam_orthos.py --min-zoom 12 --max-zoom 20 --workers 8
+python backend/scripts/compile_mbtiles.py --layer satellite --workers 32
 ```
 * **Output Archive**: `backend/data/tiles/satellite.mbtiles`
 * **Tile Schema**: XYZ Mercator `EPSG:3857` (JPEG format for satellite raster compression).
@@ -59,20 +63,37 @@ python backend/scripts/ingest_coquitlam_orthos.py --min-zoom 12 --max-zoom 20 --
 * **Street Layer**: `backend/data/tiles/street.mbtiles` (`/services/street/tiles/{z}/{x}/{y}.png`)
 * **Dark / Grey No-Labels**: `backend/data/tiles/street_nolabels.mbtiles` (`/services/street_nolabels/tiles/{z}/{x}/{y}.png`)
 
+### 4.3 Cadastral Property Overlay Pre-Cache
+Crawls the authentic municipal ArcGIS DynamicServices Cadastral overlay (`layers=show:0,1,16` — road labels, house address numbers, parcel boundaries) into transparent PNG32 tiles:
+```powershell
+python backend/scripts/crawl_cadastral_tiles.py --min-zoom 14 --max-zoom 20 --delay 0.2 --workers 8
+```
+* **Output Archive**: `backend/data/tiles/cadastral.mbtiles`
+* **Endpoint**: `http://${hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png`
+
 ---
 
 ## 5. Tile Server Health & Offline Verification
 
-Verify that the `cfr_tiles` container serves all base layers with zero WAN requests:
+> [!WARNING]
+> `mbtileserver` only accepts `GET` and `OPTIONS`. Probing with `HEAD` (`curl -I`) returns `HTTP/1.1 405 Method Not Allowed`. Always probe with `GET`.
+
+Verify that the `cfr_tiles` container serves all 4 services with zero WAN requests:
 ```powershell
 curl -s http://localhost:8081/services
 ```
-Expected response contains JSON array of available services (`satellite`, `street`, `street_nolabels`).
+Expected response contains JSON array of available services (`satellite`, `street`, `street_nolabels`, `cadastral`).
 
-Sample tile verification:
+Sample tile verification (using GET):
 ```powershell
 # Verify Z18 satellite tile for Town Centre Fire Hall (Hall 1)
-curl -I -s http://localhost:8081/services/satellite/tiles/18/41984/89445.jpg
+curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/satellite/tiles/18/41984/89445.jpg
+
+# Verify Z16 Cadastral overlay tile
+curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/cadastral/tiles/16/10400/22800.png
 ```
-Expected response: `HTTP/1.1 200 OK`, `Content-Type: image/jpeg`.
+Expected response: `200 image/jpeg (...) bytes` and `200 image/png (...) bytes`.
+
+For deep troubleshooting, coordinate math, and recovery commands, see [`.agents/skills/mbtiles-tile-server/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/mbtiles-tile-server/SKILL.md).
+
 

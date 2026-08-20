@@ -1,6 +1,6 @@
 ---
 name: local-stack-orchestrator
-description: Operational runbook for managing the containerized Docker Compose stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, and FastAPI Gateway).
+description: Operational runbook for managing the containerized Docker Compose stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI Gateway, and MBTiles Tile Server).
 ---
 
 # Local Stack Orchestration
@@ -31,6 +31,9 @@ docker compose logs -f mosquitto
 
 # PostgreSQL logs
 docker compose logs -f postgres
+
+# MBTiles Offline Tile Server logs
+docker compose logs -f cfr_tiles
 ```
 
 ---
@@ -43,6 +46,7 @@ Verify that all local ports are bound and responding:
 * **`1883`**: Mosquitto Native MQTT TCP Port
 * **`9001`**: Mosquitto MQTT over WebSockets Port (for React Kiosks)
 * **`8080`**: Ntfy Push Notification Server (`http://localhost:8080`)
+* **`8081`**: MBTiles Tile Server (`http://localhost:8081/services`) — serves `satellite`, `street`, `street_nolabels`, `cadastral`
 
 ---
 
@@ -53,3 +57,19 @@ Verify that `backend/api/init_db.sql` executed correctly:
 docker compose exec postgres psql -U cfr_user -d cfr_dispatch -c "\dt"
 ```
 Ensure table `live_calls` and `evaluation_history` exist and index `idx_live_calls_target_gin` is active.
+
+---
+
+## 4. Tile Server (cfr_tiles) Management
+
+For in-depth tile generation, SQLite WAL mode read-only permissions, and curl testing rules, consult [`.agents/skills/mbtiles-tile-server/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/mbtiles-tile-server/SKILL.md).
+
+Quick service list check:
+```powershell
+curl -s http://localhost:8081/services
+```
+Restart tile container after adding or modifying archives in `backend/data/tiles/`:
+```powershell
+docker restart cfr_tiles
+```
+

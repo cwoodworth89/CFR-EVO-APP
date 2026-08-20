@@ -20,7 +20,10 @@ This rule file defines domain constraints, runtime environments, and workflow st
     - SATELLITE: `http://${window.location.hostname}:8081/services/satellite/tiles/{z}/{x}/{y}.jpg` (Z12–Z20 zoom depth)
     - VOYAGER / OSM (Street): `http://${window.location.hostname}:8081/services/street/tiles/{z}/{x}/{y}.png`
     - GREY / DARK (No-Labels): `http://${window.location.hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png`
+    - CADASTRAL (Overlay): `http://${window.location.hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png` (Z14–Z20 parcel & address overlay)
   - All layers maintain `fallbackUrl: null` for 100% offline integrity with zero external CDN/WAN asset leaks.
+  - **SQLite WAL Read-Only Volume Constraint**: Because `cfr_tiles` mounts `backend/data/tiles/` as read-only (`:ro`), all `.mbtiles` archives must be checkpointed and converted to `PRAGMA journal_mode = DELETE` on compilation (`SQLITE_CANTOPEN` prevention).
+  - **HTTP Method Constraint**: `mbtileserver` supports `GET` and `OPTIONS` only (`405 Method Not Allowed` on `HEAD` / `curl -I`).
 * **API Gateway & Routing**: REST operations and dispatch persistence route via FastAPI (`http://localhost:8000/api/dispatches`). Apparatus turn-by-turn routing routes via local OSRM (`http://localhost:5000`).
 * **Frontend API Endpoint Resolution**: All frontend components performing `fetch()` operations MUST import and use `API_BASE_URL` and `TILE_BASE_URL` from [`frontend/src/apiClient.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/apiClient.js) (e.g., `fetch(\`${API_BASE_URL}/api/route?...\`)`). Never use raw relative paths (`fetch('/api/...')`) or hardcoded `localhost` strings, as remote kiosk browsers accessing the UI over Tailscale (`http://100.95.146.94:5173`) will route relative requests to the Vite static server (resulting in 404s).
 * **Real-Time Broadcast**: Station kiosks listen to Mosquitto MQTT over WebSockets on port `9001` (topic: `cfr/dispatches`).
@@ -55,10 +58,11 @@ To prevent duplicate work, reduce AI token usage (saving credit spending), and g
 2. **Consult the Master Index**:
    * **`dispatch-pipeline-ops`**: Core 2-phase audio processing pipeline architecture.
    * **`e2e-dispatch-testing`**: Live simulation guides, QA tests, and database purge rules.
-   * **`local-stack-orchestrator`**: Docker Compose local container stack (PostgreSQL, MQTT, FastAPI) control.
+   * **`local-stack-orchestrator`**: Docker Compose local container stack (PostgreSQL, MQTT, FastAPI, MBTiles) control.
+   * **`mbtiles-tile-server`**: Offline MBTiles tile server container (`cfr_tiles`), SQLite archives, crawler pipelines, and Slippy/TMS math.
    * **`emergency-routing-engine`**: Apparatus-aware pathfinding and route biasing logic.
    * **`stt-mlops-backtest`** / **`hitl-log-analysis`**: Word Error Rate metrics, Whisper STT regressions, and parsing corrections.
-   * **`gis-spatial-analysis`** / **`gis-pipeline-sync`**: Shapefile bounds geocoding, parcel layers, and ESRI updates.
+   * **`gis-spatial-analysis`** / **`gis-pipeline-sync`**: Shapefile bounds geocoding, parcel layers, cadastral crawling, and ESRI updates.
    * **`road-closure-management`**: Ingestion, hazard mapping, and dynamic routing updates.
    * **`kiosk-remote-ops`** / **`kiosk-ui-audit`**: Kiosk screen builds, daemon restarts, and display testing.
    * **`kiosk-responsive-ergonomics`**: CSS/UI ergonomic layout rules for kiosks.
@@ -69,6 +73,7 @@ To prevent duplicate work, reduce AI token usage (saving credit spending), and g
    * **`dispatch-qa-engineer`** (End-to-end simulation pipelines, teardown scripts)
    * **`performance-metrics-analyst`** (Dashboard metrics and latency stats)
 4. **Learn & Persist**: Propose updating rules in `GEMINI.md` or creating new custom skills in `.agents/skills/` when introducing recurring developer workflows.
+
 
 ---
 

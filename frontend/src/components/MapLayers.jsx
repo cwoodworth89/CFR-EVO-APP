@@ -121,6 +121,8 @@ export function BaseMap({ style, useLabelsFallback }) {
             maxZoom: maxZoom,
             noWrap: true,
             crossOrigin: "anonymous",
+            pane: "tilePane",
+            zIndex: 100,
         });
         tileLayer.addTo(map);
         layerRef.current = tileLayer;
@@ -139,11 +141,24 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
       
       const overlayLayer = L.tileLayer(
           `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
-          { transparent: true, opacity: 0.9, maxNativeZoom: 20, maxZoom: 22 }
+          {
+              transparent: true,
+              opacity: 0.9,
+              maxNativeZoom: 20,
+              maxZoom: 22,
+              pane: "overlayPane",
+              zIndex: 350
+          }
       );
       overlayLayer.addTo(map);
 
-      return () => { map.removeLayer(overlayLayer); };
+      return () => {
+        try {
+          if (map.hasLayer(overlayLayer)) {
+            map.removeLayer(overlayLayer);
+          }
+        } catch (e) {}
+      };
     }, [map, visible]);
     
     return null;

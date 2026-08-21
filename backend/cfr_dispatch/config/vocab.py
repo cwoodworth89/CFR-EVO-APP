@@ -31,13 +31,33 @@ def load_vocabulary_from_db(category: str) -> list[str]:
         logging.warning(f"Failed to load vocabulary '{category}' from DB, falling back to file: {e}")
         return []
 
+def load_streets_from_db() -> list[str]:
+    """Load road names from PostgreSQL public.road_names."""
+    try:
+        from sqlalchemy import create_engine, text
+        db_url = os.environ.get('DATABASE_URL', 'postgresql://cfr_user:cfr_password_2026@localhost:5432/cfr_dispatch')
+        engine = create_engine(db_url)
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text('SELECT road_name FROM public.road_names ORDER BY road_name')
+            ).fetchall()
+            return [r[0] for r in rows if r[0]]
+    except Exception as e:
+        logging.warning(f"Failed to load streets from DB, falling back to file: {e}")
+        return []
+
 # Load with DB-first, file fallback
 UNITS_VOCAB_RAW = load_vocabulary_from_db('unit') or load_vocabulary_file('units_vocabulary.txt')
 RESPONSE_TYPES = load_vocabulary_from_db('response_type') or load_vocabulary_file('response_types.txt')
 RADIO_CHANNELS = load_vocabulary_from_db('radio_channel') or load_vocabulary_file('radio_channels.txt')
 MAP_GRIDS = load_vocabulary_from_db('map_grid') or load_vocabulary_file('map_grid_numbers.txt')
 CALL_TYPES = sorted(load_vocabulary_from_db('call_type') or load_vocabulary_file('call_types.txt'), key=len, reverse=True)
-COQUITLAM_STREETS = []  # Now loaded from public.road_names via geocoder, not from file
+COQUITLAM_STREETS = (
+    load_streets_from_db()
+    or load_vocabulary_file('top_streets.txt')
+    or load_vocabulary_file('coquitlam_streets.txt')
+)
+
 
 # Extract base unit types dynamically from units_vocabulary.txt (e.g. "Engine 1" -> "Engine")
 _types_set = set()

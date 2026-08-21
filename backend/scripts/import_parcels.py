@@ -2,10 +2,15 @@
 """
 backend/scripts/import_parcels.py
 High-speed GIS ingestion script: imports 100% of Coquitlam Addresses.shp records (69,708 rows)
-into the unified 40-column PostgreSQL `public.parcels` table.
+into the unified 40-column PostgreSQL `public.parcels` table with true Polygon geometry and PostGIS indexing.
 
-Pre-computes emergency response zone_id (1..134) via spatial point-in-polygon intersection
-against Emergency_Response_Zones.shp, eliminating runtime geocoding zone lookups.
+Features:
+- Non-destructive UPSERT (ON CONFLICT address): preserves operational data (pre-plans, lockbox notes,
+  hazards, custom frontage/entrance coordinates, streetview headings) while refreshing municipal GIS attributes.
+- Full Polygon/MultiPolygon geometry ingestion into `geom geometry(Geometry, 4326)` with GiST spatial indexing.
+- Pre-computes emergency response zone_id (1..134) via spatial point-in-polygon intersection against Emergency_Response_Zones.shp.
+- Road Frontage Calculation: Computes actual road-facing frontage coordinates (front_lat, front_lng)
+  via PostGIS `ST_ClosestPoint` to nearest road centrelines in `public.roads`.
 """
 
 import os
@@ -31,6 +36,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
+
 def get_database_url() -> str:
     """Resolves database URL from environment or default local container."""
     db_url = os.environ.get(
@@ -41,16 +47,23 @@ def get_database_url() -> str:
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     return db_url
 
-def create_parcels_table(engine, drop_existing: bool = True):
-    """Creates the 40-column unified parcels table and indexes."""
+
+def create_parcels_table(engine, drop_existing: bool = False):
+    """
+    Creates or updates the 40-column unified parcels table, geometry column, and indexes.
+    Defaults to non-destructive creation (UPSERT mode).
+    """
     from sqlalchemy import text
     with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"))
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+
         if drop_existing:
-            logging.info("Dropping legacy tables (parcels, streetview_overrides)...")
+            logging.info("Force drop enabled: Dropping legacy tables (parcels, streetview_overrides)...")
             conn.execute(text("DROP TABLE IF EXISTS public.streetview_overrides CASCADE;"))
             conn.execute(text("DROP TABLE IF EXISTS public.parcels CASCADE;"))
 
-        logging.info("Creating unified 40-column public.parcels table...")
+        logging.info("Verifying unified 40-column public.parcels table...")
         create_sql = text("""
         CREATE TABLE IF NOT EXISTS public.parcels (
             id BIGSERIAL PRIMARY KEY,
@@ -84,6 +97,8 @@ def create_parcels_table(engine, drop_existing: bool = True):
             zone_id VARCHAR(16),
             address_normalized VARCHAR(255),
 
+            geom geometry(Geometry, 4326),
+
             front_lat DOUBLE PRECISION,
             front_lng DOUBLE PRECISION,
             centroid_lat DOUBLE PRECISION,
@@ -103,7 +118,33 @@ def create_parcels_table(engine, drop_existing: bool = True):
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        """)
+        conn.execute(create_sql)
 
+        # Ensure geometry column exists and supports generic Geometry (Polygon / MultiPolygon)
+        if not drop_existing:
+            conn.execute(text("ALTER TABLE public.parcels ADD COLUMN IF NOT EXISTS geom geometry(Geometry, 4326);"))
+            try:
+                conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_schema = 'public' AND table_name = 'parcels' AND column_name = 'geom'
+                    ) THEN
+                        BEGIN
+                            ALTER TABLE public.parcels ALTER COLUMN geom TYPE geometry(Geometry, 4326);
+                        EXCEPTION WHEN OTHERS THEN
+                            NULL;
+                        END;
+                    END IF;
+                END $$;
+                """))
+            except Exception:
+                pass
+
+        # Ensure all indexes exist
+        index_sql = text("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_parcels_address ON public.parcels (address);
         CREATE INDEX IF NOT EXISTS idx_parcels_address_normalized ON public.parcels (address_normalized);
         CREATE INDEX IF NOT EXISTS idx_parcels_gis_id ON public.parcels (gis_id);
@@ -112,12 +153,107 @@ def create_parcels_table(engine, drop_existing: bool = True):
         CREATE INDEX IF NOT EXISTS idx_parcels_house_street ON public.parcels (house, street);
         CREATE INDEX IF NOT EXISTS idx_parcels_unit ON public.parcels (unit) WHERE unit IS NOT NULL AND unit != '';
         CREATE INDEX IF NOT EXISTS idx_parcels_zonetype1 ON public.parcels (zonetype1);
+        CREATE INDEX IF NOT EXISTS idx_parcels_geom ON public.parcels USING GIST (geom);
         """)
-        conn.execute(create_sql)
-        logging.info("Table public.parcels and all indexes created successfully.")
+        conn.execute(index_sql)
+        logging.info("Table public.parcels and all indexes verified successfully.")
 
-def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool = True, batch_size: int = 5000):
-    """Executes the full GIS shapefile loading, spatial zone intersection, and database copy."""
+
+def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
+    """
+    Computes front_lat/front_lng as the nearest point on the closest road centreline
+    using PostGIS spatial KNN (<->) and ST_ClosestPoint.
+    Only updates parcels where front_lat is NULL or front_lat == lat (unmodified default).
+    """
+    from sqlalchemy import text
+    logging.info("=" * 60)
+    logging.info("Step: Computing Road-Facing Frontage Points (public.parcels)...")
+
+    try:
+        with engine.connect() as conn:
+            # Check public.roads table and geometry availability
+            roads_exists = conn.execute(text("SELECT to_regclass('public.roads');")).scalar()
+            if not roads_exists:
+                logging.warning("  public.roads table does not exist. Skipping frontage computation.")
+                return 0
+
+            road_count = conn.execute(text("SELECT COUNT(*) FROM public.roads WHERE geom IS NOT NULL;")).scalar()
+            if not road_count or road_count == 0:
+                logging.warning("  public.roads has no geometry records. Skipping frontage computation.")
+                return 0
+
+            logging.info(f"  Found {road_count} road segments in public.roads with geometry.")
+
+            # Identify candidate parcel IDs requiring frontage backfill
+            candidate_ids = [r[0] for r in conn.execute(text("""
+                SELECT id 
+                FROM public.parcels 
+                WHERE lat IS NOT NULL AND lng IS NOT NULL 
+                  AND (front_lat IS NULL OR front_lat = lat)
+                ORDER BY id;
+            """)).fetchall()]
+
+        total_candidates = len(candidate_ids)
+        if total_candidates == 0:
+            logging.info("  All parcels already have road-aligned frontage points.")
+            return 0
+
+        logging.info(f"  Calculating road frontage coordinates for {total_candidates} parcels (chunks of {batch_size})...")
+
+        chunk_sql = text("""
+        UPDATE public.parcels p SET
+            front_lat = ST_Y(nearest.pt),
+            front_lng = ST_X(nearest.pt)
+        FROM (
+            SELECT DISTINCT ON (p2.id)
+                p2.id as parcel_id,
+                ST_ClosestPoint(r.geom, ST_SetSRID(ST_MakePoint(p2.lng, p2.lat), 4326)) as pt
+            FROM public.parcels p2
+            CROSS JOIN LATERAL (
+                SELECT geom FROM public.roads r2
+                WHERE r2.geom IS NOT NULL
+                ORDER BY r2.geom <-> ST_SetSRID(ST_MakePoint(p2.lng, p2.lat), 4326)
+                LIMIT 1
+            ) r
+            WHERE p2.id >= :min_id AND p2.id <= :max_id
+              AND p2.lat IS NOT NULL AND p2.lng IS NOT NULL
+              AND (p2.front_lat IS NULL OR p2.front_lat = p2.lat)
+        ) nearest
+        WHERE p.id = nearest.parcel_id;
+        """)
+
+        start_t = time.time()
+        total_updated = 0
+
+        for i in range(0, total_candidates, batch_size):
+            chunk = candidate_ids[i:i + batch_size]
+            min_id = chunk[0]
+            max_id = chunk[-1]
+
+            with engine.begin() as tx_conn:
+                res = tx_conn.execute(chunk_sql, {"min_id": min_id, "max_id": max_id})
+                updated_chunk = res.rowcount if hasattr(res, "rowcount") else len(chunk)
+                total_updated += updated_chunk
+
+            pct = (min(i + batch_size, total_candidates) / total_candidates) * 100
+            logging.info(f"  Frontage backfill progress: {min(i + batch_size, total_candidates)}/{total_candidates} parcels evaluated ({pct:.1f}%)...")
+
+        elapsed_s = time.time() - start_t
+        logging.info(f"  ✓ Road frontage backfill completed for {total_updated} parcels in {elapsed_s:.2f}s.")
+        return total_updated
+    except Exception as e:
+        logging.error(f"  ✗ Error calculating parcel frontage coordinates: {e}", exc_info=True)
+        return 0
+
+
+def run_import(
+    address_shp_path: str,
+    zones_shp_path: str,
+    drop_existing: bool = False,
+    skip_frontage: bool = False,
+    batch_size: int = 5000
+):
+    """Executes the full GIS shapefile loading, spatial zone intersection, UPSERT ingestion, and frontage alignment."""
     import geopandas as gpd
     from sqlalchemy import create_engine, text
 
@@ -133,35 +269,48 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
     logging.info("CFR EVO: Ingesting Coquitlam Parcels & Pre-Computing Zones")
     logging.info(f"Addresses source: {address_shp_path}")
     logging.info(f"Zones source:     {zones_shp_path}")
+    logging.info(f"Ingestion mode:   {'FORCE DROP & RECREATE' if drop_existing else 'NON-DESTRUCTIVE UPSERT'}")
     logging.info("=" * 60)
 
-    # 1. Load Addresses Shapefile
+    # 1. Load Addresses Shapefile & Reproject to WGS84
     logging.info("Reading Addresses shapefile...")
     addr_gdf = gpd.read_file(address_shp_path)
     total_raw = len(addr_gdf)
     logging.info(f"Loaded {total_raw} raw address records. Native CRS: {addr_gdf.crs}")
 
-    # Ensure WGS84 for lat/lng extraction
     if addr_gdf.crs is None:
         logging.warning("Addresses CRS is undefined. Assuming EPSG:26910 (UTM Zone 10N)...")
         addr_gdf.set_crs(epsg=26910, inplace=True)
-    
+
+    # Transform geometry to standard EPSG:4326
     addr_wgs84 = addr_gdf.to_crs(epsg=4326)
     centroids = addr_wgs84.geometry.centroid
-    addr_gdf["lat"] = centroids.y
-    addr_gdf["lng"] = centroids.x
 
-    # 2. Load Emergency Response Zones & Spatial Join
+    addr_wgs84["lat"] = centroids.y
+    addr_wgs84["lng"] = centroids.x
+    addr_wgs84["geom_wkt"] = addr_wgs84.geometry.apply(
+        lambda g: g.wkt if g is not None and not g.is_empty else None
+    )
+
+    # 2. Load Emergency Response Zones & Spatial Point-in-Polygon Join
     logging.info("Reading Emergency Response Zones shapefile...")
     zones_gdf = gpd.read_file(zones_shp_path)
     logging.info(f"Loaded {len(zones_gdf)} response zones. Native CRS: {zones_gdf.crs}")
 
-    if zones_gdf.crs != addr_gdf.crs:
-        logging.info("Re-projecting response zones to match addresses CRS...")
-        zones_gdf = zones_gdf.to_crs(addr_gdf.crs)
+    if zones_gdf.crs != addr_wgs84.crs:
+        logging.info("Re-projecting response zones to EPSG:4326...")
+        zones_gdf = zones_gdf.to_crs(epsg=4326)
 
-    logging.info("Performing spatial point-in-polygon join (Address points -> Response Zones)...")
-    joined = gpd.sjoin(addr_gdf, zones_gdf[["MAP_NAME", "geometry"]], how="left", predicate="within")
+    logging.info("Performing spatial point-in-polygon join (Address centroids -> Response Zones)...")
+    # Use centroid points for spatial join to ensure clean point-in-polygon matching
+    addr_points_gdf = addr_wgs84.copy()
+    addr_points_gdf.geometry = centroids
+    joined = gpd.sjoin(
+        addr_points_gdf,
+        zones_gdf[["MAP_NAME", "geometry"]],
+        how="left",
+        predicate="within"
+    )
 
     # 3. Clean & Format Data
     logging.info("Formatting records and normalizing addresses...")
@@ -174,7 +323,7 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
         if val is None:
             return None
         s = str(val).strip()
-        if s == "" or s.lower() in ("nan", "none", "<null>"):
+        if s == "" or s.lower() in ("nan", "none", "<null>", "null"):
             return None
         return s
 
@@ -182,7 +331,7 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
         raw_addr = clean_str(row.get("ADDRESS"))
         if not raw_addr:
             continue
-        
+
         # Deduplicate identical address strings if present in source
         if raw_addr in seen_addresses:
             continue
@@ -198,7 +347,7 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
         block = clean_str(row.get("BLOCK"))
         plan = clean_str(row.get("PLAN"))
         lot = clean_str(row.get("LOT"))
-        
+
         raw_legal = row.get("LEGALDESC")
         legaldesc = clean_str(str(raw_legal).replace("\n", " ").replace("\r", " ")) if raw_legal is not None else None
         plan_area = clean_str(row.get("PLAN_AREA"))
@@ -207,12 +356,12 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
         zonetype2 = clean_str(row.get("ZONETYPE2"))
         zonetype3 = clean_str(row.get("ZONETYPE3"))
         status = clean_str(row.get("STATUS")) or "Active"
-        
+
         units_raw = str(row.get("UNITS", "") or "").strip()
         units = int(units_raw) if units_raw.isdigit() else None
-        
+
         sc_card = clean_str(row.get("SC_CARD"))
-        
+
         extract_dt = row.get("EXTRACT_DT")
         if extract_dt is not None:
             try:
@@ -232,6 +381,7 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
             missing_zone_count += 1
 
         addr_norm = raw_addr.lower()
+        geom_wkt = clean_str(row.get("geom_wkt"))
 
         records_to_insert.append({
             "gis_id": gis_id,
@@ -259,6 +409,7 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
             "lng": lng,
             "zone_id": zone_id,
             "address_normalized": addr_norm,
+            "geom_wkt": geom_wkt,
             "front_lat": lat,
             "front_lng": lng,
             "centroid_lat": lat,
@@ -274,58 +425,105 @@ def run_import(address_shp_path: str, zones_shp_path: str, drop_existing: bool =
     logging.info(f"Prepared {len(records_to_insert)} clean records for database ingestion.")
     logging.info(f"Emergency Zones assigned: {zone_assigned_count} | Unassigned (boundary edges): {missing_zone_count}")
 
-    # 4. Connect to DB & Bulk Insert
+    # 4. Connect to DB & Bulk UPSERT
     db_url = get_database_url()
     logging.info(f"Connecting to database: {db_url.split('@')[-1] if '@' in db_url else db_url}...")
     engine = create_engine(db_url, pool_pre_ping=True)
 
     create_parcels_table(engine, drop_existing=drop_existing)
 
-    logging.info(f"Executing batch insertion (batch size: {batch_size})...")
-    insert_sql = text("""
+    logging.info(f"Executing batch UPSERT ingestion (batch size: {batch_size})...")
+    upsert_sql = text("""
     INSERT INTO public.parcels (
         gis_id, address, house, street, streettype, unit, unittype, postal,
         block, plan, lot, legaldesc, plan_area, folio, zonetype1, zonetype2, zonetype3,
         status, units, sc_card, extract_dt, lat, lng, zone_id, address_normalized,
+        geom,
         front_lat, front_lng, centroid_lat, centroid_lng, entrance_lat, entrance_lng,
         streetview_heading, streetview_pitch, streetview_fov, is_pa_page
     ) VALUES (
         :gis_id, :address, :house, :street, :streettype, :unit, :unittype, :postal,
         :block, :plan, :lot, :legaldesc, :plan_area, :folio, :zonetype1, :zonetype2, :zonetype3,
         :status, :units, :sc_card, CAST(:extract_dt AS DATE), :lat, :lng, :zone_id, :address_normalized,
+        CASE 
+            WHEN :geom_wkt IS NOT NULL AND :geom_wkt != '' 
+            THEN ST_GeomFromText(:geom_wkt, 4326) 
+            ELSE NULL 
+        END,
         :front_lat, :front_lng, :centroid_lat, :centroid_lng, :entrance_lat, :entrance_lng,
         :streetview_heading, :streetview_pitch, :streetview_fov, :is_pa_page
     )
+    ON CONFLICT (address) DO UPDATE SET
+        gis_id = EXCLUDED.gis_id,
+        house = EXCLUDED.house,
+        street = EXCLUDED.street,
+        streettype = EXCLUDED.streettype,
+        unit = EXCLUDED.unit,
+        unittype = EXCLUDED.unittype,
+        postal = EXCLUDED.postal,
+        block = EXCLUDED.block,
+        plan = EXCLUDED.plan,
+        lot = EXCLUDED.lot,
+        legaldesc = EXCLUDED.legaldesc,
+        plan_area = EXCLUDED.plan_area,
+        folio = EXCLUDED.folio,
+        zonetype1 = EXCLUDED.zonetype1,
+        zonetype2 = EXCLUDED.zonetype2,
+        zonetype3 = EXCLUDED.zonetype3,
+        status = EXCLUDED.status,
+        units = EXCLUDED.units,
+        sc_card = EXCLUDED.sc_card,
+        extract_dt = EXCLUDED.extract_dt,
+        lat = EXCLUDED.lat,
+        lng = EXCLUDED.lng,
+        centroid_lat = EXCLUDED.centroid_lat,
+        centroid_lng = EXCLUDED.centroid_lng,
+        zone_id = EXCLUDED.zone_id,
+        address_normalized = EXCLUDED.address_normalized,
+        geom = EXCLUDED.geom,
+        updated_at = CURRENT_TIMESTAMP;
     """)
 
-    total_inserted = 0
+    total_processed = 0
     with engine.begin() as conn:
         for i in range(0, len(records_to_insert), batch_size):
             batch = records_to_insert[i:i + batch_size]
-            conn.execute(insert_sql, batch)
-            total_inserted += len(batch)
-            logging.info(f"  Inserted {total_inserted}/{len(records_to_insert)} parcels ({(total_inserted/len(records_to_insert)*100):.1f}%)...")
+            conn.execute(upsert_sql, batch)
+            total_processed += len(batch)
+            pct = (total_processed / len(records_to_insert)) * 100
+            logging.info(f"  Ingested {total_processed}/{len(records_to_insert)} parcels ({pct:.1f}%)...")
+
+    # 5. Compute Road-Facing Frontage Coordinates
+    if not skip_frontage:
+        backfill_parcel_frontage(engine, batch_size=batch_size)
+    else:
+        logging.info("Skipping road frontage point backfill (--skip-frontage specified).")
 
     elapsed_s = time.time() - start_time
     logging.info("=" * 60)
-    logging.info(f"SUCCESS: Ingested {total_inserted} parcels in {elapsed_s:.2f}s ({(total_inserted/elapsed_s):.0f} rows/sec).")
+    logging.info(f"SUCCESS: Ingested {total_processed} parcels in {elapsed_s:.2f}s ({(total_processed/elapsed_s):.0f} rows/sec).")
     logging.info("=" * 60)
 
-    # 5. Run Verification Queries
+    # 6. Run Verification Queries
     with engine.connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM public.parcels;")).scalar()
+        poly_count = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE geom IS NOT NULL;")).scalar()
         zones = conn.execute(text("SELECT COUNT(DISTINCT zone_id) FROM public.parcels WHERE zone_id IS NOT NULL;")).scalar()
         high_rises = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE units > 50;")).scalar()
         multi_units = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE unit IS NOT NULL AND unit != '';")).scalar()
-        
+        frontage_aligned = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE front_lat IS NOT NULL AND front_lat != lat;")).scalar()
+
         logging.info("Verification Summary:")
-        logging.info(f"  Total Rows in DB:               {count}")
+        logging.info(f"  Total Rows in DB:                 {count}")
+        logging.info(f"  Polygons Populated (geom):        {poly_count}")
+        logging.info(f"  Road-Aligned Frontage Points:     {frontage_aligned}")
         logging.info(f"  Unique Emergency Zones Populated: {zones}")
-        logging.info(f"  Multi-Unit / Condo Rows:        {multi_units}")
-        logging.info(f"  High-Rise Buildings (>50 units):{high_rises}")
+        logging.info(f"  Multi-Unit / Condo Rows:          {multi_units}")
+        logging.info(f"  High-Rise Buildings (>50 units):  {high_rises}")
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingest Coquitlam shapefiles into public.parcels")
+    parser = argparse.ArgumentParser(description="Ingest Coquitlam shapefiles into public.parcels (Non-destructive UPSERT mode)")
     parser.add_argument(
         "--addresses",
         default=os.path.join(backend_dir, "data", "Property_Information", "Addresses.shp"),
@@ -337,21 +535,32 @@ if __name__ == "__main__":
         help="Path to Emergency_Response_Zones.shp"
     )
     parser.add_argument(
+        "--force-drop",
+        action="store_true",
+        help="Force drop and recreate public.parcels (WARNING: destroys operational pre-plans/notes)"
+    )
+    parser.add_argument(
         "--no-drop",
         action="store_true",
-        help="Do not drop existing table before import"
+        help="Deprecated alias (non-destructive UPSERT is now the default)"
+    )
+    parser.add_argument(
+        "--skip-frontage",
+        action="store_true",
+        help="Skip PostGIS nearest road frontage point calculation"
     )
     parser.add_argument(
         "--batch-size",
         type=int,
         default=5000,
-        help="Batch insert chunk size"
+        help="Batch insert chunk size (default: 5000)"
     )
     args = parser.parse_args()
 
     run_import(
         address_shp_path=args.addresses,
         zones_shp_path=args.zones,
-        drop_existing=not args.no_drop,
+        drop_existing=args.force_drop,
+        skip_frontage=args.skip_frontage,
         batch_size=args.batch_size
     )

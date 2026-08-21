@@ -69,7 +69,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
       try {
         const evalData = await apiClient.evaluations.fetchAll();
         setEvalHistory(evalData || []);
-      } catch (e) {
+      } catch {
         // non-fatal
       }
       setDbStatus('connected');

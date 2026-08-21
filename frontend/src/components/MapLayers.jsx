@@ -2,7 +2,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Marker, CircleMarker, Tooltip, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import * as turf from '@turf/turf';
 import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 import { TILE_BASE_URL } from '../apiClient';
 
@@ -157,7 +156,7 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
           if (map.hasLayer(overlayLayer)) {
             map.removeLayer(overlayLayer);
           }
-        } catch (e) {}
+        } catch {}
       };
     }, [map, visible]);
     

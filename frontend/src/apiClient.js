@@ -119,7 +119,7 @@ export const apiClient = {
             setToken(data.access_token);
             return { data: { session: { user: data.user, access_token: data.access_token } }, error: null };
           }
-        } catch (e) {}
+        } catch {}
         return { data: { session: null }, error: null };
       }
       try {
@@ -131,7 +131,7 @@ export const apiClient = {
           setToken(null);
           return this.getSession();
         }
-      } catch (err) {
+      } catch {
         return { data: { session: { user: { username: 'cfradmin', role: 'admin' } } }, error: null };
       }
     },
@@ -154,7 +154,7 @@ export const apiClient = {
             } else if (errData.detail) {
               msg = JSON.stringify(errData.detail);
             }
-          } catch (e) {}
+          } catch {}
           throw new Error(msg);
         }
         const data = await res.json();
@@ -262,7 +262,7 @@ export const apiClient = {
         const res = await fetch(`${API_BASE_URL}/api/parcels/lookup?query=${encodeURIComponent(query)}`, { headers: getHeaders() });
         if (!res.ok) return null;
         return await res.json();
-      } catch (e) {
+      } catch {
         return null;
       }
     },
@@ -285,7 +285,7 @@ export const apiClient = {
         const res = await fetch(`${API_BASE_URL}/api/streetview-overrides/${encodeURIComponent(address)}`, { headers: getHeaders() });
         if (!res.ok) return null;
         return await res.json();
-      } catch (e) {
+      } catch {
         return null;
       }
     },
@@ -308,7 +308,7 @@ export const apiClient = {
         const res = await fetch(`${API_BASE_URL}/api/streetview-overrides/${encodeURIComponent(address)}`, { headers: getHeaders() });
         if (!res.ok) return null;
         return await res.json();
-      } catch (e) {
+      } catch {
         return null;
       }
     },

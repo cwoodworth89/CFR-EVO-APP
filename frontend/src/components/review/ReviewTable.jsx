@@ -22,11 +22,11 @@ export const formatTimestampPT = (ts) => {
     parts.forEach(p => { partMap[p.type] = p.value; });
     
     return `${partMap.year}-${partMap.month}-${partMap.day} ${partMap.hour}:${partMap.minute}:${partMap.second}`;
-  } catch (e) {
+  } catch {
     try {
       const d = new Date(ts);
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-    } catch (err) {
+    } catch {
       return ts;
     }
   }

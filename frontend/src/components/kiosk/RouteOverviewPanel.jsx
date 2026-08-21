@@ -126,7 +126,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const destLng = hasValidCoords ? Number(rawDestLng) : null;
   const destination = hasValidCoords ? { lat: destLat, lng: destLng } : null;
 
-  const [routeInfo, setRouteInfo] = useState(null);
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
@@ -138,18 +137,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     setUserPanned(false);
     setSelectedCandidateIdx(0);
   }, [callKey]);
-
-  const handleRouteCalculated = (coordinates) => {
-    if (coordinates && coordinates.length > 1) {
-      let totalDist = 0;
-      for (let i = 0; i < coordinates.length - 1; i++) {
-        const from = turf.point([coordinates[i][1], coordinates[i][0]]);
-        const to = turf.point([coordinates[i + 1][1], coordinates[i + 1][0]]);
-        totalDist += turf.distance(from, to, { units: 'kilometers' });
-      }
-      setRouteInfo({ distanceKm: totalDist });
-    }
-  };
 
   // Dynamic responding units resolution
   const unitsToRoute = useMemo(() => {
@@ -370,7 +357,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           <RoutingOverlay
             from={[origin.lat, origin.lng]}
             to={[destLat, destLng]}
-            onRouteCalculated={handleRouteCalculated}
           />
         )}
 

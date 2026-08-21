@@ -12,7 +12,7 @@ const getMqttBrokerUrl = () => {
     const hostname = url.hostname || 'localhost';
     const isSsl = url.protocol === 'https:';
     return isSsl ? `wss://${hostname}/mqtt` : `ws://${hostname}:9001`;
-  } catch (e) {
+  } catch {
     const hostname = window.location.hostname || 'localhost';
     const isSsl = window.location.protocol === 'https:';
     return isSsl ? `wss://${hostname}/mqtt` : `ws://${hostname}:9001`;

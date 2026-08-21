@@ -26,7 +26,7 @@ export default function StreetViewPanel({ activeCall }) {
     try {
       const stored = localStorage.getItem(`cfr_sv_override_${cleanAddrKey}`);
       return stored ? JSON.parse(stored) : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   };
@@ -413,7 +413,7 @@ export default function StreetViewPanel({ activeCall }) {
       await apiClient.parcels.saveStreetView(payload);
       try {
         await apiClient.streetView.saveOverride(payload);
-      } catch (e) {}
+      } catch {}
       setDbOverride(payload);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);

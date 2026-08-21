@@ -9,50 +9,6 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { STATIONS } from '../MapConstants';
 
 // Color coding tone matching: Engine = Orange, Rescue = Red, Ladder = Cyan, Chief = Gold, Medic = Emerald
-const getUnitBadgeStyle = (unitStr) => {
-  const u = (unitStr || '').toUpperCase().trim();
-  if (u.startsWith('E') || u.startsWith('ENG') || u.includes('ENGINE')) {
-    return 'bg-orange-500/20 text-orange-400 border-orange-500/50';
-  }
-  if (u.startsWith('R') || u.startsWith('RESCUE') || u.includes('RESCUE')) {
-    return 'bg-rose-500/20 text-rose-400 border-rose-500/50';
-  }
-  if (u.startsWith('L') || u.startsWith('TR') || u.includes('LADDER') || u.includes('TRUCK')) {
-    return 'bg-sky-500/20 text-sky-300 border-sky-500/50';
-  }
-  if (u.startsWith('C') || u.startsWith('CHIEF') || u.includes('CHIEF') || u.startsWith('B')) {
-    return 'bg-amber-500/20 text-amber-300 border-amber-500/50';
-  }
-  if (u.startsWith('M') || u.startsWith('MEDIC') || u.startsWith('S') || u.startsWith('AMB')) {
-    return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50';
-  }
-  return 'bg-slate-800 text-slate-200 border-slate-700';
-};
-
-const getShortCallsign = (unitStr) => {
-  const u = (unitStr || '').trim().toUpperCase();
-  if (!u) return '';
-  const numMatch = u.match(/\d+/);
-  const num = numMatch ? numMatch[0] : '';
-
-  if (u.includes('ENGINE') || u.startsWith('ENG') || u.startsWith('E')) return `E${num || u}`;
-  if (u.includes('RESCUE') || u.startsWith('R')) return `R${num || u}`;
-  if (u.includes('LADDER') || u.includes('TRUCK') || u.startsWith('L')) return `L${num || u}`;
-  if (u.includes('CHIEF') || u.startsWith('C')) return `C${num || u}`;
-  if (u.includes('MEDIC') || u.startsWith('M')) return `M${num || u}`;
-  return u;
-};
-
-const formatUnitEtaDisplay = (etaMin) => {
-  // No fabricated placeholder: an unknown ETA renders as '--:--', never a plausible number.
-  if (etaMin == null || isNaN(etaMin)) return '--:--';
-  const totalSec = Math.round(etaMin * 60);
-  const mins = Math.floor(totalSec / 60);
-  const secs = totalSec % 60;
-  const padM = String(mins).padStart(2, '0');
-  const padS = String(secs).padStart(2, '0');
-  return `${padM}:${padS}`;
-};
 
 function getUnitIcon(unit) {
   const u = String(unit).toUpperCase();
@@ -64,50 +20,6 @@ function getUnitIcon(unit) {
   if (u.startsWith('WT') || u.startsWith('W')) return '💧'; // Water Tender
   if (u.startsWith('SQ')) return '⚡'; // Squad
   return '🚒';
-}
-
-function calculateUnitEta(unitName, destLat, destLng) {
-  const cleanUnit = String(unitName).trim().toUpperCase();
-  const numMatch = cleanUnit.match(/\d+/);
-  const hallId = numMatch ? numMatch[0] : '1';
-  const station = STATIONS.find((s) => s.id === hallId) || STATIONS[0];
-
-  if (!destLat || !destLng || !station?.coords) {
-    return {
-      unit: cleanUnit,
-      hall: `Hall ${hallId}`,
-      etaStr: null,
-      distStr: null,
-      icon: getUnitIcon(cleanUnit),
-    };
-  }
-
-  // Haversine crow-flies distance
-  const [stnLat, stnLng] = station.coords;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(destLat - stnLat);
-  const dLng = toRad(destLng - stnLng);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(stnLat)) * Math.cos(toRad(destLat)) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const crowKm = 6371 * c;
-
-  // Emergency urban road network factor (~1.35x crow-flies)
-  const roadKm = crowKm * 1.35;
-  // Emergency vehicle response speed (~45 km/h) + 30s apron turnout
-  const totalMinutes = (roadKm / 45) * 60 + 0.5;
-  const etaMin = Math.max(1, Math.round(totalMinutes));
-
-  return {
-    unit: cleanUnit,
-    hall: `Hall ${hallId}`,
-    etaMin,
-    etaStr: `~${etaMin} min`,
-    distStr: `${roadKm.toFixed(1)} km`,
-    icon: getUnitIcon(cleanUnit),
-  };
 }
 
 export default function KioskView({ kioskState }) {
@@ -230,19 +142,22 @@ export default function KioskView({ kioskState }) {
   const destLat = hasCoords ? Number(rawDestLat) : null;
   const destLng = hasCoords ? Number(rawDestLng) : null;
 
+  // ETAs are OSRM's, resolved by the backend and persisted on the dispatch.
+  // If they are absent the units render as plain badges with no ETA — never a
+  // client-side estimate (CLAUDE.md §6.1, §6.2).
   const persistedMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics;
-  const unitEtas = !hasCoords
-    ? [] // No location data — units render as plain badges with no ETA or distance
-    : (persistedMetrics && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
+  const unitEtas = (hasCoords && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
     ? persistedMetrics.map((m) => ({
         unit: m.unit,
         hall: `Hall ${m.origin_hall || (m.unit.match(/\d+/) ? m.unit.match(/\d+/)[0] : '1')}`,
         etaMin: m.eta_minutes,
-        etaStr: `~${m.eta_minutes} min`,
-        distStr: `${m.road_distance_km || m.distance_km} km`,
+        etaStr: m.eta_minutes != null ? `~${m.eta_minutes} min` : null,
+        distStr: (m.road_distance_km ?? m.distance_km) != null
+          ? `${m.road_distance_km ?? m.distance_km} km`
+          : null,
         icon: getUnitIcon(m.unit),
       }))
-    : unitList.map((unit) => calculateUnitEta(unit, destLat, destLng));
+    : [];
 
   const talkGroup = activeCall?.radio_channel || activeCall?.target?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
   const rawMapGrid = activeCall?.map_grid || activeCall?.target?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;

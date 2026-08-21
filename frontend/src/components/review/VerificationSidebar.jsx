@@ -104,7 +104,6 @@ export default function VerificationSidebar({
     }
   };
 
-  const displayAddress = selectedCall.target?.address || selectedCall.address || 'Target Location';
 
   return (
     <div className="w-[28rem] bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col overflow-y-auto flex-shrink-0">

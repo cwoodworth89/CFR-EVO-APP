@@ -59,4 +59,27 @@ This document tracks feature requests, operational enhancements, and future idea
   - Instant target property identification for apparatus operators during nighttime arrival and rooftop/driveway size-up.
   - Preserves maximum visual contrast of high-resolution 7.5cm aerial imagery.
 
+---
 
+### 4. 🎮 Driver Training & Recruit Game Engine (Standalone Module Reimplementation)
+* **Description**: Reimplement the original map-quiz training modes (Emergency Zones, Street Intersections, Block Ranges, Parcel Addresses) that were removed from `MapBoard.jsx`/`DashboardHUD.jsx` (commit `d5fbdcc`) during the v1.0.0 feature freeze. The original implementation was purged because it relied on deprecated processes: static pre-extracted JSON quiz datasets (`addresses.json` ~18MB, `blocks.json`, `intersections.json`) built from the old in-memory shapefile pipeline, predating the PostGIS migration.
+* **Core Concept**:
+  - Rebuild as a **decoupled standalone module** rather than `appMode` branches woven through the live dispatch kiosk components, so training logic can't tangle with real-time dispatch code again.
+  - Source quiz data live from PostGIS (`public.zones`, `public.roads`, `public.intersections`, `public.parcels`) instead of static pre-baked JSON snapshots, so it stays in sync with GIS updates automatically.
+  - Preserve the 4 original training modes (Zones, Intersections, Blocks, Addresses) with score/feedback/tolerance-based guessing.
+* **Benefits**:
+  - Keeps recruit map-training available without reintroducing the deprecated data pipeline or the maintenance burden of hand-synced static datasets.
+  - Clean separation means training mode can be developed/tested independently of the dispatch HUD without risking regressions there.
+
+---
+
+### 5. 🏢 Multi-Hall Expansion (Halls 2–4 Kiosk Rollout)
+* **Description**: CFR EVO currently runs as a single-hall deployment (one test kiosk, `tcfire@100.95.146.94`). The original design (per `README.md`) targets 4 station kiosks (Hall 1 master DB server + Halls 2–4 slave displays) sharing one backend. This entry tracks the feature work needed when expanding beyond the single-hall test setup.
+* **Core Concept**:
+  - **Hall Identification**: `frontend/.env.local` already supports `VITE_DEFAULT_HALL` per kiosk; verify this cleanly differentiates hall-specific UI/behavior (e.g. home station highlighting, default map center) across multiple simultaneous kiosk instances.
+  - **Shared Backend, Multiple Displays**: Confirm FastAPI (`:8000`), MQTT (`:1883`/`:9001`), and the PostGIS database on Hall 1 correctly fan out to Halls 2–4 over the local network/Tailscale without per-hall data drift.
+  - **Per-Hall Deployment & Update Workflow**: Extend the current single-kiosk git-pull-and-rebuild workflow to cover multiple physical kiosks (e.g. a deploy script that pulls/rebuilds across all hall IPs rather than just one).
+  - **Hardware Provisioning**: Physical kiosk hardware, audio input devices, and network/Tailscale setup for Halls 2–4 (see `docs/hardware_specification.md`, `docs/laptop_kiosk_setup.md`).
+* **Benefits**:
+  - Realizes the originally designed multi-station architecture once single-hall testing is stable.
+  - Scoping this as its own feature effort (rather than assuming it "just works" from the single-hall docs) avoids surprises when Halls 2–4 come online.

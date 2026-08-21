@@ -1,5 +1,8 @@
 # Gate Status — Iteration 1
 
+> [!NOTE]
+> This gate evaluates completeness of the *review package itself* (explorer reports, cost matrix, rubric document) — it is not a report of implemented/verified code. See [`docs/development_freeze_summary.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/docs/development_freeze_summary.md) for actual implementation status.
+
 ## Gate Evaluation: Architectural Review & Validation Package
 | Agent | Role | Verdict | Source |
 |---|---|---|---|

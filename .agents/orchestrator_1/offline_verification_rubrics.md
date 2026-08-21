@@ -1,5 +1,8 @@
 # CFR EVO v1.0.0 — Zero-Online-Fallback & Offline Verification Rubrics
 
+> [!NOTE]
+> **Status (as of 2026-08-20)**: This rubric was drafted 2026-08-14 as a planning/review artifact and was never executed as a formal test pass — every checkbox below is unchecked and stayed that way. It does not reflect current implementation status. For what has actually been built, committed, and verified on the kiosk, see [`docs/development_freeze_summary.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/docs/development_freeze_summary.md) (Phase A–F), which is the authoritative record going forward.
+
 **Mandate**: The CFR EVO platform must operate with **100% local data authority, zero recurring monthly costs, and zero cloud WAN dependencies** for all critical emergency dispatch, routing, and station bay display operations (with graceful local fallback for optional add-on satellite/street-view PiPs).
 
 ---

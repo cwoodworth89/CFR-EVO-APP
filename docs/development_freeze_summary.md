@@ -1,8 +1,8 @@
 # CFR EVO: Comprehensive Development Freeze & Architectural Review
 
-**Freeze Timestamp**: August 20, 2026 (Commit: `f80f8a0`)  
-**Target Environment**: 100% Local Container Stack (`tcfire@100.95.146.94`, hostname `cfr-mapping-tcfh`)  
-**Status**: All containers healthy, geocoder 2.0 active, full PostGIS single-source-of-truth live.
+**Freeze Timestamp**: August 20, 2026 (Commit: `d5fbdcc`, supersedes `f80f8a0`)  
+**Target Environment**: 100% Local Container Stack (`tcfire@100.95.146.94`, hostname `cfr-mapping-tcfh`) — currently single-hall; multi-hall rollout is tracked as future work (`docs/PROJECT_IDEAS.md` #5).  
+**Status**: All containers healthy, geocoder 2.0 active, full PostGIS single-source-of-truth live, training/game mode fully removed from the frontend.
 
 ---
 
@@ -103,6 +103,14 @@ flowchart TD
 8. Manual Overrides     → Port Mann Bridge, Riverview Hospital
 ```
 
+### Phase F: Training/Game Mode Elimination (Commit `d5fbdcc`)
+* **Rationale**: The original 4-mode recruit map-training simulator (`TRAINING_ZONES`, `TRAINING_INTERSECTIONS`, `TRAINING_BLOCKS`, `TRAINING_ADDRESSES`) predated the PostGIS migration and depended on a deprecated data pipeline. Removed as part of the freeze rather than carried forward with legacy patterns.
+* **Deleted static datasets** (pre-extracted from the old shapefile pipeline, exclusively used by training quiz modes): `frontend/public/data/addresses.json` (~18MB), `blocks.json` (~356KB), `intersections.json` (~145KB).
+* **Preserved datasets** (still used by live `EXPLORE`-mode map layers, not training-specific): `zones.json`, `hydrants.json`, `coquitlam_city_boundary.json`.
+* **Code changes**: Removed quiz state machines, question loaders, keypress listeners, and tolerance-guessing logic (~470 lines combined) from [`frontend/src/components/MapBoard.jsx`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/MapBoard.jsx) and [`frontend/src/components/DashboardHUD.jsx`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/DashboardHUD.jsx); dropped `TRAINING_*` entries from `MODE_DEFAULTS` in [`MapConstants.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/MapConstants.js) (remaining supported modes: `EXPLORE`, `KIOSK_VIEW`, `DRIVER_SETUP`, `ADMIN_DISPATCHES`); removed the now-unused `SmartZoom`/`ZoomToFeedback` components from `MapActions.jsx`; deleted orphaned `frontend/src/components/review/SatelliteMiniMap.jsx` and `AudioWaveformPlayer.jsx` (also resolves punch-list items #4 and #5 in `docs/debug_and_qa_punchlist.md`).
+* **Verification**: `npm run build` compiled cleanly (0 errors) on both Windows and the remote kiosk with a reduced bundle size. Confirmed independently in this session — `TRAINING_*` and the deleted `.jsx` files are absent from the current working tree.
+* **Future work**: Reimplementation as a decoupled, PostGIS-backed standalone module (not `appMode` branches inside the dispatch kiosk components) is tracked as backlog item #4 in `docs/PROJECT_IDEAS.md`.
+
 ---
 
 ## 3. Database Schema Overview (PostgreSQL 16 + PostGIS)
@@ -142,9 +150,9 @@ flowchart TD
 
 ## 5. Ready-State Notes for Claude Code
 
-1. **Git State**: Everything is cleanly committed to `main` up to `f80f8a0` and synced with remote origin and the physical kiosk.
+1. **Git State**: Everything is cleanly committed to `main` up to `d5fbdcc` and synced with remote origin and the physical kiosk.
 2. **Local stack**: Docker Compose configuration uses `postgis/postgis:16-3.4-alpine`.
 3. **Next Candidate Work**:
    - Monitor first live over-the-air dispatch on the new geocoder cascade.
    - Frontend UI audit of the newly populated parcel polygon rings (`rings` array in dispatch payload) on the Leaflet/MapLibre apparatus bay kiosk HUD.
-   - Updating agent skill files ([`gis-spatial-analysis/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/gis-spatial-analysis/SKILL.md) and [`gis-pipeline-sync/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/gis-pipeline-sync/SKILL.md)) to reflect the PostGIS sub-resolver module structure.
+   - Updating agent skill files ([`gis-spatial-analysis/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-spatial-analysis/SKILL.md) and [`gis-pipeline-sync/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-pipeline-sync/SKILL.md)) to reflect the PostGIS sub-resolver module structure.

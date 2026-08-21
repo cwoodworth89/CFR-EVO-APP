@@ -31,6 +31,9 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Change-Tracking GIS Update**: Integrated difference logging in the monthly maintenance task to report added, deleted, or updated hydrants automatically.
 
 ### 🎓 Milestone 5: Recruits Geographical Simulator
+> [!NOTE]
+> **Removed in the v1.0.0 freeze** (commit `d5fbdcc`): these training modes and their static JSON quiz datasets were purged as deprecated pre-PostGIS code. Kept here as historical record. Reimplementation as a decoupled, PostGIS-backed module is tracked in [`docs/PROJECT_IDEAS.md`](./PROJECT_IDEAS.md) (#4).
+
 *   **Map Training Games**: Developed 4 interactive training modes to test and score recruits on response coordinates:
     *   *Emergency Zones*: Identify fire station response grid boundaries.
     *   *Street Intersections*: Pinpoint cross-streets on an unmarked map.
@@ -76,12 +79,16 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Objective**: Deploy permanent station monitors.
 *   **Implementation**: Package the React client into a localized Electron kiosk container running on wall-mounted touchscreen displays inside hall bays, powered by dedicated Raspberry Pi 5 boards.
 
-### 📲 Milestone 11: Shift-Based Apparatus Subscriptions
+### 📲 Milestone 12: Shift-Based Apparatus Subscriptions
 *   **Objective**: Filter push notifications dynamically.
 *   **Implementation**: Build a mobile-friendly onboarding interface where firefighters can subscribe their devices to a specific apparatus (e.g., E1, L1, or R1) on shift startup, receiving alerts only when their assigned vehicle is dispatched.
 
-### 📍 Milestone 12: Call Pin Mode (Incident Map Analytics)
+### 📍 Milestone 13: Call Pin Mode (Incident Map Analytics)
 *   **Objective**: Visualize historical dispatch distribution and spatial call density across Coquitlam.
 *   **Implementation**: Add an interactive map mode with timeframe filters (`Last 24 Hours`, `Last 7 Days`, `Last 30 Days`, `Last 365 Days`) and color-coded incident category pins (`Medical`, `Alarms`, `MVA`, `Chief Tone Calls`, `Other`).
+
+### 🏢 Milestone 14: Multi-Hall Expansion (Halls 2–4)
+*   **Objective**: Roll out the originally-designed 4-station architecture (Hall 1 master + Halls 2–4 slave kiosks) beyond the current single-hall test deployment.
+*   **Implementation**: See [`docs/PROJECT_IDEAS.md`](./PROJECT_IDEAS.md) (#5) for scope — per-hall `VITE_DEFAULT_HALL` verification, shared-backend fan-out testing, multi-kiosk deploy workflow, and hardware provisioning.
 
 

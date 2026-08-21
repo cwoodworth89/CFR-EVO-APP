@@ -34,7 +34,7 @@ graph TD
 ## 🛠️ Environment Prerequisites
 
 > [!TIP]
-> **AI Agent Execution**: When running diagnostics, check the [`local-stack-orchestrator`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/local-stack-orchestrator/SKILL.md) skill and use the **`cfr-docker`** MCP tools to inspect container state and **`cfr-postgres`** MCP tools to run verification queries directly.
+> **AI Agent Execution**: When running diagnostics, check the [`local-stack-orchestrator`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/local-stack-orchestrator/SKILL.md) skill and use the **`cfr-docker`** MCP tools to inspect container state and **`cfr-postgres`** MCP tools to run verification queries directly.
 
 Before running any diagnostics or tests, ensure you have the Python virtual environment activated:
 
@@ -67,7 +67,7 @@ All dispatches and audio recordings persist 100% locally on your machine or stat
 ## 🧪 Procedure 1: Automated QA & Diagnostics Test Suite
 
 > [!NOTE]
-> **AI Agent Workflows**: For full end-to-end simulation runs, invoke the specialized [**`dispatch-qa-engineer`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/agents/dispatch-qa-engineer/agent.md) subagent. Detailed validation procedures are maintained in the [`e2e-dispatch-testing`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/e2e-dispatch-testing/SKILL.md) skill.
+> **AI Agent Workflows**: For full end-to-end simulation runs, invoke the specialized [**`dispatch-qa-engineer`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents/dispatch-qa-engineer.md) subagent. Detailed validation procedures are maintained in the [`e2e-dispatch-testing`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/e2e-dispatch-testing/SKILL.md) skill.
 
 The QA test suite scans for local audio recordings in `backend/tests/test_calls/`, runs them through transcription and parsing, geocodes the resulting locations, and verifies outputs against ground-truth files.
 

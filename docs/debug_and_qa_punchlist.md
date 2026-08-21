@@ -2,11 +2,15 @@
 
 This document tracks identified bugs, routing anomalies, edge cases, and feature refinements to investigate and resolve during the final bug squashing and testing phase.
 
+> [!NOTE]
+> **Status key (as of 2026-08-20)**: Items below marked ✅ were reported fixed by a prior Gemini/Antigravity agent session but have **not** been independently re-verified against the current code by Claude Code — treat as "likely fixed, spot-check before relying on it." Items marked ⚠️ are confirmed still open.
+
 ---
 
 ## 🧭 Routing Engine & Pathfinding Anomalies
 
 ### 1. Erratic Routing Loops & Intra-Municipal Path Preference
+> **Status**: ⚠️ **Still open.** Turn-by-turn routing functions, but OSRM Lua profile arterial-vs-alleyway weighting has not been re-tuned.
 * **Incident / Path**: `1300 Pinetree Way` (Town Centre Fire Hall / Hall 1) $\rightarrow$ `428 Nelson St`.
 * **Reported Behavior**:
   * The calculated apparatus route exhibits erratic pathing with unnatural loops, parking lot / back-alley cut-throughs, and unnecessary detours (see visual trace below).
@@ -26,6 +30,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ---
 
 ### 2. Intersection Geocoding & Hardcoded Port Moody Fallback (`DISP-2026-F1F345`)
+> **Status**: ✅ Reported fixed — Port Moody fallback replaced with Coquitlam City Center coordinates.
 * **Incident**: `CHRISTMAS WAY AND WESTWOOD ST` (Grid 68, Motor Vehicle Incident).
 * **Observed Problem**:
   * The call routed from Hall 1 all the way out into **Port Moody** (`49.27305, -122.88452`).
@@ -42,6 +47,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ---
 
 ### 3. Missing `responding_units` in Simulated Dispatches
+> **Status**: ✅ Reported fixed in `App.jsx`.
 * **Observed Problem**: Simulated calls in Kiosk view display `SQ1, E1, L1` regardless of what units were dispatched (e.g. `DISP-2026-F1F345` had `E1, E2, R2, C8`).
 * **Root Cause**: `handleSimulateCall` in `frontend/src/App.jsx` omitted `responding_units: call.verified_units || call.responding_units || []` when building `mockCall`, causing `EVORoutingEngine.js` to trigger its `['SQ1', 'E1', 'L1']` fallback.
 * **Fix**: Pass `responding_units` explicitly in `App.jsx`.
@@ -51,10 +57,14 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ## 🎨 Kiosk & Review Panel UI/UX Refinements
 
 ### 4. Remove Satellite View from Call Review Panel
+> **Status**: ✅ Reported fixed — `SatelliteMiniMap.jsx` deleted entirely (removed as an orphaned component alongside the v1.0.0 training-mode cleanup, commit `d5fbdcc`).
+
 * **Observed Problem**: `VerificationSidebar.jsx` includes a `<SatelliteMiniMap />` component that was never intended in the plan. When target coordinates are missing, it persistently defaults to pinning at Burlington Ave & Pinetree Way (`49.2838, -122.7932`).
 * **Fix**: Remove `SatelliteMiniMap` from `VerificationSidebar.jsx`.
 
 ### 5. Audio Player Simplification in Call Review Panel
+> **Status**: ✅ Reported fixed — `AudioWaveformPlayer.jsx` deleted; reverted to native audio controls (also removed alongside commit `d5fbdcc`).
+
 * **Observed Problem**: The custom canvas-based `AudioWaveformPlayer` is overly complex; user prefers a simple, clean, dependable native audio player.
 * **Fix**: Revert to the clean, streamlined audio player in `VerificationSidebar.jsx`.
 

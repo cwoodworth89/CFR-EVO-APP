@@ -10,6 +10,9 @@ CFR EVO bridges the gap between station-side dispatch audio and visual mapping f
 
 Designed to operate seamlessly across **4 station kiosks** (with Hall 1 serving as the master database server and Halls 2–4 running slave kiosk displays), it provides responders with live navigation paths, hydrant coordinates, and road closures during their response.
 
+> [!NOTE]
+> **Current deployment status**: this is the target multi-hall architecture. Right now CFR EVO runs single-hall — one physical test kiosk — while the core dispatch/GIS/routing pipeline is hardened. Multi-hall rollout is tracked as future work in [`docs/PROJECT_IDEAS.md`](./docs/PROJECT_IDEAS.md) (#5).
+
 Furthermore, it doubles as a geographical training simulator, helping drivers memorize response zones, street intersections, block numbers, and parcel shapes through interactive training games.
 
 ---

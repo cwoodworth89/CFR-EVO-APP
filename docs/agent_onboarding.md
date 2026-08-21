@@ -73,28 +73,36 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Decoupling monolith into microservices. | None |
 | **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant mapping. | `gis-pipeline-sync` |
 | **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | PostgreSQL index tuning and DSP calibration. | `performance-metrics-analytics` |
+| **Development Freeze Summary** | [docs/development_freeze_summary.md](./development_freeze_summary.md) | Current implementation status (Phase A–F): PostGIS migration, STT vocab biasing, API decomposition, geocoder 2.0. **Start here for current state.** | `gis-spatial-analysis` |
+| **Debug & QA Punch List** | [docs/debug_and_qa_punchlist.md](./debug_and_qa_punchlist.md) | Open bugs and edge cases (routing anomalies, geocoding fallbacks, UI refinements). | `e2e-dispatch-testing` |
+| **Data Contracts** | [docs/data_contracts.md](./data_contracts.md) | Shared payload/schema shapes between backend, GIS, and frontend. | None |
+| **Routing Engine Reference** | [docs/evo_routing_engine.md](./evo_routing_engine.md) | `EVORoutingEngine` design and apparatus routing logic. | `emergency-routing-engine` |
+| **Dispatch Integration Options** | [docs/dispatch_integration_options.md](./dispatch_integration_options.md) | Radio/audio ingestion integration approaches. | `dispatch-pipeline-ops` |
+| **Project Purpose & History** | [docs/PROJECT_PURPOSE_AND_HISTORY.md](./PROJECT_PURPOSE_AND_HISTORY.md) | Origin story and evolution from training-game prototype to dispatch HUD. | None |
+| **Project Ideas / Future Features** | [docs/PROJECT_IDEAS.md](./PROJECT_IDEAS.md) | Backlog of future feature candidates (e.g. reimplemented driver training module). | None |
 
 ---
 
 ## 🤖 AI Agent Customizations (Custom Skills & Sub-agents)
 
-CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in the [**`.agents`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents) directory. These resources extend agent capabilities and document domain runbooks.
+CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in [**`.claude/skills`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills) and [**`.claude/agents`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents) (Claude Code's native convention). These resources extend agent capabilities and document domain runbooks. The original Antigravity-authored copies remain in `.agents/skills` and `.agents/agents` for historical reference, but `.claude/` is the canonical, auto-loaded location going forward.
 
 ### 🛠️ Specialized Sub-agents
 When spawning helper sub-agents, inherit from these type specifications:
 * **`call-review-analyst`**: Specialist in auditing dispatch call logs, triaging HITL reviews, diagnosing audio transcripts, and phonetic ambiguity analysis.
 * **`dispatch-qa-engineer`**: Specialist in automated end-to-end dispatch simulations, testing protocol enforcement, and clean QA database teardowns.
 * **`performance-metrics-analyst`**: Specialist in operational metrics analytics (Turnout Lead Time, Parsing Accuracy %, Stage Latency) and executive HUD telemetry design.
+* **`frontend-kiosk-architect`**, **`gis-spatial-engineer`**, **`kiosk-remote-operator`**, **`pipeline-core-engineer`**, **`stt-mlops-evaluator`**: see [`.claude/agents/`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents) for the full roster.
 
 ### 📚 Domain Skills
 These markdown runbooks guide agents through complex developer workflows:
-* [**`dispatch-pipeline-ops`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/dispatch-pipeline-ops/SKILL.md): Architecture of the 2-phase real-time dispatch audio pipeline.
-* [**`e2e-dispatch-testing`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/e2e-dispatch-testing/SKILL.md): Running system tests, MQTT validation, and purging test entries.
-* [**`performance-metrics-analytics`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/performance-metrics-analytics/SKILL.md): Guidelines for measuring pipeline latencies and business intelligence metrics.
-* [**`gis-spatial-analysis`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/gis-spatial-analysis/SKILL.md): Procedures for shapefile queries, coordinate reference transformations, and NFPA 291 hydrants.
-* [**`gis-pipeline-sync`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/gis-pipeline-sync/SKILL.md): Pulling Coquitlam ESRI shapefiles and GIS caching updates.
-* [**`google-imagery-streetview`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/google-imagery-streetview/SKILL.md): Ingestion and display of satellite imagery and Google Street View.
-* [**`road-closure-management`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/road-closure-management/SKILL.md): Tracking active road closures, construction zones, and routing around hazards.
+* [**`dispatch-pipeline-ops`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/dispatch-pipeline-ops/SKILL.md): Architecture of the 2-phase real-time dispatch audio pipeline.
+* [**`e2e-dispatch-testing`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/e2e-dispatch-testing/SKILL.md): Running system tests, MQTT validation, and purging test entries.
+* [**`performance-metrics-analytics`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/performance-metrics-analytics/SKILL.md): Guidelines for measuring pipeline latencies and business intelligence metrics.
+* [**`gis-spatial-analysis`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-spatial-analysis/SKILL.md): Procedures for shapefile queries, coordinate reference transformations, and NFPA 291 hydrants.
+* [**`gis-pipeline-sync`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-pipeline-sync/SKILL.md): Pulling Coquitlam ESRI shapefiles and GIS caching updates.
+* [**`google-imagery-streetview`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/google-imagery-streetview/SKILL.md): Ingestion and display of satellite imagery and Google Street View.
+* [**`road-closure-management`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/road-closure-management/SKILL.md): Tracking active road closures, construction zones, and routing around hazards.
 
 ---
 

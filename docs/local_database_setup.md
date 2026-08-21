@@ -3,13 +3,16 @@
 This document outlines the containerized database schema, API gateway endpoints, and real-time MQTT settings required to run **CFR EVO** on a **Station Server / Raspberry Pi** without external cloud dependencies.
 
 > [!TIP]
-> **AI Agent Workflows**: To manage the local container orchestration, check the [`local-stack-orchestrator`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/local-stack-orchestrator/SKILL.md) skill. Agents can query the database directly using the **`cfr-postgres`** MCP server and check container health/logs using the **`cfr-docker`** MCP server.
+> **AI Agent Workflows**: To manage the local container orchestration, check the [`local-stack-orchestrator`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/local-stack-orchestrator/SKILL.md) skill. Agents can query the database directly using the **`cfr-postgres`** MCP server (connects to the kiosk's Postgres over Tailscale via `DATABASE_URL`) and check container health/logs using the **`cfr-docker`** MCP server.
 
 ---
 
 ## 📊 Container Stack Architecture
 
-The local stack consists of three Docker containers orchestrated via `docker-compose.yml`:
+> [!NOTE]
+> **Current deployment is single-hall**: the diagram below shows the target multi-hall design (tracked as future work in `docs/PROJECT_IDEAS.md` #5). Right now, everything runs on one physical test kiosk (`tcfire@100.95.146.94`) — there is only one kiosk app consuming the stack, not four.
+
+The local stack runs on `postgis/postgis:16-3.4-alpine` (not generic PostgreSQL — see `docs/development_freeze_summary.md`) plus Mosquitto MQTT and the FastAPI gateway, orchestrated via `docker-compose.yml`:
 
 ```
   ┌────────────────────────────────────────────────────────────────────────┐
@@ -31,6 +34,7 @@ The local stack consists of three Docker containers orchestrated via `docker-com
              ▼                          ▼                          ▼
    ┌───────────────────┐      ┌───────────────────┐      ┌───────────────────┐
    │ Hall 1 Kiosk App  │      │ Hall 2 Kiosk App  │      │ Halls 3 & 4 Kiosks│
+   │ (deployed today)  │      │  (future — #5)    │      │   (future — #5)   │
    └───────────────────┘      └───────────────────┘      └───────────────────┘
 ```
 

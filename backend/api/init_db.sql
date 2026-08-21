@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS public.road_names (
 );
 CREATE INDEX IF NOT EXISTS idx_road_names_normalized ON public.road_names (road_name_normalized);
 
-CREATE TABLE IF NOT EXISTS public.landmarks (
+CREATE TABLE IF NOT EXISTS public.custom_places (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     name_normalized VARCHAR(255),
@@ -242,8 +242,8 @@ CREATE TABLE IF NOT EXISTS public.landmarks (
     metadata JSONB,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_landmarks_name ON public.landmarks (name_normalized);
-CREATE INDEX IF NOT EXISTS idx_landmarks_geom ON public.landmarks USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_custom_places_name ON public.custom_places (name_normalized);
+CREATE INDEX IF NOT EXISTS idx_custom_places_geom ON public.custom_places USING GIST (geom);
 
 CREATE TABLE IF NOT EXISTS public.vocabulary (
     id BIGSERIAL PRIMARY KEY,

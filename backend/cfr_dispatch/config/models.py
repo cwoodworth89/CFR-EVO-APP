@@ -11,7 +11,10 @@ class DispatchData:
     response_type: Optional[str] = None
     call_type: Optional[str] = None
     address: Optional[str] = None
-    intersection: Optional[str] = None
+    intersection: Optional[str] = None       # Full intersection string when address IS an intersection
+    cross_street_1: Optional[str] = None     # First nearby cross street (from 'near X and Y')
+    cross_street_2: Optional[str] = None     # Second nearby cross street
     radio_channel: Optional[str] = None
     map_grid: Optional[str] = None
     subaddress: Optional[str] = None
+

@@ -9,7 +9,7 @@ Imports authoritative City of Coquitlam GIS layers into containerized PostgreSQL
   3. Emergency Response Zones (GeoJSON -> public.zones)
   4. City Boundary (GeoJSON -> public.city_boundary)
   5. Road Names Dictionary (JSON -> public.road_names)
-  6. Dispatch Landmarks (JSON -> public.landmarks)
+  6. Custom Places (JSON -> public.custom_places)
   7. Radio & Dispatch Vocabulary (.txt -> public.vocabulary)
   8. Topological Road Intersections (Shapely intersection computation -> public.intersections)
   9. Parcel Road Frontage Point Backfill (ST_ClosestPoint)
@@ -172,7 +172,7 @@ def ensure_tables(engine):
     );
     CREATE INDEX IF NOT EXISTS idx_road_names_normalized ON public.road_names (road_name_normalized);
 
-    CREATE TABLE IF NOT EXISTS public.landmarks (
+    CREATE TABLE IF NOT EXISTS public.custom_places (
         id BIGSERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         name_normalized VARCHAR(255),
@@ -184,8 +184,8 @@ def ensure_tables(engine):
         metadata JSONB,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE INDEX IF NOT EXISTS idx_landmarks_name ON public.landmarks (name_normalized);
-    CREATE INDEX IF NOT EXISTS idx_landmarks_geom ON public.landmarks USING GIST (geom);
+    CREATE INDEX IF NOT EXISTS idx_custom_places_name ON public.custom_places (name_normalized);
+    CREATE INDEX IF NOT EXISTS idx_custom_places_geom ON public.custom_places USING GIST (geom);
 
     CREATE TABLE IF NOT EXISTS public.vocabulary (
         id BIGSERIAL PRIMARY KEY,
@@ -451,16 +451,16 @@ def step5_import_road_names(engine, road_names_json_path: str, batch_size: int =
         return 0
 
 
-def step6_import_landmarks(engine, landmarks_json_path: str, batch_size: int = 500) -> int:
-    """Step 6: Import Landmarks -> public.landmarks."""
+def step6_import_custom_places(engine, custom_places_json_path: str, batch_size: int = 500) -> int:
+    """Step 6: Import Custom Places -> public.custom_places."""
     logging.info("=" * 60)
-    logging.info("Step 6: Importing Landmarks -> public.landmarks...")
-    if not os.path.exists(landmarks_json_path):
-        logging.error(f"  ✗ Landmarks JSON not found at: {landmarks_json_path}")
+    logging.info("Step 6: Importing Custom Places -> public.custom_places...")
+    if not os.path.exists(custom_places_json_path):
+        logging.error(f"  ✗ Custom places JSON not found at: {custom_places_json_path}")
         return 0
 
     try:
-        with open(landmarks_json_path, "r", encoding="utf-8") as f:
+        with open(custom_places_json_path, "r", encoding="utf-8") as f:
             lm_data = json.load(f)
 
         records = []
@@ -470,7 +470,7 @@ def step6_import_landmarks(engine, landmarks_json_path: str, batch_size: int = 5
             address = val.get("address")
             lat = float(val["lat"])
             lng = float(val["lng"])
-            category = val.get("category", "landmark")
+            category = val.get("category", "custom_place")
             meta = json.dumps(val.get("metadata")) if val.get("metadata") else None
 
             records.append({
@@ -484,7 +484,7 @@ def step6_import_landmarks(engine, landmarks_json_path: str, batch_size: int = 5
             })
 
         insert_sql = text("""
-        INSERT INTO public.landmarks (name, name_normalized, address, lat, lng, geom, category, metadata)
+        INSERT INTO public.custom_places (name, name_normalized, address, lat, lng, geom, category, metadata)
         VALUES (
             :name, :name_normalized, :address, :lat, :lng,
             ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
@@ -493,18 +493,18 @@ def step6_import_landmarks(engine, landmarks_json_path: str, batch_size: int = 5
         """)
 
         with engine.begin() as conn:
-            conn.execute(text("TRUNCATE TABLE public.landmarks RESTART IDENTITY CASCADE;"))
+            conn.execute(text("TRUNCATE TABLE public.custom_places RESTART IDENTITY CASCADE;"))
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
                 conn.execute(insert_sql, batch)
 
         with engine.connect() as conn:
-            count = conn.execute(text("SELECT COUNT(*) FROM public.landmarks;")).scalar()
+            count = conn.execute(text("SELECT COUNT(*) FROM public.custom_places;")).scalar()
 
-        logging.info(f"  ✓ Successfully imported {count} landmarks into public.landmarks.")
+        logging.info(f"  ✓ Successfully imported {count} custom places into public.custom_places.")
         return count
     except Exception as e:
-        logging.error(f"  ✗ Step 6 error importing landmarks: {e}")
+        logging.error(f"  ✗ Step 6 error importing custom places: {e}")
         return 0
 
 
@@ -895,7 +895,7 @@ def run_full_import(
     zones_path = os.path.join(staging_dir, "emergency_zones.geojson")
     boundary_path = os.path.join(staging_dir, "city_boundary.geojson")
     road_names_path = os.path.join(staging_dir, "road_names.json")
-    landmarks_path = os.path.join(vocab_dir, "landmarks.json")
+    custom_places_path = os.path.join(vocab_dir, "custom_places.json")
     intersections_path = os.path.join(data_dir, "gis", "intersections.json")
 
     logging.info("=" * 70)
@@ -924,8 +924,8 @@ def run_full_import(
     # Step 5: Import Road Names
     road_names_count = step5_import_road_names(engine, road_names_path, batch_size=batch_size)
 
-    # Step 6: Import Landmarks
-    landmarks_count = step6_import_landmarks(engine, landmarks_path, batch_size=batch_size)
+    # Step 6: Import Custom Places
+    custom_places_count = step6_import_custom_places(engine, custom_places_path, batch_size=batch_size)
 
     # Step 7: Import Vocabulary
     vocab_counts = step7_import_vocabulary(engine, vocab_dir, batch_size=batch_size)
@@ -965,7 +965,7 @@ def run_full_import(
     print(f"zones:         {zones_count:>8d} rows")
     print(f"city_boundary: {boundary_count:>8d} row")
     print(f"road_names:    {road_names_count:>8d} rows")
-    print(f"landmarks:     {landmarks_count:>8d} rows")
+    print(f"custom_places: {custom_places_count:>8d} rows")
     print(f"vocabulary:    {total_vocab:>8d} rows")
     print(f"parcels geom:  {parcels_geom_count:>8d} updated")
     print(f"parcels front: {parcels_front_count:>8d} updated")

@@ -49,6 +49,10 @@ def build_dispatch_payload(
         if d.intersection and d.intersection not in unique_addresses:
             unique_addresses.append(d.intersection)
             
+    # Extract cross streets for geocoder narrowing
+    cross_street_1 = next((d.cross_street_1 for d in all_candidates if d.cross_street_1), None)
+    cross_street_2 = next((d.cross_street_2 for d in all_candidates if d.cross_street_2), None)
+            
     incident_type = match_incident_type(sanitized_transcript, CALL_TYPES)
     if incident_type == "Unknown Incident" and all_candidates:
         for cand in all_candidates:
@@ -96,7 +100,12 @@ def build_dispatch_payload(
     else:
         for i, candidate_address in enumerate(unique_addresses):
             logging.debug(f"[{dispatch_id}] Attempting Local Geocode for Candidate #{i+1}: '{candidate_address}'")
-            res = validator.local_geocode(candidate_address) if validator else None
+            res = validator.local_geocode(
+                candidate_address,
+                target_map_grid=next((d.map_grid for d in all_candidates if d.map_grid), None),
+                cross_street_1=cross_street_1,
+                cross_street_2=cross_street_2
+            ) if validator else None
             if res:
                 conf = res.get("confidence", 85.0)
                 logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}' (Score: {conf}%)")
@@ -123,6 +132,7 @@ def build_dispatch_payload(
     lat = local_geocode_result["lat"]
     lng = local_geocode_result["lng"]
     rings = local_geocode_result["rings"]
+    target_cross_streets = [s for s in [cross_street_1, cross_street_2] if s]
     
     timestamp = datetime.datetime.now().astimezone().isoformat()
     
@@ -179,7 +189,8 @@ def build_dispatch_payload(
         "rings": rings,
         "map_grid": map_grid,
         "radio_channel": radio_channel,
-        "routing_metrics": routing_metrics
+        "routing_metrics": routing_metrics,
+        "cross_streets": target_cross_streets
     }
     if subaddress:
         target_payload["subaddress"] = subaddress
@@ -204,6 +215,8 @@ def build_dispatch_payload(
                 call_type=incident_type,
                 address=best_address,
                 intersection=all_candidates[0].intersection,
+                cross_street_1=cross_street_1,
+                cross_street_2=cross_street_2,
                 radio_channel=radio_channel,
                 map_grid=map_grid,
                 subaddress=subaddress

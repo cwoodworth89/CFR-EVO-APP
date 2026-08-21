@@ -762,15 +762,32 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                         logging.warning(f"Parsed map grid '{grid_val}' is not in ground-truth MAP_GRIDS. Rejecting.")
                     
             is_intersection = bool(normalized_address and re.search(r'\band\b', normalized_address, re.IGNORECASE))
+
+            # Split cross streets into individual columns
+            cross_1 = None
+            cross_2 = None
+            if cross_roads_str:
+                cross_parts = re.split(r'\s+and\s+|\s*&\s*', cross_roads_str, flags=re.IGNORECASE)
+                cross_1 = cross_parts[0].strip() if len(cross_parts) >= 1 else None
+                cross_2 = cross_parts[1].strip() if len(cross_parts) >= 2 else None
+
+            # If the address itself is an intersection, also extract its parts as cross streets
+            if is_intersection and normalized_address:
+                int_parts = re.split(r'\s+and\s+|\s*&\s*', normalized_address, flags=re.IGNORECASE)
+                cross_1 = int_parts[0].strip() if len(int_parts) >= 1 else cross_1
+                cross_2 = int_parts[1].strip() if len(int_parts) >= 2 else cross_2
+
             dispatch = DispatchData(
                 raw_text=text,
                 units=units_segment if units_segment else None,
                 response_type=respond_match.group(1).strip(),
                 call_type=matched_call_type,
                 address=normalized_address if normalized_address and not is_intersection else None,
-                intersection=normalized_address if normalized_address and is_intersection else cross_roads_str,
-                map_grid=map_grid_str,
+                intersection=normalized_address if is_intersection else None,  # ONLY true intersections
+                cross_street_1=cross_1,
+                cross_street_2=cross_2,
                 radio_channel=talk_group_str,
+                map_grid=map_grid_str,
                 subaddress=extracted_subaddr
             )
             
@@ -843,7 +860,12 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
         normalized_leg2 = normalize_street_suffix(leg2)
         if normalized_leg1 and normalized_leg2:
             intersection_str = f"{normalized_leg1} and {normalized_leg2}"
-            found_dispatches.append(DispatchData(raw_text=text, intersection=intersection_str))
+            found_dispatches.append(DispatchData(
+                raw_text=text,
+                intersection=intersection_str,
+                cross_street_1=normalized_leg1,
+                cross_street_2=normalized_leg2
+            ))
             
     if not found_dispatches:
         return []
@@ -976,8 +998,16 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
         address_part = expand_address_suffix(dispatch.address)
         if dispatch.subaddress:
             address_part = f"{address_part} {dispatch.subaddress}"
-        inter = dispatch.intersection or (dispatch.address if (" and " in dispatch.address.lower() or " & " in dispatch.address) else None)
-        intersection_part = f", near {expand_address_suffix(inter)}" if inter else ""
+        cross_desc = None
+        if dispatch.cross_street_1 and dispatch.cross_street_2:
+            cross_desc = f"{dispatch.cross_street_1} and {dispatch.cross_street_2}"
+        elif dispatch.cross_street_1:
+            cross_desc = dispatch.cross_street_1
+        elif dispatch.intersection:
+            cross_desc = dispatch.intersection
+        elif " and " in dispatch.address.lower() or " & " in dispatch.address:
+            cross_desc = dispatch.address
+        intersection_part = f", near {expand_address_suffix(cross_desc)}" if cross_desc else ""
     elif dispatch.intersection:
         address_part = expand_address_suffix(dispatch.intersection)
         if dispatch.subaddress:

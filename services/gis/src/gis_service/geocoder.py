@@ -1,16 +1,20 @@
-# NOTE: For shapefile details, offline geocoding layouts, and zone boundaries details, see docs/gis_endpoints.md
+"""
+services/gis/src/gis_service/geocoder.py
+PostGIS-backed Address Geocoder and Spatial Validation Engine for CFR EVO.
+
+Replaces GeoPandas shapefile loading with high-performance PostgreSQL/PostGIS queries.
+Pre-caches small lookup tables (road names, landmarks, topological intersections)
+and performs spatial queries for parcel addresses, zone lookups, boundary checks,
+and road network metadata.
+"""
+
 import os
 import re
 import json
 import logging
-from typing import List, Tuple, Any
+from typing import List, Tuple, Optional, Any
 
-try:
-    import geopandas as gpd
-    from shapely.geometry import Point
-except ImportError:
-    gpd = None
-    Point = None
+from sqlalchemy import create_engine, text
 
 try:
     from thefuzz import fuzz
@@ -21,14 +25,6 @@ except ImportError:
         def token_set_ratio(s1, s2):
             return int(difflib.SequenceMatcher(None, str(s1).lower(), str(s2).lower()).ratio() * 100)
     fuzz = _Fuzz()
-
-try:
-    from gis_service.shapefile_loader import load_addresses, load_zones
-except (ImportError, ModuleNotFoundError):
-    def load_addresses(*args, **kwargs):
-        return None, {}
-    def load_zones(*args, **kwargs):
-        return None, None, None
 
 SUFFIX_MAPPINGS = {
     "AVENUE": "AVE", "AVE": "AVE",
@@ -87,160 +83,129 @@ def split_intersection_parts(address_str: str) -> Tuple[str, str] | None:
 
 
 class CoquitlamDataValidator:
-    def __init__(self, 
-                 address_shp_path: str = None, 
-                 zones_shp_path: str = None,
-                 house_num_col: str = "HOUSE",
-                 street_name_col: str = "STREET",
-                 street_type_col: str = "STREETTYPE",
-                 full_addr_col: str = "ADDRESS",
-                 zone_map_name_col: str = "MAP_NAME",
-                 street_confidence_threshold: int = 80,
-                 intersections_json_path: str = None):
-        
-        self.house_num_col = house_num_col
-        self.street_name_col = street_name_col
-        self.street_type_col = street_type_col
-        self.full_addr_col = full_addr_col
-        self.zone_map_name_col = zone_map_name_col
-        self.street_confidence_threshold = street_confidence_threshold
-        
-        self.addresses_gdf, self.house_number_index = load_addresses(
-            address_shp_path, house_num_col, street_name_col, street_type_col
-        ) if address_shp_path else (None, {})
-        self.zones_gdf, self.zones_crs, self.zones_sindex = load_zones(zones_shp_path) if zones_shp_path else (None, None, None)
+    """
+    Authoritative Municipal Geocoder and Spatial Validation Engine.
+    Queries containerized PostgreSQL 16 / PostGIS for parcels, intersections,
+    emergency response zones, and city boundary containment.
+    """
 
-        # Pre-compute spatial grid-to-streets index for fast low-confidence disambiguation
-        self.grid_to_streets = {}
+    def __init__(self, database_url: str = None, *args, **kwargs):
+        db_url = database_url
+        if not db_url or db_url.endswith('.shp') or db_url.endswith('.json'):
+            db_url = os.environ.get('DATABASE_URL', 'postgresql://cfr_user:cfr_password_2026@localhost:5432/cfr_dispatch')
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+        self.engine = create_engine(db_url, pool_size=5, pool_pre_ping=True)
+        self.street_confidence_threshold = kwargs.get('street_confidence_threshold', 80)
+
+        # Pre-cache small tables for fuzzy matching and fast lookups
+        self._road_names_cache = self._load_road_names()
+        self._landmark_cache = self._load_landmarks()
+        self._intersection_keys_cache = self._load_intersection_keys()
+
+        # Backward compatibility aliases
+        self.landmarks = self._landmark_cache
+        self.intersections_index = self._intersection_keys_cache
+
+    def _load_road_names(self) -> List[str]:
+        """Loads all road names from public.road_names into memory for fuzzy matching."""
+        names = []
         try:
-            if self.addresses_gdf is not None and self.zones_gdf is not None and gpd is not None:
-                zones_matching = self.zones_gdf.to_crs(self.addresses_gdf.crs) if self.addresses_gdf.crs != self.zones_crs else self.zones_gdf
-                joined = gpd.sjoin(self.addresses_gdf, zones_matching[[self.zone_map_name_col, 'geometry']], how="inner", predicate="within")
-                for grid_id, group in joined.groupby(self.zone_map_name_col):
-                    grid_key = str(grid_id).strip()
-                    streets = set(group[self.street_name_col].fillna('').astype(str).str.upper().unique()) - {''}
-                    self.grid_to_streets[grid_key] = streets
-                logging.info(f"Pre-computed spatial street indexes for {len(self.grid_to_streets)} emergency response grids.")
+            with self.engine.connect() as conn:
+                res = conn.execute(text("SELECT road_name FROM public.road_names ORDER BY road_name;")).fetchall()
+                names = [r[0] for r in res if r[0]]
+            logging.info(f"Loaded {len(names)} road names from PostgreSQL.")
         except Exception as e:
-            logging.error(f"Failed to pre-compute spatial grid-to-street index: {e}")
+            logging.error(f"Failed to load road names from PostgreSQL: {e}")
+        return names
 
-        # Load landmarks configuration if it exists
-        self.landmarks = {}
+    def _load_landmarks(self) -> dict:
+        """Loads all landmarks from public.landmarks into memory for fuzzy matching."""
+        landmarks = {}
         try:
-            landmarks_path = None
-            if address_shp_path:
-                cand_landmarks = os.path.join(os.path.dirname(os.path.dirname(address_shp_path)), "vocabulary", "landmarks.json")
-                if os.path.exists(cand_landmarks):
-                    landmarks_path = cand_landmarks
-            if not landmarks_path:
-                defaults = [
-                    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../backend/data/vocabulary/landmarks.json")),
-                    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../backend/data/vocabulary/landmarks.json")),
-                    os.path.abspath(os.path.join(os.getcwd(), "backend/data/vocabulary/landmarks.json")),
-                ]
-                for p in defaults:
-                    if os.path.exists(p):
-                        landmarks_path = p
-                        break
-            if landmarks_path and os.path.exists(landmarks_path):
-                with open(landmarks_path, 'r', encoding='utf-8') as f:
-                    self.landmarks = json.load(f)
-                logging.info(f"Loaded {len(self.landmarks)} landmarks from {landmarks_path}")
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT name, name_normalized, address, lat, lng, category, metadata 
+                    FROM public.landmarks;
+                """)).fetchall()
+                for row in res:
+                    name, name_norm, address, lat, lng, category, meta = row
+                    if isinstance(meta, str):
+                        try:
+                            meta = json.loads(meta)
+                        except Exception:
+                            pass
+                    entry = {
+                        "name": name,
+                        "name_normalized": name_norm or name.upper(),
+                        "address": address or name,
+                        "lat": float(lat),
+                        "lng": float(lng),
+                        "category": category,
+                        "metadata": meta
+                    }
+                    landmarks[name.lower().strip()] = entry
+                    if name_norm and name_norm.lower() != name.lower():
+                        landmarks[name_norm.lower().strip()] = entry
+            logging.info(f"Loaded {len(landmarks)} landmarks from PostgreSQL.")
         except Exception as e:
-            logging.error(f"Failed to load landmarks.json: {e}")
+            logging.error(f"Failed to load landmarks from PostgreSQL: {e}")
+        return landmarks
 
-        # Load authoritative intersections dataset
-        self.intersections = {}
-        self.intersections_index = {}
+    def _load_intersection_keys(self) -> dict:
+        """Loads all topological intersections from public.intersections into an O(1) candidate index."""
+        index = {}
         try:
-            intersections_path = intersections_json_path
-            if not intersections_path and address_shp_path:
-                cand_gis = os.path.join(os.path.dirname(os.path.dirname(address_shp_path)), "gis", "intersections.json")
-                if os.path.exists(cand_gis):
-                    intersections_path = cand_gis
-                else:
-                    cand_vocab = os.path.join(os.path.dirname(os.path.dirname(address_shp_path)), "vocabulary", "intersections.json")
-                    if os.path.exists(cand_vocab):
-                        intersections_path = cand_vocab
-            if not intersections_path:
-                defaults = [
-                    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../backend/data/gis/intersections.json")),
-                    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../backend/data/gis/intersections.json")),
-                    os.path.abspath(os.path.join(os.getcwd(), "backend/data/gis/intersections.json")),
-                    os.path.abspath(os.path.join(os.getcwd(), "frontend/public/data/intersections.json")),
-                ]
-                for p in defaults:
-                    if os.path.exists(p):
-                        intersections_path = p
-                        break
-            if intersections_path and os.path.exists(intersections_path):
-                with open(intersections_path, 'r', encoding='utf-8') as f:
-                    raw_data = json.load(f)
-                self._build_intersections_index(raw_data)
-                logging.info(f"Loaded {len(self.intersections_index)} unique intersection keys from {intersections_path}")
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT street_a, street_b, intersection_key, lat, lng, zone_id, candidate_index 
+                    FROM public.intersections 
+                    ORDER BY intersection_key, candidate_index;
+                """)).fetchall()
+                for row in res:
+                    street_a, street_b, raw_key, lat, lng, zone_id, candidate_index = row
+                    cand = {
+                        "name": f"{street_a} & {street_b}".title(),
+                        "lat": float(lat),
+                        "lng": float(lng),
+                        "grid": str(zone_id).strip() if zone_id is not None else None,
+                        "description": f"{street_a} & {street_b}",
+                        "candidate_index": int(candidate_index) if candidate_index is not None else 0
+                    }
+                    norm_key = normalize_intersection_key(street_a, street_b)
+                    if norm_key not in index:
+                        index[norm_key] = []
+                    index[norm_key].append(cand)
+
+                    raw_key_clean = raw_key.strip().upper()
+                    if raw_key_clean != norm_key:
+                        if raw_key_clean not in index:
+                            index[raw_key_clean] = []
+                        if cand not in index[raw_key_clean]:
+                            index[raw_key_clean].append(cand)
+            logging.info(f"Loaded {len(index)} unique intersection keys from PostgreSQL.")
         except Exception as e:
-            logging.error(f"Failed to load intersections.json: {e}")
-
-    def _build_intersections_index(self, raw_data: dict | list):
-        """Builds an O(1) normalized index where keys are sorted alphabetically."""
-        self.intersections_index = {}
-        if isinstance(raw_data, dict):
-            for raw_key, candidates in raw_data.items():
-                cand_list = candidates if isinstance(candidates, list) else [candidates]
-                parts = split_intersection_parts(raw_key)
-                if parts:
-                    norm_key = normalize_intersection_key(parts[0], parts[1])
-                else:
-                    norm_key = raw_key.strip().upper()
-
-                formatted_cands = []
-                for c in cand_list:
-                    formatted_cands.append({
-                        "name": c.get("name", raw_key),
-                        "lat": float(c["lat"]),
-                        "lng": float(c["lng"]),
-                        "grid": str(c.get("grid", "")).strip() if c.get("grid") is not None else None,
-                        "description": c.get("description", "")
-                    })
-                self.intersections_index[norm_key] = formatted_cands
-
-        elif isinstance(raw_data, list):
-            for item in raw_data:
-                name = item.get("name", "")
-                parts = split_intersection_parts(name)
-                if parts:
-                    norm_key = normalize_intersection_key(parts[0], parts[1])
-                else:
-                    norm_key = name.strip().upper()
-
-                cand = {
-                    "name": name,
-                    "lat": float(item["lat"]),
-                    "lng": float(item["lng"]),
-                    "grid": str(item.get("grid", "")).strip() if item.get("grid") is not None else None,
-                    "description": item.get("description", "")
-                }
-                if norm_key not in self.intersections_index:
-                    self.intersections_index[norm_key] = []
-                self.intersections_index[norm_key].append(cand)
+            logging.error(f"Failed to load intersections from PostgreSQL: {e}")
+        return index
 
     def _lookup_intersection(self, parsed_address: str) -> Tuple[List[dict] | None, int]:
         """
         Parses intersection address and looks up candidates in normalized index.
         Returns (candidates, score).
         """
-        if not self.intersections_index:
+        if not self._intersection_keys_cache:
             return None, 0
         parts = split_intersection_parts(parsed_address)
         if not parts:
             return None, 0
         s1, s2 = parts
         norm_key = normalize_intersection_key(s1, s2)
-        
+
         # 1. Exact match
-        if norm_key in self.intersections_index:
-            return self.intersections_index[norm_key], 100
-        
+        if norm_key in self._intersection_keys_cache:
+            return self._intersection_keys_cache[norm_key], 100
+
         # 2. Road type alias match (e.g. RD <-> AVE)
         alias_replacements = [
             (" RD", " AVE"), (" AVE", " RD"),
@@ -250,31 +215,31 @@ class CoquitlamDataValidator:
         for src, target in alias_replacements:
             if src in norm_key:
                 alt_key = norm_key.replace(src, target)
-                if alt_key in self.intersections_index:
-                    return self.intersections_index[alt_key], 95
-        
+                if alt_key in self._intersection_keys_cache:
+                    return self._intersection_keys_cache[alt_key], 95
+
         # 3. Fuzzy matching across keys
         best_score = 0
         best_cands = None
-        for key, cands in self.intersections_index.items():
+        for key, cands in self._intersection_keys_cache.items():
             score = fuzz.token_set_ratio(norm_key, key)
             if score > best_score:
                 best_score = score
                 best_cands = cands
-                
+
         if best_score >= 80 and best_cands is not None:
             return best_cands, best_score
-            
+
         return None, 0
 
-    def _resolve_candidates(self, candidates: List[dict], target_map_grid: str | int = None) -> dict:
+    def _resolve_candidates(self, candidates: List[dict], target_map_grid: str | int = None) -> dict | None:
         """
         Disambiguates candidate list using target_map_grid if provided.
         Returns formatted coordinate payload.
         """
         if not candidates:
             return None
-            
+
         if len(candidates) == 1:
             c = candidates[0]
             return {
@@ -287,7 +252,7 @@ class CoquitlamDataValidator:
                 "candidates": candidates,
                 "confidence": 100.0
             }
-            
+
         # Multiple candidates (e.g., dual-junction corridor)
         if target_map_grid is not None:
             target_grid_clean = re.sub(r'^(?:GRID|ZONE)\s*', '', str(target_map_grid).strip(), flags=re.IGNORECASE)
@@ -304,7 +269,7 @@ class CoquitlamDataValidator:
                         "candidates": candidates,
                         "confidence": 100.0
                     }
-                    
+
         # No grid or grid unmatched: return primary candidate with is_ambiguous=True
         primary = candidates[0]
         return {
@@ -319,21 +284,21 @@ class CoquitlamDataValidator:
         }
 
     def validate_address_exists(self, parsed_address: str) -> Tuple[int, str | None]:
-        """Surgically checks if a parsed address exists in our local GIS database."""
+        """Surgically checks if a parsed address exists in the local GIS database."""
         if not parsed_address:
             return 0, None
 
         # Check landmarks first (parks, schools, facilities)
-        if self.landmarks:
+        if self._landmark_cache:
             clean_addr_lower = parsed_address.strip().lower()
             best_l_match = None
             best_l_score = 0
-            for name, details in self.landmarks.items():
+            for name, details in self._landmark_cache.items():
                 score = fuzz.token_set_ratio(clean_addr_lower, name)
                 if score > best_l_score:
                     best_l_score = score
                     best_l_match = details
-            
+
             if best_l_score >= 85:
                 return best_l_score, best_l_match["address"]
 
@@ -350,35 +315,41 @@ class CoquitlamDataValidator:
             # Address was explicitly formatted as an intersection but was not found in municipal registry
             return 0, None
 
-        if self.addresses_gdf is None and not self.house_number_index:
-            return 0, None
-
         match = re.search(r'^(?P<number>\d+)\s+(?P<street>.*)', clean_address)
         if not match:
             return 0, None
-            
-        parsed_num, parsed_street = match.group('number'), match.group('street').upper()
-        
-        # O(1) Dictionary Lookup
-        possible_matches = self.house_number_index.get(parsed_num, [])
-        if not possible_matches:
+
+        parsed_num, parsed_street_raw = match.group('number'), match.group('street').strip()
+        parsed_street_raw = re.sub(r'\b(number|num|unit|suite|apt|apartment|#)\s+\w+\b.*', '', parsed_street_raw, flags=re.IGNORECASE).strip()
+        parsed_street_raw = re.sub(r'\b(block|blk|of)\b', '', parsed_street_raw, flags=re.IGNORECASE).strip()
+        parsed_street = normalize_street_name(parsed_street_raw)
+
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT house, street, streettype, address 
+                    FROM public.parcels 
+                    WHERE house = :house;
+                """), {"house": parsed_num}).mappings().fetchall()
+
+                best_score = 0
+                best_match_full_address = None
+                for row in rows:
+                    db_street = f"{row['street']} {row['streettype'] or ''}".strip().upper()
+                    db_norm = normalize_street_name(db_street)
+                    score = fuzz.token_set_ratio(parsed_street, db_norm)
+                    if score > best_score:
+                        best_score = score
+                        st_type = row['streettype'] or ""
+                        best_match_full_address = f"{parsed_num} {row['street']} {st_type}".strip().title()
+
+                logging.debug(f"GIS Lookup for '{parsed_address}': Best street match score = {best_score}%")
+                if best_score >= self.street_confidence_threshold:
+                    return best_score, best_match_full_address
+                return best_score, None
+        except Exception as e:
+            logging.error(f"Error validating address in database: {e}")
             return 0, None
-            
-        best_score = 0
-        best_match_full_address = None
-        for row in possible_matches:
-            db_full_street = f"{row[self.street_name_col]} {row[self.street_type_col]}".upper()
-            score = fuzz.token_set_ratio(parsed_street, db_full_street.strip())
-            if score > best_score:
-                best_score = score
-                # Construct a clean address string without database suite/unit numbers
-                st_type = row[self.street_type_col] or ""
-                best_match_full_address = f"{parsed_num} {row[self.street_name_col]} {st_type}".strip().title()
-                
-        logging.debug(f"GIS Lookup for '{parsed_address}': Best street match score = {best_score}%")
-        if best_score >= self.street_confidence_threshold:
-            return best_score, best_match_full_address
-        return best_score, None
 
     def get_coordinates(self, parsed_address: str, target_map_grid: str | int = None) -> dict | None:
         """
@@ -389,17 +360,17 @@ class CoquitlamDataValidator:
         if not parsed_address:
             return None
 
-        # Check landmarks first (parks, schools, facilities)
-        if self.landmarks:
+        # 1. Check landmarks first (parks, schools, facilities)
+        if self._landmark_cache:
             clean_addr_lower = parsed_address.strip().lower()
             best_l_match = None
             best_l_score = 0
-            for name, details in self.landmarks.items():
+            for name, details in self._landmark_cache.items():
                 score = fuzz.token_set_ratio(clean_addr_lower, name)
                 if score > best_l_score:
                     best_l_score = score
                     best_l_match = details
-            
+
             if best_l_score >= 85:
                 return {
                     "address": best_l_match["address"],
@@ -410,7 +381,7 @@ class CoquitlamDataValidator:
                     "is_ambiguous": False
                 }
 
-        # Manual geocoding overrides
+        # 2. Manual geocoding overrides
         clean_address = parsed_address.split(',')[0].strip().upper()
         if clean_address == "3080 GORDON AVE":
             res = self.get_coordinates("3030 GORDON AVE", target_map_grid=target_map_grid)
@@ -435,7 +406,7 @@ class CoquitlamDataValidator:
                 "confidence": 100.0,
                 "is_ambiguous": False
             }
-            
+
         # Manual Riverview Station overrides (e.g. "Station 15", "Station 37", etc.)
         if "RIVERVIEW" in clean_address or "STATION" in clean_address:
             station_match = re.search(r'\bSTATION\s*(\d+)\b', clean_address, re.IGNORECASE)
@@ -451,7 +422,7 @@ class CoquitlamDataValidator:
                     "is_ambiguous": False
                 }
 
-        # Check intersection authority
+        # 3. Check intersection authority
         cands, score = self._lookup_intersection(parsed_address)
         if cands:
             res = self._resolve_candidates(cands, target_map_grid=target_map_grid)
@@ -462,174 +433,290 @@ class CoquitlamDataValidator:
             # Address was explicitly an intersection but unresolvable in local registry
             return None
 
-        if self.addresses_gdf is None and not self.house_number_index:
-            return None
-
+        # 4. Parcels house + street resolution
         match = re.search(r'^(?P<number>\d+)\s+(?P<street>.*)', clean_address)
         if not match:
             return None
-            
+
         parsed_num, parsed_street_raw = match.group('number'), match.group('street').strip()
-        # Clean unit/suite numbers (e.g. "number 105", "unit B") to ensure parcel match
+        # Clean unit/suite numbers (e.g. "number 105", "unit B")
         parsed_street_raw = re.sub(r'\b(number|num|unit|suite|apt|apartment|#)\s+\w+\b.*', '', parsed_street_raw, flags=re.IGNORECASE).strip()
-        
         # Clean block designations (e.g. "1080 block ponderosa street" or "1000 blk of ponderosa")
         parsed_street_raw = re.sub(r'\b(block|blk|of)\b', '', parsed_street_raw, flags=re.IGNORECASE).strip()
         parsed_street_raw = " ".join(parsed_street_raw.split())
-        
-        # Normalize suffix to map indices
+        parsed_street = normalize_street_name(parsed_street_raw)
+
         words = parsed_street_raw.split()
         if len(words) >= 1:
             street_type_raw = words[-1]
             street_name_raw = " ".join(words[:-1])
-            type_mapping = {
-                "crescent": "cres", "highway": "hwy", "street": "st",
-                "avenue": "ave", "court": "crt", "place": "pl",
-                "drive": "dr", "boulevard": "blvd", "lane": "ln", "road": "rd"
-            }
-            norm_type = type_mapping.get(street_type_raw.lower(), street_type_raw).upper()
-            parsed_street = f"{street_name_raw} {norm_type}".upper().strip()
+            norm_type = SUFFIX_MAPPINGS.get(street_type_raw.upper(), street_type_raw.upper())
         else:
-            parsed_street = parsed_street_raw.upper().strip()
-            norm_type = ""
             street_name_raw = parsed_street_raw
-            
-        # O(1) Dictionary Lookup
-        possible_matches = self.house_number_index.get(parsed_num, [])
-        best_score = 0
-        best_row = None
-        
-        if possible_matches:
-            for row in possible_matches:
-                db_full_street = f"{row[self.street_name_col]} {row[self.street_type_col]}".upper().strip()
-                score = fuzz.token_set_ratio(parsed_street, db_full_street)
-                if score > best_score:
-                    best_score = score
-                    best_row = row
-                
-        if best_score >= self.street_confidence_threshold and best_row is not None and gpd is not None and self.addresses_gdf is not None:
-            try:
-                # Convert geometry to WGS84 (EPSG:4326)
-                geom_gdf = gpd.GeoDataFrame([best_row], crs=self.addresses_gdf.crs)
-                geom_gdf_wgs84 = geom_gdf.to_crs("EPSG:4326")
-                matched_geom = geom_gdf_wgs84.geometry.iloc[0]
-                centroid = matched_geom.centroid
-                
-                rings = []
-                def extract_rings(geometry) -> list:
-                    r = []
-                    if geometry.geom_type == 'Polygon':
-                        exterior = [[coord[0], coord[1]] for coord in geometry.exterior.coords]
-                        r.append(exterior)
-                        for interior in geometry.interiors:
-                            r.append([[coord[0], coord[1]] for coord in interior.coords])
-                    elif geometry.geom_type == 'MultiPolygon':
-                        for polygon in geometry.geoms:
-                            r.extend(extract_rings(polygon))
-                    return r
-                    
-                rings = extract_rings(matched_geom)
-                
-                street_type_val = best_row[self.street_type_col]
-                if street_type_val:
-                    clean_addr_val = f"{best_row[self.house_num_col]} {best_row[self.street_name_col]} {street_type_val}"
-                else:
-                    clean_addr_val = f"{best_row[self.house_num_col]} {best_row[self.street_name_col]}"
-                
-                clean_addr_val = " ".join(clean_addr_val.strip().split()).title()
-                try:
-                    from cfr_dispatch.parser import normalize_street_suffix
-                    clean_addr_val = normalize_street_suffix(clean_addr_val)
-                except Exception:
-                    pass
+            norm_type = ""
 
-                return {
-                    "address": clean_addr_val,
-                    "lat": centroid.y,
-                    "lng": centroid.x,
-                    "rings": rings,
-                    "confidence": best_score,
-                    "is_ambiguous": False
-                }
-            except Exception as e:
-                logging.error(f"Error transforming coordinates for local geocode: {e}", exc_info=True)
-                return None
-                
-        # Fallback to Street Centroid if no exact address is found
         try:
-            if self.addresses_gdf is not None and gpd is not None:
-                street_matches = self.addresses_gdf[
-                    (self.addresses_gdf[self.street_name_col].astype(str).str.upper() == street_name_raw.upper()) &
-                    (self.addresses_gdf[self.street_type_col].astype(str).str.upper() == norm_type.upper())
-                ]
-                if not street_matches.empty:
-                    centroids = street_matches.geometry.centroid
-                    mean_x = centroids.x.mean()
-                    mean_y = centroids.y.mean()
-                    centroid_proj = Point(mean_x, mean_y)
-                    point_gdf = gpd.GeoDataFrame([{'geometry': centroid_proj}], crs=self.addresses_gdf.crs)
-                    point_wgs84 = point_gdf.to_crs("EPSG:4326").geometry.iloc[0]
-                    logging.info(f"Local geocode exact match failed for '{parsed_address}'. Fell back to street centroid: Lat {point_wgs84.y:.6f}, Lng {point_wgs84.x:.6f}")
+            with self.engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT id, address, house, street, streettype, lat, lng,
+                           front_lat, front_lng, entrance_lat, entrance_lng,
+                           centroid_lat, centroid_lng, zone_id,
+                           ST_AsGeoJSON(geom) as geom_geojson
+                    FROM public.parcels
+                    WHERE house = :house;
+                """), {"house": parsed_num}).mappings().fetchall()
+
+                best_score = 0
+                best_row = None
+                for row in rows:
+                    db_street = f"{row['street']} {row['streettype'] or ''}".strip().upper()
+                    db_norm = normalize_street_name(db_street)
+                    score = fuzz.token_set_ratio(parsed_street, db_norm)
+                    if score > best_score:
+                        best_score = score
+                        best_row = row
+
+                if best_score >= self.street_confidence_threshold and best_row is not None:
+                    # Routing priority: front_lat or entrance_lat or lat
+                    dest_lat = best_row["front_lat"] or best_row["entrance_lat"] or best_row["lat"]
+                    dest_lng = best_row["front_lng"] or best_row["entrance_lng"] or best_row["lng"]
+
+                    rings = []
+                    geojson_str = best_row["geom_geojson"]
+                    if geojson_str:
+                        try:
+                            geom_data = json.loads(geojson_str)
+                            gtype = geom_data.get("type")
+                            if gtype == "Polygon":
+                                rings = geom_data.get("coordinates", [])
+                            elif gtype == "MultiPolygon":
+                                rings = [r for poly in geom_data.get("coordinates", []) for r in poly]
+                        except Exception:
+                            rings = []
+
+                    st_type = best_row["streettype"] or ""
+                    clean_addr_val = f"{best_row['house']} {best_row['street']} {st_type}".strip().title()
+                    try:
+                        from cfr_dispatch.parser import normalize_street_suffix
+                        clean_addr_val = normalize_street_suffix(clean_addr_val)
+                    except Exception:
+                        pass
+
                     return {
-                        "address": f"{parsed_num} {parsed_street_raw}".strip(),
-                        "lat": point_wgs84.y,
-                        "lng": point_wgs84.x,
+                        "address": clean_addr_val,
+                        "lat": float(dest_lat),
+                        "lng": float(dest_lng),
+                        "rings": rings,
+                        "confidence": float(best_score),
+                        "is_ambiguous": False
+                    }
+
+                # 5. Centroid Fallback on Street if exact house number not found
+                centroid_res = conn.execute(text("""
+                    SELECT AVG(lat) as avg_lat, AVG(lng) as avg_lng, COUNT(*) as cnt
+                    FROM public.parcels
+                    WHERE UPPER(street) = UPPER(:street_name)
+                      AND (UPPER(streettype) = UPPER(:norm_type) OR :norm_type = '');
+                """), {"street_name": street_name_raw, "norm_type": norm_type}).mappings().fetchone()
+
+                if centroid_res and centroid_res["cnt"] > 0 and centroid_res["avg_lat"] is not None:
+                    avg_lat = float(centroid_res["avg_lat"])
+                    avg_lng = float(centroid_res["avg_lng"])
+                    logging.info(f"Local geocode exact match failed for '{parsed_address}'. Fell back to street centroid: Lat {avg_lat:.6f}, Lng {avg_lng:.6f}")
+                    return {
+                        "address": f"{parsed_num} {parsed_street_raw}".strip().title(),
+                        "lat": avg_lat,
+                        "lng": avg_lng,
+                        "rings": [],
+                        "confidence": 60.0,
+                        "is_street_centroid": True,
+                        "is_ambiguous": False
+                    }
+
+                # Try road centre lines centroid
+                road_res = conn.execute(text("""
+                    SELECT ST_Y(ST_Centroid(ST_Union(geom))) as lat,
+                           ST_X(ST_Centroid(ST_Union(geom))) as lng
+                    FROM public.roads
+                    WHERE UPPER(fullname) = UPPER(:fullname) OR UPPER(roadname) = UPPER(:roadname);
+                """), {"fullname": parsed_street_raw, "roadname": street_name_raw}).mappings().fetchone()
+
+                if road_res and road_res["lat"] is not None:
+                    return {
+                        "address": f"{parsed_num} {parsed_street_raw}".strip().title(),
+                        "lat": float(road_res["lat"]),
+                        "lng": float(road_res["lng"]),
                         "rings": [],
                         "confidence": 60.0,
                         "is_street_centroid": True,
                         "is_ambiguous": False
                     }
         except Exception as e:
-            logging.warning(f"Error computing fallback street centroid for '{parsed_address}': {e}")
-            
+            logging.error(f"Error querying coordinates for '{parsed_address}': {e}", exc_info=True)
+
         return None
 
     def local_geocode(self, parsed_address: str, target_map_grid: str | int = None) -> dict | None:
         """Geocodes address locally; alias for get_coordinates."""
         return self.get_coordinates(parsed_address, target_map_grid=target_map_grid)
 
-    def validate_point_in_grid(self, lat: float, lon: float, grid_id: str) -> bool:
+    def validate_point_in_grid(self, lat: float, lng: float = None, grid_id: str = None, lon: float = None) -> bool:
         """Determines if a given coordinate lies within the boundaries of a specific response grid map."""
-        if self.zones_gdf is None or self.zones_sindex is None or not grid_id or lat is None or lon is None or Point is None:
+        target_lng = lng if lng is not None else lon
+        if not grid_id or lat is None or target_lng is None:
             return False
+        clean_grid = re.sub(r'^(?:GRID|ZONE)\s*', '', str(grid_id).strip(), flags=re.IGNORECASE)
         try:
-            point = Point(lon, lat)
-            point_gdf = gpd.GeoDataFrame([{'geometry': point}], crs="EPSG:4326").to_crs(self.zones_crs)
-            point_geom = point_gdf.geometry.iloc[0]
-            possible_matches_idx = list(self.zones_sindex.intersection(point_geom.bounds))
-            possible_matches = self.zones_gdf.iloc[possible_matches_idx]
-            target_zone = possible_matches[possible_matches[self.zone_map_name_col] == grid_id]
-            
-            if target_zone.empty:
-                return False
-            return target_zone.geometry.contains(point_geom).any()
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT 1 
+                    FROM public.zones 
+                    WHERE UPPER(map_name) = UPPER(:grid_id)
+                      AND ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+                    LIMIT 1;
+                """), {"lat": float(lat), "lng": float(target_lng), "grid_id": clean_grid}).fetchone()
+                return bool(res)
         except Exception as e:
             logging.error(f"Point-in-grid validation error: {e}", exc_info=True)
             return False
 
-    def get_map_grid_for_point(self, lat: float, lon: float) -> str | None:
-        """Looks up the emergency response map grid ID containing the given lat/lon coordinates."""
-        if self.zones_gdf is None or self.zones_sindex is None or lat is None or lon is None or Point is None:
+    def get_map_grid_for_point(self, lat: float, lng: float = None, lon: float = None) -> str | None:
+        """Looks up the emergency response map grid ID containing the given lat/lng coordinates."""
+        target_lng = lng if lng is not None else lon
+        if lat is None or target_lng is None:
             return None
         try:
-            point = Point(lon, lat)
-            point_gdf = gpd.GeoDataFrame([{'geometry': point}], crs="EPSG:4326").to_crs(self.zones_crs)
-            point_geom = point_gdf.geometry.iloc[0]
-            possible_matches_idx = list(self.zones_sindex.intersection(point_geom.bounds))
-            possible_matches = self.zones_gdf.iloc[possible_matches_idx]
-            match = possible_matches[possible_matches.geometry.contains(point_geom)]
-            if not match.empty:
-                grid_id = str(match.iloc[0][self.zone_map_name_col]).strip()
-                return grid_id
-            return None
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT map_name 
+                    FROM public.zones 
+                    WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+                    LIMIT 1;
+                """), {"lat": float(lat), "lng": float(target_lng)}).fetchone()
+                if res:
+                    return str(res[0]).strip()
         except Exception as e:
             logging.error(f"Point-to-grid spatial lookup error: {e}", exc_info=True)
-            return None
+        return None
 
     def get_streets_in_grid(self, grid_id: str) -> List[str]:
         """Returns the list of unique street names contained within a specific map grid."""
         if not grid_id:
             return []
-        grid_key = str(grid_id).strip()
-        return sorted(list(self.grid_to_streets.get(grid_key, [])))
+        clean_grid = re.sub(r'^(?:GRID|ZONE)\s*', '', str(grid_id).strip(), flags=re.IGNORECASE)
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT DISTINCT UPPER(street) 
+                    FROM public.parcels 
+                    WHERE UPPER(zone_id) = UPPER(:grid_id) AND street IS NOT NULL AND street != ''
+                    ORDER BY UPPER(street);
+                """), {"grid_id": clean_grid}).fetchall()
+                return [r[0] for r in res if r[0]]
+        except Exception as e:
+            logging.error(f"Error fetching streets in grid '{grid_id}': {e}", exc_info=True)
+            return []
+
+    def is_within_city(self, lat: float, lng: float = None, lon: float = None) -> bool:
+        """Determines whether a coordinate lies within authoritative City of Coquitlam municipal boundary."""
+        target_lng = lng if lng is not None else lon
+        if lat is None or target_lng is None:
+            return False
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+                    FROM public.city_boundary
+                    LIMIT 1;
+                """), {"lat": float(lat), "lng": float(target_lng)}).fetchone()
+                if res and res[0] is not None:
+                    return bool(res[0])
+                # Fallback to municipal bounding box
+                return (49.20 <= float(lat) <= 49.39) and (-122.92 <= float(target_lng) <= -122.70)
+        except Exception as e:
+            logging.error(f"Error checking is_within_city: {e}", exc_info=True)
+            return (49.20 <= float(lat) <= 49.39) and (-122.92 <= float(target_lng) <= -122.70)
+
+    def get_all_road_names(self) -> List[str]:
+        """Returns list of all known road names."""
+        if self._road_names_cache:
+            return list(self._road_names_cache)
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("SELECT road_name FROM public.road_names ORDER BY road_name;")).fetchall()
+                return [r[0] for r in res]
+        except Exception as e:
+            logging.error(f"Error fetching all road names: {e}")
+            return []
+
+    def get_top_street_names(self, limit: int = 100) -> List[str]:
+        """Returns top street names by parcel frequency."""
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT street, COUNT(*) as cnt 
+                    FROM public.parcels 
+                    WHERE street IS NOT NULL AND street != ''
+                    GROUP BY street 
+                    ORDER BY cnt DESC 
+                    LIMIT :limit;
+                """), {"limit": limit}).fetchall()
+                return [r[0] for r in res]
+        except Exception as e:
+            logging.error(f"Error fetching top street names: {e}")
+            if self._road_names_cache:
+                return self._road_names_cache[:limit]
+            return []
+
+    def get_road_metadata(self, road_name: str) -> dict | None:
+        """Retrieves road network classification, speed limits, and traffic attributes from public.roads."""
+        if not road_name:
+            return None
+        clean_name = road_name.strip()
+        words = clean_name.split()
+        base_name = " ".join(words[:-1]) if len(words) > 1 else clean_name
+
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT fullname, roadname, roadtype, road_class, functional_class,
+                           speed, num_lanes, truck_route, bus_route, status,
+                           left_begin, left_end, right_begin, right_end
+                    FROM public.roads
+                    WHERE UPPER(fullname) = UPPER(:name)
+                       OR UPPER(roadname) = UPPER(:name)
+                       OR UPPER(roadname) = UPPER(:base_name)
+                       OR UPPER(fullname) ILIKE :like_name
+                    ORDER BY 
+                       CASE WHEN UPPER(fullname) = UPPER(:name) THEN 1
+                            WHEN UPPER(roadname) = UPPER(:name) THEN 2
+                            WHEN UPPER(roadname) = UPPER(:base_name) THEN 3
+                            ELSE 4 END
+                    LIMIT 1;
+                """), {
+                    "name": clean_name,
+                    "base_name": base_name,
+                    "like_name": f"%{base_name}%"
+                }).fetchone()
+
+                if res:
+                    return {
+                        "fullname": res[0],
+                        "roadname": res[1],
+                        "roadtype": res[2],
+                        "road_class": res[3],
+                        "functional_class": res[4],
+                        "speed": res[5],
+                        "num_lanes": res[6],
+                        "truck_route": bool(res[7]),
+                        "bus_route": bool(res[8]),
+                        "status": res[9],
+                        "left_begin": res[10],
+                        "left_end": res[11],
+                        "right_begin": res[12],
+                        "right_end": res[13]
+                    }
+        except Exception as e:
+            logging.error(f"Error fetching road metadata for '{road_name}': {e}")
+        return None
 

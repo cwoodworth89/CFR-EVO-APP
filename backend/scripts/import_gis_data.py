@@ -576,10 +576,70 @@ def step7_import_vocabulary(engine, vocab_dir: str, batch_size: int = 500) -> di
         return category_counts
 
 
-def step8_compute_intersections(engine, road_features: list, batch_size: int = 1000) -> int:
-    """Step 8: Compute Topological Road Intersections -> public.intersections."""
+def step8_compute_intersections(engine, road_features: list, intersections_json_path: str = None, batch_size: int = 1000) -> int:
+    """Step 8: Import or Compute Topological Road Intersections -> public.intersections."""
     logging.info("=" * 60)
-    logging.info("Step 8: Computing Topological Road Intersections...")
+    logging.info("Step 8: Importing / Computing Topological Road Intersections...")
+
+    if intersections_json_path and os.path.exists(intersections_json_path):
+        logging.info(f"  Loading authoritative intersections from: {intersections_json_path}")
+        try:
+            with open(intersections_json_path, "r", encoding="utf-8") as f:
+                raw_data = json.load(f)
+            from gis_service.geocoder import split_intersection_parts, normalize_intersection_key
+            records = []
+            for key, candidates in raw_data.items():
+                parts = split_intersection_parts(key)
+                if parts:
+                    street_a, street_b = sorted([parts[0], parts[1]])
+                    norm_key = normalize_intersection_key(street_a, street_b)
+                else:
+                    words = key.split('&')
+                    if len(words) >= 2:
+                        street_a, street_b = sorted([words[0].strip(), words[1].strip()])
+                        norm_key = normalize_intersection_key(street_a, street_b)
+                    else:
+                        street_a = key
+                        street_b = key
+                        norm_key = key.strip().upper()
+                cand_list = candidates if isinstance(candidates, list) else [candidates]
+                for idx, c in enumerate(cand_list):
+                    records.append({
+                        "street_a": street_a,
+                        "street_b": street_b,
+                        "intersection_key": norm_key,
+                        "lat": float(c["lat"]),
+                        "lng": float(c["lng"]),
+                        "zone_id": str(c.get("grid", "")).strip() if c.get("grid") is not None and str(c.get("grid")).strip() != "" else None,
+                        "candidate_index": idx
+                    })
+            insert_sql = text("""
+            INSERT INTO public.intersections (
+                street_a, street_b, intersection_key, lat, lng, zone_id, geom, candidate_index
+            ) VALUES (
+                :street_a, :street_b, :intersection_key, :lat, :lng, :zone_id,
+                ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
+                :candidate_index
+            )
+            ON CONFLICT (intersection_key, candidate_index) DO UPDATE SET
+                street_a = EXCLUDED.street_a,
+                street_b = EXCLUDED.street_b,
+                lat = EXCLUDED.lat,
+                lng = EXCLUDED.lng,
+                zone_id = EXCLUDED.zone_id,
+                geom = EXCLUDED.geom;
+            """)
+            with engine.begin() as conn:
+                conn.execute(text("TRUNCATE TABLE public.intersections RESTART IDENTITY CASCADE;"))
+                for i in range(0, len(records), batch_size):
+                    batch = records[i:i + batch_size]
+                    conn.execute(insert_sql, batch)
+            with engine.connect() as conn:
+                count = conn.execute(text("SELECT COUNT(*) FROM public.intersections;")).scalar()
+            logging.info(f"  ✓ Successfully imported {count} authoritative intersections into public.intersections.")
+            return count
+        except Exception as e:
+            logging.warning(f"  Failed to import intersections from JSON ({e}), falling back to shape computation.")
 
     start_t = time.time()
 
@@ -836,6 +896,7 @@ def run_full_import(
     boundary_path = os.path.join(staging_dir, "city_boundary.geojson")
     road_names_path = os.path.join(staging_dir, "road_names.json")
     landmarks_path = os.path.join(vocab_dir, "landmarks.json")
+    intersections_path = os.path.join(data_dir, "gis", "intersections.json")
 
     logging.info("=" * 70)
     logging.info("  CFR EVO MASTER GIS POSTGIS INGESTION PIPELINE")
@@ -875,7 +936,11 @@ def run_full_import(
         if not road_features and os.path.exists(roads_path):
             with open(roads_path, "r", encoding="utf-8") as f:
                 road_features = json.load(f).get("features", [])
-        intersections_count = step8_compute_intersections(engine, road_features, batch_size=batch_size)
+        intersections_count = step8_compute_intersections(
+            engine, road_features,
+            intersections_json_path=intersections_path,
+            batch_size=batch_size
+        )
     else:
         logging.info("Step 8: Skipped (--skip-intersections).")
         intersections_count = 0

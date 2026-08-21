@@ -81,13 +81,8 @@ def get_shared_validator() -> CoquitlamDataValidator | None:
     global _cached_validator
     if _cached_validator is None:
         try:
-            address_shp = str(SHAPES_DIR / "Property_Information" / "Addresses.shp")
-            zones_shp = str(SHAPES_DIR / "Emergency_Response_Zones" / "Emergency_Response_Zones.shp")
-            logging.info("Initializing shared CoquitlamDataValidator...")
-            _cached_validator = CoquitlamDataValidator(
-                address_shp_path=address_shp,
-                zones_shp_path=zones_shp
-            )
+            logging.info("Initializing shared PostGIS CoquitlamDataValidator...")
+            _cached_validator = CoquitlamDataValidator()
         except Exception as e:
             logging.warning(f"Failed to load shared validator: {e}")
     return _cached_validator

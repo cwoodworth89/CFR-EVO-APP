@@ -38,9 +38,6 @@ class TestFireHallsAndApparatusMapping:
         assert "1300 Pinetree Way" in hall1["address"]
         assert abs(hall1["lat"] - 49.291) < 0.01
         assert abs(hall1["lng"] - (-122.790)) < 0.01
-        assert "southbound_apron" in hall1
-        assert hall1["southbound_apron"]["lat"] == 49.2905
-        assert hall1["southbound_apron"]["lng"] == -122.7915
 
         hall2 = FIRE_HALLS["2"]
         assert hall2["id"] == 2
@@ -206,33 +203,26 @@ class TestPhase1RouteFindingAndAprons:
             mock_osrm.assert_called_once()
             called_waypoints = mock_osrm.call_args[0][0]
 
-            # Exactly 2 waypoints: departure apron and destination
+            # Exactly 2 waypoints: hall front apron and destination
             assert len(called_waypoints) == 2
-            assert called_waypoints[0] == [49.2905, -122.7915]
+            assert called_waypoints[0] == [FIRE_HALLS["1"]["lat"], FIRE_HALLS["1"]["lng"]]
             assert called_waypoints[1] == [dest_lat, dest_lng]
 
-    def test_station_1_southbound_apron_departure(self):
-        """Southbound calls (dest_lat < 49.290) depart from Hall 1 Southbound Apron."""
+    def test_hall_apron_departure_is_direction_independent(self):
+        """Departure is always the hall front apron, regardless of destination bearing.
+
+        Direction of travel is OSRM's responsibility; the engine must not pick a
+        different origin based on where the incident happens to be.
+        """
         engine = EVORoutingEngine()
-        dest_lat = 49.2850
-        dest_lng = -122.7930
+        apron = [FIRE_HALLS["1"]["lat"], FIRE_HALLS["1"]["lng"]]
 
-        with patch.object(engine, "_fetch_osrm_polyline", return_value=(None, None)) as mock_osrm:
-            res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
-            called_waypoints = mock_osrm.call_args[0][0]
-            assert called_waypoints[0] == [49.2905, -122.7915]
-            assert res["origin"] == {"lat": 49.2905, "lng": -122.7915}
-
-    def test_station_1_northbound_departure(self):
-        """Northbound calls (dest_lat >= 49.290) depart from Hall 1 main station front."""
-        engine = EVORoutingEngine()
-        dest_lat = 49.3100
-        dest_lng = -122.7800
-
-        with patch.object(engine, "_fetch_osrm_polyline", return_value=(None, None)) as mock_osrm:
-            res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
-            called_waypoints = mock_osrm.call_args[0][0]
-            assert abs(called_waypoints[0][0] - FIRE_HALLS["1"]["lat"]) < 0.0001
+        for dest_lat, dest_lng in [(49.2850, -122.7930), (49.3100, -122.7800)]:
+            with patch.object(engine, "_fetch_osrm_polyline", return_value=(None, None)) as mock_osrm:
+                res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
+                called_waypoints = mock_osrm.call_args[0][0]
+                assert called_waypoints[0] == apron
+                assert res["origin"] == {"lat": apron[0], "lng": apron[1]}
             assert abs(called_waypoints[0][1] - FIRE_HALLS["1"]["lng"]) < 0.0001
 
     def test_route_1300_pinetree_to_428_nelson_st(self):
@@ -256,7 +246,7 @@ class TestPhase1RouteFindingAndAprons:
             mock_osrm.assert_called_once()
             called_waypoints = mock_osrm.call_args[0][0]
             assert len(called_waypoints) == 2
-            assert called_waypoints[0] == [49.2905, -122.7915]
+            assert called_waypoints[0] == [FIRE_HALLS["1"]["lat"], FIRE_HALLS["1"]["lng"]]
             assert called_waypoints[1] == [dest_lat, dest_lng]
             assert res["status"] == "success"
             assert res["distance_km"] == 9.42
@@ -273,7 +263,7 @@ class TestPhase1RouteFindingAndAprons:
             res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
             assert res["status"] == "success"
             assert res["distance_km"] == 1.45
-            assert res["origin"] == {"lat": 49.2905, "lng": -122.7915}
+            assert res["origin"] == {"lat": FIRE_HALLS["1"]["lat"], "lng": FIRE_HALLS["1"]["lng"]}
 
     def test_route_hall_2_to_1475_pipeline_rd(self):
         """Key verification: Hall 2 (Mariner) to 1475 Pipeline Rd."""
@@ -395,7 +385,7 @@ class TestOSRMResponsesAndFallback:
             assert res["distance_km"] > 0
             assert res["eta_minutes"] >= 1
             assert len(res["polyline"]) == 2
-            assert res["origin"]["lat"] == 49.2905  # Hall 1 southbound apron
+            assert res["origin"]["lat"] == FIRE_HALLS["1"]["lat"]  # Hall 1 front apron
             assert res["destination"]["lat"] == 49.2785
 
     def test_osrm_malformed_json_fallback(self):

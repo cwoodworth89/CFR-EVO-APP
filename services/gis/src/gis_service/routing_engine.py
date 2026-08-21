@@ -15,10 +15,6 @@ FIRE_HALLS: Dict[str, Dict[str, Any]] = {
         "address": "1300 Pinetree Way",
         "lat": 49.29109654571679,
         "lng": -122.79072561861948,
-        "southbound_apron": {
-            "lat": 49.2905,
-            "lng": -122.7915,
-        },
     },
     "2": {
         "id": 2,
@@ -153,7 +149,7 @@ class EVORoutingEngine:
     Two-Phase Emergency Apparatus Routing Engine for Coquitlam Fire Rescue.
     
     Phase 1: Pure OSRM street network route finding with vehicle momentum preservation (continue_straight=true)
-             and station apron departure geometry.
+             and hall front-apron departure geometry.
     Phase 2: Apparatus-aware ETA assessment, road physics, turn penalties, and EMTRAC signal preemption.
     """
     def __init__(self, default_station_id: str = "1"):
@@ -335,7 +331,7 @@ class EVORoutingEngine:
     ) -> Dict[str, Any]:
         """
         Calculates origin-to-destination response route using 2-phase architecture:
-          Phase 1: Pure OSRM street network routing with station apron exit alignment.
+          Phase 1: Pure OSRM street network routing from the hall front apron.
           Phase 2: Apparatus dynamics and ETA calculation on the resulting polyline distance.
         """
         if start_lat is None or start_lng is None:
@@ -357,17 +353,11 @@ class EVORoutingEngine:
 
         turn_penalty_sec = tier_data["turn_penalty_sec"]
 
-        # Station 1 Dual-Carriageway Apron Resolution:
-        # Station 1 (1300 Pinetree Way) sits on the east side of Pinetree Way (divided arterial).
-        # For southbound calls (dest_lat < 49.290), depart from the Southbound Apron Exit (49.2905, -122.7915)
-        # to cleanly enter the divided carriageway without median snapping traps or U-turn loops.
-        is_hall_1 = (abs(start_lat - 49.291) < 0.008 and abs(start_lng - (-122.790)) < 0.008) or (str(station_id) == "1")
-
+        # Departure is always the hall's verified front-apron GPS coordinate.
+        # Direction of travel is OSRM's job, not ours: the router decides how to
+        # leave the apron based on the actual road network.
         departure_lat = start_lat
         departure_lng = start_lng
-        if is_hall_1 and dest_lat < 49.290:
-            departure_lat = 49.2905
-            departure_lng = -122.7915
 
         # Phase 1: Pure OSRM route pathfinding (No brittle intermediate waypoint injections!)
         waypoint_pts = [[departure_lat, departure_lng], [dest_lat, dest_lng]]

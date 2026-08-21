@@ -92,6 +92,10 @@ services:
       MQTT_BROKER_HOST: mosquitto
       MQTT_BROKER_PORT: 1883
       NTFY_SERVER_URL: http://ntfy:80
+      # Master dispatch topic (docs/ntfy_server_access_and_qr_spec.md §2A).
+      # Must match NTFY_TOPIC in backend/.env, which the host agent reads --
+      # a mismatch publishes agent and API notifications to different topics.
+      NTFY_TOPIC: ${NTFY_TOPIC:-chief-master}
       OSRM_BACKEND_URL: http://osrm:5000
       TILE_SERVER_URL: http://tiles:8080
       DISABLE_WAN_FALLBACK: ${DISABLE_WAN_FALLBACK:-false}

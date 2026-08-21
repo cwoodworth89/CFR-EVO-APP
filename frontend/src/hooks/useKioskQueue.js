@@ -123,26 +123,6 @@ export function useKioskQueue() {
     };
   }, [activeCall]);
 
-  // 5-Minute Auto-Dismiss Countdown (Disabled during historical Review replay)
-  useEffect(() => {
-    if (!activeCall || isTimerPaused || isReviewMode || activeCall?.isReview) return;
-
-    timeoutTimerRef.current = setInterval(() => {
-      setTimeoutSecondsLeft((prev) => {
-        if (prev <= 1) {
-          // Timeout reached: dismiss call
-          dismissActiveCall();
-          return DEFAULT_TIMEOUT_SECONDS;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timeoutTimerRef.current) clearInterval(timeoutTimerRef.current);
-    };
-  }, [activeCall, isTimerPaused, isReviewMode]);
-
   // Advance to next call in queue
   const advanceToNextCall = useCallback(() => {
     setQueuedCalls((prev) => {
@@ -169,6 +149,27 @@ export function useKioskQueue() {
       }
     });
   }, [activateCall]);
+
+  // 5-Minute Auto-Dismiss Countdown (Disabled during historical Review replay).
+  // Declared after dismissActiveCall: referencing it earlier hit the temporal dead
+  // zone and threw when the countdown actually reached zero.
+  useEffect(() => {
+    if (!activeCall || isTimerPaused || isReviewMode || activeCall?.isReview) return;
+
+    timeoutTimerRef.current = setInterval(() => {
+      setTimeoutSecondsLeft((prev) => {
+        if (prev <= 1) {
+          dismissActiveCall();
+          return DEFAULT_TIMEOUT_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timeoutTimerRef.current) clearInterval(timeoutTimerRef.current);
+    };
+  }, [activeCall, isTimerPaused, isReviewMode, dismissActiveCall]);
 
   // Historical Dispatch Review Replay (Admin Dispatch Review panel)
   const triggerReviewCall = useCallback((reviewCall) => {

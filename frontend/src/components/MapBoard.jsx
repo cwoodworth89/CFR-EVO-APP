@@ -824,7 +824,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
           appMode={appMode}
           activeDispatch={activeDispatch}
           setActiveDispatch={setActiveDispatch}
-          loadingTraining={loadingTraining}
           mapStyle={mapStyle}
           setMapStyle={setMapStyle}
           onOpenRoutingConfig={() => setShowRoutingConfigModal(true)}
@@ -842,7 +841,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
           setShowSchools={setShowSchools}
           showFireHalls={showFireHalls}
           setShowFireHalls={setShowFireHalls}
-          addresses={addresses}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
           targetAddress={targetAddress}

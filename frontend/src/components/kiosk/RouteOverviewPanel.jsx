@@ -106,12 +106,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
   const callKey = activeCall?.dispatch_id || activeCall?.id || (activeCall?.address ? activeCall.address : 'active-call');
 
-  // Automatically reset state whenever the active call changes
-  useEffect(() => {
-    setUserPanned(false);
-    setSelectedCandidateIdx(0);
-  }, [callKey]);
-
   const activeCandidate = (candidates && candidates.length > selectedCandidateIdx)
     ? candidates[selectedCandidateIdx]
     : null;
@@ -136,6 +130,14 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+
+  // Automatically reset view state whenever the active call changes.
+  // Must sit after the useState declarations above: referencing setUserPanned
+  // earlier hit the temporal dead zone and threw on every new dispatch.
+  useEffect(() => {
+    setUserPanned(false);
+    setSelectedCandidateIdx(0);
+  }, [callKey]);
 
   const handleRouteCalculated = (coordinates) => {
     if (coordinates && coordinates.length > 1) {

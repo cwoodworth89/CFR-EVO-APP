@@ -348,7 +348,6 @@ export function LeftSidebar({
   appMode, 
   activeDispatch,
   setActiveDispatch,
-  loadingTraining,
   mapStyle,
   setMapStyle,
   onOpenRoutingConfig,

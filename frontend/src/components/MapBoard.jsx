@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
@@ -60,11 +60,6 @@ import { sanitizeAddress } from '../utils/addressUtils';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 
 // 🎲 Pure utility function to pick a random element, satisfying React 19 render purity rules
-const getRandomElement = (arr) => {
-  if (!arr || arr.length === 0) return null;
-  const index = Math.floor(Math.random() * arr.length);
-  return arr[index];
-};
 
 const getZoneCentroid = (zone) => {
   if (!zone || !zone.geometry || !zone.geometry.coordinates || !zone.geometry.coordinates[0]) return null;
@@ -132,24 +127,6 @@ class GeometryDecoder {
 }
 
 // helper for road closure type names from Municipal 511
-const getClosureTypeName = (bit) => {
-  switch (bit) {
-    case 1: return "Detour";
-    case 8: return "Sidewalk Closed";
-    case 16: return "Bike Lane Closed";
-    case 32:
-    case 256:
-    case 512: return "Lane(s) Closed";
-    case 2048: return "Alternating Traffic";
-    case 8192: return "One Direction Closed";
-    case 16384: return "Road Closed - Local Traffic Only";
-    case 32768:
-    case 65536: return "Road Closed - Emergency Access Only";
-    case 131072: return "Intermittent Blockage";
-    case 262144: return "Road Closed - No Emergency Access";
-    default: return "";
-  }
-};
 
 // 🚧 Barricade Icon for Road Closures
 const closureIcon = L.divIcon({
@@ -329,11 +306,13 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   // APP/TERMINAL STATE
   const [appMode, setAppMode] = useState(initialMode);
 
-  useEffect(() => {
-    if (initialMode) {
-      setAppMode(initialMode);
-    }
-  }, [initialMode]);
+  // Sync the initialMode prop into local state during render rather than in an
+  // effect: an effect renders the stale mode once before correcting itself.
+  const [prevInitialMode, setPrevInitialMode] = useState(initialMode);
+  if (initialMode && initialMode !== prevInitialMode) {
+    setPrevInitialMode(initialMode);
+    setAppMode(initialMode);
+  }
   const [activeDispatch, setActiveDispatch] = useState(null);
   const [mapStyle, setMapStyle] = useState("GREY"); 
   const [showLabels, setShowLabels] = useState(true); 
@@ -669,17 +648,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   const [filterNoAccess, setFilterNoAccess] = useState(true);
   const [filterAccessOnly, setFilterAccessOnly] = useState(true);
   const [filterCaution, setFilterCaution] = useState(true);
-
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [score, setScore] = useState(0);
-  const [feedback, setFeedback] = useState(null);
-  
-  const [userGuess, setUserGuess] = useState(null);
-  const [distanceOff, setDistanceOff] = useState(0); 
-  const [clickedBlockData, setClickedBlockData] = useState(null);
-
-  // ⏱️ TIMER REF (Prevents double-skipping if you hit Enter while waiting)
-  const autoAdvanceTimer = useRef(null);
 
   // Auto-resize Leaflet map container to prevent gray areas when sidebars open/close
   useEffect(() => {

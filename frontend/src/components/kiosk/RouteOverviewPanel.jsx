@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { MapContainer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import * as turf from '@turf/turf';
 import { RoutingOverlay } from '../RoutingOverlay';
 import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
@@ -79,11 +78,13 @@ const altCandidateIcon = new L.Icon({
 });
 
 export default function RouteOverviewPanel({ activeCall, stationHall }) {
-  const origin = stationHall || {
+  // Stable identity: a fresh literal here re-triggers every downstream useMemo.
+  // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
+  const origin = useMemo(() => stationHall || {
     lat: 49.29109654571679,
     lng: -122.79072561861948,
     name: 'Hall 1 (1300 Pinetree Way)'
-  };
+  }, [stationHall]);
 
   // Extract raw candidates if present (e.g. dual junction ambiguity)
   const rawCandidates = (activeCall?.candidates && Array.isArray(activeCall.candidates) && activeCall.candidates.length > 1)
@@ -130,13 +131,18 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const [mapInstance, setMapInstance] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
 
-  // Automatically reset view state whenever the active call changes.
-  // Must sit after the useState declarations above: referencing setUserPanned
-  // earlier hit the temporal dead zone and threw on every new dispatch.
-  useEffect(() => {
+  // Reset view state when the active call changes.
+  //
+  // Adjusted during render rather than in an effect: React's documented pattern for
+  // "reset state when a prop changes". An effect would paint the previous call's pan
+  // state for one frame, then re-render -- a visible flicker on the apparatus bay
+  // display at the exact moment a new dispatch lands.
+  const [prevCallKey, setPrevCallKey] = useState(callKey);
+  if (callKey !== prevCallKey) {
+    setPrevCallKey(callKey);
     setUserPanned(false);
     setSelectedCandidateIdx(0);
-  }, [callKey]);
+  }
 
   // Dynamic responding units resolution
   const unitsToRoute = useMemo(() => {
@@ -157,7 +163,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
   // ETAs come from the backend's persisted OSRM routing_metrics, never from a
   // client-side estimate.
-  const persistedUnitMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics || [];
+  const persistedUnitMetrics = useMemo(
+    () => activeCall?.routing_metrics || activeCall?.target?.routing_metrics || [],
+    [activeCall]
+  );
 
   const routeMetrics = useMemo(() => {
     if (!hasValidCoords) return null;

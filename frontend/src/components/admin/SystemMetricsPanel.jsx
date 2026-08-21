@@ -3,7 +3,7 @@ import { API_BASE_URL } from "../../apiClient";
 
 export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }) {
   const [metricsSummary, setMetricsSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [selectedCall, setSelectedCall] = useState(null);
 
   useEffect(() => {

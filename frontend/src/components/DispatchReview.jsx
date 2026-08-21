@@ -231,10 +231,11 @@ export default function DispatchReview({ onClose, onReviewCall }) {
       case 'transcript':
         setVerifiedTranscript(selectedCall.sanitized_transcript || selectedCall.raw_transcript || '');
         break;
-      case 'units':
+      case 'units': {
         const displayUnits = selectedCall.responding_units || [];
         setVerifiedUnits(displayUnits.join(', '));
         break;
+      }
       case 'incident':
         setVerifiedIncident(selectedCall.incident_type || '');
         break;

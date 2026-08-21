@@ -107,12 +107,18 @@ export function useKioskQueue() {
     enabled: true,
   });
 
+  // Reset the elapsed counter the moment the active call clears, during render.
+  // Doing it inside the effect below left the previous call's elapsed time on
+  // screen for one frame after dismissal.
+  const [hadActiveCall, setHadActiveCall] = useState(false);
+  if (!!activeCall !== hadActiveCall) {
+    setHadActiveCall(!!activeCall);
+    if (!activeCall) setElapsedSeconds(0);
+  }
+
   // Count-up elapsed timer for active call
   useEffect(() => {
-    if (!activeCall) {
-      setElapsedSeconds(0);
-      return;
-    }
+    if (!activeCall) return;
 
     elapsedTimerRef.current = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);

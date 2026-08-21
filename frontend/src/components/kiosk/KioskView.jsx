@@ -139,9 +139,6 @@ export default function KioskView({ kioskState }) {
     !isNaN(Number(rawDestLat)) && !isNaN(Number(rawDestLng)) &&
     (Number(rawDestLat) !== 0 || Number(rawDestLng) !== 0);
 
-  const destLat = hasCoords ? Number(rawDestLat) : null;
-  const destLng = hasCoords ? Number(rawDestLng) : null;
-
   // ETAs are OSRM's, resolved by the backend and persisted on the dispatch.
   // If they are absent the units render as plain badges with no ETA — never a
   // client-side estimate (CLAUDE.md §6.1, §6.2).

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { API_BASE_URL, TILE_BASE_URL } from '../../apiClient';
 import { isWithinCoquitlam } from '../../utils/addressUtils';
 
@@ -58,7 +57,6 @@ const targetIcon = new L.Icon({
 });
 
 export default function PropertySatellitePanel({ activeCall }) {
-  const isOnline = useOnlineStatus();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const rawDestLat = activeCall?.lat ?? activeCall?.target?.lat ?? null;

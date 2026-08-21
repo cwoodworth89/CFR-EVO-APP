@@ -149,6 +149,9 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
               zIndex: 350
           }
       );
+      // MapBoard passes onLoadError to surface a cadastral outage; without this
+      // listener the callback was never invoked and the banner could never appear.
+      if (onLoadError) overlayLayer.on('tileerror', onLoadError);
       overlayLayer.addTo(map);
 
       return () => {
@@ -156,16 +159,10 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
           if (map.hasLayer(overlayLayer)) {
             map.removeLayer(overlayLayer);
           }
-        } catch {}
+        } catch { /* non-fatal: caller handles the absent value */ }
       };
-    }, [map, visible]);
+    }, [map, visible, onLoadError]);
     
-    return null;
-}
-
-// 🚒 FIRE ZONES (Rendered via local zones.json layer)
-export function FireZonesLayer({ visible, pane }) {
-    // Legacy ArcGIS DynamicServices replaced with local zones.json
     return null;
 }
 
@@ -337,162 +334,8 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
     }, [targetCoords, allHydrants]);
 
     // Custom Icon styling
-    const getHydrantIcon = (status, flowClass) => {
-      let bgColor = 'rgba(15, 23, 42, 0.6)';
-      let borderColor = '#facc15';
-      let borderStyle = '2px solid';
-      let opacity = '1.0';
-      let isSpecial = false;
-      let emoji = '';
-
-      if (status === 'PRIVATE') {
-        borderColor = '#f59e0b';
-        isSpecial = true;
-        emoji = '🔒';
-      } else if (status === 'ABANDONED' || status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
-        borderColor = '#ef4444';
-        isSpecial = true;
-        emoji = '⚠️';
-        opacity = '0.9';
-      } else {
-        const fc = (flowClass || "").toUpperCase();
-        if (fc === 'AA') borderColor = '#38bdf8';
-        else if (fc === 'A') borderColor = '#4ade80';
-        else if (fc === 'B') borderColor = '#fb923c';
-        else if (fc === 'C') borderColor = '#f87171';
-        else borderColor = '#facc15';
-      }
-
-      const iconHtml = isSpecial ? `
-        <div style="
-          background-color: ${status === 'PRIVATE' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(55, 65, 81, 0.6)'};
-          border: ${borderStyle} ${borderColor};
-          border-radius: 50%;
-          width: 20px;
-          height: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-          font-size: 10px;
-          box-sizing: border-box;
-          opacity: ${opacity};
-        ">${emoji}</div>
-      ` : `
-        <div style="
-          width: 20px;
-          height: 20px;
-          border: 2px solid ${borderColor};
-          border-radius: 50%;
-          background-color: ${bgColor};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-          box-sizing: border-box;
-          opacity: ${opacity};
-        ">
-          <div style="
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: ${borderColor};
-          "></div>
-        </div>
-      `;
-
-      const ratingHtml = flowClass ? `
-        <div style="
-          font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, sans-serif;
-          font-weight: 900;
-          font-size: 9px;
-          color: #ffffff;
-          text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-          letter-spacing: 0.5px;
-          text-align: center;
-          line-height: 1;
-        ">${flowClass}</div>
-      ` : '';
-
-      const labelHtml = ratingHtml ? `
-        <div style="
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          margin-top: 2px; 
-          pointer-events: none;
-        ">
-          ${ratingHtml}
-        </div>
-      ` : '';
-
-      return L.divIcon({
-        className: 'custom-hydrant-icon-container',
-        html: `
-          <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-          ">
-            ${iconHtml}
-            ${labelHtml}
-          </div>
-        `,
-        iconSize: [24, 40],
-        iconAnchor: [12, 10],
-        popupAnchor: [0, -10]
-      });
-    };
 
     // Tactical Highlight Icons for Nearest City & Private Hydrants
-    const createTacticalHighlightIcon = (isPrivate, gisId, flowClass, distMeters) => {
-      const mainColor = isPrivate ? '#f59e0b' : '#00e5ff';
-      const badgeTitle = isPrivate ? '🔒 PRIVATE HYDRANT' : '💧 CITY HYDRANT';
-      const badgeBg = isPrivate ? 'rgba(245, 158, 11, 0.95)' : 'rgba(2, 132, 199, 0.95)';
-
-      return L.divIcon({
-        className: 'custom-tactical-hydrant-highlight',
-        html: `
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-            <div style="
-              width: 32px;
-              height: 32px;
-              border: 3px solid ${mainColor};
-              border-radius: 50%;
-              background: rgba(15, 23, 42, 0.85);
-              box-shadow: 0 0 15px ${mainColor}, inset 0 0 10px ${mainColor};
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 14px;
-              animation: pulse 2s infinite;
-            ">
-              ${isPrivate ? '🔒' : '💧'}
-            </div>
-            <div style="
-              background: ${badgeBg};
-              color: #ffffff;
-              font-family: monospace, sans-serif;
-              font-size: 9px;
-              font-weight: 900;
-              padding: 2px 6px;
-              border-radius: 6px;
-              border: 1px solid rgba(255,255,255,0.4);
-              box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-              white-space: nowrap;
-              margin-top: 3px;
-              letter-spacing: 0.5px;
-            ">
-              ${badgeTitle} (${gisId}) • ${distMeters}m ${flowClass ? '• ' + flowClass : ''}
-            </div>
-          </div>
-        `,
-        iconSize: [180, 55],
-        iconAnchor: [90, 16],
-        popupAnchor: [0, -16]
-      });
-    };
 
     const canvasRenderer = React.useMemo(() => L.canvas({ padding: 0.5 }), []);
 

@@ -3,29 +3,19 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import { UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, STATIONS as STATIONS_LIST } from './MapConstants';
-import { sanitizeAddress, calculateParcelFrontagePoint } from '../utils/addressUtils';
+import { sanitizeAddress } from '../utils/addressUtils';
 import { API_BASE_URL, TILE_BASE_URL } from '../apiClient';
 
 
 export function Header({ 
   appMode, 
   setAppMode, 
-  mapStyle, 
-  setMapStyle, 
-  showLabels, 
-  setShowLabels,
-  leftSidebarOpen,
-  setLeftSidebarOpen,
   rightSidebarOpen,
   setRightSidebarOpen,
-  showRoadClosures,
   setShowRoadClosures,
-  onOpenRoutingConfig,
   alertsCount,
-  gisOffline,
-  homeHall
+  gisOffline
 }) {
-  const [showLayersMenu, setShowLayersMenu] = React.useState(false);
   const isExplore = appMode === "EXPLORE";
 
   const handleModeChange = (e) => {
@@ -350,7 +340,6 @@ export function LeftSidebar({
   setActiveDispatch,
   mapStyle,
   setMapStyle,
-  onOpenRoutingConfig,
   // Explore layer toggles
   showZones, 
   setShowZones, 
@@ -370,7 +359,6 @@ export function LeftSidebar({
   setHomeHall,
   targetAddress,
   setTargetAddress,
-  nearestHydrant,
   nearestHydrants = [],
   routeMetrics,
   // Road access filter toggles
@@ -381,14 +369,7 @@ export function LeftSidebar({
   setFilterAccessOnly,
   filterCaution,
   setFilterCaution,
-  showActiveNow = true,
-  setShowActiveNow,
-  showNext24h = false,
-  setShowNext24h,
-  showNext7d = false,
-  setShowNext7d,
 
-  map
 }) {
   const isExplore = appMode === "EXPLORE";
   const [searchQuery, setSearchQuery] = React.useState("");

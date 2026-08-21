@@ -53,7 +53,7 @@ const NS_STREETS = [
 /**
  * Calculates the exact 0m front property line midpoint from parcel polygon rings.
  */
-export function calculateParcelFrontagePoint(rings, streetName = '') {
+export function calculateParcelFrontagePoint(rings) {
   if (!rings || !rings.length || !rings[0] || rings[0].length < 3) return null;
   const pts = rings[0]; // [lng, lat]
   

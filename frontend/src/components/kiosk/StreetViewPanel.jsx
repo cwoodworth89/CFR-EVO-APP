@@ -36,6 +36,10 @@ export default function StreetViewPanel({ activeCall }) {
   // Fetch DB override on mount or when address changes via apiClient.parcels.lookup
   useEffect(() => {
     let isMounted = true;
+    // Intentional: clear the previous address's override before the new lookup
+    // resolves, so a stale Street View heading is never shown against a new
+    // incident. The cascading render is the point, not an oversight.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDbOverride(null);
     if (!cleanAddrKey) return;
 
@@ -133,6 +137,9 @@ export default function StreetViewPanel({ activeCall }) {
     const targetContainer = isExpanded ? modalContainerRef.current : containerRef.current;
     if (!targetContainer) return;
 
+    // Intentional: the panorama mounts asynchronously via the Google SDK and this
+    // marks the loading state before that begins.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
 
     const initPanorama = () => {
@@ -413,7 +420,7 @@ export default function StreetViewPanel({ activeCall }) {
       await apiClient.parcels.saveStreetView(payload);
       try {
         await apiClient.streetView.saveOverride(payload);
-      } catch {}
+      } catch { /* non-fatal: caller handles the absent value */ }
       setDbOverride(payload);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);

@@ -70,7 +70,6 @@ export const getCallTones = (call) => {
 };
 
 export default function ReviewTable({
-  calls = [],
   filteredCalls = [],
   selectedCall,
   onSelectCall,

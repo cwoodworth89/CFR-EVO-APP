@@ -119,7 +119,7 @@ export const apiClient = {
             setToken(data.access_token);
             return { data: { session: { user: data.user, access_token: data.access_token } }, error: null };
           }
-        } catch {}
+        } catch { /* non-fatal: caller handles the absent value */ }
         return { data: { session: null }, error: null };
       }
       try {
@@ -154,7 +154,7 @@ export const apiClient = {
             } else if (errData.detail) {
               msg = JSON.stringify(errData.detail);
             }
-          } catch {}
+          } catch { /* non-fatal: caller handles the absent value */ }
           throw new Error(msg);
         }
         const data = await res.json();

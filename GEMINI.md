@@ -13,6 +13,7 @@ This rule file defines domain constraints, runtime environments, and workflow st
   - City of Coquitlam 2025 7.5cm aerial orthophotos pre-cached locally on the kiosk SSD in SQLite MBTiles archives (sub-decimeter clarity for rooflines, hydrants, and driveways across Z12–Z20)
   - NFPA 291 color-coded fire hydrants with GPM ratings (`hydrants.json`)
   - 3D building footprints with LiDAR-derived heights (`Buildings.shp`)
+* **PostGIS Spatial Database**: PostgreSQL 16 runs with PostGIS 3.4 extension (`postgis/postgis:16-3.4-alpine`). All GIS data (parcels, roads, intersections, emergency zones, city boundary, road names, landmarks) is stored in PostgreSQL as the single source of truth. In-memory shapefile loading has been eliminated. Vocabulary (units, call types, radio channels) is stored in `public.vocabulary` table. Import scripts: `backend/scripts/import_parcels.py` (parcels), `backend/scripts/import_gis_data.py` (roads, intersections, zones, vocabulary).
 * **Centralized Offline Tile Architecture (`cfr_tiles` on Port 8081)**:
   - Base layers and high-resolution orthophotos are served directly by `mbtileserver` (`ghcr.io/consbio/mbtileserver:latest`) on port `8081` mounting `backend/data/tiles/`.
   - **OpenStreetMap Slippy Map Specification Compliance**: All MBTiles archives conform to standard Slippy XYZ Web Mercator (`EPSG:3857`) with top-left origin (`{z}/{x}/{y}`), eliminating TMS Y-inversion overhead at runtime.

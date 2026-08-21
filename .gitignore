@@ -194,6 +194,8 @@ agent/data/Property_Information/
 backend/data/Property_Information/
 agent/data/Emergency_Response_Zones/
 backend/data/Emergency_Response_Zones/
+backend/data/staging/
+backend/data/Transportation/
 backend/data/tiles/
 data/tiles/
 scratch/

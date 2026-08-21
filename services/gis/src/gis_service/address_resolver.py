@@ -116,11 +116,32 @@ class AddressResolver:
                         fraction = 0.5
                     fraction = max(0.0, min(1.0, fraction))  # Clamp to [0,1]
 
-                    # Interpolate point along the LineString
+                    # Interpolate point along the road centreline.
+                    #
+                    # public.roads stores geom as MULTILINESTRING (all 3,214 rows), but
+                    # ST_LineInterpolatePoint requires a LINESTRING and raises
+                    # "1st arg isn't a line" otherwise -- this step previously threw on
+                    # every call. ST_LineMerge stitches 3,184 of 3,214 into a single
+                    # LINESTRING; the remaining 30 are genuinely disjoint, so fall back
+                    # to their longest component rather than failing the lookup.
                     point = conn.execute(text("""
-                        SELECT ST_Y(ST_LineInterpolatePoint(geom, :fraction)) as lat,
-                               ST_X(ST_LineInterpolatePoint(geom, :fraction)) as lng
-                        FROM public.roads WHERE id = :road_id;
+                        WITH merged AS (
+                            SELECT ST_LineMerge(geom) AS g
+                            FROM public.roads WHERE id = :road_id
+                        ),
+                        line AS (
+                            SELECT CASE
+                                     WHEN GeometryType(g) = 'LINESTRING' THEN g
+                                     ELSE (
+                                       SELECT d.geom FROM ST_Dump(g) AS d
+                                       ORDER BY ST_Length(d.geom) DESC LIMIT 1
+                                     )
+                                   END AS g
+                            FROM merged
+                        )
+                        SELECT ST_Y(ST_LineInterpolatePoint(g, :fraction)) as lat,
+                               ST_X(ST_LineInterpolatePoint(g, :fraction)) as lng
+                        FROM line WHERE g IS NOT NULL;
                     """), {"fraction": fraction, "road_id": row['id']}).mappings().fetchone()
 
                     if point and point['lat'] is not None:

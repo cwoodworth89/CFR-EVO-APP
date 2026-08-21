@@ -112,9 +112,19 @@ def ensure_tables(engine):
         left_end INTEGER,
         right_begin INTEGER,
         right_end INTEGER,
-        geom GEOMETRY(LineString, 4326),
+        geom GEOMETRY(MultiLineString, 4326),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='roads' AND column_name='geom') THEN
+            BEGIN
+                ALTER TABLE public.roads ALTER COLUMN geom TYPE GEOMETRY(MultiLineString, 4326) USING ST_Multi(geom);
+            EXCEPTION WHEN OTHERS THEN
+                NULL;
+            END;
+        END IF;
+    END $$;
     CREATE INDEX IF NOT EXISTS idx_roads_fullname ON public.roads (fullname);
     CREATE INDEX IF NOT EXISTS idx_roads_class ON public.roads (road_class);
     CREATE INDEX IF NOT EXISTS idx_roads_geom ON public.roads USING GIST (geom);
@@ -273,7 +283,7 @@ def step2_import_roads(engine, roads_geojson_path: str, batch_size: int = 500) -
             :fullname, :roadname, :roadtype, :road_class, :functional_class,
             :speed, :num_lanes, :truck_route, :bus_route, :status,
             :left_begin, :left_end, :right_begin, :right_end,
-            ST_Force2D(ST_GeomFromText(:wkt, 4326))
+            ST_Multi(ST_Force2D(ST_GeomFromText(:wkt, 4326)))
         );
         """)
 

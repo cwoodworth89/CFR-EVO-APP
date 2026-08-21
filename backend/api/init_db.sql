@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS public.roads (
     left_end INTEGER,
     right_begin INTEGER,
     right_end INTEGER,
-    geom GEOMETRY(LineString, 4326),
+    geom GEOMETRY(MultiLineString, 4326),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_roads_fullname ON public.roads (fullname);

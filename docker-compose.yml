@@ -102,6 +102,7 @@ services:
     volumes:
       - ./backend/audio_files/recordings:/app/backend/audio_files/recordings
       - ./backend/data:/app/backend/data
+      - ./backend/scripts:/app/backend/scripts
       - ./services:/app/services
       - ./frontend/public/data:/app/frontend/public/data:ro
     depends_on:

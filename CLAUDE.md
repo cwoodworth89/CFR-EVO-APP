@@ -49,8 +49,15 @@ The kiosk (`tcfire@100.95.146.94`, hostname `cfr-mapping-tcfh`, reachable over T
    git add . && git commit -m "..." && git push origin main
    ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend && npm run build"
    ```
-5. **Git-Ignored Files**: Files in `.gitignore` (e.g. `backend/.env`, `frontend/.env.local`, model caches in `backend/models/`, shapefiles in `backend/data/`) are not synced via git and must be transferred manually via `scp` when updated.
-6. **Local DB Access**: The `cfr-postgres` MCP server and any local scripts connect to the kiosk's Postgres directly over Tailscale (`DATABASE_URL` → `100.95.146.94:5432`), since that's the one authoritative database.
+5. **Pre-Commit Lint Guard**: `git config core.hooksPath .githooks` (once per clone) enables
+   [`.githooks/pre-commit`](.githooks/pre-commit), which runs `npm run lint:crash` in
+   `frontend/` whenever staged changes touch `frontend/src/**`. It blocks only the
+   **crash class** — `no-undef` and use-before-declaration (TDZ) — because those compile
+   cleanly through Vite and throw only at runtime on the kiosk. `npm run build` does NOT
+   catch them. Style/hygiene lint (`npm run lint`) is advisory and never blocks.
+   Bypass a single commit with `git commit --no-verify`.
+6. **Git-Ignored Files**: Files in `.gitignore` (e.g. `backend/.env`, `frontend/.env.local`, model caches in `backend/models/`, shapefiles in `backend/data/`) are not synced via git and must be transferred manually via `scp` when updated.
+7. **Local DB Access**: The `cfr-postgres` MCP server and any local scripts connect to the kiosk's Postgres directly over Tailscale (`DATABASE_URL` → `100.95.146.94:5432`), since that's the one authoritative database.
 
 ---
 

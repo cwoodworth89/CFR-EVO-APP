@@ -9,7 +9,8 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint:crash": "eslint src -c eslint.crash.config.js --quiet"
   },
   "dependencies": {
     "@turf/turf": "^7.3.1",

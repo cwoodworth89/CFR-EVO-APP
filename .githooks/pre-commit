@@ -1,0 +1,25 @@
+#!/bin/sh
+# CFR EVO pre-commit guard.
+#
+# Blocks only the "crash class": mistakes that compile fine and then throw at
+# runtime on the kiosk. `npm run build` does NOT catch these -- Vite happily
+# bundles a reference to a variable that does not exist.
+#
+# Everything else eslint reports (unused vars, hook dependency warnings) is
+# advisory and does not block a commit.
+#
+# Install once:  git config core.hooksPath .githooks
+# Bypass once:   git commit --no-verify
+
+if git diff --cached --name-only | grep -qE '^frontend/src/.*\.(js|jsx)$'; then
+  echo "pre-commit: checking frontend for runtime-crash errors..."
+  if ! (cd frontend && npm run --silent lint:crash); then
+    echo
+    echo "COMMIT BLOCKED: runtime-crash errors found above."
+    echo "These build cleanly but throw in the browser. Fix them, or use"
+    echo "'git commit --no-verify' if you are certain."
+    exit 1
+  fi
+  echo "pre-commit: no crash-class errors."
+fi
+exit 0

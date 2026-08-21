@@ -59,42 +59,45 @@ def get_hitl_verified_streets() -> list[str]:
         return _cached_hitl_streets
 
 def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None) -> tuple[str, str]:
-    """
-    Builds dynamic vocabulary biasing prompts and hotwords for local Whisper inference.
-    Combines core dispatch keywords, apparatus units, top Coquitlam streets, and HITL corrections.
-    """
-    # High-priority dispatch terms
     core_dispatch_terms = [
-        "Coquitlam", "respond", "routine", "emergency", "Combined Response Coquitlam",
-        "use talk group", "map grid", "medical aid", "overdose", "lift assist", 
-        "structure fire", "alarm activated", "rescue", "hazard"
+        'Coquitlam', 'respond', 'routine', 'emergency', 'Combined Response Coquitlam',
+        'use talk group', 'map grid', 'medical aid', 'overdose', 'lift assist',
+        'structure fire', 'alarm activated', 'rescue', 'hazard'
     ]
     
+    # ALL unit names
     unit_terms = []
     if units_vocabulary and isinstance(units_vocabulary, (list, set)):
         unit_terms = [str(u).title() for u in units_vocabulary if len(str(u).strip()) > 1]
     
-    # Fetch HITL verified streets to bias Whisper dynamically toward corrected addresses
+    # HITL corrections (unchanged)
     hitl_streets = get_hitl_verified_streets()
     
-    top_streets = []
-    if validator:
+    # ALL road names from database (replaces top-25 GeoDataFrame hack)
+    all_streets = []
+    if validator and hasattr(validator, 'get_all_road_names'):
         try:
-            if hasattr(validator, 'addresses_gdf') and validator.addresses_gdf is not None:
-                col = getattr(validator, 'street_name_col', 'STREET')
-                street_counts = validator.addresses_gdf[col].dropna().value_counts()
-                top_streets = [str(s).title() for s in street_counts.head(25).index.tolist() if len(str(s).strip()) > 1]
+            all_streets = [str(s).title() for s in validator.get_all_road_names()]
         except Exception as e:
-            logging.warning(f"Failed to fetch unique streets for STT hotwords: {e}")
-            
-    # Distinct hotwords list (bounded to avoid Whisper attention saturation)
-    all_hotwords = list(dict.fromkeys(core_dispatch_terms + unit_terms[:15] + hitl_streets[:10] + top_streets[:15]))
-    hotwords_str = ", ".join(all_hotwords)
+            logging.warning(f'Failed to load road names for STT hotwords: {e}')
     
-    # Natural, realistic dispatch prompt anchor
+    # ALL call types from vocabulary
+    all_call_types = []
+    try:
+        from cfr_dispatch.config.vocab import CALL_TYPES
+        all_call_types = [str(ct).title() for ct in CALL_TYPES if len(str(ct).strip()) > 1]
+    except Exception:
+        pass
+    
+    # Build complete hotword list — NO artificial truncation
+    all_hotwords = list(dict.fromkeys(
+        core_dispatch_terms + unit_terms + hitl_streets + all_streets + all_call_types
+    ))
+    hotwords_str = ', '.join(all_hotwords)
+    
     initial_prompt_str = (
-        "Coquitlam Fire Dispatch. Engine 1, Ladder 1, Quint 5, Rescue 1. "
-        "Structure Fire, Medical Aid, Alarm Activated, Commercial Alarm. "
-        "Respond on talk group Tac 1, map grid."
+        'Coquitlam Fire Dispatch. Engine 1, Ladder 1, Quint 5, Rescue 1. '
+        'Structure Fire, Medical Aid, Alarm Activated, Commercial Alarm. '
+        'Respond on talk group Tac 1, map grid.'
     )
     return initial_prompt_str, hotwords_str

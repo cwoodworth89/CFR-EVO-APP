@@ -8,7 +8,6 @@ from typing import Any, Dict
 from cfr_dispatch.config.cloud import (
     WHISPER_MODEL
 )
-from cfr_dispatch.config.paths import SHAPES_DIR
 from cfr_dispatch.stt import get_whisper_model
 from cfr_dispatch.pipeline import process_phase_1_check, process_phase_2_finalize
 from gis_service import CoquitlamDataValidator
@@ -77,14 +76,17 @@ class DispatchSessionManager:
 _cached_validator = None
 
 def get_shared_validator() -> CoquitlamDataValidator | None:
-    """Returns singleton CoquitlamDataValidator for geocoding and STT hotword indexing."""
     global _cached_validator
     if _cached_validator is None:
         try:
-            logging.info("Initializing shared PostGIS CoquitlamDataValidator...")
-            _cached_validator = CoquitlamDataValidator()
+            db_url = os.environ.get(
+                'DATABASE_URL',
+                'postgresql://cfr_user:cfr_password_2026@localhost:5432/cfr_dispatch'
+            )
+            logging.info('Initializing CoquitlamDataValidator (PostgreSQL)...')
+            _cached_validator = CoquitlamDataValidator(database_url=db_url)
         except Exception as e:
-            logging.warning(f"Failed to load shared validator: {e}")
+            logging.warning(f'Failed to load shared validator: {e}')
     return _cached_validator
 
 def background_worker_loop(task_queue: multiprocessing.Queue):

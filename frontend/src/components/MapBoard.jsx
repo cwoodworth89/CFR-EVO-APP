@@ -8,7 +8,7 @@ import L from 'leaflet';
 
 // Import from your other components
 import { BaseMap, CoquitlamOverlays, StationsLayer, FireZonesLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
-import { MapClickEvents, SmartZoom, ZoomToFeedback } from './MapActions';
+import { MapClickEvents } from './MapActions';
 import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
 import { apiClient } from '../apiClient';
@@ -323,9 +323,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
 
   // RAW DATA STATES
   const [zones, setZones] = useState([]);
-  const [intersections, setIntersections] = useState([]);
-  const [blocks, setBlocks] = useState([]);
-  const [addresses, setAddresses] = useState([]);
   const [roadClosures, setRoadClosures] = useState([]);
   const [selectedClosure, setSelectedClosure] = useState(null);
   
@@ -338,8 +335,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     }
   }, [initialMode]);
   const [activeDispatch, setActiveDispatch] = useState(null);
-  const [trainingDataLoaded, setTrainingDataLoaded] = useState(false);
-  const [loadingTraining, setLoadingTraining] = useState(false);
   const [mapStyle, setMapStyle] = useState("GREY"); 
   const [showLabels, setShowLabels] = useState(true); 
   const [showHydrants, setShowHydrants] = useState(true); 
@@ -735,59 +730,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     return () => clearInterval(interval);
   }, []);
 
-  // LAZY LOAD TRAINING DATA
-  const loadTrainingData = useCallback(() => {
-    if (trainingDataLoaded || loadingTraining) return;
-    setLoadingTraining(true);
-    const baseUrl = import.meta.env.BASE_URL;
-
-    const fetchZones = fetch(`${baseUrl}data/zones.json?v=2`).then(r => r.ok ? r.json() : []);
-    const fetchIntersections = fetch(`${baseUrl}data/intersections.json?v=1`).then(r => r.ok ? r.json() : []);
-    const fetchBlocks = fetch(`${baseUrl}data/blocks.json?v=2`).then(r => r.ok ? r.json() : []);
-    const fetchAddresses = fetch(`${baseUrl}data/addresses.json?v=2`).then(r => r.ok ? r.json() : []);
-
-    Promise.all([fetchZones, fetchIntersections, fetchBlocks, fetchAddresses])
-      .then(([zonesData, intersectionsData, blocksData, addressesData]) => {
-        setZones(zonesData);
-        setIntersections(intersectionsData);
-        setBlocks(blocksData);
-        setAddresses(addressesData);
-        setTrainingDataLoaded(true);
-        setLoadingTraining(false);
-      })
-      .catch(err => {
-        console.error("Failed to load training data:", err);
-        setLoadingTraining(false);
-      });
-  }, [trainingDataLoaded, loadingTraining]);
-
-  // --- CONTROLLER LOGIC (Callbacks wrapped in useCallback to prevent unnecessary re-renders) ---
-  const nextQuestion = useCallback((dataset) => {
-      clearTimeout(autoAdvanceTimer.current); // Stop timer if manual click happened
-      if (!dataset || dataset.length === 0) return;
-      setCurrentQuestion(getRandomElement(dataset));
-      setFeedback(null);
-      setUserGuess(null);
-  }, []);
-
-  const nextBlockQuestion = useCallback(() => {
-    clearTimeout(autoAdvanceTimer.current);
-    if (!blocks || blocks.length === 0) return;
-    const valid = blocks.filter(b => b.block > 0);
-    setCurrentQuestion(getRandomElement(valid));
-    setFeedback(null);
-    setClickedBlockData(null);
-  }, [blocks]);
-
-  const goToNext = useCallback(() => {
-      if(appMode === "TRAINING_ZONES") nextQuestion(zones);
-      if(appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
-      if(appMode === "TRAINING_BLOCKS") nextBlockQuestion();
-      if(appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
-  }, [appMode, zones, intersections, addresses, nextQuestion, nextBlockQuestion]);
-
   const startMode = useCallback((mode) => {
-      clearTimeout(autoAdvanceTimer.current); // Clear any pending jumps
       if (mode === "KIOSK_VIEW") {
         if (typeof onLaunchKiosk === 'function') {
           onLaunchKiosk();
@@ -796,16 +739,9 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
       }
       setAppMode(mode);
       setActiveDispatch(null);
-      setScore(0);
-      setFeedback(null);
-      setUserGuess(null);
       setTargetAddress(null);
-      setCurrentQuestion(null);
-      setClickedBlockData(null);
       setMapStyle(MODE_DEFAULTS[mode] || "GREY"); 
-      
-      // Only show labels automatically for Address Mode and Explore
-      setShowLabels(mode === "TRAINING_ADDRESSES" || mode === "EXPLORE");
+      setShowLabels(mode === "EXPLORE");
       
       if (mode === "EXPLORE") {
           setShowZones(true);
@@ -814,118 +750,12 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setLeftSidebarOpen(true);
           setRightSidebarOpen(false);
       } else {
-          // Training Modes: Hydrants ON by default, road closures icons ON by default, zones OFF
-          setShowHydrants(true);
-          setShowRoadClosures(true);
-          setShowZones(false);
           setLeftSidebarOpen(true);
-          setRightSidebarOpen(false); // Close alerts list panel for training focus
-          
-          if (!trainingDataLoaded) {
-            loadTrainingData();
-          }
+          setRightSidebarOpen(false);
       }
-  }, [trainingDataLoaded, loadTrainingData]);
+  }, [onLaunchKiosk]);
 
-  // Reactive effect to set active question once training data downloads
-  useEffect(() => {
-    if (!trainingDataLoaded || appMode === "EXPLORE") return;
-    if (!currentQuestion) {
-      const timer = setTimeout(() => {
-        if (appMode === "TRAINING_ZONES") nextQuestion(zones);
-        if (appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
-        if (appMode === "TRAINING_BLOCKS") nextBlockQuestion();
-        if (appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [trainingDataLoaded, appMode, zones, intersections, blocks, addresses, nextQuestion, nextBlockQuestion, currentQuestion]);
-
-  // ⌨️ KEYBOARD LISTENER (Enter = Next) - Declared below goToNext to resolve TDZ hoisting bug
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-        // If Enter is pressed AND we are showing feedback (waiting for next)
-        if (e.key === "Enter" && feedback && appMode !== "EXPLORE") {
-            goToNext();
-        }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [feedback, appMode, goToNext]);
-
-  // --- HANDLERS ---
-  const handleZoneGuess = useCallback((unitId) => {
-    if (!currentQuestion) return;
-    if (unitId === currentQuestion.unit_id) { 
-        setFeedback("CORRECT"); 
-        setScore(s => s + 1); 
-        // Auto-advance
-        autoAdvanceTimer.current = setTimeout(() => nextQuestion(zones), 1000); 
-    } 
-    else { setFeedback("WRONG"); }
-  }, [currentQuestion, zones, nextQuestion]);
-
-  const handleMapClick = useCallback((latlng) => {
-    if (!currentQuestion || (appMode !== "TRAINING_INTERSECTIONS" && appMode !== "TRAINING_ADDRESSES") || feedback) return;
-    setUserGuess(latlng);
-    
-    const from = turf.point([latlng.lng, latlng.lat]);
-    const to = turf.point([currentQuestion.lng, currentQuestion.lat]);
-    let distMeters = Math.round(turf.distance(from, to, { units: 'kilometers' }) * 1000);
-    
-    const tolerance = appMode === "TRAINING_ADDRESSES" ? 15 : 50;
-    if (distMeters <= tolerance) distMeters = 0;
-    
-    setDistanceOff(distMeters);
-    const points = Math.max(0, 500 - distMeters);
-    setScore(s => s + points);
-    
-    const result = distMeters === 0 ? "PERFECT" : points > 0 ? "OKAY" : "MISS";
-    setFeedback(result);
- 
-    // 🔽 Auto-advance for Intersection/Address modes too
-    if (result === "PERFECT") {
-        autoAdvanceTimer.current = setTimeout(() => {
-            if (appMode === "TRAINING_INTERSECTIONS") nextQuestion(intersections);
-            if (appMode === "TRAINING_ADDRESSES") nextQuestion(addresses);
-        }, 1500);
-    }
-  }, [currentQuestion, appMode, feedback, intersections, addresses, nextQuestion]);
- 
-  const handleBlockClick = useCallback((blockData) => {
-    if (!currentQuestion || appMode !== "TRAINING_BLOCKS" || feedback) return;
-    setClickedBlockData(blockData);
-    
-    const isCorrectStreet = currentQuestion.street === blockData.street;
-    const diff = Math.abs(currentQuestion.block - blockData.block);
-    
-    if (isCorrectStreet && diff === 0) { 
-        setFeedback("PERFECT"); 
-        setScore(s => s + 1); 
-        // Auto-advance
-        autoAdvanceTimer.current = setTimeout(nextBlockQuestion, 1500); 
-    }
-    else { setFeedback("WRONG"); setDistanceOff(diff); }
-  }, [currentQuestion, appMode, feedback, nextBlockQuestion]);
- 
-  // --- RENDER HELPERS ---
-  const getBlockStyle = useCallback((block) => {
-    if (!feedback) return { color: "#64748b", weight: 6, opacity: 0.8 }; 
-    const isTarget = block.block === currentQuestion.block && block.street === currentQuestion.street;
-    const isClicked = clickedBlockData && block.block === clickedBlockData.block && block.street === clickedBlockData.street;
-    if (isTarget) return { color: "#22c55e", weight: 12, opacity: 1 }; 
-    if (isClicked) return { color: "#ef4444", weight: 12, opacity: 1 }; 
-    return { color: "#475569", weight: 4, opacity: 0.15 }; 
-  }, [feedback, currentQuestion, clickedBlockData]);
- 
   const getZoneStyle = (zone) => {
-    if (appMode === "TRAINING_ZONES") {
-        if (currentQuestion && zone.zone_id === currentQuestion.zone_id) {
-            return { color: "#06b6d4", fillOpacity: 0.5, weight: 0 }; 
-        }
-        return { color: "transparent", fillOpacity: 0, weight: 0 }; 
-    }
-    
     // Color-code by fire hall for explore/live modes
     const stationName = zone.station || "";
     let color = "#475569"; // default slate gray
@@ -1033,13 +863,6 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
           setShowNext24h={setShowNext24h}
           showNext7d={showNext7d}
           setShowNext7d={setShowNext7d}
-          score={score}
-          currentQuestion={currentQuestion}
-          feedback={feedback}
-          distanceOff={distanceOff}
-          clickedBlockData={clickedBlockData}
-          onNext={goToNext}
-          onZoneGuess={handleZoneGuess}
           map={map}
         />
 
@@ -1078,7 +901,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             {/* 3. LAYERS ASSIGNED TO PANES */}
             
             {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall - OFF at zoom >= 16) */}
-            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom < 16 && zones.map((zone) => (
+            {(showZones) && currentZoom < 16 && zones.map((zone) => (
               <Polygon 
                   key={zone.zone_id} 
                   positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
@@ -1088,7 +911,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             ))}
 
             {/* Centered Soft Black Zone Number Labels (ON at zoom 13/14/15 when showZones is ON, OFF at zoom >= 16) */}
-            {(appMode === "TRAINING_ZONES" || (appMode === "EXPLORE" && showZones)) && currentZoom >= 13 && currentZoom < 16 && zones.map((zone) => {
+            {(showZones) && currentZoom >= 13 && currentZoom < 16 && zones.map((zone) => {
               const center = getZoneCentroid(zone);
               if (!center) return null;
               return (
@@ -1103,59 +926,11 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
             })}
 
             {/* HIDE STATIONS IN TRAINING MODE */}
-            {appMode !== "TRAINING_ZONES" && <StationsLayer visible={showFireHalls} />}
+            {<StationsLayer visible={showFireHalls} />}
 
             {/* AT-GRADE RAILROAD CROSSINGS LAYER */}
             <RailroadCrossingsLayer visible={showRailroadCrossings} />
             
-            <MapClickEvents onMapClick={handleMapClick} />
-            
-            {!feedback && currentQuestion && (
-               <SmartZoom target={currentQuestion} mode={appMode} allBlocks={blocks} allZones={zones} />
-            )}
-            {feedback === "WRONG" && appMode === "TRAINING_BLOCKS" && clickedBlockData && (
-               <ZoomToFeedback guessBlock={clickedBlockData} targetBlock={blocks.find(b => b.block === currentQuestion.block && b.street === currentQuestion.street)} mode={appMode} />
-            )}
-
-            {/* TRAINING VISUALS: BLOCKS */}
-            {appMode === "TRAINING_BLOCKS" && currentQuestion && blocks && blocks.length > 0 && 
-              blocks.map((block, i) => (
-                  <Polyline 
-                      key={`${block.street}-${block.block}-${i}`} 
-                      positions={block.coordinates} 
-                      eventHandlers={{ 
-                          click: (e) => { L.DomEvent.stopPropagation(e); handleBlockClick(block); },
-                          mouseover: (e) => { 
-                              if (!feedback) {
-                                  e.target.setStyle({ color: "#f59e0b", weight: 10, opacity: 1 });
-                                  e.target.bringToFront();
-                              }
-                          },
-                          mouseout: (e) => { 
-                              e.target.setStyle(getBlockStyle(block)); 
-                          }
-                      }} 
-                      pathOptions={getBlockStyle(block)}
-                  >
-                      <Tooltip sticky direction="top" className="font-bold text-xs bg-slate-900 text-white border-0">
-                          {feedback ? `${block.block} ${block.street}` : "Block ???"}
-                      </Tooltip>
-                  </Polyline>
-            ))}
-
-            {/* TRAINING VISUALS: PINS */}
-            {(appMode === "TRAINING_INTERSECTIONS" || appMode === "TRAINING_ADDRESSES") && userGuess && (
-               <>
-                  <CircleMarker center={userGuess} radius={6} pathOptions={{ color: "white", fillColor: feedback === "PERFECT" ? "#22c55e" : "#ef4444", fillOpacity: 1, weight: 2 }} />
-                  {feedback !== "PERFECT" && (
-                      <>
-                          <CircleMarker center={[currentQuestion.lat, currentQuestion.lng]} radius={6} pathOptions={{ color: "white", fillColor: "#22c55e", fillOpacity: 1, weight: 2 }} />
-                          <Polyline positions={[userGuess, [currentQuestion.lat, currentQuestion.lng]]} pathOptions={{ color: "#ef4444", dashArray: '10, 10', weight: 2, opacity: 0.8 }} />
-                      </>
-                  )}
-               </>
-            )}
-
             {/* ROAD CLOSURES LAYER */}
             {showRoadClosures && activeClosures.map((closure, i) => (
               <RoadClosureMarker 

@@ -76,10 +76,6 @@ export function Header({
               <option value="EXPLORE">🧭 Notifications / Explore</option>
               <option value="KIOSK_VIEW">🖥️ KIOSK: IN-STATION MODE</option>
               <option value="DRIVER_SETUP">📱 MOBILE: DRIVER PUSH SETUP</option>
-              <option value="TRAINING_ZONES">🎓 TRAINING: EMERGENCY ZONES</option>
-              <option value="TRAINING_INTERSECTIONS">🎓 TRAINING: STREET INTERSECTIONS</option>
-              <option value="TRAINING_BLOCKS">🎓 TRAINING: BLOCK RANGES</option>
-              <option value="TRAINING_ADDRESSES">🎓 TRAINING: PARCEL ADDRESSES</option>
               <option value="ADMIN_DISPATCHES">🛡️ ADMIN: DISPATCH REVIEW</option>
             </select>
           </div>
@@ -392,14 +388,7 @@ export function LeftSidebar({
   setShowNext24h,
   showNext7d = false,
   setShowNext7d,
-  // Training HUD
-  score,
-  currentQuestion,
-  feedback,
-  distanceOff,
-  clickedBlockData,
-  onNext,
-  onZoneGuess,
+
   map
 }) {
   const isExplore = appMode === "EXPLORE";
@@ -550,24 +539,13 @@ export function LeftSidebar({
              <div className="w-80 h-full flex flex-col overflow-y-auto overflow-x-hidden">
                 {/* Header Title */}
                 <div className="bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0">
-                {isExplore ? (
-                   <>
-                     <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO SYSTEM</div>
-                     <div className="text-lg text-emerald-500 font-extrabold uppercase font-sans tracking-wide">MAP CONTROLS</div>
-                   </>
-                ) : (
-                   <>
-                     <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO TRAINING</div>
-                     <div className="text-lg text-sky-400 font-extrabold uppercase font-sans tracking-wide">ACTIVE SESSION</div>
-                   </>
-                )}
-             </div>
+                   <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO SYSTEM</div>
+                   <div className="text-lg text-emerald-500 font-extrabold uppercase font-sans tracking-wide">{isExplore ? "MAP CONTROLS" : "ACTIVE SESSION"}</div>
+                </div>
 
              {/* Controls / Information Area */}
              <div className="p-5 flex-grow flex flex-col gap-6 overflow-y-auto">
-                {isExplore ? (
-                  <>
-                     {/* Basemap View Switcher (Explore Mode Only) */}
+                     {/* Basemap View Switcher */}
                      <div className="flex flex-col gap-2 bg-slate-950 p-3 border border-slate-800 rounded-xl flex-shrink-0">
                         <div className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5 flex justify-between items-center">
                            <span>BASEMAP VIEW</span>
@@ -850,203 +828,14 @@ export function LeftSidebar({
                                    <span>Lane Restrictions & Construction</span>
                                 </span>
                              </label>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-slate-850/80">
-                             <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wider">📅 Closure Timeframe Window</span>
-                             <div className="flex flex-col gap-1.5">
-                                <label className="flex items-center gap-2 text-xs text-emerald-400 font-bold cursor-pointer">
-                                   <input 
-                                      type="checkbox" 
-                                      checked={showActiveNow} 
-                                      onChange={(e) => setShowActiveNow && setShowActiveNow(e.target.checked)}
-                                      className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" 
-                                   />
-                                   <span>Active Now</span>
-                                </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer">
-                                   <input 
-                                      type="checkbox" 
-                                      checked={showNext24h} 
-                                      onChange={(e) => setShowNext24h && setShowNext24h(e.target.checked)}
-                                      className="rounded border-slate-850 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" 
-                                   />
-                                   <span>Next 24 Hours</span>
-                                </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer">
-                                   <input 
-                                      type="checkbox" 
-                                      checked={showNext7d} 
-                                      onChange={(e) => setShowNext7d && setShowNext7d(e.target.checked)}
-                                      className="rounded border-slate-850 bg-slate-950 text-purple-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" 
-                                   />
-                                   <span>Next 7 Days (Planned)</span>
-                                </label>
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-
-                    {/* 4. Map Legend */}
-                    <div className="flex flex-col gap-2 mt-auto border-t border-slate-855 pt-4">
-                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono mb-1">MAP LEGEND</h3>
-                       <div className="flex flex-col gap-2 font-mono text-[9px] text-slate-400">
-                          <div className="flex items-center gap-2.5">
-                             <img src={`${import.meta.env.BASE_URL || '/'}icons/fire_hall.png`} className="w-4 h-4 rounded-full object-cover shadow" alt="Fire Hall" />
-                             <span className="text-slate-300 font-sans text-xs">Coquitlam Fire Halls</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <img src={`${import.meta.env.BASE_URL || '/'}icons/school.svg`} className="w-4 h-4 rounded-full object-cover shadow" alt="School" />
-                             <span className="text-slate-300 font-sans text-xs">Schools & Zones</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <img src={`${import.meta.env.BASE_URL || '/'}icons/railroad_crossing.png`} className="w-4 h-4 rounded-full object-cover shadow" alt="Railroad Crossing" />
-                             <span className="text-slate-300 font-sans text-xs">CP Rail Crossings</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <div className="flex items-center gap-1">
-                               <span className="w-2.5 h-2.5 rounded-full bg-sky-400 border border-slate-900 shadow-sm" title="Class AA (1500+ GPM)"></span>
-                               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow-sm" title="Class A (1000-1499 GPM)"></span>
-                               <span className="w-2.5 h-2.5 rounded-full bg-orange-400 border border-slate-900 shadow-sm" title="Class B (500-999 GPM)"></span>
-                               <span className="w-2.5 h-2.5 rounded-full bg-red-400 border border-slate-900 shadow-sm" title="Class C (<500 GPM)"></span>
-                             </div>
-                             <span className="text-slate-300 font-sans text-xs">Hydrants (NFPA 291 Ratings)</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 mt-1 pt-1 border-t border-slate-850">
-                             <div className="w-5 border-b-2 border-dashed border-red-500"></div>
-                             <span className="text-slate-400 font-sans text-[11px]">Full Road Closure</span>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                             <div className="w-5 border-b-2 border-dashed border-yellow-500"></div>
-                             <span className="text-slate-400 font-sans text-[11px]">Lane Restrictions</span>
-                          </div>
-                       </div>
-                    </div>
-                  </>
-                 ) : loadingTraining ? (
-                   <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-                      <span className="flex h-5 w-5 relative">
-                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                         <span className="relative inline-flex rounded-full h-5 w-5 bg-sky-500"></span>
-                      </span>
-                      <span className="text-[10px] font-bold font-mono tracking-widest animate-pulse">LOADING TRAINING DATA...</span>
-                   </div>
-                 ) : (
-                  <>
-                    {/* Training Details Panel */}
-                    <div className="flex flex-col gap-4 text-center">
-                       {appMode === "TRAINING_ZONES" && currentQuestion && (
-                         <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl animate-in fade-in">
-                           <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest">Target Zone</div>
-                           <div className="text-3xl text-sky-400 font-extrabold mt-1">Zone {currentQuestion.zone_id}</div>
-                         </div>
-                       )}
-                       {appMode === "TRAINING_INTERSECTIONS" && currentQuestion && (
-                         <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl text-left animate-in fade-in">
-                           <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1 text-center">Locate Intersection</div>
-                           <div className="text-sm text-white font-black text-center mt-1 leading-snug">{currentQuestion.name}</div>
-                         </div>
-                       )}
-                       {appMode === "TRAINING_BLOCKS" && currentQuestion && (
-                         <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl animate-in fade-in">
-                           <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest">Target Block Range</div>
-                           <div className="text-3xl text-amber-500 font-black mt-1">{currentQuestion.block}</div>
-                           <div className="text-sm text-white font-bold mt-1 font-mono">{currentQuestion.street}</div>
-                         </div>
-                       )}
-                       {appMode === "TRAINING_ADDRESSES" && currentQuestion && (
-                         <div className="bg-slate-950 p-4 border border-slate-850 rounded-xl text-left animate-in fade-in">
-                           <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1 text-center">Find Target Address</div>
-                           <div className="text-base text-white font-black text-center mt-1 leading-snug">{currentQuestion.address}</div>
-                         </div>
-                       )}
-                    </div>
-
-                    {/* Active Option Inputs / Buttons */}
-                    <div className="flex-grow flex flex-col justify-center gap-3">
-                       {appMode === "TRAINING_ZONES" && (
-                           <div className="flex flex-col gap-2">
-                               {Object.keys(UNIT_COLORS).filter(u => u !== "UNKNOWN").map((unit) => (
-                                   <button 
-                                     key={unit} 
-                                     onClick={() => onZoneGuess(unit)} 
-                                     disabled={feedback !== null} 
-                                     className={`w-full py-3 px-4 rounded-xl font-bold text-left flex justify-between items-center transition-all border-l-4 shadow-sm ${
-                                       feedback === "WRONG" && unit === currentQuestion.unit_id 
-                                         ? "bg-green-600 text-white border-green-300 animate-pulse" 
-                                         : "bg-slate-950 border-slate-850 text-slate-300 hover:bg-slate-800 hover:text-white"
-                                     }`}
-                                   >
-                                       <span>{unit} Response</span>
-                                       <span 
-                                         className="w-3 h-3 rounded-full" 
-                                         style={{ backgroundColor: UNIT_COLORS[unit] }}
-                                       ></span>
-                                   </button>
-                               ))}
                            </div>
-                       )}
-
-                       {/* Score HUD */}
-                       <div className="mt-4 text-center">
-                          <span className="text-slate-500 text-[10px] font-mono uppercase tracking-wider">Session Score</span>
-                          <div className="text-2xl font-black text-white font-mono mt-0.5">{score} pts</div>
-                       </div>
-                    </div>
-
-                    {/* Response Feedback Details */}
-                    {feedback ? (
-                        <div className="text-center bg-slate-950 p-4 border border-slate-850 rounded-xl animate-in fade-in">
-                            <div className={`text-3xl font-extrabold mb-1.5 ${
-                              feedback === "PERFECT" || feedback === "CORRECT" 
-                                ? "text-emerald-400" 
-                                : "text-rose-400"
-                            }`}>
-                                {feedback === "PERFECT" || feedback === "CORRECT" ? "PERFECT!" : "WRONG"}
-                            </div>
-                            
-                            {feedback !== "PERFECT" && feedback !== "CORRECT" && (
-                               <div className="text-xs text-slate-400 font-mono mt-1">
-                                  Error Distance: <span className="text-white font-bold">{distanceOff}m</span>
-                               </div>
-                            )}
-
-                            {appMode === "TRAINING_BLOCKS" && feedback === "WRONG" && clickedBlockData && (
-                                <div className="text-rose-400 font-semibold text-xs mt-1 border-t border-slate-900 pt-1.5">
-                                  Selected: {clickedBlockData.block} {clickedBlockData.street}
-                                </div>
-                            )}
-
-                            <button 
-                              onClick={onNext} 
-                              className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3 px-6 rounded-xl w-full shadow-lg mt-4 transition-all duration-150"
-                            >
-                              NEXT &rarr;
-                            </button>
                         </div>
-                    ) : (
-                        <div className="text-center text-slate-500 text-[10px] italic border-t border-slate-850/50 pt-4">
-                            {appMode === "TRAINING_INTERSECTIONS" && "Tap matching intersection point on the map..."}
-                            {appMode === "TRAINING_BLOCKS" && "Click correct highlighted road segment..."}
-                            {appMode === "TRAINING_ADDRESSES" && "Zoom in and tap correct parcel boundary..."}
-                        </div>
-                    )}
+                     </div>
+                  </div>
+               </div>
+           )}
+        </div>
 
-                    {/* ZOOM UTILITIES */}
-                    {appMode === "TRAINING_ADDRESSES" && !feedback && currentQuestion && (
-                        <button 
-                          onClick={() => map.setView([currentQuestion.lat, currentQuestion.lng], 20, { animate: true })} 
-                          className="bg-slate-950 hover:bg-slate-850 text-[10px] text-white font-bold py-2.5 px-4 rounded-lg w-full border border-slate-800 flex items-center justify-center gap-1.5 transition-all mt-auto"
-                        >
-                          🔍 ZOOM TO PARCEL
-                        </button>
-                    )}
-                  </>
-                )}
-             </div>
-          </div>
-          )}
-       </div>
 
        {/* Floating Toggle Tab */}
        <button 

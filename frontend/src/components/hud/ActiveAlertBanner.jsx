@@ -36,7 +36,8 @@ export const getShortCallsign = (unitStr) => {
 };
 
 export const formatUnitEtaDisplay = (etaMin) => {
-  if (etaMin == null || isNaN(etaMin)) return '02:30';
+  // No fabricated placeholder: an unknown ETA renders as '--:--', never a plausible number.
+  if (etaMin == null || isNaN(etaMin)) return '--:--';
   const totalSec = Math.round(etaMin * 60);
   const mins = Math.floor(totalSec / 60);
   const secs = totalSec % 60;
@@ -54,13 +55,13 @@ export default function ActiveAlertBanner({
   displayAddress = '',
   displayIncident = '',
   isEmergency = true,
-  isSimulationMode = false,
+  isReviewMode = false,
   isRecentlyUpdated = false,
   isTvMode = false,
   elapsedFormatted = '00:00',
   timeoutFormatted = '03:00',
   onDismiss = null,
-  onExitSimulation = null,
+  onExitReview = null,
   onToggleTvMode = null,
   onOpenPrePlan = null,
 }) {
@@ -77,10 +78,10 @@ export default function ActiveAlertBanner({
             {isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'}
           </div>
 
-          {(isSimulationMode || activeCall?.isSimulated) && (
+          {(isReviewMode || activeCall?.isReview) && (
             <div className="bg-purple-950/90 border border-purple-500/80 text-purple-200 px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold flex items-center gap-1 shadow animate-pulse">
               <span>🧪</span>
-              <span>SIMULATED / REVIEW</span>
+              <span>REVIEW REPLAY</span>
             </div>
           )}
 
@@ -192,15 +193,15 @@ export default function ActiveAlertBanner({
           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Elapsed Time</div>
           <div className="text-xl font-black text-emerald-400">{elapsedFormatted}</div>
           <div className="text-[9px] text-slate-500">
-            {(isSimulationMode || activeCall?.isSimulated) ? '⏸️ Auto-Dismiss Paused' : `Auto-Dismiss in ${timeoutFormatted}`}
+            {(isReviewMode || activeCall?.isReview) ? '⏸️ Auto-Dismiss Paused' : `Auto-Dismiss in ${timeoutFormatted}`}
           </div>
         </div>
 
-        {(isSimulationMode || activeCall?.isSimulated) ? (
-          onExitSimulation && (
+        {(isReviewMode || activeCall?.isReview) ? (
+          onExitReview && (
             <button
               type="button"
-              onClick={onExitSimulation}
+              onClick={onExitReview}
               className="bg-purple-700 hover:bg-purple-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow cursor-pointer border border-purple-500 flex items-center gap-1 font-mono"
             >
               <span>🚪</span>

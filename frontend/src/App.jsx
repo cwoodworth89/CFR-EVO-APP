@@ -19,54 +19,49 @@ function App() {
   const [explicitKioskMode, setExplicitKioskMode] = useState(false);
   const [returnMode, setReturnMode] = useState('EXPLORE');
 
-  const shouldRenderKiosk = explicitKioskMode || !!kioskState.activeCall || kioskState.isSimulationMode;
+  const shouldRenderKiosk = explicitKioskMode || !!kioskState.activeCall || kioskState.isReviewMode;
 
-  const handleSimulateCall = (call) => {
+  // Replay a real historical dispatch in Kiosk view exactly as it was received.
+  // No data is invented here: every field is passed through from the database record,
+  // and unresolved coordinates stay null so the kiosk renders the Tier 1 warning
+  // instead of routing to a guessed location (see CLAUDE.md §5).
+  const handleReviewCall = (call) => {
     if (!call) return;
 
     // Track that we originated from Admin Dispatch Review panel
     setReturnMode('ADMIN_DISPATCHES');
 
-    const targetAddr = (call.verified_address || call.target?.address || call.address || '').toUpperCase();
-    let fallbackLat = 49.2838;
-    let fallbackLng = -122.7907;
-
-    if (targetAddr.includes('CHRISTMAS') && targetAddr.includes('WESTWOOD')) {
-      fallbackLat = 49.2783;
-      fallbackLng = -122.7935;
-    }
-
     const units = (call.verified_units && call.verified_units.length > 0)
       ? call.verified_units
       : (call.responding_units && call.responding_units.length > 0 ? call.responding_units : []);
 
-    const mockCall = {
-      id: call.id || 'sim-' + Date.now(),
-      dispatch_id: call.dispatch_id || ('DISP-SIM-' + Date.now()),
-      address: call.verified_address || call.target?.address || call.address || 'Simulated Address',
+    const reviewCall = {
+      ...call,
+      id: call.id,
+      dispatch_id: call.dispatch_id,
+      address: call.verified_address || call.target?.address || call.address || null,
       subaddress: call.target?.subaddress || '',
       intersection: call.target?.intersection || '',
-      lat: call.target?.lat ?? call.lat ?? fallbackLat,
-      lng: call.target?.lng ?? call.lng ?? fallbackLng,
+      lat: call.target?.lat ?? call.lat ?? null,
+      lng: call.target?.lng ?? call.lng ?? null,
       rings: call.target?.rings || call.rings || [],
-      incident_type: call.verified_incident || call.incident_type || 'SIMULATED DISPATCH',
+      incident_type: call.verified_incident || call.incident_type || null,
       responding_units: units,
-      priority_code: call.priority_code || 1,
+      priority_code: call.priority_code,
       verify_location: call.verify_location ?? (call.confidence_score ? call.confidence_score >= 90 : true),
       map_grid: call.target?.verified_map_grid || call.target?.map_grid || '',
-      radio_channel: call.target?.verified_talkgroup || call.target?.radio_channel || '10 Combined Response',
+      radio_channel: call.target?.verified_talkgroup || call.target?.radio_channel || '',
       tone_name: call.target?.tone_name || '',
-      isSimulated: true,
-      created_at: new Date().toISOString()
+      isReview: true
     };
 
-    kioskState.triggerSimulationCall(mockCall);
+    kioskState.triggerReviewCall(reviewCall);
   };
 
   const extendedKioskState = {
     ...kioskState,
-    exitSimulation: () => {
-      kioskState.exitSimulation();
+    exitReview: () => {
+      kioskState.exitReview();
       setExplicitKioskMode(false);
     }
   };
@@ -79,7 +74,7 @@ function App() {
         ) : (
           <MapBoard
             initialMode={returnMode}
-            onSimulateCall={handleSimulateCall}
+            onReviewCall={handleReviewCall}
             onLaunchKiosk={() => {
               setReturnMode('EXPLORE');
               setExplicitKioskMode(true);

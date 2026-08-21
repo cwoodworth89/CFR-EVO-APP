@@ -44,7 +44,8 @@ const getShortCallsign = (unitStr) => {
 };
 
 const formatUnitEtaDisplay = (etaMin) => {
-  if (etaMin == null || isNaN(etaMin)) return '02:30';
+  // No fabricated placeholder: an unknown ETA renders as '--:--', never a plausible number.
+  if (etaMin == null || isNaN(etaMin)) return '--:--';
   const totalSec = Math.round(etaMin * 60);
   const mins = Math.floor(totalSec / 60);
   const secs = totalSec % 60;
@@ -115,7 +116,7 @@ export default function KioskView({ kioskState }) {
   const {
     activeCall,
     queuedCalls,
-    isSimulationMode,
+    isReviewMode,
     isTvMode,
     isRecentlyUpdated,
     elapsedFormatted,
@@ -123,7 +124,7 @@ export default function KioskView({ kioskState }) {
     resetTimeoutClock,
     advanceToNextCall,
     dismissActiveCall,
-    exitSimulation,
+    exitReview,
     toggleTvMode,
   } = kioskState;
 
@@ -166,7 +167,7 @@ export default function KioskView({ kioskState }) {
           </div>
 
           <button
-            onClick={exitSimulation}
+            onClick={exitReview}
             className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-semibold text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
           >
             <span>🚪</span>
@@ -216,11 +217,23 @@ export default function KioskView({ kioskState }) {
 
   let unitList = extractCallUnits(activeCall);
 
-  const destLat = activeCall?.lat ?? activeCall?.target?.lat ?? 49.2838;
-  const destLng = activeCall?.lng ?? activeCall?.target?.lng ?? -122.7932;
+  // Tier 1 (CLAUDE.md §5): coordinates are never guessed. If the geocoder did not
+  // resolve a location, destLat/destLng stay null, all routing output is suppressed,
+  // and the unresolved-location warning is shown instead.
+  const rawDestLat = activeCall?.lat ?? activeCall?.target?.lat ?? null;
+  const rawDestLng = activeCall?.lng ?? activeCall?.target?.lng ?? null;
+
+  const hasCoords = rawDestLat != null && rawDestLng != null &&
+    !isNaN(Number(rawDestLat)) && !isNaN(Number(rawDestLng)) &&
+    (Number(rawDestLat) !== 0 || Number(rawDestLng) !== 0);
+
+  const destLat = hasCoords ? Number(rawDestLat) : null;
+  const destLng = hasCoords ? Number(rawDestLng) : null;
 
   const persistedMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics;
-  const unitEtas = (persistedMetrics && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
+  const unitEtas = !hasCoords
+    ? [] // No location data — units render as plain badges with no ETA or distance
+    : (persistedMetrics && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
     ? persistedMetrics.map((m) => ({
         unit: m.unit,
         hall: `Hall ${m.origin_hall || (m.unit.match(/\d+/) ? m.unit.match(/\d+/)[0] : '1')}`,
@@ -273,6 +286,17 @@ export default function KioskView({ kioskState }) {
         </div>
       )}
 
+      {/* Tier 1 Unresolved-Location Warning (CLAUDE.md §5) — all call details still
+          display normally below; only routing/ETA output is withheld. */}
+      {!hasCoords && (
+        <div className="bg-amber-500 text-slate-950 font-bold px-6 py-2 flex items-center gap-3 border-b border-amber-600 shadow-xl z-50 flex-shrink-0 animate-pulse">
+          <span className="text-lg">⚠️</span>
+          <span className="text-sm tracking-wide uppercase font-mono">
+            Location Unresolved — Coordinates Awaiting Operator Verification • Routing &amp; ETAs Unavailable
+          </span>
+        </div>
+      )}
+
       {/* Modular High-Visibility Active Alert Banner Header */}
       <ActiveAlertBanner
         activeCall={activeCall}
@@ -283,13 +307,13 @@ export default function KioskView({ kioskState }) {
         displayAddress={displayAddress}
         displayIncident={displayIncident}
         isEmergency={isEmergency}
-        isSimulationMode={isSimulationMode}
+        isReviewMode={isReviewMode}
         isRecentlyUpdated={isRecentlyUpdated}
         isTvMode={isTvMode}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
         onDismiss={dismissActiveCall}
-        onExitSimulation={exitSimulation}
+        onExitReview={exitReview}
         onToggleTvMode={toggleTvMode}
         onOpenPrePlan={() => setShowPrePlanModal(true)}
       />

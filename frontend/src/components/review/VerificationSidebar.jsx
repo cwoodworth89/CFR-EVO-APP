@@ -53,7 +53,7 @@ export default function VerificationSidebar({
   onSubmitReview,
   onPrefillDefaults,
   onPrefillField,
-  onSimulateCall,
+  onReviewCall,
   formContainerRef: externalFormContainerRef,
 }) {
   const localFormContainerRef = useRef(null);
@@ -104,9 +104,6 @@ export default function VerificationSidebar({
     }
   };
 
-  const destLat = selectedCall.target?.lat ?? selectedCall.lat ?? 49.2838;
-  const destLng = selectedCall.target?.lng ?? selectedCall.lng ?? -122.7932;
-  const rings = selectedCall.target?.rings || selectedCall.rings || null;
   const displayAddress = selectedCall.target?.address || selectedCall.address || 'Target Location';
 
   return (
@@ -134,14 +131,14 @@ export default function VerificationSidebar({
             </div>
           </div>
 
-          {typeof onSimulateCall === 'function' && (
+          {typeof onReviewCall === 'function' && (
             <button
               type="button"
-              onClick={() => onSimulateCall(selectedCall)}
+              onClick={() => onReviewCall(selectedCall)}
               className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 shadow border border-amber-500/40 cursor-pointer"
-              title="Simulate this dispatch call in Kiosk Mode"
+              title="Replay this dispatch in Kiosk Mode as it was received"
             >
-              🚀 SIMULATE
+              ▶️ REVIEW
             </button>
           )}
         </div>

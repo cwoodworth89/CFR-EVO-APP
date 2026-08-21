@@ -162,7 +162,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     if (typeof units === 'string' && units.trim().length > 0) {
       return units.split(',').map((u) => u.trim()).filter(Boolean);
     }
-    return ['SQ1', 'E1', 'L1'];
+    // No units in the dispatch record: route nothing rather than inventing apparatus.
+    return [];
   }, [activeCall]);
 
   const routeMetrics = useMemo(() => {

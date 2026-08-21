@@ -315,7 +315,7 @@ function getAlphaSegment(rings, referencePt) {
   return alphaSeg;
 }
 
-export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = "EXPLORE" }) {
+export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "EXPLORE" }) {
   const [map, setMap] = useState(null);
 
   // Safe dynamic compile-time stamp
@@ -376,7 +376,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
     
     const dispatchedUnits = activeDispatch?.units 
       ? activeDispatch.units.split(',').map(u => u.trim()) 
-      : ['SQ1', 'E1', 'L1'];
+      : []; // No units on the dispatch: show nothing rather than inventing apparatus.
 
     return calculateEVORouteMetrics({
       originCoords: origin,
@@ -1166,7 +1166,7 @@ export default function MapBoard({ onSimulateCall, onLaunchKiosk, initialMode = 
         {appMode === "ADMIN_DISPATCHES" && (
           <DispatchReview 
             onClose={() => startMode("EXPLORE")} 
-            onSimulateCall={onSimulateCall}
+            onReviewCall={onReviewCall}
           />
         )}
 

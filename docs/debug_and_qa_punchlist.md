@@ -3,7 +3,7 @@
 This document tracks identified bugs, routing anomalies, edge cases, and feature refinements to investigate and resolve during the final bug squashing and testing phase.
 
 > [!NOTE]
-> **Status key (as of 2026-08-20)**: Items below marked ✅ were reported fixed by a prior Gemini/Antigravity agent session but have **not** been independently re-verified against the current code by Claude Code — treat as "likely fixed, spot-check before relying on it." Items marked ⚠️ are confirmed still open.
+> **Status key (as of 2026-08-20)**: Items marked ✅ have been independently verified against the current working tree. Items marked ⚠️ are confirmed still open.
 
 ---
 
@@ -30,7 +30,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ---
 
 ### 2. Intersection Geocoding & Hardcoded Port Moody Fallback (`DISP-2026-F1F345`)
-> **Status**: ✅ Reported fixed — Port Moody fallback replaced with Coquitlam City Center coordinates.
+> **Status**: ✅ **Resolved (2026-08-20).** The prior "fix" only swapped the Port Moody coordinates for Coquitlam City Centre — still a silent guess, and a more dangerous one because it renders as a fully valid in-coverage dispatch. All hardcoded coordinate fallbacks have now been removed frontend-wide; unresolved coordinates stay `null` and surface the CLAUDE.md §5 Tier 1 warning with routing suppressed.
 * **Incident**: `CHRISTMAS WAY AND WESTWOOD ST` (Grid 68, Motor Vehicle Incident).
 * **Observed Problem**:
   * The call routed from Hall 1 all the way out into **Port Moody** (`49.27305, -122.88452`).
@@ -46,8 +46,8 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 
 ---
 
-### 3. Missing `responding_units` in Simulated Dispatches
-> **Status**: ✅ Reported fixed in `App.jsx`.
+### 3. Missing `responding_units` in Replayed Dispatches
+> **Status**: ✅ **Confirmed fixed** — independently verified in `App.jsx`; `verified_units` → `responding_units` → `[]` resolution is passed through explicitly. The `['SQ1','E1','L1']` invented-apparatus fallbacks have additionally been removed from `EVORoutingEngine.js`, `RouteOverviewPanel.jsx`, and `MapBoard.jsx`.
 * **Observed Problem**: Simulated calls in Kiosk view display `SQ1, E1, L1` regardless of what units were dispatched (e.g. `DISP-2026-F1F345` had `E1, E2, R2, C8`).
 * **Root Cause**: `handleSimulateCall` in `frontend/src/App.jsx` omitted `responding_units: call.verified_units || call.responding_units || []` when building `mockCall`, causing `EVORoutingEngine.js` to trigger its `['SQ1', 'E1', 'L1']` fallback.
 * **Fix**: Pass `responding_units` explicitly in `App.jsx`.

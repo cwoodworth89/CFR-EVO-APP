@@ -186,7 +186,7 @@ function ActiveDispatchPanel({ activeDispatch, setActiveDispatch, nearestHydrant
           : "bg-gradient-to-r from-red-600 to-orange-600 border-red-700"
       }`}>
         <span className="text-[10px] text-white/95 font-black uppercase tracking-widest font-mono">
-          {activeDispatch.is_test ? "⚠️ *TEST* DISPATCH SIMULATION ACTIVE ⚠️" : "🚨 DISPATCH OVERRIDE ACTIVE 🚨"}
+          {activeDispatch.is_test ? "⚠️ *TEST* DISPATCH ACTIVE ⚠️" : "🚨 DISPATCH OVERRIDE ACTIVE 🚨"}
         </span>
         <span className="text-xs text-white/80 font-bold tracking-wider font-mono">
           {activeDispatch.is_test ? "SYSTEM QA / TRAINING DRILL" : "STATION KIOSK ALERT"}

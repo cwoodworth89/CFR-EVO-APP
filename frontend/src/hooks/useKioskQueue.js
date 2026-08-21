@@ -6,7 +6,7 @@ const DEFAULT_TIMEOUT_SECONDS = 300; // 5 minutes
 export function useKioskQueue() {
   const [activeCall, setActiveCall] = useState(null);
   const [queuedCalls, setQueuedCalls] = useState([]);
-  const [isSimulationMode, setIsSimulationMode] = useState(false);
+  const [isReviewMode, setIsReviewMode] = useState(false);
   const [isTvMode, setIsTvMode] = useState(false);
   const [isRecentlyUpdated, setIsRecentlyUpdated] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -61,14 +61,14 @@ export function useKioskQueue() {
 
   // Handle incoming INSERT dispatch event
   const handleInsert = useCallback((newCall) => {
-    // If this is a real live dispatch, exit simulation/review mode immediately
-    if (!newCall?.isSimulated) {
-      setIsSimulationMode(false);
+    // If this is a real live dispatch, exit review-replay mode immediately
+    if (!newCall?.isReview) {
+      setIsReviewMode(false);
     }
 
     setActiveCall((current) => {
-      // If idle or currently showing a simulated/review call, real call takes over immediately!
-      if (!current || (current.isSimulated && !newCall?.isSimulated)) {
+      // If idle or currently replaying a historical review call, a real call takes over immediately!
+      if (!current || (current.isReview && !newCall?.isReview)) {
         resetTimeoutClock();
         setElapsedSeconds(0);
         return newCall;
@@ -123,9 +123,9 @@ export function useKioskQueue() {
     };
   }, [activeCall]);
 
-  // 5-Minute Auto-Dismiss Countdown (Disabled during Review/Simulation Mode)
+  // 5-Minute Auto-Dismiss Countdown (Disabled during historical Review replay)
   useEffect(() => {
-    if (!activeCall || isTimerPaused || isSimulationMode || activeCall?.isSimulated) return;
+    if (!activeCall || isTimerPaused || isReviewMode || activeCall?.isReview) return;
 
     timeoutTimerRef.current = setInterval(() => {
       setTimeoutSecondsLeft((prev) => {
@@ -141,7 +141,7 @@ export function useKioskQueue() {
     return () => {
       if (timeoutTimerRef.current) clearInterval(timeoutTimerRef.current);
     };
-  }, [activeCall, isTimerPaused, isSimulationMode]);
+  }, [activeCall, isTimerPaused, isReviewMode]);
 
   // Advance to next call in queue
   const advanceToNextCall = useCallback(() => {
@@ -170,18 +170,14 @@ export function useKioskQueue() {
     });
   }, [activateCall]);
 
-  // Admin Simulation Actions
-  const triggerSimulationCall = useCallback((mockCall) => {
-    setIsSimulationMode(true);
-    handleInsert(mockCall);
+  // Historical Dispatch Review Replay (Admin Dispatch Review panel)
+  const triggerReviewCall = useCallback((reviewCall) => {
+    setIsReviewMode(true);
+    handleInsert(reviewCall);
   }, [handleInsert]);
 
-  const triggerSimulationUpdate = useCallback((updatedMockCall) => {
-    handleUpdate(updatedMockCall);
-  }, [handleUpdate]);
-
-  const exitSimulation = useCallback(() => {
-    setIsSimulationMode(false);
+  const exitReview = useCallback(() => {
+    setIsReviewMode(false);
     setActiveCall(null);
     setQueuedCalls([]);
   }, []);
@@ -204,7 +200,7 @@ export function useKioskQueue() {
   return {
     activeCall,
     queuedCalls,
-    isSimulationMode,
+    isReviewMode,
     isTvMode,
     isRecentlyUpdated,
     elapsedFormatted: formatTime(elapsedSeconds),
@@ -213,9 +209,8 @@ export function useKioskQueue() {
     resetTimeoutClock,
     advanceToNextCall,
     dismissActiveCall,
-    triggerSimulationCall,
-    triggerSimulationUpdate,
-    exitSimulation,
+    triggerReviewCall,
+    exitReview,
     toggleTvMode,
   };
 }

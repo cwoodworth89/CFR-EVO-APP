@@ -140,7 +140,8 @@ export function calculateEVORouteMetrics({
   }
 
   // If no units provided, default to Engine + Ladder + Squad benchmark
-  const unitsToProcess = dispatchedUnits.length > 0 ? dispatchedUnits : ['SQ1', 'E1', 'L1'];
+  // Never substitute a default apparatus list — an empty dispatch yields no route metrics.
+  const unitsToProcess = dispatchedUnits;
 
   // Process ETAs for each dispatched unit
   const unitResults = unitsToProcess.map(unitStr => {

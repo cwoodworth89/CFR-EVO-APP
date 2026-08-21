@@ -86,7 +86,7 @@ export default function ReviewTable({
   dbStatus = 'connected',
   dbError = null,
   onRetryFetch,
-  onSimulateCall,
+  onReviewCall,
   onDeleteCall,
 }) {
   return (
@@ -328,14 +328,14 @@ export default function ReviewTable({
                       </td>
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1.5 justify-end items-center">
-                          {typeof onSimulateCall === 'function' && (
+                          {typeof onReviewCall === 'function' && (
                             <button
                               type="button"
-                              onClick={() => onSimulateCall(call)}
+                              onClick={() => onReviewCall(call)}
                               className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold px-3 py-1 rounded-lg text-[10px] border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer shadow"
-                              title="Simulate this registered dispatch in Kiosk Mode"
+                              title="Replay this dispatch in Kiosk Mode as it was received"
                             >
-                              🚀 SIMULATE
+                              ▶️ REVIEW
                             </button>
                           )}
 

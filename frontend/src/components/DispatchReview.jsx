@@ -5,7 +5,7 @@ import SystemMetricsPanel from './admin/SystemMetricsPanel';
 import ReviewTable, { getCallTones } from './review/ReviewTable';
 import VerificationSidebar, { toTitleCase } from './review/VerificationSidebar';
 
-export default function DispatchReview({ onClose, onSimulateCall }) {
+export default function DispatchReview({ onClose, onReviewCall }) {
   const [calls, setCalls] = useState([]);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -598,7 +598,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
             dbStatus={dbStatus}
             dbError={dbError}
             onRetryFetch={fetchCalls}
-            onSimulateCall={onSimulateCall}
+            onReviewCall={onReviewCall}
             onDeleteCall={handleDeleteCall}
           />
 
@@ -639,7 +639,7 @@ export default function DispatchReview({ onClose, onSimulateCall }) {
             onSubmitReview={handleSubmitReview}
             onPrefillDefaults={handlePrefillDefaults}
             onPrefillField={handlePrefillField}
-            onSimulateCall={onSimulateCall}
+            onReviewCall={onReviewCall}
             formContainerRef={formContainerRef}
           />
         </div>

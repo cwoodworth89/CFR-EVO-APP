@@ -1,5 +1,6 @@
 -- Initialize CFR Dispatch Local PostgreSQL Database Schema
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- 1. Create live_calls Table
 
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS public.parcels (
     -- From Addresses.shp geometry
     lat DOUBLE PRECISION,                               -- Latitude from shapefile point geometry
     lng DOUBLE PRECISION,                               -- Longitude from shapefile point geometry
+    geom GEOMETRY(Point, 4326),
 
     -- Pre-computed at import (spatial intersection with Emergency_Response_Zones.shp)
     zone_id VARCHAR(16),                                -- Emergency response zone (1–134)
@@ -156,4 +158,106 @@ CREATE INDEX IF NOT EXISTS idx_parcels_unit ON public.parcels (unit) WHERE unit 
 
 -- Municipal zoning
 CREATE INDEX IF NOT EXISTS idx_parcels_zonetype1 ON public.parcels (zonetype1);
+CREATE INDEX IF NOT EXISTS idx_parcels_geom ON public.parcels USING GIST (geom);
+
+-- ============================================================
+-- GIS Data Tables (PostGIS Migration)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.roads (
+    id BIGSERIAL PRIMARY KEY,
+    fullname VARCHAR(255) NOT NULL,
+    roadname VARCHAR(255),
+    roadtype VARCHAR(20),
+    road_class VARCHAR(10),
+    functional_class VARCHAR(10),
+    speed INTEGER,
+    num_lanes INTEGER,
+    truck_route BOOLEAN DEFAULT FALSE,
+    bus_route BOOLEAN DEFAULT FALSE,
+    status VARCHAR(20) DEFAULT 'OPERATING',
+    left_begin INTEGER,
+    left_end INTEGER,
+    right_begin INTEGER,
+    right_end INTEGER,
+    geom GEOMETRY(LineString, 4326),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_roads_fullname ON public.roads (fullname);
+CREATE INDEX IF NOT EXISTS idx_roads_class ON public.roads (road_class);
+CREATE INDEX IF NOT EXISTS idx_roads_geom ON public.roads USING GIST (geom);
+
+CREATE TABLE IF NOT EXISTS public.intersections (
+    id BIGSERIAL PRIMARY KEY,
+    street_a VARCHAR(255) NOT NULL,
+    street_b VARCHAR(255) NOT NULL,
+    intersection_key VARCHAR(511) NOT NULL,
+    lat DOUBLE PRECISION NOT NULL,
+    lng DOUBLE PRECISION NOT NULL,
+    zone_id VARCHAR(16),
+    geom GEOMETRY(Point, 4326),
+    candidate_index INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_intersections_key ON public.intersections (intersection_key);
+CREATE INDEX IF NOT EXISTS idx_intersections_streets ON public.intersections (street_a, street_b);
+CREATE INDEX IF NOT EXISTS idx_intersections_zone ON public.intersections (zone_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intersections_unique ON public.intersections (intersection_key, candidate_index);
+CREATE INDEX IF NOT EXISTS idx_intersections_geom ON public.intersections USING GIST (geom);
+
+CREATE TABLE IF NOT EXISTS public.zones (
+    id BIGSERIAL PRIMARY KEY,
+    map_name VARCHAR(16) NOT NULL UNIQUE,
+    geom GEOMETRY(MultiPolygon, 4326),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_zones_map_name ON public.zones (map_name);
+CREATE INDEX IF NOT EXISTS idx_zones_geom ON public.zones USING GIST (geom);
+
+CREATE TABLE IF NOT EXISTS public.city_boundary (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) DEFAULT 'City of Coquitlam',
+    geom GEOMETRY(MultiPolygon, 4326),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_city_boundary_geom ON public.city_boundary USING GIST (geom);
+
+CREATE TABLE IF NOT EXISTS public.road_names (
+    id BIGSERIAL PRIMARY KEY,
+    road_name VARCHAR(255) NOT NULL UNIQUE,
+    road_name_normalized VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_road_names_normalized ON public.road_names (road_name_normalized);
+
+CREATE TABLE IF NOT EXISTS public.landmarks (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    name_normalized VARCHAR(255),
+    address VARCHAR(255),
+    lat DOUBLE PRECISION NOT NULL,
+    lng DOUBLE PRECISION NOT NULL,
+    geom GEOMETRY(Point, 4326),
+    category VARCHAR(50),
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_landmarks_name ON public.landmarks (name_normalized);
+CREATE INDEX IF NOT EXISTS idx_landmarks_geom ON public.landmarks USING GIST (geom);
+
+CREATE TABLE IF NOT EXISTS public.vocabulary (
+    id BIGSERIAL PRIMARY KEY,
+    category VARCHAR(50) NOT NULL,
+    term VARCHAR(255) NOT NULL,
+    term_normalized VARCHAR(255),
+    sort_order INTEGER DEFAULT 0,
+    source VARCHAR(20) DEFAULT 'import',
+    is_active BOOLEAN DEFAULT TRUE,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_vocab_category ON public.vocabulary (category);
+CREATE INDEX IF NOT EXISTS idx_vocab_term ON public.vocabulary (term_normalized);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vocab_unique ON public.vocabulary (category, term);
 

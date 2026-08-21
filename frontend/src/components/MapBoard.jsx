@@ -383,10 +383,9 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       targetCoords: target,
       dispatchedUnits,
       routeCoordinates,
-      config: routingConfig,
-      timeOfDay: new Date()
+      unitMetrics: activeDispatch?.routing_metrics || []
     });
-  }, [targetAddress, homeHall, routeCoordinates, activeDispatch, routingConfig]);
+  }, [targetAddress, homeHall, routeCoordinates, activeDispatch]);
 
   const [userPanned, setUserPanned] = useState(false);
   const [isOffDefault, setIsOffDefault] = useState(false);

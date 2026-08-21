@@ -684,19 +684,8 @@ export function LeftSidebar({
                                      <span className="text-[8.5px] text-emerald-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
                                         🚒 Dispatched Unit ETAs
                                      </span>
-                                     <span className="text-[8px] text-slate-400 font-mono">EMTRAC Code 3</span>
+                                     <span className="text-[8px] text-slate-400 font-mono">OSRM</span>
                                   </div>
-
-                                  {/* Driver Railroad Warning Badge */}
-                                  {routeMetrics?.railroadWarning && (
-                                     <div className={`p-2 rounded-lg text-[9px] font-mono font-bold leading-snug flex items-center gap-1.5 border ${
-                                        routeMetrics.railroadWarning.type === 'AVOIDED'
-                                          ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-300'
-                                          : 'bg-amber-950/80 border-amber-700/80 text-amber-300'
-                                     }`}>
-                                        {routeMetrics.railroadWarning.badge}
-                                     </div>
-                                  )}
 
                                   {/* Unit List */}
                                   <div className="flex flex-col gap-1.5">
@@ -708,8 +697,8 @@ export function LeftSidebar({
                                               <span className="text-[7.5px] text-slate-400 uppercase font-bold">{u.tierKey}</span>
                                            </div>
                                            <div className="flex items-center gap-2">
-                                              <span className="text-slate-400 text-[10px]">{u.distanceKm} km</span>
-                                              <span className="text-emerald-400 font-black">{u.etaMinutes} min</span>
+                                              <span className="text-slate-400 text-[10px]">{u.distanceKm != null ? `${u.distanceKm} km` : '-- km'}</span>
+                                              <span className="text-emerald-400 font-black">{u.etaMinutes != null ? `${u.etaMinutes} min` : '-- min'}</span>
                                            </div>
                                         </div>
                                      ))}

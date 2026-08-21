@@ -166,14 +166,19 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     return [];
   }, [activeCall]);
 
+  // ETAs come from the backend's persisted OSRM routing_metrics, never from a
+  // client-side estimate.
+  const persistedUnitMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics || [];
+
   const routeMetrics = useMemo(() => {
     if (!hasValidCoords) return null;
     return calculateEVORouteMetrics({
       originCoords: [origin.lat, origin.lng],
       targetCoords: [destLat, destLng],
-      dispatchedUnits: unitsToRoute
+      dispatchedUnits: unitsToRoute,
+      unitMetrics: persistedUnitMetrics
     });
-  }, [origin, destLat, destLng, hasValidCoords, unitsToRoute]);
+  }, [origin, destLat, destLng, hasValidCoords, unitsToRoute, persistedUnitMetrics]);
 
   const handleRecenter = () => {
     setUserPanned(false);
@@ -278,25 +283,13 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         {/* Collapsible Panel Content Body */}
         {isPanelOpen && (
           <div className="p-3 flex flex-col gap-2.5 animate-in fade-in duration-200">
-            {/* Railroad Crossing Warning Badge */}
-            {routeMetrics?.railroadWarning && (
-              <div className={`p-2 rounded-xl text-[9.5px] font-mono font-bold leading-snug flex items-center gap-2 border ${
-                routeMetrics.railroadWarning.type === 'AVOIDED'
-                  ? 'bg-emerald-950/90 border-emerald-700 text-emerald-300'
-                  : 'bg-amber-950/90 border-amber-700 text-amber-300'
-              }`}>
-                <span>⚠️</span>
-                <span>{routeMetrics.railroadWarning.badge}</span>
-              </div>
-            )}
-
             {/* Dispatched Apparatus Unit ETAs List */}
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center px-1">
                 <span className="text-[9px] text-slate-400 uppercase font-mono font-extrabold tracking-wider">
                   Dispatched Apparatus ETAs
                 </span>
-                <span className="text-[8.5px] text-sky-400 font-mono font-bold">EMTRAC Code 3</span>
+                <span className="text-[8.5px] text-sky-400 font-mono font-bold">OSRM</span>
               </div>
 
               {routeMetrics?.units?.map((u, idx) => (
@@ -307,8 +300,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
                     <span className="text-[8px] text-slate-400 uppercase font-extrabold bg-slate-800 px-1.5 py-0.5 rounded border border-slate-750">{u.tierKey}</span>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-slate-400 text-[10.5px]">{u.distanceKm} km</span>
-                    <span className="text-emerald-400 text-xs font-black">{u.etaMinutes} min</span>
+                    <span className="text-slate-400 text-[10.5px]">{u.distanceKm != null ? `${u.distanceKm} km` : '-- km'}</span>
+                    <span className="text-emerald-400 text-xs font-black">{u.etaMinutes != null ? `${u.etaMinutes} min` : '-- min'}</span>
                   </div>
                 </div>
               ))}

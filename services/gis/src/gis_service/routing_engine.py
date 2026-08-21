@@ -39,7 +39,12 @@ FIRE_HALLS: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# 3-Tier Apparatus Physics Profiles
+# 3-Tier Apparatus Physics Profiles.
+#
+# NOT CURRENTLY APPLIED. Routing runs on stock OSRM: distance and duration come
+# straight from the router. This table is retained as the seed data for the
+# planned CFR customized route configuration feature, which will layer apparatus
+# adjustments on top of the OSRM baseline. Do not wire it back in ad hoc.
 APPARATUS_TIERS: Dict[str, Dict[str, Any]] = {
     "light": {
         "key": "LIGHT",
@@ -172,10 +177,16 @@ class EVORoutingEngine:
         return R * c
 
     def _get_osrm_endpoints(self, loc_str: str) -> List[str]:
-        """Constructs prioritized candidate endpoints with continue_straight=true for vehicle forward momentum preservation."""
-        query_params = "overview=full&geometries=geojson&continue_straight=true&steps=true"
-        
-        disable_wan = os.environ.get("DISABLE_WAN_FALLBACK", "false").lower() in ("true", "1", "yes")
+        """Constructs prioritized OSRM endpoints using stock routing parameters.
+
+        No continue_straight override: OSRM's default lets the profile decide, which
+        is correct for point-to-point routing. Forcing it to true forbids U-turns at
+        via points and can introduce large detours on multi-waypoint queries.
+        """
+        query_params = "overview=full&geometries=geojson&steps=true"
+
+        # Offline-first (CLAUDE.md S1): the public OSRM demo server is opt-in only.
+        disable_wan = os.environ.get("DISABLE_WAN_FALLBACK", "true").lower() in ("true", "1", "yes")
 
         candidates = []
         for env_key in ("OSRM_BACKEND_URL", "OSRM_ROUTER_URL", "OSRM_URL"):
@@ -202,10 +213,15 @@ class EVORoutingEngine:
                 endpoints.append(f"{base}/route/v1/driving/{loc_str}?{query_params}")
         return endpoints
 
-    def _fetch_osrm_polyline(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float]]:
-        """Phase 1: Queries OSRM for optimal street polyline and road distance."""
+    def _fetch_osrm_route(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float], Optional[float]]:
+        """Queries OSRM and returns (polyline, distance_km, duration_min) as reported by the router.
+
+        OSRM computes duration from per-segment speeds, road classification, and real
+        turn costs on the actual graph. It is the authoritative travel-time answer;
+        we do not recompute it.
+        """
         if not waypoints or len(waypoints) < 2:
-            return None, None
+            return None, None, None
         
         # Format coordinates as lng,lat;lng,lat...
         loc_str = ";".join([f"{pt[1]},{pt[0]}" for pt in waypoints])
@@ -227,11 +243,12 @@ class EVORoutingEngine:
                             coords = route["geometry"]["coordinates"]
                             lat_lngs = [[pt[1], pt[0]] for pt in coords]
                             dist_km = round(route["distance"] / 1000.0, 2)
-                            return lat_lngs, dist_km
+                            dur_min = round(route["duration"] / 60.0, 2)
+                            return lat_lngs, dist_km, dur_min
             except Exception as e:
                 logging.debug(f"OSRM query attempt failed for {url}: {e}")
-        
-        return None, None
+
+        return None, None, None
 
     def calculate_unit_metrics(
         self,
@@ -241,47 +258,40 @@ class EVORoutingEngine:
         response_type: str = "emergency",
         road_distance_km: Optional[float] = None
     ) -> Dict[str, Any]:
-        """
-        Phase 2: Calculates apparatus dynamics, road distance, and ETA for a specific unit from its Home Fire Hall.
+        """Returns OSRM routing metrics for one unit, from its home hall to the incident.
 
-        3-Tier Apparatus Profiles:
-          - Light (5 tons): Squad (SQ1-4), Medic (M1), Command (C1, C10), LAV -> 52 km/h Code 3, 1.25x road factor, 3s turn penalty
-          - General (22 tons): Engine (E1-4), Rescue (R1-4), Quint (Q5), Pumper -> 45 km/h Code 3, 1.35x road factor, 5s turn penalty
-          - Heavy (35 tons): Ladder (L1-4), Tower Platform, Water Tender (T1-4, WT4) -> 38 km/h Code 3, 1.45x road factor, 8s turn penalty
+        Stock OSRM: distance and ETA are the router's own figures. Apparatus-class
+        adjustments are deliberately not applied here (see APPARATUS_TIERS).
+
+        If OSRM is unreachable, distance falls back to great-circle and eta_minutes is
+        None. An unknown ETA is reported as unknown, never as a plausible estimate.
         """
         clean_unit = str(unit).strip().upper()
         station_id = get_unit_station_id(clean_unit)
         hall = self.get_hall_location(station_id)
-        profile_class = get_apparatus_profile_class(clean_unit)
-        tier_data = APPARATUS_TIERS.get(profile_class, APPARATUS_TIERS["general"])
-        
+
         crow_km = self.calculate_distance_km(hall["lat"], hall["lng"], dest_lat, dest_lng)
         is_routine = str(response_type).lower().strip() == "routine"
 
-        if is_routine:
-            avg_speed_kmh = tier_data["speed_code1_kmh"]
-            road_factor = tier_data["road_factor_code1"]
-        else:
-            avg_speed_kmh = tier_data["speed_code3_kmh"]
-            road_factor = tier_data["road_factor_code3"]
-
-        turn_penalty_sec = tier_data["turn_penalty_sec"]
-        turnout_minutes = 0.0
-
         if road_distance_km is not None and road_distance_km > 0:
+            # Caller already resolved the road distance via OSRM for this origin.
             road_km = round(road_distance_km, 2)
+            _, _, dur_min = self._fetch_osrm_route(
+                [[hall["lat"], hall["lng"]], [dest_lat, dest_lng]]
+            )
         else:
-            road_km = round(crow_km * road_factor, 2)
+            _, osrm_km, dur_min = self._fetch_osrm_route(
+                [[hall["lat"], hall["lng"]], [dest_lat, dest_lng]]
+            )
+            road_km = osrm_km if osrm_km is not None else round(crow_km, 2)
 
-        est_turns = round(road_km * 1.2)
-        turn_delay_min = (est_turns * turn_penalty_sec) / 60.0
-        travel_time_min = (road_km / avg_speed_kmh) * 60.0 + turn_delay_min + turnout_minutes
-        eta_minutes = max(1, round(travel_time_min))
+        eta_minutes = max(1, round(dur_min)) if dur_min is not None else None
+        routing_source = "osrm" if dur_min is not None else "degraded_no_router"
 
         return {
             "unit": clean_unit,
             "unit_type": get_unit_type(clean_unit),
-            "apparatus_class": profile_class,
+            "apparatus_class": get_apparatus_profile_class(clean_unit),
             "origin_hall": hall["id"],
             "hall_name": hall["name"],
             "hall_address": hall["address"],
@@ -290,7 +300,7 @@ class EVORoutingEngine:
             "crow_distance_km": round(crow_km, 2),
             "road_distance_km": road_km,
             "eta_minutes": eta_minutes,
-            "speed_kmh": avg_speed_kmh,
+            "routing_source": routing_source,
             "response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)",
             "calculated_at": datetime.now(timezone.utc).isoformat()
         }
@@ -329,10 +339,11 @@ class EVORoutingEngine:
         response_type: str = "emergency",
         unit: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Calculates origin-to-destination response route using 2-phase architecture:
-          Phase 1: Pure OSRM street network routing from the hall front apron.
-          Phase 2: Apparatus dynamics and ETA calculation on the resulting polyline distance.
+        """Calculates the hall-to-incident response route using stock OSRM.
+
+        Distance, duration, and geometry are the router's own output. If OSRM is
+        unreachable the result is marked degraded: a straight-line placeholder
+        geometry with great-circle distance and eta_minutes = None.
         """
         if start_lat is None or start_lng is None:
             hall_key = station_id or (get_unit_station_id(unit) if unit else self.default_hall_key)
@@ -341,50 +352,33 @@ class EVORoutingEngine:
             start_lng = hall["lng"]
 
         is_routine = str(response_type).lower().strip() == "routine"
-        profile_class = get_apparatus_profile_class(unit) if unit else "general"
-        tier_data = APPARATUS_TIERS.get(profile_class, APPARATUS_TIERS["general"])
-
-        if is_routine:
-            avg_speed_kmh = tier_data["speed_code1_kmh"]
-            road_factor = tier_data["road_factor_code1"]
-        else:
-            avg_speed_kmh = tier_data["speed_code3_kmh"]
-            road_factor = tier_data["road_factor_code3"]
-
-        turn_penalty_sec = tier_data["turn_penalty_sec"]
 
         # Departure is always the hall's verified front-apron GPS coordinate.
         # Direction of travel is OSRM's job, not ours: the router decides how to
         # leave the apron based on the actual road network.
-        departure_lat = start_lat
-        departure_lng = start_lng
-
-        # Phase 1: Pure OSRM route pathfinding (No brittle intermediate waypoint injections!)
-        waypoint_pts = [[departure_lat, departure_lng], [dest_lat, dest_lng]]
-        osrm_polyline, osrm_km = self._fetch_osrm_polyline(waypoint_pts)
-
-        dist_km = self.calculate_distance_km(departure_lat, departure_lng, dest_lat, dest_lng)
-        fallback_road_km = round(dist_km * road_factor, 2)
+        waypoint_pts = [[start_lat, start_lng], [dest_lat, dest_lng]]
+        osrm_polyline, osrm_km, osrm_min = self._fetch_osrm_route(waypoint_pts)
 
         if osrm_polyline and len(osrm_polyline) >= 2:
             final_polyline = osrm_polyline
-            road_km = osrm_km if osrm_km is not None else fallback_road_km
+            road_km = osrm_km
+            eta_minutes = max(1, round(osrm_min)) if osrm_min is not None else None
+            status = "success"
+            routing_source = "osrm"
         else:
             final_polyline = waypoint_pts
-            road_km = fallback_road_km
-
-        # Phase 2: Apparatus ETA Dynamics on road distance
-        est_turns = round(road_km * 1.2)
-        turn_delay_min = (est_turns * turn_penalty_sec) / 60.0
-        travel_time_min = (road_km / avg_speed_kmh) * 60.0 + turn_delay_min
-        eta_minutes = max(1, round(travel_time_min))
+            road_km = round(self.calculate_distance_km(start_lat, start_lng, dest_lat, dest_lng), 2)
+            eta_minutes = None
+            status = "degraded"
+            routing_source = "degraded_no_router"
 
         return {
-            "status": "success",
+            "status": status,
+            "routing_source": routing_source,
             "distance_km": road_km,
             "eta_minutes": eta_minutes,
             "response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)",
-            "origin": {"lat": departure_lat, "lng": departure_lng},
+            "origin": {"lat": start_lat, "lng": start_lng},
             "destination": {"lat": dest_lat, "lng": dest_lng},
             "polyline": final_polyline
         }

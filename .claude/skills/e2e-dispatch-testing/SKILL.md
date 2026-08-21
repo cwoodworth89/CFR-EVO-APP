@@ -54,9 +54,9 @@ ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && XDG_RUNTIME_DIR=/run/us
 Always clean up temporary test dispatches after full system test sessions:
 
 ```bash
-# 1. Remove test records from PostgreSQL live_calls table
-ssh tcfire@100.95.146.94 "docker exec cfr_postgres psql -U cfr_user -d cfr_dispatch -c \"DELETE FROM live_calls WHERE target->>'is_test' = 'true' OR dispatch_id LIKE 'DISP-TEST-%';\""
+# 1. Remove test records from PostgreSQL dispatches table
+ssh tcfire@100.95.146.94 "docker exec cfr_postgres psql -U cfr_user -d cfr_dispatch -c \"DELETE FROM dispatches WHERE target->>'is_test' = 'true' OR dispatch_id LIKE 'DISP-TEST-%';\""
 
 # 2. Verify latest operational call
-ssh tcfire@100.95.146.94 "docker exec cfr_postgres psql -U cfr_user -d cfr_dispatch -c 'SELECT id, dispatch_id, incident_type, timestamp FROM live_calls ORDER BY id DESC LIMIT 3;'"
+ssh tcfire@100.95.146.94 "docker exec cfr_postgres psql -U cfr_user -d cfr_dispatch -c 'SELECT id, dispatch_id, incident_type, timestamp FROM dispatches ORDER BY id DESC LIMIT 3;'"
 ```

@@ -146,7 +146,7 @@ python backend/scripts/feed_recorded_call.py backend/audio_files/custom_call.wav
 
 ### 📋 Verification Checkpoints:
 1. **Local Filesystem**: A clean copy of the filtered audio is saved to `backend/audio_files/recordings/[DISP-ID].wav`.
-2. **FastAPI Gateway**: `POST /api/dispatches` persists the call to the local PostgreSQL `live_calls` table.
+2. **FastAPI Gateway**: `POST /api/dispatches` persists the call to the local PostgreSQL `dispatches` table.
 3. **MQTT Broadcast**: An `INSERT` event is published to `cfr/dispatches` over Mosquitto MQTT.
 4. **WebSocket Push**: The web client dashboard (`http://localhost:5173/`) instantly centers the map on the geocoded address, draws a route line from the station, and highlights the three closest fire hydrants.
 
@@ -169,7 +169,7 @@ The python agent runs a background runner and FastAPI server that allows develop
 3. Check the agent console logs or `dispatch.log`. You should see:
    - *"Processing simulation request..."*
    - Transcription, parsing, and geocoding executing.
-   - A new dispatch entry pushed/upserted to the local PostgreSQL `live_calls` table.
+   - A new dispatch entry pushed/upserted to the local PostgreSQL `dispatches` table.
    - Live update published over MQTT to local station kiosk displays.
 
 ---

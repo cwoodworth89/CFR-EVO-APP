@@ -40,7 +40,7 @@ This skill governs the collection, database aggregation, statistical modeling, a
 ## 2. Database Schema & Aggregation Architecture
 
 ### A. Granular Per-Call Telemetry Storage
-* Captured inside PostgreSQL table `live_calls` and `evaluation_history`:
+* Captured inside PostgreSQL table `dispatches` and `evaluation_history`:
   - `metrics` column (JSONB):
     ```json
     {

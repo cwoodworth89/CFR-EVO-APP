@@ -1,10 +1,10 @@
--- Migration: Setup simulation_requests table and update live_calls columns
+-- Migration: Setup simulation_requests table and update dispatches columns
 
--- 1. Add missing columns to public.live_calls if they do not exist
-ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS audio_url TEXT;
-ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS audio_duration NUMERIC(6,2);
-ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS origins TEXT[] DEFAULT '{}';
-ALTER TABLE public.live_calls ADD COLUMN IF NOT EXISTS sanitized_transcript TEXT;
+-- 1. Add missing columns to public.dispatches if they do not exist
+ALTER TABLE public.dispatches ADD COLUMN IF NOT EXISTS audio_url TEXT;
+ALTER TABLE public.dispatches ADD COLUMN IF NOT EXISTS audio_duration NUMERIC(6,2);
+ALTER TABLE public.dispatches ADD COLUMN IF NOT EXISTS origins TEXT[] DEFAULT '{}';
+ALTER TABLE public.dispatches ADD COLUMN IF NOT EXISTS sanitized_transcript TEXT;
 
 -- 2. Create the simulation_requests table
 CREATE TABLE IF NOT EXISTS public.simulation_requests (
@@ -39,15 +39,15 @@ DROP POLICY IF EXISTS "Allow authenticated update on simulation_requests" ON pub
 CREATE POLICY "Allow authenticated update on simulation_requests" 
 ON public.simulation_requests FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
--- 6. Update RLS Policies for live_calls to allow authenticated read and update only
-DROP POLICY IF EXISTS "Allow public read dispatches" ON public.live_calls;
-DROP POLICY IF EXISTS "Allow authenticated users to read dispatches" ON public.live_calls;
+-- 6. Update RLS Policies for dispatches to allow authenticated read and update only
+DROP POLICY IF EXISTS "Allow public read dispatches" ON public.dispatches;
+DROP POLICY IF EXISTS "Allow authenticated users to read dispatches" ON public.dispatches;
 CREATE POLICY "Allow authenticated users to read dispatches" 
-ON public.live_calls FOR SELECT TO authenticated USING (true);
+ON public.dispatches FOR SELECT TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Allow public submit corrections" ON public.live_calls;
-DROP POLICY IF EXISTS "Allow authenticated users to submit corrections" ON public.live_calls;
+DROP POLICY IF EXISTS "Allow public submit corrections" ON public.dispatches;
+DROP POLICY IF EXISTS "Allow authenticated users to submit corrections" ON public.dispatches;
 CREATE POLICY "Allow authenticated users to submit corrections" 
-ON public.live_calls FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+ON public.dispatches FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
 

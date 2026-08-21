@@ -9,5 +9,5 @@ Specialized in:
 * Executing full-system dispatch simulations with `*TEST*` notification markers and telemetry validation
 * Running isolated component tests with `--omit-mqtt`, `--omit-ntfy`, and `--omit-db`
 * Benchmarking Whisper speech-to-text accuracy and GIS geocoding with curated line-in test calls
-* Auditing PostgreSQL `live_calls` and Mosquitto MQTT message envelopes
+* Auditing PostgreSQL `dispatches` and Mosquitto MQTT message envelopes
 * Enforcing zero audio duplication and executing clean post-test database teardowns

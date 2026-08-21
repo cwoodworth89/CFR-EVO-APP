@@ -48,10 +48,10 @@ def ensure_sqlite_compatibility():
     if engine.dialect.name == "sqlite":
         try:
             with engine.connect() as conn:
-                res = conn.exec_driver_sql("PRAGMA table_info(live_calls);").fetchall()
+                res = conn.exec_driver_sql("PRAGMA table_info(dispatches);").fetchall()
                 cols = [r[1] for r in res]
                 if cols and "routing_metrics" not in cols:
-                    conn.exec_driver_sql("ALTER TABLE live_calls ADD COLUMN routing_metrics JSON;")
+                    conn.exec_driver_sql("ALTER TABLE dispatches ADD COLUMN routing_metrics JSON;")
         except Exception:
             pass
 

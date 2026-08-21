@@ -56,7 +56,7 @@ Verify that `backend/api/init_db.sql` executed correctly:
 ```powershell
 docker compose exec postgres psql -U cfr_user -d cfr_dispatch -c "\dt"
 ```
-Ensure table `live_calls` and `evaluation_history` exist and index `idx_live_calls_target_gin` is active.
+Ensure table `dispatches` and `evaluation_history` exist and index `idx_dispatches_target_gin` is active.
 
 ---
 

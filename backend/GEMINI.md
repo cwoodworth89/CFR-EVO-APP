@@ -23,6 +23,6 @@ Rules and constraints for Python backend code in `backend/`.
 
 ## 3. PostgreSQL Database & FastAPI Gateway
 * **Index Rules**: `dispatch_id TEXT UNIQUE` automatically creates a B-tree unique index in PostgreSQL; do NOT create duplicate manual indexes on `dispatch_id`.
-* **JSONB & HITL Indexes**: Maintain JSONB GIN index `idx_live_calls_target_gin` on `target` and partial index `idx_live_calls_feedback_verified` on `(timestamp DESC) WHERE feedback_submitted = TRUE AND verified_address IS NOT NULL`.
+* **JSONB & HITL Indexes**: Maintain JSONB GIN index `idx_dispatches_target_gin` on `target` and partial index `idx_dispatches_feedback_verified` on `(timestamp DESC) WHERE feedback_submitted = TRUE AND verified_address IS NOT NULL`.
 * **Pagination**: Always include `limit` (default 100) and `offset` pagination on `GET /api/dispatches` in [`backend/api/server.py`](api/server.py).
 * **Connection Pooling**: Configure SQLAlchemy engine with `pool_recycle=1800` (30 mins) and `pool_timeout=30` in [`backend/api/database.py`](api/database.py).

@@ -189,7 +189,7 @@ The python agent pushes notification payloads to `ntfy.sh` to trigger instant au
 
 Updates pushed via Mosquitto MQTT WebSockets use a standardized JSON object layout matching the PostgreSQL database schema for the React frontend client:
 
-*   **`live_calls` Table & MQTT Schema**:
+*   **`dispatches` Table & MQTT Schema**:
     *   `dispatch_id` (Text): Unique alphanumeric index (`DISP-[Year]-[HEX]`).
     *   `incident_type` (Text): Parsed or verified incident category.
     *   `responding_units` (Array): Array of active units (e.g., `["E1", "L1"]`).
@@ -232,7 +232,7 @@ Because the inter-round pause in digital TTS is razor-thin (~300ms inter-word ga
 * As soon as `"map grid [N]"` is recognized, Phase 1 STT fires **IMMEDIATELY**, pushing preliminary phone alerts in **~12–20s total** from tones.
 
 ### Second-by-Second Latency Waterfall
-Pipeline latency timestamps are logged to PostgreSQL `live_calls.target['telemetry']` and visualized on the **System Metrics & Performance Dashboard** (`SystemMetricsPanel.jsx`):
+Pipeline latency timestamps are logged to PostgreSQL `dispatches.target['telemetry']` and visualized on the **System Metrics & Performance Dashboard** (`SystemMetricsPanel.jsx`):
 1. `t_tone_sequence`: Time spent playing tones (2.5s–9.5s).
 2. `t_speech_start`: 1st `"Coquitlam"` spoken anchor.
 3. `t_round1_speech`: Spoken Round 1 announcement duration.

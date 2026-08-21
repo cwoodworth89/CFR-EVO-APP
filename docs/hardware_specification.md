@@ -408,7 +408,7 @@ sequenceDiagram
 ### Technical Implementation Details
 
 #### 1. Database Schema
-The `live_calls` table requires an array column (e.g. `origins text[]`) to track which single board computers recorded the dispatch.
+The `dispatches` table requires an array column (e.g. `origins text[]`) to track which single board computers recorded the dispatch.
 *   **Column**: `origins text[] DEFAULT '{}'::text[]`
 *   **Index**: GIN index on `origins` for quick queries.
 
@@ -418,9 +418,9 @@ When a local Pi's audio gate opens (detected by tone matching or RMS volume spik
 2.  **Lookup Existing**: Before inserting a new row, the Pi checks the database for active calls inserted within the last **45 seconds** with overlapping text or locations.
 3.  **Insert/Update Logic**:
     *   **If no overlap exists**: The Pi inserts a new row:
-        `INSERT INTO live_calls (dispatch_id, incident_type, target, origins) VALUES (..., ARRAY['TCFH'])`
+        `INSERT INTO dispatches (dispatch_id, incident_type, target, origins) VALUES (..., ARRAY['TCFH'])`
     *   **If an overlap is found** (another hall already wrote the record): The Pi appends its local ID to the array:
-        `UPDATE live_calls SET origins = array_append(origins, 'TCFH') WHERE id = [existing_id]`
+        `UPDATE dispatches SET origins = array_append(origins, 'TCFH') WHERE id = [existing_id]`
 
 #### 3. Client Frontend Kiosk Behavior
 Each kiosk runs the React frontend and reads its local station identifier (e.g. `const localStation = "TCFH"` configured via environment or local storage).

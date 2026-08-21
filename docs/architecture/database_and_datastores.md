@@ -11,7 +11,7 @@ graph TD
     subgraph PrimaryDB ["1. Primary Relational DB (PostgreSQL 16)"]
         direction TB
         PG[("PostgreSQL 16 (Port 5432)")]
-        T1["live_calls (Dispatches, Transcripts, Target JSONB, Reviews)"]
+        T1["dispatches (Dispatches, Transcripts, Target JSONB, Reviews)"]
         T2["evaluation_history (WER/CER Metrics, Quality Ratings)"]
         T3["road_closures (Municipal Hazards & Detours)"]
         T4["parcels (69,708 Civic Properties, Units, Pre-computed Zones 1..134, Tactical Pre-Plans)"]

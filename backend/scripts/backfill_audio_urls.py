@@ -11,7 +11,7 @@ from api.database import engine
 def backfill():
     with engine.connect() as conn:
         query = text("""
-            UPDATE live_calls 
+            UPDATE dispatches 
             SET audio_url = '/api/audio/' || dispatch_id || '.wav' 
             WHERE audio_url IS NULL AND dispatch_id IS NOT NULL;
         """)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CFR EVO - Historical Routing Metrics Migration & Backfill Script
-Adds the routing_metrics JSONB column to public.live_calls and backfills
+Adds the routing_metrics JSONB column to public.dispatches and backfills
 per-unit driving distance and ETA metrics from Home Fire Halls for all historical dispatches.
 """
 
@@ -65,14 +65,14 @@ def main():
 
     try:
         # Step 1: Ensure column and index exist
-        logging.info("Ensuring 'routing_metrics' column and GIN index exist in public.live_calls...")
+        logging.info("Ensuring 'routing_metrics' column and GIN index exist in public.dispatches...")
         cur.execute("""
-            ALTER TABLE public.live_calls 
+            ALTER TABLE public.dispatches 
             ADD COLUMN IF NOT EXISTS routing_metrics JSONB NOT NULL DEFAULT '[]'::jsonb;
         """)
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_live_calls_routing_metrics_gin 
-            ON public.live_calls USING gin (routing_metrics jsonb_path_ops);
+            CREATE INDEX IF NOT EXISTS idx_dispatches_routing_metrics_gin 
+            ON public.dispatches USING gin (routing_metrics jsonb_path_ops);
         """)
         conn.commit()
         logging.info("Schema migration verified successfully.")
@@ -80,7 +80,7 @@ def main():
         # Step 2: Query all records
         cur.execute("""
             SELECT id, dispatch_id, responding_units, verified_units, target 
-            FROM public.live_calls 
+            FROM public.dispatches 
             ORDER BY id ASC;
         """)
         rows = cur.fetchall()
@@ -114,7 +114,7 @@ def main():
             metrics_json = json.dumps(metrics)
 
             cur.execute("""
-                UPDATE public.live_calls 
+                UPDATE public.dispatches 
                 SET routing_metrics = %s::jsonb,
                     target = jsonb_set(
                         COALESCE(target, '{}'::jsonb),

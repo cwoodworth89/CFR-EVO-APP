@@ -9,8 +9,8 @@ This document outlines the systematic diagnosis, container audits, tone spotter 
 ### 1. Database & Persistence Layer (PostgreSQL 16)
 - **Schema Improvements** ([`backend/api/init_db.sql`](../../backend/api/init_db.sql)):
   - Added `pgcrypto` extension for UUID generation.
-  - Added JSONB GIN index `idx_live_calls_target_gin` on `target` column for fast metadata queries.
-  - Added partial index `idx_live_calls_feedback_verified` on `(timestamp DESC) WHERE feedback_submitted = TRUE AND verified_address IS NOT NULL`.
+  - Added JSONB GIN index `idx_dispatches_target_gin` on `target` column for fast metadata queries.
+  - Added partial index `idx_dispatches_feedback_verified` on `(timestamp DESC) WHERE feedback_submitted = TRUE AND verified_address IS NOT NULL`.
   - Removed duplicate `dispatch_id` B-tree index (handled by `UNIQUE NOT NULL`).
 - **API & Connection Management**:
   - Added `limit` and `offset` pagination to `GET /api/dispatches` in [`backend/api/server.py`](../../backend/api/server.py).

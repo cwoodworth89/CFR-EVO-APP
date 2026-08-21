@@ -47,7 +47,7 @@ The entire system runs on a containerized, self-contained local stack hosted on 
 flowchart TB
     subgraph Hall1Master [Hall 1 Master Station Server - Docker Compose]
         subgraph Containers [Docker Container Stack]
-            PG[(PostgreSQL 16 DB\nlive_calls, eval_history\nPort 5432)]
+            PG[(PostgreSQL 16 DB\ndispatches, eval_history\nPort 5432)]
             API[FastAPI Gateway\nREST API & Auth\nPort 8000]
             MQTT[Mosquitto MQTT Broker\nTCP 1883 & WebSockets 9001]
             TILES[MBTiles Tile Server\nSlippy XYZ EPSG:3857\nPort 8081]

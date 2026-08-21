@@ -45,6 +45,11 @@ FIRE_HALLS: Dict[str, Dict[str, Any]] = {
 # straight from the router. This table is retained as the seed data for the
 # planned CFR customized route configuration feature, which will layer apparatus
 # adjustments on top of the OSRM baseline. Do not wire it back in ad hoc.
+#
+# PROVENANCE REQUIRED (CLAUDE.md 6.3): the speed, road-factor, and turn-penalty
+# figures below are inherited and currently carry no cited source. Before this data
+# is applied to any operational output it must be sourced -- NFPA 1710 response-time
+# objectives, department policy, or measurement on this system -- or replaced.
 APPARATUS_TIERS: Dict[str, Dict[str, Any]] = {
     "light": {
         "key": "LIGHT",

@@ -76,4 +76,76 @@ This project's operational runbooks and specialist personas were migrated from A
 
 ---
 
+## 6. No Fabricated Data, No Unsourced Constants
+
+This is an emergency dispatch system. A plausible-looking wrong answer is more
+dangerous than a visible unknown, because crews cannot tell it is wrong. These rules
+are absolute and override convenience, tidiness, and "the UI looks broken without it."
+
+### 6.1 Never Invent a Value to Fill a Gap
+If a value is unknown, it MUST propagate as `null` / `None` and render as an explicit
+unknown (`--`, `--:--`, `-- km`, or a Tier 1 warning card). It MUST NEVER be replaced by:
+* A default coordinate (see §5 — this is the same rule applied beyond geocoding).
+* An estimated ETA, distance, or travel time.
+* A default apparatus list, unit roster, radio channel, or incident type.
+* A placeholder that reads as real data (`'02:30'`, `'Simulated Address'`, `['SQ1','E1','L1']`).
+
+Suppress the output, warn, and let the operator see the gap. **An unknown reported as
+unknown is a correct answer. An unknown reported as a number is a defect.**
+
+### 6.2 Prefer the Authoritative Source Over a Local Model
+Where a system of record already computes a value, use its answer rather than
+re-deriving one:
+* **Routing**: OSRM's `distance` and `duration` are authoritative. Do not recompute
+  travel time from speed × distance, and do not estimate turn counts — OSRM returns
+  the real turn list in `steps`.
+* **Spatial**: PostGIS/PostGIS-backed municipal data is authoritative over hand-derived
+  geometry. Do not approximate a spatial relationship with a latitude/longitude
+  threshold comparison when the real geometry exists (e.g. rail crossings are
+  `railway=level_crossing` in OSM, not `lat < 49.26`).
+* **Geocoding**: A miss belongs in `public.intersections` / `public.parcels` as a data
+  fix, never as a string-match special case in application code.
+
+### 6.3 Every Magic Number Carries Its Source
+Any hardcoded constant affecting operational output MUST carry an inline comment naming
+where it came from. Acceptable provenance, in order of preference:
+
+1. **Published standard** — cite it precisely, e.g.
+   `# NFPA 1710 s4.1.2.1: 80s turnout time, alarm-to-en-route, fire suppression`
+2. **Municipal / authoritative dataset** — name the table or layer, e.g.
+   `# public.roads.speed (City of Coquitlam Transportation, posted limit)`
+3. **Measured on this system** — state what was measured and when, e.g.
+   `# Measured Hall 1 -> 428 Nelson, kiosk OSRM graph 2026-08-21: 9.74 km`
+4. **Department operational policy** — name the decision and who set it.
+
+A constant with no comment, or a comment that only restates the number, is treated as a
+defect and removed. Invented-sounding rationale ("vehicle momentum preservation",
+"assuming ~1.2 turns per km") is not provenance.
+
+Where NFPA figures apply, prefer them over locally invented ones — notably **NFPA 1710**
+(turnout and response time objectives) and **NFPA 291** (hydrant flow classification,
+already used for hydrant colour coding).
+
+### 6.4 Domain Constants Are Staged, Not Silently Applied
+Apparatus physics, response-mode factors, and similar tuning values MUST NOT be applied
+implicitly inside a calculation path. They belong in a named configuration surface that
+is explicitly enabled and auditable. Until such a feature exists, the data may be
+retained as clearly-marked staged seed data that is documented as **not applied** (see
+`APPARATUS_TIERS` in `services/gis/src/gis_service/routing_engine.py` and
+`frontend/src/utils/EVORoutingEngine.js`).
+
+### 6.5 No Fabricated Dispatches
+Test and demonstration paths MUST replay real historical dispatch records
+("review" mode). Do not synthesise fake calls, addresses, units, or transcripts to
+exercise the kiosk. Genuine pipeline test dispatches use the existing `is_test` flag and
+`*TEST*` labelling.
+
+### 6.6 Report Verification Honestly
+Do not mark a bug fixed, a phase complete, or a value verified without checking it
+against the running system or the working tree. Distinguish **reported** from
+**confirmed** in status documents (see `docs/debug_and_qa_punchlist.md`), and state
+plainly when something could not be verified and why.
+
+---
+
 See also: [`PROJECT.md`](PROJECT.md) for architecture/feature/milestone tracking, [`README.md`](README.md) for setup instructions, and [`docs/agent_onboarding.md`](docs/agent_onboarding.md) for the full CLI command reference, SSH/audio (`XDG_RUNTIME_DIR`) heuristics, and the STT MLOps feedback pipeline.

@@ -17,9 +17,9 @@ When a dispatch specifies responding units, the routing engine resolves the depa
 flowchart TD
     A[Dispatch Responding Units: E1, L1, Q5] --> B{Resolve Origin Hall}
     B -->|E1, L1, R1, C10, C1| H1[Hall 1 - Town Centre: 1300 Pinetree Way]
-    B -->|E2, R2| H2[Hall 2 - North Coquitlam: 1475 Pipeline Rd]
-    B -->|E3, Q5, H3, HT3, S3| H3[Hall 3 - Austin / Mariner: 528 Austin Ave]
-    B -->|E4, T4, LAV4| H4[Hall 4 - Cape Horn / Waterfront: 2280 Lougheed Hwy]
+    B -->|E2, L2, R2| H2[Hall 2 - Mariner: 775 Mariner Way]
+    B -->|E3, Q5, H3, HT3, S3| H3[Hall 3 - Austin Heights: 438 Nelson St]
+    B -->|E4, T4, LAV4| H4[Hall 4 - Burke Mountain: 3501 David Ave]
     
     H1 --> C[Apparatus Pathfinding Engine]
     H2 --> C
@@ -32,10 +32,20 @@ flowchart TD
 ### Station Coordinates Master Table:
 | Station | Address | Latitude | Longitude | Primary Units |
 | :--- | :--- | :--- | :--- | :--- |
-| **Hall 1 (Headquarters)** | 1300 Pinetree Way, Coquitlam, BC | `49.2882` | `-122.7938` | `E1`, `L1`, `R1`, `C10`, `C1`, `S1`, `M1` |
-| **Hall 2 (North)** | 1475 Pipeline Rd, Coquitlam, BC | `49.3095` | `-122.7661` | `E2`, `L2`, `R2` |
-| **Hall 3 (Southwest)** | 528 Austin Ave, Coquitlam, BC | `49.2437` | `-122.8834` | `E3`, `Q5` (Quint 5), `H3`, `HT3`, `S3` |
-| **Hall 4 (Southeast)** | 2280 Lougheed Hwy, Coquitlam, BC | `49.2551` | `-122.8023` | `E4`, `T4`, `LAV4` |
+| **Hall 1 (Town Centre)** | 1300 Pinetree Way | `49.29109654571679` | `-122.79072561861948` | `E1`, `L1`, `R1`, `C1`, `C10`, `S1`, `M1`, `SQ1` |
+| **Hall 2 (Mariner)** | 775 Mariner Way | `49.2622197420057` | `-122.81747986099539` | `E2`, `L2`, `R2`, `SQ2`, `T2`, `WT2` |
+| **Hall 3 (Austin Heights)** | 438 Nelson Street | `49.24803974681661` | `-122.86546062387211` | `E3`, `Q5`, `H3`, `HT3`, `S3`, `SQ3` |
+| **Hall 4 (Burke Mountain)** | 3501 David Ave | `49.29510006403205` | `-122.74247651791484` | `E4`, `T4`, `WT4`, `LAV4`, `SQ4` |
+
+> Coordinates are verified front-apron driveway GPS points and are the single source of
+> truth for routing origins. They mirror `FIRE_HALLS` in
+> [`routing_engine.py`](../../../services/gis/src/gis_service/routing_engine.py) and
+> `STATIONS` in [`MapConstants.js`](../../../frontend/src/components/MapConstants.js);
+> update all three together.
+>
+> Departure is always the hall apron regardless of incident bearing. OSRM decides the
+> direction of travel from the real road network — do not add destination-conditional
+> departure coordinates.
 
 ---
 
@@ -56,7 +66,7 @@ flowchart LR
 ### A. Online: Google Maps Directions API
 * **Endpoint**: `https://maps.googleapis.com/maps/api/directions/json`
 * **Parameters**:
-  - `origin`: Hall coordinates (e.g. `49.2882,-122.7938`)
+  - `origin`: Hall apron coordinates (e.g. Hall 1 `49.29109654571679,-122.79072561861948`)
   - `destination`: Target incident coordinates
   - `departure_time`: `now`
   - `traffic_model`: `pessimistic` / `best_guess`
@@ -80,14 +90,31 @@ Different vehicle classes require specific path weighting:
 
 ---
 
-## 4. Response Mode Physics & ETAs (Code 3 Emergency vs Code 1 Routine)
+## 4. Response Mode & ETAs
 
-The routing engine dynamically adjusts speed profiles, road curvature multipliers, and turnout chute times based on the parsed `response_type`:
+> [!IMPORTANT]
+> **ETAs come from OSRM. No local physics model is applied.**
+>
+> `distance_km` and `eta_minutes` are OSRM's own `distance` and `duration`, computed
+> from per-segment speeds and real turn costs on the graph. The engine does not
+> recompute travel time, estimate turn counts, or apply speed/road-factor multipliers.
+>
+> If OSRM is unreachable the result is `status: "degraded"` with `eta_minutes: None`
+> and a great-circle placeholder distance. An unknown ETA is reported as unknown
+> (`-- min`), never estimated (CLAUDE.md §6.1).
+>
+> `response_type` currently selects only the display label
+> (`Emergency (Code 3)` / `Routine (Code 1)`); it does not alter the ETA.
 
-| Response Mode | Signal Preemption (EmTrac / Opticom) | Avg Urban Speed | Road Multiplier | Turnout Buffer | Driving Characteristics |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **🚨 Emergency (Code 3)** | **Active** (Lights & Siren, Opticom green-light request) | **45.0 km/h** | `1.35x` | **0.5 min** (30s) | Priority intersection clearance, running red signals safely, Opticom preempted green lights |
-| **🟢 Routine (Code 1)** | **Inactive** (Standard Public Drive Time) | **32.0 km/h** | `1.45x` | **1.0 min** (60s) | Obeys all traffic signals, stop signs, speed limits, and standard public traffic congestion |
+Apparatus-class and response-mode adjustment is planned as the **CFR customized route
+configuration** feature, layering on top of the OSRM baseline. Seed values live in
+`APPARATUS_TIERS` (both engines), explicitly marked as not applied and as requiring
+cited provenance before use (CLAUDE.md §6.3, §6.4).
+
+Historical note: a previous implementation estimated ETAs from `distance / avg_speed`
+plus an assumed `1.2 turns per km`, along with an EMTRAC rush-hour model and a blanket
+"downhill" speed cap. None carried a cited source and all disagreed with the router's
+own answer; they were removed in commit `c332b81`.
 
 ---
 

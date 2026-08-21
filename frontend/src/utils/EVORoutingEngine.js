@@ -14,8 +14,12 @@ import * as turf from '@turf/turf';
 // Apparatus tier metadata.
 //
 // Presentation fields (name, subtitle, color, weightTons) are live and used for
-// unit badges. The physics fields are retained as seed data for the planned CFR
-// route configuration feature and are NOT applied to any ETA today.
+// unit badges. The `staged` physics fields are seed data for the planned CFR route
+// configuration feature and are NOT applied to any ETA today.
+//
+// PROVENANCE REQUIRED (CLAUDE.md 6.3): the staged figures carry no cited source.
+// They must be sourced (NFPA 1710, department policy, or measurement on this system)
+// or replaced before being applied to operational output.
 export const APPARATUS_TIERS = {
   LIGHT: {
     key: 'LIGHT',

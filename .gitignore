@@ -214,6 +214,8 @@ backend/audio_files/
 frontend/public/recordings/
 frontend/dist/recordings/
 services/backend/
+backend/frontend/
+backend/test_capture.wav
 backend/client/
 backend/data/training/audio/
 

@@ -207,6 +207,37 @@ Remaining JSON under `frontend/public/data/`: `zones.json`, `coquitlam_city_boun
 (`public.zones`, `public.city_boundary`) and are candidates for the same treatment
 hydrants just received.
 
+### 4.2b Audio storage — resolved 2026-08-21
+
+`backend/audio_files/recordings/` (421 files) is the sole recordings store, served at
+`/api/audio` from `RECORDINGS_DIR`. Seven other locations held duplicates and were
+removed:
+
+| Location | Files | Cause |
+|:--|--:|:--|
+| `frontend/public/recordings/` | 131 | `phase2.py` dual-write, never read |
+| `backend/frontend/public/recordings/` | 284 | same dual-write under a path that resolved differently |
+| `services/backend/audio_files/recordings/` | 51 | off-by-one in the `dispatch_persistence.py` fallback (`range(4)` vs `range(5)`) |
+| `backend/data/training/audio/` | 53 | duplicated dispatch audio, no reader |
+| `backend/client/public/recordings/` | 6 | pre-rename frontend directory |
+| `frontend/dist/recordings/` | — | build copy |
+| `backend/test_capture.wav` | 1 | stray debug capture |
+
+Every file was verified present in the canonical store before deletion. The dual-write
+in `phase2.py` is removed, so none of these regenerate.
+
+**Backtesting must read the canonical store**, filtered by the HITL review flags
+(`feedback_submitted`, `verified_transcript`) on `public.dispatches`, rather than keeping
+a second copy of the audio. `backend/data/training/audio/` was that second copy and had
+no code reading it — likely residue from the Whisper/LoRA training experiment.
+
+Still to confirm: `backend/tests/audio_samples/negative_controls/pa_page_DISP-2026-AB76A8.wav`
+is the only `.wav` tracked in git and nothing references it. Its filename carries a real
+dispatch ID, so it looks like a genuine PA page kept as a tone-rejection negative control
+rather than a synthetic sample — retained pending confirmation.
+`backend/tests/test_calls/` (8 `.wav` + paired `.txt` ground truth) is actively read by
+`run_test_suite.py` and stays.
+
 ### 4.3 Other scripts
 
 `import_parcels.py` (566), `compile_mbtiles.py` (538), `crawl_cadastral_tiles.py` (491),

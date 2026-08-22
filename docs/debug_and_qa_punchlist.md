@@ -225,3 +225,98 @@ session with `--ignore` because `librosa` (local) and `pvporcupine` (kiosk) are 
 wake-word dependency that is not installed on the kiosk at all — worth deciding whether
 that feature is live before keeping a test for it.
 
+---
+
+## 🚰 Hydrant Data
+
+### 11. Private hydrants defaulted to NFPA 291 class AA — fabricated flow rating
+> **Status**: ⚠️ **Open — confirmed 2026-08-21.** Safety-relevant.
+
+`backend/scripts/sync_hydrants.py:80` substitutes the highest flow class when the
+municipal source has none:
+
+```python
+"flowClass": attribs.get("flow_class") or "AA",
+```
+
+`backend/scripts/update_gis_data.py:207` does the same lookup honestly:
+
+```python
+"flowClass": attribs.get("flow_class") or "",
+```
+
+The two scripts disagree, and the fabricating one produced the cached data.
+
+Distribution in `frontend/public/data/hydrants.json` (3,387 hydrants):
+
+| status | AA | A | B | C |
+|:--|--:|--:|--:|--:|
+| OPERATING | 2322 | 333 | 123 | 60 |
+| **PRIVATE** | **462** | 2 | 0 | 0 |
+| OPERATING NON-TCA | 68 | 0 | 0 | 0 |
+| NOT READY | 9 | 0 | 0 | 0 |
+| METRO | 8 | 0 | 0 | 0 |
+
+OPERATING shows a real spread (≈82% AA). PRIVATE is **99.6% AA**, and NON-TCA, NOT READY
+and METRO are **100% AA**. That pattern is a default, not a measurement — consistent with
+the operator's report that private hydrants have no recorded flow value.
+
+**The direction of the error matters.** Under NFPA 291, AA is the *highest* class
+(light blue, 1500+ GPM). Defaulting unknown hydrants to AA tells crews an unrated
+hydrant is the best available supply. For a working fire that is the most dangerous
+possible substitution — the opposite of failing safe, and a direct CLAUDE.md §6.1
+violation.
+
+**Fix**: `flow_class` should propagate as null and render as an explicit unknown
+(grey/unclassified marker, "flow not rated"), never as a colour-coded class. Requires:
+1. Change the `or "AA"` default in `sync_hydrants.py`.
+2. Re-sync hydrant data — the cached JSON already carries the fabricated values, so a
+   code fix alone changes nothing.
+3. Give the kiosk hydrant layer an explicit unknown rendering, distinct from all four
+   NFPA colours.
+
+---
+
+## 🧭 Geocoder Honesty Gaps
+
+### 12. Street centroid reports the requested address as though exact
+> **Status**: ⚠️ **Open.** Noted during the step 4b work.
+
+`geocoder.py` step 5 overwrites the result address with the address that was asked for:
+
+```python
+result = self.address.resolve_street_centroid(parsed.street, parsed.street_type)
+if result:
+    result['address'] = f"{parsed.house} {parsed.raw}".strip().title() if parsed.house else result['address']
+```
+
+So a whole-street average is displayed as "3080 Gordon Ave" — indistinguishable on
+screen from an exact parcel match apart from the confidence score. Step 6 (road centroid)
+does the same.
+
+The step 4b nearest-civic resolver added 2026-08-21 deliberately does **not** do this: it
+reports the parcel actually used, keeps the dispatched string in `requested_address`, and
+explains the substitution in `resolution_note`. Steps 5 and 6 should follow that pattern.
+
+### 13. `public.intersections` needs the same data-integrity pass
+> **Status**: ⚠️ **Open.** Extends item #9.
+
+The nearest-civic work fixed the *address* side of unresolvable locations. The
+intersection side has had no equivalent review:
+
+* At least one confirmed false intersection (`DAVID AVE & PANORAMA DR`, item #9), where
+  PostGIS confirms the road geometries never meet.
+* 6,499 rows against 3,947 documented in `docs/development_freeze_summary.md`.
+* Apparent duplicates (`ABBEY LN & GLENBROOK ST` twice) that may or may not be legitimate
+  `candidate_index` entries.
+* No validation that a stored intersection point actually lies on both named roads.
+
+A proper audit must normalise street suffixes first — `intersections.street_a` uses
+abbreviations (`ABBEY LN`) while `roads.fullname` uses full words (`Waterford Place`),
+so a raw string join matches only 317 of 6,499. Reuse `normalize_street_suffix` from
+`parser/location.py`.
+
+Worth considering whether intersections should be *derived* from `public.roads` geometry
+via `ST_Intersects` rather than imported as a separate list — that would make false
+intersections structurally impossible.
+

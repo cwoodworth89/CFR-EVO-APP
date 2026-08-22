@@ -22,7 +22,6 @@ from .normalization import (
 from .address_resolver import AddressResolver
 from .intersection_resolver import IntersectionResolver
 from .spatial_queries import SpatialQueryEngine
-from .manual_overrides import check_manual_overrides
 
 
 class CoquitlamDataValidator:
@@ -180,16 +179,16 @@ class CoquitlamDataValidator:
                 result['address'] = f"{parsed.house} {parsed.raw}".strip().title() if parsed.house else result['address']
                 return result
 
-        # === STEP 7: Manual overrides (very last resort) ===
-        # The custom-places fuzzy step that sat here was removed: its coordinates were
-        # script-generated and unverified (up to 1.8 km off), and it was unnecessary --
-        # Locution always speaks the civic address before the place name
-        # ("1240 Lansdowne Drive Scott Creek Middle School"), so Step 1 resolves it
-        # against public.parcels and the name is captured as the sub-address.
-        result = check_manual_overrides(clean, self.get_coordinates)
-        if result:
-            return result
-
+        # No further fallbacks. Two former steps were removed:
+        #   - custom places: script-generated coordinates, up to 1.8 km off a parcel,
+        #     and unreachable because Locution always speaks the civic address first.
+        #   - manual overrides: hardcoded string matches for Port Mann Bridge, Riverview
+        #     Hospital, the Coquitlam Central bus loop and 3080 Gordon Ave. Destinations
+        #     missing from municipal records belong in the database as real records, not
+        #     as string comparisons in application code (CLAUDE.md §6.2).
+        #
+        # An address that reaches this point is genuinely unresolved and returns None,
+        # which surfaces as the Tier 1 warning rather than a guessed location (§6.1).
         return None
 
     def local_geocode(self, parsed_address: str, target_map_grid=None,
@@ -217,10 +216,6 @@ class CoquitlamDataValidator:
         parsed = parse_house_and_street(clean)
         if not parsed:
             return 0, None
-
-        # Manual override check
-        if clean == '3080 GORDON AVE':
-            return 100, '3080 GORDON AVE'
 
         return self.address.validate_address_exists(parsed.house, parsed.raw, parsed.street_type)
 

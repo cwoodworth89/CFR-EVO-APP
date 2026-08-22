@@ -103,6 +103,8 @@ class TestGeocoderOrchestrator:
     def test_step5_street_centroid(self, mock_validator):
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value=None)
+        # Step 4b (nearest civic address) sits ahead of these fallbacks
+        mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
         mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value=None)
         mock_validator.address.resolve_street_centroid = MagicMock(return_value={
             "address": "Gordon Ave", "lat": 49.275, "lng": -122.792,
@@ -117,6 +119,8 @@ class TestGeocoderOrchestrator:
     def test_step6_road_centroid(self, mock_validator):
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value=None)
+        # Step 4b (nearest civic address) sits ahead of these fallbacks
+        mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
         mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value=None)
         mock_validator.address.resolve_street_centroid = MagicMock(return_value=None)
         mock_validator.address.resolve_road_centroid = MagicMock(return_value={
@@ -143,16 +147,22 @@ class TestGeocoderOrchestrator:
         mock_validator.address.resolve_road_centroid = MagicMock(return_value=None)
         assert mock_validator.get_coordinates("Mundy Park") is None
 
-    def test_step7_manual_overrides(self, mock_validator):
-        res_bridge = mock_validator.get_coordinates("Port Mann Bridge")
-        assert res_bridge is not None
-        assert "Port Mann" in res_bridge["address"]
-        assert abs(res_bridge["lat"] - 49.2237874) < 0.001
+    def test_no_hardcoded_destination_overrides(self, mock_validator):
+        """Hardcoded string-match destinations were removed (CLAUDE.md §6.2).
 
-        res_rv = mock_validator.get_coordinates("Riverview Hospital Station 15")
-        assert res_rv is not None
-        assert "Riverview Hospital" in res_rv["address"]
-        assert abs(res_rv["lat"] - 49.245830) < 0.001
+        Port Mann Bridge, Riverview Hospital station numbers, the Coquitlam Central bus
+        loop and 3080 Gordon Ave were matched by string comparison in application code.
+        Destinations missing from municipal records belong in the database as real
+        records. An address that resolves to nothing now returns None, which surfaces as
+        the Tier 1 unresolved warning rather than a guessed coordinate.
+        """
+        mock_validator.address.resolve_exact = MagicMock(return_value=None)
+        mock_validator.address.resolve_block = MagicMock(return_value=None)
+        mock_validator.address.resolve_cross_road_narrowing = MagicMock(return_value=None)
+        mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
+        mock_validator.address.resolve_street_centroid = MagicMock(return_value=None)
+        mock_validator.address.resolve_road_centroid = MagicMock(return_value=None)
+        assert mock_validator.get_coordinates("Port Mann Bridge") is None
 
     def test_validate_address_exists(self, mock_validator):
         # Intersection match
@@ -160,10 +170,6 @@ class TestGeocoderOrchestrator:
         assert score == 100
         assert addr == "Christmas Way & Westwood St"
 
-        # 3080 Gordon Ave override
-        score, addr = mock_validator.validate_address_exists("3080 Gordon Ave")
-        assert score == 100
-        assert addr == "3080 GORDON AVE"
 
     def test_spatial_delegation(self, mock_validator):
         mock_validator.spatial.get_map_grid_for_point = MagicMock(return_value="62")

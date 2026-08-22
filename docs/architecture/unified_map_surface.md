@@ -106,7 +106,8 @@ DispatchProvider                     one MQTT listener, one target model
     ├── MapSurface    one <MapContainer>, mode-selected layer set
     │   ├── BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer   always
     │   ├── DispatchTargetLayer, RoutingOverlay                        always
-    │   ├── ZonesLayer, RoadClosuresLayer, RailroadCrossingsLayer      standby
+    │   ├── RoadClosuresLayer                                         both
+    │   ├── ZonesLayer, RailroadCrossingsLayer                        standby
     │   └── AutoFitBounds, CandidateSelector                           dispatch
     └── detail stack
         ├── TargetAddressCard (standby) | BlockParcelPanel (dispatch)

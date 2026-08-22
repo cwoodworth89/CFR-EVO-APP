@@ -1,6 +1,7 @@
 # cfr_dispatch/parser/call_types.py
 # Incident/call type vocabulary loading and fuzzy matching.
 
+import os
 import logging
 import regex as re
 from typing import List
@@ -67,6 +68,10 @@ def match_incident_type(transcript: str, call_types: List[str]) -> str:
             best_score = score
             best_match = ct
             
+    # PROVENANCE REQUIRED (CLAUDE.md §6.3): 80 is an inherited fuzzy-match cutoff with
+    # no cited source. Failing it is safe -- the result is the explicit "Unknown
+    # Incident", never a guessed call type -- but the value should be validated against
+    # the HITL correction history rather than left as a magic number.
     if best_score >= 80:
         return best_match
     return "Unknown Incident"

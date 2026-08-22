@@ -182,7 +182,11 @@ def fuzzy_correct_street(street_name: str, known_streets: List[str]) -> str:
     if not clean_base:
         return street_name
     
-    # If base name is 4 characters or less, require higher match threshold to prevent collision errors
+    # Short street names collide easily under fuzzy matching (e.g. "Oak" vs "Oaks"),
+    # so they demand a stricter score.
+    # PROVENANCE REQUIRED (CLAUDE.md §6.3): 90/75 and the 4-character boundary are
+    # inherited and uncited. Failing the threshold returns the street name unchanged,
+    # so a miss degrades to raw text rather than a wrong street.
     threshold = 90 if len(clean_base) <= 4 else 75
     
     best_match = None

@@ -304,6 +304,10 @@ def split_rounds(text: str, units_vocab: List[str]) -> List[str]:
     """
     # Normalize spaces
     text = ' '.join(text.strip().split())
+
+    # The `> 15` guards below require a first segment of at least ~15 characters before
+    # accepting a split, so a stray early match cannot produce a meaningless fragment.
+    # PROVENANCE REQUIRED (CLAUDE.md §6.3): 15 is inherited and uncited.
     
     # 1. Split right after the first "(map) grid [digits/words]" (standard end of Round 1)
     grid_split = re.split(r'(?<=\b(?:map\s+)?grid\s+\w+\b)', text, maxsplit=1, flags=re.IGNORECASE)

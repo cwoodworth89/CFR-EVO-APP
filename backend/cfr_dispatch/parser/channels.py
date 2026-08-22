@@ -44,9 +44,11 @@ def match_radio_channel(talk_group_raw: str, radio_channels: List[str]) -> Optio
             best_score = score
             best_match = channel
             
+    # PROVENANCE REQUIRED (CLAUDE.md §6.3): 75 is an inherited cutoff with no cited
+    # source. Failing it returns None (channel unknown) rather than a guessed channel.
     if best_score >= 75:
         return best_match
-        
+
     return None
 
 def clean_channel_name_for_output(channel_name: str) -> str:

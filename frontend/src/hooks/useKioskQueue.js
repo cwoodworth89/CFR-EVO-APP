@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatchListener } from './useDispatchListener';
+import { isSameDispatch } from '../utils/dispatchModel';
 
 const DEFAULT_TIMEOUT_SECONDS = 300; // 5 minutes
 
@@ -72,19 +73,51 @@ export function useKioskQueue() {
         resetTimeoutClock();
         setElapsedSeconds(0);
         return newCall;
-      } else {
-        // Active real call in progress -> queue next call and chime
-        setQueuedCalls((prev) => [...prev, newCall]);
-        playQueuedChime();
-        return current;
       }
+
+      // SAME DISPATCH, BROADCAST AGAIN -- merge, do not queue.
+      //
+      // The two-phase pipeline can emit more than one INSERT for one dispatch_id: phase 1
+      // broadcasts a preliminary payload, and phase 2 re-broadcasts after correcting the
+      // address and map grid. Without this check the kiosk queued the corrected copy as
+      // though it were a second incident, so the operator saw an amber "call queued"
+      // banner for a call already on screen, and tapping it appeared to do nothing --
+      // it activated a near-identical copy of the same call.
+      //
+      // Observed 2026-08-22 on DISP-2026-282647: the screen showed map grid 61 while the
+      // stored record had grid 68, so the two payloads genuinely differed. Merging keeps
+      // the corrected values, which is what an operator needs, and is what an UPDATE
+      // event would have done.
+      if (isSameDispatch(current, newCall)) {
+        triggerUpdateFlash();
+        return { ...current, ...newCall };
+      }
+
+      // A genuinely different incident: queue it and chime.
+      setQueuedCalls((prev) => {
+        // Guard the queue too -- a re-broadcast of something already waiting should
+        // replace it rather than stack up.
+        const existing = prev.findIndex((q) => isSameDispatch(q, newCall));
+        if (existing !== -1) {
+          const merged = [...prev];
+          merged[existing] = { ...merged[existing], ...newCall };
+          return merged;
+        }
+        playQueuedChime();
+        return [...prev, newCall];
+      });
+      return current;
     });
-  }, [playQueuedChime, resetTimeoutClock]);
+  }, [playQueuedChime, resetTimeoutClock, triggerUpdateFlash]);
 
   // Handle incoming UPDATE dispatch event
   const handleUpdate = useCallback((updatedCall) => {
+    // Identity is dispatch_id, never address. Matching on address merged distinct
+    // incidents that happen to share a location -- the recorded corpus has three
+    // separate overdose dispatches at 3030 Gordon Ave, so two of them active at once
+    // would have overwritten each other's units, transcript and coordinates.
     setActiveCall((current) => {
-      if (current && (current.id === updatedCall.id || current.address === updatedCall.address)) {
+      if (isSameDispatch(current, updatedCall)) {
         triggerUpdateFlash();
         return { ...current, ...updatedCall };
       }
@@ -92,11 +125,9 @@ export function useKioskQueue() {
     });
 
     setQueuedCalls((prev) =>
-      prev.map((item) =>
-        item.id === updatedCall.id || item.address === updatedCall.address
-          ? { ...item, ...updatedCall }
-          : item
-      )
+      prev.map((item) => (isSameDispatch(item, updatedCall)
+        ? { ...item, ...updatedCall }
+        : item))
     );
   }, [triggerUpdateFlash]);
 

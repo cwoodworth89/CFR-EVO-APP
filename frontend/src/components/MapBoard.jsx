@@ -44,6 +44,7 @@ import { sanitizeAddress } from '../utils/addressUtils';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import { useMapInstance } from '../hooks/useMapInstance';
 import { toActiveCall, toMapTarget, isSameDispatch } from '../utils/dispatchModel';
+import { API_BASE_URL } from '../apiClient';
 
 // helper for road closure type names from Municipal 511
 
@@ -134,13 +135,20 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   // Load all hydrants data and fire zones once on mount
   useEffect(() => {
     const baseUrl = import.meta.env.BASE_URL;
-    fetch(`${baseUrl}data/hydrants.json`)
-      .then(r => r.ok ? r.json() : [])
+    // public.hydrants via the API. This previously fetched data/hydrants.json, which was
+    // deleted when hydrants moved to the database -- the request 404'd, the handler
+    // swallowed it into an empty array, and the console's nearest-hydrant panel was
+    // silently empty on every search. MapLayers already reads the API.
+    fetch(`${API_BASE_URL}/api/hydrants`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => {
-        setAllHydrantsData(data);
+        setAllHydrantsData(Array.isArray(data) ? data : []);
       })
       .catch(err => {
-        console.error("Failed to load local cached hydrants database:", err);
+        console.error("Failed to load hydrants from /api/hydrants:", err);
       });
 
     // Fetch zones on startup for offline map overlay

@@ -20,6 +20,9 @@ export default function ActiveAlertBanner({
   onToggleTvMode = null,
   onOpenPrePlan = null,
 }) {
+  const hydrantId = activeCall?.target?.nearest_city_hydrant ?? activeCall?.nearest_city_hydrant ?? null;
+  const hydrantDist = activeCall?.target?.nearest_city_dist ?? activeCall?.nearest_city_dist ?? null;
+
   if (!activeCall) return null;
 
   return (
@@ -90,12 +93,20 @@ export default function ActiveAlertBanner({
               📻 {talkGroup}
             </span>
           )}
-          <div className="bg-slate-950/90 text-sky-400 border border-sky-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
-            <span>💧</span>
-            <span className="font-bold text-white">City Hydrant:</span>
-            <span className="text-sky-300 font-black">{activeCall?.target?.nearest_city_hydrant || activeCall?.nearest_city_hydrant || 'D-163'}</span>
-            <span className="text-slate-400">({activeCall?.target?.nearest_city_dist || activeCall?.nearest_city_dist || '42'}m)</span>
-          </div>
+          {/* Nearest hydrant. Rendered ONLY when the dispatch actually carries one.
+              This previously fell back to the literal strings 'D-163' and '42' when the
+              fields were absent -- and they are absent on every dispatch, because the
+              backend has never emitted nearest_city_hydrant or nearest_city_dist. So the
+              kiosk named a specific hydrant, at a specific distance, on every call, and
+              none of it was data (CLAUDE.md §6.1, punch-list #24). */}
+          {hydrantId && (
+            <div className="bg-slate-950/90 text-sky-400 border border-sky-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <span>💧</span>
+              <span className="font-bold text-white">City Hydrant:</span>
+              <span className="text-sky-300 font-black">{hydrantId}</span>
+              {hydrantDist != null && <span className="text-slate-400">({hydrantDist}m)</span>}
+            </div>
+          )}
           {(activeCall?.target?.pre_plan_pdf_url || activeCall?.pre_plan_pdf_url) && onOpenPrePlan && (
             <button
               type="button"

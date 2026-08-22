@@ -328,12 +328,18 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               )}
             </div>
 
-            {/* Hydrant & Tactical Notes Bar */}
+            {/* Hydrant & Tactical Notes Bar.
+                Previously fell back to the literal string 'City Hydrant: D-165 (42m)'.
+                No dispatch has ever carried a `hydrant` field -- the backend does not emit
+                one -- so that invented hydrant and distance were shown on every call
+                (CLAUDE.md §6.1, punch-list #24). */}
             <div className="bg-slate-900/80 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs font-mono">
               <div className="flex items-center gap-2 text-sky-400 font-bold">
                 <span>💧</span>
                 <span className="text-[10.5px] text-slate-200">
-                  {activeCall?.hydrant || activeCall?.target?.hydrant || 'City Hydrant: D-165 (42m)'}
+                  {activeCall?.hydrant || activeCall?.target?.hydrant || (
+                    <span className="text-slate-500 italic">Nearest hydrant not computed</span>
+                  )}
                 </span>
               </div>
               <span className="text-[9px] text-slate-400 uppercase font-bold bg-slate-800 px-1.5 py-0.5 rounded">

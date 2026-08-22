@@ -1,94 +1,90 @@
 ---
 name: kiosk-responsive-ergonomics
-description: Guidelines and component standards for developing responsive CFR EVO station displays, supporting both 10-foot high-visibility apparatus bay kiosks and compact laptop/desktop workstation consoles.
+description: Layout and typography conventions for the CFR EVO station display and workstation console. Read before changing display sizing, viewport behaviour, or adding a display mode.
 ---
 
-# Kiosk & Workstation Responsive Ergonomics Guide
+# Station Display & Workstation Ergonomics
 
-This skill provides layout rules, typography tokens, and viewport adaptation standards for the **CFR EVO Frontend** across two distinct operating environments:
-1. **Station Bay Kiosk (10-Foot UI)**: High-visibility 1080p/4K displays viewed from 10–25 feet away as crew mounts apparatus.
-2. **Workstation / Laptop Console**: Interactive split-pane interface used on officer laptops and desk terminals.
+## Current design constraint
+
+**Members approach the screen and read it from normal reading distance.** There is no
+10-foot / apparatus-bay readability requirement, and typography should not be sized for
+one.
+
+Decided 2026-08-22. Changing display type — a wall-mounted bay display, multiple screen
+profiles, viewport-driven mode switching — is a **possible future feature, not a current
+requirement.** Do not build sizing infrastructure for it in advance.
+
+> [!WARNING]
+> **This file previously described a system that did not exist.** It specified an
+> `isKioskMode` / `isKioskView` prop, a `?mode=kiosk` URL switch, a "top 30% / bottom 70%"
+> kiosk layout and 72pt typography. None of those were ever in the code. Corrected
+> 2026-08-22 after verifying every claim against the source. Treat anything here as
+> checkable, and check it (CLAUDE.md §7).
 
 ---
 
-## 1. Dual-Mode Responsive Architecture
+## What actually exists
 
-```mermaid
-graph TD
-    A[Window Dimensions / Viewport Query] --> B{Screen & Interaction Mode}
-    B -->|Fullscreen Bay Display / Touch| C[Station Bay 10-Foot HUD]
-    B -->|Laptop / Workstation Desktop| D[Interactive Console Client]
-    
-    C --> C1[72pt+ Ultra-Bold Address]
-    C --> C2[High-Contrast Red/Amber/Blue Alert Banner]
-    C --> C3[Oversized 64px Touch Targets]
-    C --> C4[Auto-Centering Parcel Polygon]
-    
-    D --> D1[Interactive Split-Pane Map & Log Table]
-    D --> D2[HITL Address Correction Forms]
-    D --> D3[Hydrant Flow & GIS Layer Toggles]
-    D --> D4[Audio Playback & Waveform Inspector]
+### Two surfaces
+
+**Dispatch display** (`components/kiosk/KioskView.jsx`) — shown when there is an active
+call or a review replay.
+
+```
+ActiveAlertBanner  (header: address, units, incident, timers)
+├── RouteOverviewPanel   col-span-8   main route map
+└── detail stack         col-span-4   BlockParcelPanel
+                                      PropertySatellitePanel
+                                      StreetViewPanel
 ```
 
----
+**Workstation console** (`components/MapBoard.jsx`) — standby / explore.
 
-## 2. Display Mode Specifications
-
-### Mode A: Station Bay 10-Foot UI Standard (`isKioskMode: true`)
-* **Viewing Distance**: 10–25 feet across apparatus bay.
-* **Layout Structure**:
-  * **Top 30% Viewport**: Active Alert Banner with flashing incident priority, apparatus unit badges (`E1`, `L1`, `R1`), and live response timer.
-  * **Bottom 70% Viewport**: Full-bleed map view automatically panning and zooming to the parcel polygon boundary (`target.rings`).
-* **Design System Tokens**:
-  * Primary Address Font: `text-5xl` to `text-7xl` (`font-black`, uppercase).
-  * Unit Badges: `text-3xl font-extrabold px-6 py-3 rounded-2xl`.
-  * Background: Deep slate/black (`#0a0f1d`) for maximum contrast and reduced eye strain in dark bay bays.
-  * Touch Dismissal: Entire screen tap or giant 80px "Acknowledge" button.
-
-### Mode B: Workstation / Laptop Console (`isKioskMode: false`)
-* **Viewing Distance**: 18–24 inches (laptop screen or dual-monitor console).
-* **Layout Structure**:
-  * **Left Panel (40%)**: Dispatch history feed, confidence badges, audio waveform player, and HITL feedback modal.
-  * **Right Panel (60%)**: Interactive map with layer toggles (NFPA hydrants, road closures, emergency zone boundaries).
-* **Design System Tokens**:
-  * Typography: Clean Inter/Roboto (`text-base` to `text-xl`).
-  * Interactive Controls: Compact form inputs, dropdown selectors, copy-to-clipboard coordinates, and street view split toggle.
-
----
-
-## 3. Implementation Patterns (Tailwind & React)
-
-```jsx
-// Example responsive container pattern:
-export function DispatchHUD({ dispatch, isKioskView }) {
-  return (
-    <div className={`transition-all duration-300 ${
-      isKioskView 
-        ? "h-screen w-screen p-8 bg-slate-950 flex flex-col justify-between" 
-        : "max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4"
-    }`}>
-      {/* Dynamic typography based on mode */}
-      <h1 className={isKioskView ? "text-6xl font-black text-white" : "text-2xl font-bold text-slate-100"}>
-        {dispatch.address}
-      </h1>
-      
-      {/* Unit Badges */}
-      <div className="flex flex-wrap gap-3">
-        {dispatch.responding_units.map(unit => (
-          <span key={unit} className={isKioskView ? "text-3xl font-black px-6 py-3 bg-red-600 rounded-2xl" : "text-sm font-bold px-3 py-1 bg-red-700 rounded-lg"}>
-            {unit}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
+```
+Header
+├── LeftSidebar          map layer toggles, target, hydrants, closure filters
+├── MapContainer         main map
+└── right stack          address card, PropertySatellitePanel, StreetViewPanel
 ```
 
+Both are header + main map + right-hand detail stack. See
+[`docs/architecture/unified_map_surface.md`](../../../docs/architecture/unified_map_surface.md)
+for the proposal to collapse them into one mode-selected surface.
+
+### The only real sizing mechanism: `isTvMode`
+
+`useKioskQueue` owns `isTvMode` (default **false**), toggled by the user from the alert
+banner. It is consumed only by `ActiveAlertBanner`, where it bumps two headings:
+
+| | Normal | TV mode |
+|:--|:--|:--|
+| Address heading | `text-3xl sm:text-4xl` | `text-4xl sm:text-5xl` |
+| Secondary line | `text-xl sm:text-2xl` | `text-2xl sm:text-3xl` |
+
+It also hides the dismiss button, so a wall display cannot be cleared by a passer-by.
+
+That is the whole feature. If display-type switching is ever wanted, `isTvMode` is the
+hook to extend — not a new parallel mechanism.
+
 ---
 
-## 4. Testing Display Profiles
+## Conventions to follow
 
-To simulate both modes in local development:
-* **Bay Kiosk Mode**: Press `F11` in browser or append `?mode=kiosk` to `http://localhost:5173`.
-* **Workstation Mode**: Open in standard browser window at `http://localhost:5173` or responsive tablet/laptop resolution (1366x768 / 1920x1080).
+* **Tailwind responsive prefixes** (`sm:`, `lg:`) for viewport adaptation. There is no
+  custom breakpoint system and none is needed.
+* **Dark slate palette** (`bg-slate-950`, `border-slate-800`) throughout. This is for
+  low-light station conditions and contrast, not viewing distance, and stays regardless of
+  the constraint above.
+* **Priority colour coding** is semantic, not decorative: amber for warnings and
+  unresolved state (CLAUDE.md §5), red for emergency response, emerald for confirmed.
+* **Panels own their own layout.** The detail-stack cards are given a flex cell and size
+  themselves within it; do not set their heights from the parent.
+* **New size variants need a reason.** With one viewing distance, a second set of type
+  scales is unjustified until the display-type feature actually exists.
+
+## Testing
+
+Run the app and resize the browser. There is no mode query parameter and no kiosk
+simulation flag — the dispatch display appears when there is an active call or a review
+replay, which `App.jsx` decides from `useKioskQueue`.

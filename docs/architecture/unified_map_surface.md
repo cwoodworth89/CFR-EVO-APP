@@ -123,9 +123,16 @@ DispatchProvider                     one MQTT listener, one target model
 | **Map + layers** | **Share** | Layers already exist as components. Mode selects which mount — no flags inside the layers themselves. |
 | **Chrome** | **Keep separate** | `LeftSidebar` (layer controls) and `ActiveAlertBanner` (incident information) display different *kinds* of thing. |
 
-**Flags for degree, components for kind.** Font scale and density for 10-foot versus desk
-viewing are flags. Layer controls versus incident information are separate components. A
-single 479-line sidebar threaded with `isKiosk` is the failure mode to avoid.
+**Flags for degree, components for kind.** Layer controls versus incident information are
+different kinds of thing and stay as separate components; a single 479-line sidebar
+threaded with `isKiosk` is the failure mode to avoid.
+
+**There is no display-density difference to design for.** Decided 2026-08-22: members
+approach the screen and read it at normal distance, so there is no 10-foot readability
+requirement and no second type scale. `isTvMode` already exists as an opt-in font bump on
+the alert banner and is the hook to extend if a wall display is ever wanted — changing
+display type is a possible future feature, not a current requirement. This removes the
+main thing that would have needed a mode flag, leaving mode as purely *which pieces mount*.
 
 ---
 

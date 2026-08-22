@@ -59,15 +59,31 @@ Only three functions across 464 lines — `process_phase_2_finalize` and
 geocode, persist, MQTT and ntfy. Natural seams already exist as numbered comment
 blocks. Review alongside `phase1.py` for duplicated broadcast logic.
 
-### 1.3 `backend/cfr_dispatch/parser.py` (1053 lines, 20 functions)
+### 1.3 `backend/cfr_dispatch/parser.py` (1053 lines) — ✅ DONE
 
-Largest backend module. Clear functional groupings are already present: transcript
-sanitisation, call-type matching, unit abbreviation and merge, street suffix
-normalisation, radio channel matching, location extraction.
+Converted to a package, module path unchanged:
 
-Candidate split: `parser/sanitize.py`, `parser/units.py`, `parser/location.py`,
-`parser/channels.py`. Has a sibling `destructive_parser.py` — review the two together
-for divergence.
+| Module | Lines | Responsibility |
+|:--|--:|:--|
+| `parser/sanitize.py` | 200 | transcript normalisation |
+| `parser/call_types.py` | 64 | call-type vocabulary, fuzzy incident matching |
+| `parser/units.py` | 94 | unit abbreviation, expansion, P1/P2 merge |
+| `parser/channels.py` | 52 | radio talkgroup matching and formatting |
+| `parser/location.py` | 203 | street suffix, location cleaning, subaddress, fuzzy street |
+| `parser/announcement.py` | 411 | segmentation + template parser |
+
+`__init__.py` re-exports all 18 public names, so the nine consumers were not edited.
+Dependency direction is one-way: `announcement` depends on the other five; those five
+are independent of each other.
+
+Verified two ways: the test suite is identical before and after (11 failed / 72 passed
+both, same list, all pre-existing and environmental), and a golden diff against the
+pre-split module loaded side by side produced **byte-identical output on 6/6
+transcripts**, five of them reconstructed from real dispatches.
+
+**Still outstanding:** `destructive_parser.py` was not reviewed for divergence against
+the template parser. It imports `sanitize_transcript` from this package and duplicates
+some location logic. That comparison remains a separate task.
 
 ### 1.4 `backend/cfr_dispatch/audio_listener.py` + `config/dsp.py`
 
@@ -194,8 +210,8 @@ Not tied to a single file — worth handling as their own passes.
 
 1. ~~`road_closure_service.py` → PostGIS.~~ **Done** (`206af55`).
 2. ~~`DashboardHUD.jsx` → five files.~~ **Done.**
-3. **`parser.py` → four modules.** Highest-value backend split; pair with
-   `destructive_parser.py` to check for divergence.
+3. ~~`parser.py` → modules.~~ **Done** (six-module package). The
+   `destructive_parser.py` divergence review was *not* done and is still open.
 4. **Helper extraction for `react-refresh`.** Move non-component exports out of
    `MapLayers.jsx`, `ActiveAlertBanner.jsx`, `ReviewTable.jsx` and
    `VerificationSidebar.jsx` into sibling modules. Mechanical, clears 14 of the

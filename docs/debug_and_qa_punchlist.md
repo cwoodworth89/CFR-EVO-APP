@@ -18,7 +18,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > same pass.
 >
 > Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**,
-> **#22**.
+> **#22**, **#27**, **#29**.
 >
 > **Found from live operation 2026-08-22**, none of them reachable from the test corpus —
 > all three came from one operator screenshot of a real dispatch: **#24** (an invented
@@ -1116,3 +1116,99 @@ a warning. A dispatch that resolves to the wrong place leaves no trace of how it
 **Fix**: configure logging in the worker process entry point with the same format and level
 as the agent. Until then, treat "the logs show nothing" as "the logs are not recording",
 not as evidence that nothing happened.
+
+---
+
+## ⚙️ Dispatch Worker Process Architecture
+
+The two-phase pipeline runs in a `multiprocessing.Process` spawned by
+`orchestration.run_dispatch_system`. The separation is justified — Whisper int8 inference
+takes seconds and must not stall PortAudio capture, and a pipeline crash must not take the
+audio listener down with it. These items are about how that separation is *implemented*.
+
+### 27. The worker process is unsupervised
+> **Status**: ⚠️ **Open — found 2026-08-22.**
+
+`orchestration.py`:
+
+```python
+worker_process = multiprocessing.Process(target=background_worker_loop, args=(dispatch_queue,), daemon=True)
+worker_process.start()
+```
+
+That is the only reference to it. The process is never checked with `is_alive()`, never
+restarted, and emits no health signal. **A worker crash is permanent and silent** until
+someone restarts the whole service.
+
+Before #28 was fixed this compounded badly: a dead worker stopped draining the queue, the
+queue filled, and the blocking `put()` then stopped the audio listener entirely. That path
+is closed, but a dead worker still means no dispatch is ever processed, persisted or
+broadcast — while the listener keeps happily detecting tones.
+
+**Fix direction**: check `worker_process.is_alive()` from the listener loop, restart it, and
+log the restart at CRITICAL. Restarting is cheap relative to the alternative — the worker
+reloads the Whisper model and the GIS validator on start, which is seconds.
+
+**Watch for**: a crash loop. If the worker dies repeatedly on the same task, restarting
+forever is worse than stopping loudly. A restart counter with a ceiling, and a distinct
+log line when the ceiling is hit, is the honest version.
+
+### 28. A stalled worker could block the audio listener — fixed
+> **Status**: ✅ **Closed 2026-08-22.**
+
+`dispatch_queue` is a `multiprocessing.Queue(maxsize=10)` and both producers used a
+**blocking** `put()`:
+
+* `audio_listener.py` — `phase_2_finalize`, carrying the complete audio buffer.
+* `sound_capture.py` — `phase_1_check`, enqueued **inside the capture loop**.
+
+If the worker stalled or died, the queue filled and `put()` blocked the audio listener
+indefinitely. It would stop capturing tones with no error and no warning: the system would
+look like a quiet night while being deaf. For a dispatch system that is the worst available
+failure mode, because nothing distinguishes it from no calls arriving. The `phase_1_check`
+case was worse still, stalling capture of a dispatch already in progress.
+
+**Fix**: `audio_service.enqueue_dispatch_task` — never blocks, and prioritises by task type,
+because the two are not equally important:
+
+* `phase_2_finalize` carries the full audio and is what persists and broadcasts the call.
+  Losing one loses the call, so it is admitted by **displacing an older queued item**.
+* `phase_1_check` is an optimistic early alert on a partial buffer. Dropping one costs
+  notification latency; phase 2 still produces the full record. It is **discarded**.
+
+A full queue is logged at ERROR (phase 1) or CRITICAL (phase 2) rather than swallowed, so it
+reaches the journal — which it now can, since #26.
+
+Verified against a genuinely full queue:
+
+```
+phase_1_check    accepted=False  elapsed=0.000s   -> ERROR, discarded
+phase_2_finalize accepted=True   elapsed=0.000s   -> CRITICAL, displaced OLD-0
+survivors: ['OLD-1', 'OLD-2', 'NEW-P2']
+```
+
+The newest call gets through and neither call blocks.
+
+### 29. Phase 1 session state lives only in worker memory
+> **Status**: ⚠️ **Open — found 2026-08-22.**
+
+`DispatchSessionManager` holds phase 1 candidates in a plain dict inside the worker
+process (`worker.py`, `_phase_1_candidates`). Nothing persists it.
+
+If the worker dies, every in-flight dispatch loses its phase 1 context. Phase 2 then finds
+`p1_data` empty and takes the **"Phase 1 was skipped"** single-phase branch
+(`phase2.py:127`), which publishes a second `INSERT` rather than the `UPDATE` the
+correction path uses — the exact mechanism implicated in #25.
+
+It is also inconsistent with the rest of the system: PostgreSQL is the single source of
+truth for dispatches, vocabulary, hydrants, intersections and road closures, and this is
+the one piece of dispatch state that is not in it.
+
+**Fix direction**: persist phase 1 candidates to Postgres keyed by `dispatch_id`, with the
+existing 600 s TTL enforced by a timestamp column. Phase 2 then reads them regardless of
+which process — or which *instance* of the worker — handled phase 1.
+
+**Related and worth fixing with it**: `phase1.py` broadcasts its `INSERT` *before* calling
+`record_phase_1_success`. Any exception in that broadcast block leaves an INSERT emitted
+with no session recorded, producing the same "phase 1 was skipped" outcome. Recording the
+session first would make an untracked INSERT impossible.

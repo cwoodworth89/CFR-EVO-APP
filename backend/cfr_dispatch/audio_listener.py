@@ -35,6 +35,7 @@ from audio_service import (
     analyze_live_audio,
     get_all_matches,
     capture_full_dispatch,
+    enqueue_dispatch_task,
     resolve_audio_device
 )
 
@@ -201,7 +202,9 @@ def run_audio_listener_loop(dispatch_queue):
             )
             if dispatch_buffer:
                 logging.info(f"[{dispatch_id}] Queueing finalized dispatch for background processing...")
-                dispatch_queue.put({
+                # Non-blocking. A full queue means the worker is not draining, which used
+                # to block the listener here and silently stop it capturing tones.
+                enqueue_dispatch_task(dispatch_queue, {
                     "type": "phase_2_finalize",
                     "dispatch_id": dispatch_id,
                     "buffer": list(dispatch_buffer),

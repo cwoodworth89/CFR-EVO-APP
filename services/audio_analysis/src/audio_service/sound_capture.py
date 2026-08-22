@@ -3,6 +3,7 @@
 import time
 import logging
 from audio_service.dsp_tone_spotter import get_rms
+from audio_service.dispatch_queue import enqueue_dispatch_task
 
 def capture_full_dispatch(
     stream, 
@@ -38,7 +39,9 @@ def capture_full_dispatch(
             if duration_s >= min_phase_1_duration_s and (current_time - last_check_time >= phase_1_check_interval_s):
                 last_check_time = current_time
                 logging.debug(f"Queueing intermediate audio buffer for Phase 1 check ({len(audio_buffer)} blocks, {duration_s:.1f}s)...")
-                dispatch_queue.put({
+                # Non-blocking: this runs INSIDE the capture loop, so a blocking put on a
+                # full queue would stall capture of the dispatch in progress.
+                enqueue_dispatch_task(dispatch_queue, {
                     "type": "phase_1_check",
                     "dispatch_id": dispatch_id,
                     "buffer": list(audio_buffer),

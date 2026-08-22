@@ -17,6 +17,7 @@ import { apiClient } from '../apiClient';
 import { targetIcon, createSoftZoneNumberIcon } from './map/mapIcons';
 import { getZoneCentroid, getAlphaSegment, enrichAddressWithBuilding } from './map/mapGeometry';
 import RoadClosureMarker from './map/RoadClosureMarker';
+import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
 
 import { RoutingOverlay } from './RoutingOverlay';
 import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
@@ -64,16 +65,19 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     setAppMode(initialMode);
   }
   const [activeDispatch, setActiveDispatch] = useState(null);
-  const [mapStyle, setMapStyle] = useState("GREY"); 
-  const [showLabels, setShowLabels] = useState(true); 
-  const [showHydrants, setShowHydrants] = useState(true); 
-  const [showZones, setShowZones] = useState(true); 
-  const [showRoadClosures, setShowRoadClosures] = useState(true); 
-  const [showActiveNow, setShowActiveNow] = useState(true);
-  const [showNext24h, setShowNext24h] = useState(false);
-  const [showNext7d, setShowNext7d] = useState(false);
-  const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
-  const [showFireHalls, setShowFireHalls] = useState(true);
+  // Layer visibility and road-closure filters live in one hook so the sidebars can be
+  // given {...layers} rather than forty lines of individual prop pass-through.
+  const layers = useMapLayerPreferences();
+  const {
+    mapStyle, showLabels, showHydrants, showZones, showRoadClosures,
+    showRailroadCrossings, showFireHalls,
+    showActiveNow, showNext24h, showNext7d,
+    filterNoAccess, filterAccessOnly, filterCaution,
+    // Header takes these three explicitly rather than by spread: it uses six of the
+    // hook's values, so listing them keeps its interface visible.
+    setMapStyle, setShowLabels, setShowRoadClosures,
+    applyModeDefaults,
+  } = layers;
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
@@ -398,10 +402,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     }
   }, [map, targetAddress, homeHall, appMode, userPanned, targetCoords]);
 
-  // ROAD ACCESS FILTER STATES
-  const [filterNoAccess, setFilterNoAccess] = useState(true);
-  const [filterAccessOnly, setFilterAccessOnly] = useState(true);
-  const [filterCaution, setFilterCaution] = useState(true);
 
   // Auto-resize Leaflet map container to prevent gray areas when sidebars open/close
   useEffect(() => {
@@ -461,20 +461,10 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       setAppMode(mode);
       setActiveDispatch(null);
       setTargetAddress(null);
-      setMapStyle(MODE_DEFAULTS[mode] || "GREY"); 
-      setShowLabels(mode === "EXPLORE");
-      
-      if (mode === "EXPLORE") {
-          setShowZones(true);
-          setShowHydrants(true);
-          setShowRoadClosures(true);
-          setLeftSidebarOpen(true);
-          setRightSidebarOpen(false);
-      } else {
-          setLeftSidebarOpen(true);
-          setRightSidebarOpen(false);
-      }
-  }, [onLaunchKiosk]);
+      applyModeDefaults(mode);
+      setLeftSidebarOpen(true);
+      setRightSidebarOpen(false);
+  }, [onLaunchKiosk, applyModeDefaults]);
 
   const getZoneStyle = (zone) => {
     // Color-code by fire hall for explore/live modes
@@ -541,26 +531,13 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       <div className="flex flex-row flex-grow w-full h-[calc(100vh-4rem)] relative overflow-hidden z-10">
         {/* Left Control Panel & Option Toggles */}
         <LeftSidebar 
+          {...layers}
           leftSidebarOpen={leftSidebarOpen}
           setLeftSidebarOpen={setLeftSidebarOpen}
           appMode={appMode}
           activeDispatch={activeDispatch}
           setActiveDispatch={setActiveDispatch}
-          mapStyle={mapStyle}
-          setMapStyle={setMapStyle}
           onOpenRoutingConfig={() => setShowRoutingConfigModal(true)}
-          showZones={showZones}
-          setShowZones={setShowZones}
-          showHydrants={showHydrants}
-          setShowHydrants={setShowHydrants}
-          showRoadClosures={showRoadClosures}
-          setShowRoadClosures={setShowRoadClosures}
-          showLabels={showLabels}
-          setShowLabels={setShowLabels}
-          showRailroadCrossings={showRailroadCrossings}
-          setShowRailroadCrossings={setShowRailroadCrossings}
-          showFireHalls={showFireHalls}
-          setShowFireHalls={setShowFireHalls}
           homeHall={homeHall}
           setHomeHall={setHomeHall}
           targetAddress={targetAddress}
@@ -568,18 +545,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
           nearestHydrant={nearestHydrants[0] || null}
           nearestHydrants={nearestHydrants}
           routeMetrics={routeMetrics}
-          filterNoAccess={filterNoAccess}
-          setFilterNoAccess={setFilterNoAccess}
-          filterAccessOnly={filterAccessOnly}
-          setFilterAccessOnly={setFilterAccessOnly}
-          filterCaution={filterCaution}
-          setFilterCaution={setFilterCaution}
-          showActiveNow={showActiveNow}
-          setShowActiveNow={setShowActiveNow}
-          showNext24h={showNext24h}
-          setShowNext24h={setShowNext24h}
-          showNext7d={showNext7d}
-          setShowNext7d={setShowNext7d}
           map={map}
         />
 
@@ -878,17 +843,11 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
         {/* Right Sidebar Alerts Panel */}
         {(!targetAddress || appMode !== "EXPLORE") && (
           <RightSidebar 
+            {...layers}
             rightSidebarOpen={rightSidebarOpen}
             setRightSidebarOpen={setRightSidebarOpen}
             appMode={appMode}
             roadClosures={roadClosures}
-            showRoadClosures={showRoadClosures}
-            filterNoAccess={filterNoAccess}
-            filterAccessOnly={filterAccessOnly}
-            filterCaution={filterCaution}
-            showActiveNow={showActiveNow}
-            showNext24h={showNext24h}
-            showNext7d={showNext7d}
             map={map}
             onSelectClosure={setSelectedClosure}
             zones={zones}

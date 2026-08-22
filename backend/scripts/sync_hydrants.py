@@ -76,8 +76,13 @@ def sync_hydrants(mode="full"):
         hyd = {
             "id": obj_id,
             "gisId": attribs.get("gis_id") or f"H-{obj_id}",
-            "status": attribs.get("status") or "OPERATING",
-            "flowClass": attribs.get("flow_class") or "AA",
+            # No defaults. Verified against the City ArcGIS source 2026-08-21: private
+            # hydrants return flow_class = null. Defaulting to "AA" told crews an
+            # unrated hydrant was the highest NFPA 291 class -- the most dangerous
+            # direction for a substitution (CLAUDE.md 6.1). Defaulting status to
+            # "OPERATING" likewise showed a hydrant of unknown condition as in service.
+            "status": attribs.get("status"),
+            "flowClass": attribs.get("flow_class"),
             "lng": round(geometry.get("x"), 6),
             "lat": round(geometry.get("y"), 6),
             "updatedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -88,6 +93,64 @@ def sync_hydrants(mode="full"):
         json.dump(new_hydrants_list, out_f, indent=2)
 
     logging.info(f"Successfully saved {len(new_hydrants_list)} hydrants to {output_path}!")
+
+    unrated = sum(1 for h in new_hydrants_list if not h["flowClass"])
+    no_status = sum(1 for h in new_hydrants_list if not h["status"])
+    logging.info(
+        f"  {unrated} hydrants have no NFPA 291 flow class and {no_status} have no "
+        f"status at source; these are stored NULL and must render as UNRATED/UNKNOWN."
+    )
+
+    _write_hydrants_to_db(new_hydrants_list)
+    return True
+
+
+def _write_hydrants_to_db(hydrants: list) -> None:
+    """Upserts the synced hydrants into public.hydrants.
+
+    public.hydrants is the source of truth; the JSON file is a browser cache that the
+    kiosk still fetches directly. Unknown status/flow_class are written NULL.
+    """
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        logging.warning("DATABASE_URL not set; skipping public.hydrants upsert.")
+        return
+
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            for h in hydrants:
+                conn.execute(text("""
+                    INSERT INTO public.hydrants
+                        (object_id, gis_id, status, flow_class, lat, lng, geom, synced_at)
+                    VALUES
+                        (:oid, :gid, :status, :flow, :lat, :lng,
+                         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326), CURRENT_TIMESTAMP)
+                    ON CONFLICT (object_id) DO UPDATE SET
+                        gis_id     = EXCLUDED.gis_id,
+                        status     = EXCLUDED.status,
+                        flow_class = EXCLUDED.flow_class,
+                        lat        = EXCLUDED.lat,
+                        lng        = EXCLUDED.lng,
+                        geom       = EXCLUDED.geom,
+                        synced_at  = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                """), {
+                    "oid": h["id"], "gid": h["gisId"], "status": h["status"],
+                    "flow": h["flowClass"], "lat": h["lat"], "lng": h["lng"],
+                })
+
+            conn.execute(text("""
+                UPDATE public.hydrants h SET zone_id = z.map_name
+                FROM public.zones z
+                WHERE h.zone_id IS DISTINCT FROM z.map_name
+                  AND ST_Contains(z.geom, h.geom)
+            """))
+
+        logging.info(f"  Upserted {len(hydrants)} hydrants into public.hydrants.")
+    except Exception as e:
+        logging.error(f"  Failed to write hydrants to public.hydrants: {e}")
     return True
 
 if __name__ == "__main__":

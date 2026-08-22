@@ -191,8 +191,14 @@ function HydrantDetailCard({ gisId, statusVal, flowClass, label }) {
     ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
     : 'bg-rose-500/20 text-rose-400 border-rose-500/30';
 
-  let flowBadgeColor = 'text-sky-400';
+  // An unrated hydrant must say so. The City records no flow_class for private
+  // hydrants; a previous sync default wrote "AA" (the HIGHEST NFPA 291 class), which
+  // told crews an unrated hydrant was the best available supply. Blank is not good
+  // enough either -- absence of a badge reads as "nothing to report".
   const fc = (flowClass || '').toUpperCase();
+  const isRated = ['AA', 'A', 'B', 'C'].includes(fc);
+
+  let flowBadgeColor = 'text-slate-400';
   if (fc === 'AA') flowBadgeColor = 'text-sky-400';
   else if (fc === 'A') flowBadgeColor = 'text-emerald-400';
   else if (fc === 'B') flowBadgeColor = 'text-amber-400';
@@ -207,11 +213,20 @@ function HydrantDetailCard({ gisId, statusVal, flowClass, label }) {
         </span>
       </div>
       <h3 className="font-bold text-sm text-sky-400 mt-1.5 leading-tight">ID: {gisId}</h3>
-      {flowClass && (
-        <div className="mt-2 pt-1.5 border-t border-slate-850 flex justify-between items-center text-xs">
-          <span className="text-slate-400 font-sans">Flow Rating</span>
-          <span className={`font-mono font-bold ${flowBadgeColor}`}>{flowClass}</span>
-        </div>
+      <div className="mt-2 pt-1.5 border-t border-slate-850 flex justify-between items-center text-xs">
+        <span className="text-slate-400 font-sans">Flow Rating</span>
+        {isRated ? (
+          <span className={`font-mono font-bold ${flowBadgeColor}`}>{fc}</span>
+        ) : (
+          <span className="font-mono font-black text-amber-300 bg-amber-950/60 border border-amber-700/70 px-1.5 py-0.5 rounded text-[10px] tracking-wider">
+            ⚠️ UNRATED
+          </span>
+        )}
+      </div>
+      {!isRated && (
+        <p className="mt-1 text-[9px] text-amber-300/90 font-sans leading-snug">
+          No NFPA 291 flow rating on record for this hydrant. Confirm supply on scene.
+        </p>
       )}
       <div className="mt-1 flex justify-between items-center text-xs">
         <span className="text-slate-400 font-sans font-medium">Status</span>
@@ -361,8 +376,11 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
           if (statusVal === "PRIVATE") label = "PRIVATE";
           if (statusVal === "ABANDONED" || statusVal === "OUT_OF_SERVICE" || statusVal === "INACTIVE") label = "OUT OF SERVICE";
 
-          let borderColor = '#facc15';
+          // Unrated hydrants get a neutral grey, deliberately outside the four NFPA
+          // 291 colours, so an unknown rating can never be mistaken for a class.
           const fc = (flowClass || "").toUpperCase();
+          const isRated = ['AA', 'A', 'B', 'C'].includes(fc);
+          let borderColor = '#94a3b8';
           if (fc === 'AA') borderColor = '#38bdf8';
           else if (fc === 'A') borderColor = '#4ade80';
           else if (fc === 'B') borderColor = '#fb923c';

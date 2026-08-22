@@ -210,10 +210,12 @@ backend/*.json
 agent/test_calls/
 backend/tests/test_calls/
 *.json.key
-agent/audio_files/
 backend/audio_files/
-agent/client/public/recordings/
 frontend/public/recordings/
+frontend/dist/recordings/
+services/backend/
+backend/client/
+backend/data/training/audio/
 
 # Block all audio files from Git globally
 *.wav
@@ -238,4 +240,4 @@ archive/
 *.las
 *.laz
 backend/data/staging/
-frontend/public/data/*.zip
+frontend/public/data/*.zip

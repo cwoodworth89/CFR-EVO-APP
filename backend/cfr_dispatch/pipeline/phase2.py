@@ -49,20 +49,10 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None,
         wavio.write(wav_io, full_audio, AUDIO_SAMPLE_RATE, sampwidth=2)
         audio_bytes = wav_io.getvalue()
         
-        # Save to frontend/public/recordings/ if present (atomic write)
-        try:
-            import tempfile
-            frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "..", "frontend", "public", "recordings")
-            os.makedirs(frontend_dir, exist_ok=True)
-            target_frontend_path = os.path.join(frontend_dir, f"{dispatch_id}.wav")
-            with tempfile.NamedTemporaryFile(dir=frontend_dir, delete=False, suffix=".tmp") as tmp:
-                tmp.write(audio_bytes)
-                tmp_path = tmp.name
-            os.replace(tmp_path, target_frontend_path)
-        except Exception:
-            pass
-
-        # Save locally using notification_service persistence
+        # Single write. Recordings previously went here AND to
+        # frontend/public/recordings/, but nothing ever read the second copy -- the
+        # kiosk plays audio from the dispatch record's audio_url, which resolves to
+        # /api/audio/<id>.wav served from RECORDINGS_DIR.
         local_api_audio_url = save_audio_recording(audio_bytes, f"{dispatch_id}.wav")
         return local_api_audio_url, duration_seconds
     except Exception as e:

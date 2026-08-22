@@ -17,6 +17,7 @@ import { getAlphaSegment, enrichAddressWithBuilding } from './map/mapGeometry';
 import RoadClosureMarker from './map/RoadClosureMarker';
 import ZonesLayer from './map/ZonesLayer';
 import MapViewControls from './map/MapViewControls';
+import TargetAddressCard from './hud/TargetAddressCard';
 import RoadClosuresLayer from './map/RoadClosuresLayer';
 import DispatchTargetLayer from './map/DispatchTargetLayer';
 import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
@@ -42,12 +43,16 @@ const ModalLoadingFallback = () => (
 );
 import { sanitizeAddress } from '../utils/addressUtils';
 import { useDispatchListener } from '../hooks/useDispatchListener';
+import { useMapInstance } from '../hooks/useMapInstance';
 
 // helper for road closure type names from Municipal 511
 
 // 🚧 Barricade Icon for Road Closures
 export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "EXPLORE" }) {
-  const [map, setMap] = useState(null);
+  const {
+    map, setMap, currentZoom, isOffDefault, userPanned, setUserPanned,
+    fitTo, invalidateSoon,
+  } = useMapInstance();
 
   // Safe dynamic compile-time stamp
   const buildTime = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
@@ -84,7 +89,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
 
   // Road closures and the filtered subset the map and alert count render.
   const { roadClosures, activeClosures } = useRoadClosures(layers);
-  const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
   // COLLAPSIBLE SIDEBAR STATES
@@ -125,39 +129,7 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     });
   }, [targetAddress, homeHall, routeCoordinates, activeDispatch]);
 
-  const [userPanned, setUserPanned] = useState(false);
-  const [isOffDefault, setIsOffDefault] = useState(false);
 
-  // Track zoom level & map movement off default center/zoom
-  useEffect(() => {
-    if (!map) return;
-    const updateMapState = () => {
-      const zoom = map.getZoom();
-      setCurrentZoom(zoom);
-      const center = map.getCenter();
-      const latDiff = Math.abs(center.lat - COQUITLAM_CENTER[0]);
-      const lngDiff = Math.abs(center.lng - COQUITLAM_CENTER[1]);
-      const zoomDiff = Math.abs(zoom - 12);
-      
-      // Off default if panned > ~300m or zoomed away from 12
-      const offDefault = latDiff > 0.003 || lngDiff > 0.003 || zoomDiff > 0.15;
-      setIsOffDefault(offDefault);
-    };
-
-    const onUserGesture = (e) => {
-      if (e && e.originalEvent) {
-        setUserPanned(true);
-      }
-    };
-
-    map.on('zoomend moveend', updateMapState);
-    map.on('dragstart zoomstart touchstart', onUserGesture);
-    updateMapState();
-    return () => {
-      map.off('zoomend moveend', updateMapState);
-      map.off('dragstart zoomstart touchstart', onUserGesture);
-    };
-  }, [map]);
 
   // Load all hydrants data and fire zones once on mount
   useEffect(() => {
@@ -201,7 +173,10 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     }
     setAllNearbyHydrants([]);
     setRouteCoordinates([]);
-  }, []);
+    // setUserPanned is a useState setter and therefore stable, but it now arrives through
+    // useMapInstance, so the compiler can no longer prove that and bails out of optimizing
+    // this component unless it is declared. Listing it changes nothing at runtime.
+  }, [setUserPanned]);
 
   // Auto-open target address popup when targetAddress changes
   useEffect(() => {
@@ -399,25 +374,20 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   // Adaptive Zooming: fit bounds to show both origin hall & destination address inside middle window (between Left 320px & Right 380px sidebars)
   useEffect(() => {
     if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE" && !userPanned && targetCoords) {
-      const origin = STATIONS[homeHall];
-      map.fitBounds([origin, targetCoords], { 
-        paddingTopLeft: [340, 80], 
-        paddingBottomRight: [400, 80], 
-        animate: true 
+      // Padding is asymmetric on purpose: the left sidebar and right inspection stack
+      // both overlay the map, so an evenly padded fit tucks the route underneath them.
+      fitTo([STATIONS[homeHall], targetCoords], {
+        paddingTopLeft: [340, 80],
+        paddingBottomRight: [400, 80],
       });
     }
-  }, [map, targetAddress, homeHall, appMode, userPanned, targetCoords]);
+  }, [map, targetAddress, homeHall, appMode, userPanned, targetCoords, fitTo]);
 
 
   // Auto-resize Leaflet map container to prevent gray areas when sidebars open/close
   useEffect(() => {
-    if (map) {
-      const timer = setTimeout(() => {
-        map.invalidateSize();
-      }, 350); // wait for transitions to settle
-      return () => clearTimeout(timer);
-    }
-  }, [map, leftSidebarOpen, rightSidebarOpen]);
+    return invalidateSoon();
+  }, [invalidateSoon, leftSidebarOpen, rightSidebarOpen]);
 
   const startMode = useCallback((mode) => {
       if (mode === "KIOSK_VIEW") {
@@ -554,57 +524,11 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
         {appMode === "EXPLORE" && targetAddress && (
           <aside className="w-[380px] h-full bg-slate-950 border-l border-slate-800 p-3 flex flex-col gap-3 z-[1000] flex-shrink-0 shadow-2xl animate-in slide-in-from-right duration-300">
             {/* Top 1/3 Address Information Card */}
-            <div className="flex-1 min-h-0 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-xl backdrop-blur relative overflow-hidden">
-              <div>
-                <div className="flex justify-between items-center gap-2 pb-2.5 border-b border-slate-800">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">SEARCH TARGET</span>
-                    <span className="text-emerald-400 text-[9px] font-black tracking-wider bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded">ACTIVE ROUTE</span>
-                  </div>
-                  <button 
-                    onClick={() => setTargetAddress(null)}
-                    className="text-slate-400 hover:text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-800 transition cursor-pointer"
-                    title="Close Inspection Panel"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {targetAddress.buildingName && (
-                  <div className="flex items-center gap-1.5 mt-2.5 bg-amber-950/70 border border-amber-700/80 px-2.5 py-1 rounded-lg text-amber-300 font-extrabold text-xs">
-                    <span>🏢</span>
-                    <span>{targetAddress.buildingName}</span>
-                  </div>
-                )}
-                <h3 className="font-black text-lg text-sky-400 mt-2 leading-tight uppercase font-sans tracking-tight">
-                  {targetAddress.address}
-                </h3>
-                <p className="text-[11px] text-slate-400 font-mono mt-0.5 font-semibold">Coquitlam, BC</p>
-                {targetAddress.note && (
-                  <p className="text-[10px] text-sky-300 font-sans italic mt-1 font-semibold bg-slate-950/60 p-1.5 rounded border border-slate-800">
-                    ℹ️ {targetAddress.note}
-                  </p>
-                )}
-                
-                {nearestHydrants.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col gap-1.5">
-                    <span className="text-[9.5px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
-                      💧 Nearest Hydrant
-                    </span>
-                    <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
-                      <span className="text-slate-400">ID / Distance</span>
-                      <span className="text-white font-black">{nearestHydrants[0].gisId} ({nearestHydrants[0].distance}m)</span>
-                    </div>
-                    {nearestHydrants[0].flowClass && (
-                      <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
-                        <span className="text-slate-400">Flow Rating</span>
-                        <span className="text-sky-400 font-black">{nearestHydrants[0].flowClass}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            <TargetAddressCard
+              targetAddress={targetAddress}
+              nearestHydrants={nearestHydrants}
+              onClose={() => setTargetAddress(null)}
+            />
 
             {/* Middle 1/3 3D Property Satellite View */}
             <div className="flex-1 min-h-0 relative">

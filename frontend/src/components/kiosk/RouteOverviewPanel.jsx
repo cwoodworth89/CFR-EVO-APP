@@ -5,6 +5,7 @@ import { RoutingOverlay } from '../RoutingOverlay';
 import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
+import StreetSectionBanner from './StreetSectionBanner';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 function AutoFitBounds({ origin, destination, userPanned, callKey }) {
@@ -239,6 +240,14 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Street section: resolved to a stretch of road, not a point. A third state --
+          neither a located incident nor an unresolved one -- so it gets its own card. */}
+      {activeCall?.location_type === 'street_section' && (
+        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
+          <StreetSectionBanner activeCall={activeCall} />
         </div>
       )}
 

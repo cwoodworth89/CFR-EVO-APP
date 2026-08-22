@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional, Tuple, List, Any
 from sqlalchemy import text
-from .normalization import normalize_street_name, SUFFIX_MAPPINGS
+from .normalization import normalize_street_name
 
 try:
     from thefuzz import fuzz

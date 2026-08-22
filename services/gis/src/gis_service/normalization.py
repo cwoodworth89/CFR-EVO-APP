@@ -3,22 +3,69 @@ import re
 from typing import Tuple, Optional
 from dataclasses import dataclass
 
-SUFFIX_MAPPINGS = {
-    "AVENUE": "AVE", "AVE": "AVE",
-    "STREET": "ST", "ST": "ST",
-    "ROAD": "RD", "RD": "RD",
-    "DRIVE": "DR", "DR": "DR",
-    "BOULEVARD": "BLVD", "BLVD": "BLVD",
-    "HIGHWAY": "HWY", "HWY": "HWY",
-    "WAY": "WAY",
-    "CRESCENT": "CRES", "CRES": "CRES",
-    "COURT": "CRT", "CRT": "CRT",
-    "PLACE": "PL", "PL": "PL",
-    "LANE": "LN", "LN": "LN",
-    "PROMENADE": "PROM", "PROM": "PROM",
-    "RAMP": "RAMP",
-    "ALLEY": "ALLEY",
-}
+# Street suffix mappings live in public.vocabulary (category 'street_suffix'), not here.
+#
+# They were hardcoded in this module AND in extract_all_intersections_from_gis.py, and
+# the two disagreed: the extractor wrote 'SUNSET SQ' into public.intersections while
+# this module normalized an incoming dispatch to 'SUNSET SQUARE', so those intersections
+# could never be found. This module was also missing 10 suffix types that occur in
+# public.roads.roadtype, covering 26 real streets.
+#
+# The database is the single source of truth, matching the pattern already used for
+# units, call types and radio channels (backend/cfr_dispatch/config/vocab.py). There is
+# deliberately NO file fallback: a stale or partial suffix table silently mis-normalizes
+# street names, which surfaces as an address that will not resolve rather than as an
+# error, and nothing would report it (CLAUDE.md 6.1).
+#
+# Loaded lazily on first use rather than at import: this is a leaf utility imported by
+# the parser, and an import-time database round trip makes import order load-bearing.
+
+_SUFFIX_CACHE: dict | None = None
+
+
+def _load_suffix_mappings() -> dict:
+    """Load variant -> canonical street suffix mappings from public.vocabulary."""
+    import os
+    from sqlalchemy import create_engine, text
+    db_url = os.environ.get('DATABASE_URL',
+                            'postgresql://cfr_user:cfr_password_2026@localhost:5432/cfr_dispatch')
+    engine = create_engine(db_url)
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT term, term_normalized FROM public.vocabulary
+            WHERE category = 'street_suffix' AND is_active = TRUE
+        """)).fetchall()
+    return {r[0].strip().upper(): r[1].strip().upper() for r in rows if r[0] and r[1]}
+
+
+def get_suffix_mappings() -> dict:
+    """Cached accessor. Raises if the vocabulary is unreachable or empty."""
+    global _SUFFIX_CACHE
+    if _SUFFIX_CACHE is None:
+        try:
+            mappings = _load_suffix_mappings()
+        except Exception as e:
+            raise RuntimeError(
+                "Could not load street suffix vocabulary from public.vocabulary "
+                f"(category 'street_suffix'): {e}. Refusing to normalize street names "
+                "against an unknown suffix set -- addresses would silently fail to "
+                "resolve. Check DATABASE_URL and that cfr_postgres is healthy, then "
+                "apply backend/migrations/2026-08-22_street_suffix_vocabulary.sql."
+            ) from e
+        if not mappings:
+            raise RuntimeError(
+                "public.vocabulary has no active 'street_suffix' rows. Apply "
+                "backend/migrations/2026-08-22_street_suffix_vocabulary.sql."
+            )
+        _SUFFIX_CACHE = mappings
+    return _SUFFIX_CACHE
+
+
+def reset_suffix_cache() -> None:
+    """Drop the cache so the next call re-reads the table (for tests and after edits)."""
+    global _SUFFIX_CACHE
+    _SUFFIX_CACHE = None
+
 
 INTERSECTION_SPLIT_REGEX = re.compile(
     r'\s+(?:and|&|/|near|at|@)\s+|\s*[/&@]\s*',
@@ -43,8 +90,9 @@ def normalize_street_name(name: str) -> str:
     words = clean.split()
     if not words:
         return ""
-    if len(words) > 1 and words[-1] in SUFFIX_MAPPINGS:
-        words[-1] = SUFFIX_MAPPINGS[words[-1]]
+    mappings = get_suffix_mappings()
+    if len(words) > 1 and words[-1] in mappings:
+        words[-1] = mappings[words[-1]]
     return " ".join(words)
 
 def normalize_intersection_key(street1: str, street2: str) -> str:
@@ -90,11 +138,11 @@ def parse_house_and_street(clean_address: str) -> ParsedAddress | None:
     if len(words) > 1:
         street_type_raw = words[-1]
         street_name = ' '.join(words[:-1])
-        norm_type = SUFFIX_MAPPINGS.get(street_type_raw.upper(), street_type_raw.upper())
+        norm_type = get_suffix_mappings().get(street_type_raw.upper(), street_type_raw.upper())
     elif len(words) == 1:
-        if words[0].upper() in SUFFIX_MAPPINGS:
+        if words[0].upper() in get_suffix_mappings():
             street_name = ''
-            norm_type = SUFFIX_MAPPINGS[words[0].upper()]
+            norm_type = get_suffix_mappings()[words[0].upper()]
         else:
             street_name = street_raw
             norm_type = ''

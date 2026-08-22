@@ -45,6 +45,15 @@ function App() {
       lat: call.target?.lat ?? call.lat ?? null,
       lng: call.target?.lng ?? call.lng ?? null,
       rings: call.target?.rings || call.rings || [],
+      // Street-section fields. A "<street> and <street>" dispatch has no point location;
+      // these drive the amber section banner and the highlighted polyline. Dropping them
+      // would make the section's representative midpoint look like an exact match.
+      location_type: call.target?.location_type || null,
+      segment: call.target?.segment || null,
+      endpoints: call.target?.endpoints || null,
+      length_m: call.target?.length_m ?? null,
+      street: call.target?.street || null,
+      resolution_note: call.target?.resolution_note || null,
       incident_type: call.verified_incident || call.incident_type || null,
       responding_units: units,
       priority_code: call.priority_code,

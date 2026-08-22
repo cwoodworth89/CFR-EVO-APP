@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, text
 from .normalization import (
     normalize_street_name, normalize_intersection_key,
     split_intersection_parts, parse_house_and_street, extract_near_street,
-    SUFFIX_MAPPINGS, ParsedAddress
+    ParsedAddress
 )
 from .address_resolver import AddressResolver
 from .intersection_resolver import IntersectionResolver
@@ -47,7 +47,8 @@ class CoquitlamDataValidator:
 
         # Initialize sub-resolvers
         self.address = AddressResolver(self.engine, self.street_confidence_threshold)
-        self.intersection = IntersectionResolver(self._intersection_keys_cache, self.street_confidence_threshold)
+        self.intersection = IntersectionResolver(
+            self._intersection_keys_cache, self.street_confidence_threshold, engine=self.engine)
         self.spatial = SpatialQueryEngine(self.engine, self._road_names_cache)
 
     def _load_road_names(self) -> List[str]:
@@ -68,7 +69,11 @@ class CoquitlamDataValidator:
         try:
             with self.engine.connect() as conn:
                 res = conn.execute(text("""
-                    SELECT street_a, street_b, intersection_key, lat, lng, zone_id, candidate_index
+                    -- The grid is DERIVED, not stored. intersections.zone_id was a
+                    -- denormalized copy of this same function's result and was free to
+                    -- drift from the geometry it came from, so the column was dropped.
+                    SELECT street_a, street_b, intersection_key, lat, lng,
+                           public.zone_for_point(geom) AS zone_id, candidate_index
                     FROM public.intersections
                     ORDER BY intersection_key, candidate_index;
                 """)).fetchall()
@@ -129,11 +134,28 @@ class CoquitlamDataValidator:
 
         # === STEP 2: Intersection lookup ===
         if is_intersection_pattern:
+            # 2a. "<street> and <street>" -- the same street in both slots. This is a
+            # Locution/CAD artifact for "no cross street given", not a self-intersection
+            # (ST_IsSimple is true for these roads; they do not cross themselves). The
+            # answer is the stretch of that street inside the announced map grid, which
+            # the kiosk highlights. Without a grid it stays unresolved: the whole street
+            # is not a location.
+            section = self._street_section_if_self_paired(parsed_address, target_map_grid)
+            if section:
+                return section
+
             cands, score = self.intersection.lookup(parsed_address)
             if cands:
-                result = self.intersection.resolve_candidates(cands, target_map_grid)
+                result = self.intersection.resolve_candidates(
+                    cands, target_map_grid, requested_address=parsed_address,
+                    cross_streets=[s for s in (cross_street_1, cross_street_2) if s])
                 if result:
-                    result['confidence'] = float(score)
+                    # Do NOT overwrite confidence for a suggested match: resolve_candidates
+                    # already set it to the per-street match score, and stamping the
+                    # lookup score over it would report a near-miss as more certain than
+                    # it is (the pattern punch-list #12 flags for steps 5 and 6).
+                    if result.get('resolution_note') is None:
+                        result['confidence'] = float(score)
                     return result
             # Explicitly an intersection but not found — don't fall through to street matching
             return None
@@ -198,6 +220,45 @@ class CoquitlamDataValidator:
             parsed_address, target_map_grid=target_map_grid,
             cross_street_1=cross_street_1, cross_street_2=cross_street_2
         )
+
+    def _street_section_if_self_paired(self, parsed_address: str,
+                                       target_map_grid=None) -> dict | None:
+        """Handle "<street> and <street>" by highlighting that street inside the grid."""
+        parts = split_intersection_parts(parsed_address)
+        if not parts:
+            return None
+        a = normalize_street_name(parts[0])
+        b = normalize_street_name(parts[1])
+        if not a or a != b:
+            return None
+
+        if target_map_grid is None:
+            logging.info("%r names one street twice with no map grid; unresolved.",
+                         parsed_address)
+            return None
+
+        section = self.spatial.resolve_street_section_in_grid(a, target_map_grid)
+        if not section:
+            logging.info("%r: %s does not enter map grid %s; unresolved.",
+                         parsed_address, a, target_map_grid)
+            return None
+
+        section.update({
+            "address": f"{a.title()} (map grid {section['grid']})",
+            "requested_address": parsed_address,
+            "rings": [],
+            "is_ambiguous": False,
+            # Not a point match. The confidence reflects that this is a bounded section,
+            # not a located incident, and must not read like an exact parcel hit.
+            "confidence": 50.0,
+            "resolution_note": (
+                f"No cross street was given -- the announcement named "
+                f"{a.title()} in both slots. Highlighting the {section['length_m']} m of "
+                f"{a.title()} inside map grid {section['grid']}. This is a street "
+                f"section, not a located incident; route to the nearer end."
+            ),
+        })
+        return section
 
     def validate_address_exists(self, parsed_address: str) -> Tuple[int, str | None]:
         """Checks if a parsed address exists in the local GIS database."""

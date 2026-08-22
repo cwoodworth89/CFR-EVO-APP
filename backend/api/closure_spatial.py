@@ -88,13 +88,15 @@ def resolve_zones_and_hall(db: Session, geojson: dict) -> Tuple[List[str], Optio
         if not affected:
             return [], None, None
 
+        # public.zone_for_point is the canonical containment definition. This used
+        # ST_Contains directly, so a closure whose centroid fell on a road -- which is
+        # most of them, being road closures -- missed the primary lookup and fell through
+        # to the fallback below.
         primary = db.execute(text("""
             SELECT z.map_name AS zone_id, z.hall_id
             FROM public.zones z
-            WHERE ST_Contains(
-                z.geom,
-                ST_Centroid(ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326))
-            )
+            WHERE z.map_name = public.zone_for_point(
+                ST_Centroid(ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326)))
             LIMIT 1
         """), {"gj": gj}).mappings().fetchone()
 

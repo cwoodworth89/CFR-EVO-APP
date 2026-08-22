@@ -8,9 +8,16 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > ⚠️ = confirmed still open. Each status line states what was checked, so a later reader
 > can tell **reported** from **confirmed** (CLAUDE.md §6.6).
 >
-> Items closed at this reconciliation: **#7** (obsolete — the cascade step was removed),
-> **#11** (fixed and re-synced). Item **#2 has been reopened**: one coordinate fallback
-> survived the sweep. Items #1, #6, #8, #9, #10, #12, #13, #14 remain open.
+> Items closed at the 2026-08-21 reconciliation: **#7** (obsolete — the cascade step was
+> removed), **#11** (fixed and re-synced). Item **#2** was reopened, then closed the same
+> day once both surviving coordinate fallbacks were removed.
+>
+> Closed 2026-08-22 by the intersection rebuild: **#8** (test suite), **#9** and **#13**
+> (`public.intersections` derived from road geometry), plus new items **#15** (fuzzy
+> substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
+> same pass.
+>
+> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**.
 
 ---
 
@@ -391,10 +398,35 @@ Actual causes:
   work. Stale mock signature.
 
 ### 9. False intersection: DAVID AVE & PANORAMA DR
-> **Status**: ⚠️ **Open — re-confirmed 2026-08-21. Scope still unknown.** Now additionally
-> covered by an `xfail` in `test_postgis_migration.py::test_no_false_intersections`, which
-> will flip to XPASS when the data is corrected. The `xfail` records the defect; it does
-> **not** fix it. The two rows are
+> **Status**: ✅ **Closed 2026-08-22 — resolved structurally.** `public.intersections` is
+> now DERIVED from `public.roads` centreline geometry
+> ([`backend/scripts/derive_intersections.py`](../backend/scripts/derive_intersections.py)),
+> so a pair of streets that never meet cannot be stored. 6,499 rows → **1,784**; the
+> `DAVID AVE & PANORAMA DR` rows are gone, and
+> `test_every_intersection_is_geometrically_real` now asserts the invariant over the whole
+> table rather than that one pair.
+>
+> **The scope question is answered, and it was not a handful of bad rows.** The old table
+> came from `extract_all_intersections_from_gis.py`, which never read a road centreline:
+> it paired PARCEL address points within 40 m of each other on differently-named streets,
+> took the midpoint of the shortest line between the two parcels, and clustered those with
+> a 45 m epsilon. Its working definition of "intersection" was *two houses on different
+> streets happen to be within 40 m*. Measured against road geometry:
+>
+> | Measure | Count |
+> |:--|--:|
+> | Rows whose two streets never meet | **3,086** (1,777 of those pairs >60 m apart) |
+> | Rows where the streets do meet, median coordinate error | **63 m** (only 129 of 2,863 within 10 m) |
+> | Stored points not within 20 m of *any* road | **3,413** |
+> | Rows on a street literally named `NAN` | **113** |
+>
+> Verified against the 24 real intersection dispatches: **kept 20, gained 1, lost 0**, and
+> against the five operator-verified coordinates the error fell from 879 m → 5 m,
+> 471 m → 1 m, 107 m → 15 m, 41 m → 7 m, and 8 m → 9 m.
+>
+> The original finding is kept below.
+
+**Original finding (2026-08-21):** the two rows were
 > still present on the kiosk: `SELECT count(*) FROM public.intersections WHERE
 > intersection_key = 'DAVID AVE & PANORAMA DR'` returns **2**, against a table of **6,499**.
 
@@ -529,9 +561,24 @@ reports the parcel actually used, keeps the dispatched string in `requested_addr
 explains the substitution in `resolution_note`. Steps 5 and 6 should follow that pattern.
 
 ### 13. `public.intersections` needs the same data-integrity pass
-> **Status**: ⚠️ **Open — re-confirmed 2026-08-21.** Extends item #9. `public.intersections`
-> still holds **6,499** rows and still contains the false `DAVID AVE & PANORAMA DR` pair.
-> No integrity pass has been run.
+> **Status**: ✅ **Closed 2026-08-22.** This item proposed deriving intersections from
+> `public.roads` via `ST_Intersects` "so false entries become structurally impossible".
+> That is what was done — see #9 for the measured before/after.
+>
+> Three further defects were found and fixed in the same pass:
+>
+> * **Suffix vocabulary was hardcoded in two places that disagreed.** The extractor wrote
+>   `SUNSET SQ` while the geocoder normalized a dispatch to `SUNSET SQUARE`, so those
+>   intersections were unreachable; `normalization.py` was also missing 10 suffix types
+>   present in `public.roads.roadtype`, covering 26 real streets. Suffixes now live in
+>   `public.vocabulary` (category `street_suffix`) and are read by both, with a migration
+>   guard that fails loudly if the municipal data gains a suffix nothing maps.
+> * **Five inconsistent zone-containment queries.** `ST_Contains` tests the strict
+>   interior, and zone polygons are bounded by roads, so junctions sit exactly on a
+>   boundary and were rejected: 155 of 1,784 intersections got no map grid for that reason
+>   alone. There is now one `public.zone_for_point()`, and `intersections.zone_id` — a
+>   denormalized copy of it — was dropped.
+> * **Fuzzy intersection matching substituted silently.** See #15.
 
 The nearest-civic work fixed the *address* side of unresolvable locations. The
 intersection side has had no equivalent review:
@@ -616,3 +663,76 @@ As of 2026-08-21 no dispatches carry the tag yet, and the single
 its dispatch had no row in `public.dispatches`, and the corpus will come from tagged
 captures instead.
 
+
+---
+
+## 🔎 Geocoder Substitution
+
+### 15. Fuzzy matching silently substituted a different intersection
+> **Status**: ✅ **Closed 2026-08-22.** Found while verifying the #9 rebuild.
+
+`intersection_resolver.lookup` resolved an unmatched intersection by fuzzy-matching the
+whole normalized key against every other key and returning the best hit above 80.
+
+Observed live:
+
+| Requested | Returned | Reported as |
+|:--|:--|:--|
+| `Lougheed Hwy & Mariner Way` | `Lougheed Hwy & Pinetree Way` — **4,301 m away** | conf 86, `is_ambiguous: false`, no note |
+| `Lougheed Hwy & Lougheed Hwy` | `Alderson Ave & Lougheed Hwy` | **conf 100** |
+
+Two independent causes:
+
+1. **The `token_set_ratio` subset trap.** It returns 100 when one token set is a subset of
+   the other, so `token_set_ratio('LOUGHEED HWY', 'ALDERSON AVE & LOUGHEED HWY')` = 100.
+   Any key containing the requested street scored a perfect match.
+2. **No safe threshold exists.** Measured across all 1,079 road names, genuinely different
+   streets score `HAMBER CRT`/`AMBER CRT` **96**, `WESTWOOD ST`/`EASTWOOD ST` **93**,
+   `BURKE MOUNTAIN ST`/`BLUE MOUNTAIN ST` **93** — while the transcription errors worth
+   recovering score `TASIS→TAHSIS` **95** and `JOHNSON→JOHNSTON` **98**. The correct
+   corrections sit *below* the dangerous collisions. No cutoff separates them, and
+   confusing Westwood with Eastwood sends apparatus across the city.
+
+**Fix.** Fuzzy matching is now a *candidate generator only*, never a resolution. Each
+street is scored independently (whole-key scoring let the shared half inflate the result —
+that is how `MARINER WAY`→`PINETREE WAY` reached 86), only combinations that correspond to
+a real existing junction are offered, and any non-exact match comes back
+`is_ambiguous: true` with `requested_address` and `resolution_note` so the operator sees
+and confirms it. The street-type alias swap (`RD↔AVE`, `ST↔WAY`, `BLVD↔DR`, returning
+confidence 95) was deleted outright — renaming a street is not a match.
+
+The real fix for transcription noise is upstream: Whisper already receives
+`COQUITLAM_STREETS` from `public.road_names`, and biasing transcription toward the real
+vocabulary stops "Lowheed" reaching the geocoder at all.
+
+### 16. `<street> and <street>` is a CAD artifact, not a self-intersection
+> **Status**: ✅ **Closed 2026-08-22.**
+
+`DISP-2026-546B9E` transcribed as *"lougheed highway and lougheed highway, near lougheed
+highway and lougheed highway ... map grid 49"* — Locution filled both the address slot and
+the "near" cross-street slot with the same street because the CAD record had no cross
+street. It is not a junction: `ST_IsSimple` is true for Lougheed Hwy, so the centreline
+never crosses itself.
+
+Resolved as a **street section** rather than a point: the stretch of that street inside
+the announced map grid (533 m of Lougheed Hwy in grid 49). The kiosk highlights the
+section in amber (`StreetSectionBanner`, and a dashed polyline on the map) and states
+plainly that it is not a located incident; each unit routes to whichever end of the
+section is nearest its own hall rather than to a midpoint that may be past the incident.
+
+With **no** map grid it stays unresolved and raises the §5 Tier 1 card — without a grid
+the "section" is the whole street, up to 14 km, which is not a location.
+
+### 17. Grade-separated interchanges have no junction to find
+> **Status**: ⚠️ **Open — one manual row added, needs operational confirmation.**
+
+Lougheed Hwy and Mariner Way never meet: closest approach **221.6 m**. The derived table
+correctly holds `HIGHWAY RAMP & LOUGHEED HWY` (3 candidates) and `MARINER WAY & UNITED
+BLVD` there instead. Crews nevertheless call the place "Lougheed and Mariner", so it exists
+as a `source='manual'` row that `derive_intersections.py` will never overwrite.
+
+**The coordinate is not operationally confirmed.** It is the midpoint of the shortest line
+between the two centrelines (`49.240487, -122.816114`, map grid 49) — a defensible
+derivation, but nobody has decided whether the centre of the gap is where apparatus should
+be sent rather than a specific ramp head or the Mariner Way overpass. The row's `notes`
+column says so. Needs review by whoever owns response geography.

@@ -10,6 +10,101 @@ class SpatialQueryEngine:
         self.engine = engine
         self._road_names_cache = road_names_cache or []
 
+    def resolve_street_section_in_grid(self, street: str, grid_id: str) -> Optional[dict]:
+        """The stretch of one street that lies inside one emergency response map grid.
+
+        WHY THIS EXISTS
+        Locution sometimes announces a location as "<street> and <street>" -- the same
+        street in both the address slot and the "near" cross-street slot -- when the CAD
+        record has no cross street. DISP-2026-546B9E is the recorded example: "lougheed
+        highway and lougheed highway, near lougheed highway and lougheed highway ... map
+        grid 49".
+
+        That is not a self-intersection. ST_IsSimple on Lougheed Hwy's centreline is true,
+        so the road never crosses itself in the municipal data. It means "somewhere on
+        this street, no cross street given" -- a CAD artifact the dispatch system has to
+        adapt to, not an intersection to be found.
+
+        The honest answer is the section of that street inside the announced grid: for
+        grid 49 that is 533 m of Lougheed Hwy. Returns the geometry so the kiosk can
+        highlight it, plus the endpoints so routing can send apparatus to whichever end
+        is nearest the responding hall. There is deliberately no single "the location"
+        point: inventing one would restate an unknown as a coordinate (CLAUDE.md 6.1).
+
+        Returns None when the grid is missing or the street does not enter it. Without a
+        grid the section is the whole street -- up to 14 km of Lougheed Hwy -- which is
+        not a location, so it surfaces as the section 5 Tier 1 card instead.
+        """
+        if not street or not grid_id:
+            return None
+        clean_grid = re.sub(r'^(?:GRID|ZONE)\s*', '', str(grid_id).strip(), flags=re.IGNORECASE)
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text("""
+                    WITH sfx AS (
+                        SELECT upper(btrim(term)) f, upper(btrim(term_normalized)) a
+                        FROM public.vocabulary
+                        WHERE category = 'street_suffix' AND is_active
+                    ),
+                    street AS (
+                        SELECT btrim(regexp_replace(upper(btrim(r.roadname)), '[,.]', '', 'g')
+                                     || ' ' || COALESCE(s.a, upper(btrim(COALESCE(r.roadtype,'')))))
+                                 AS canon,
+                               ST_Union(r.geom) AS geom
+                        FROM public.roads r
+                        LEFT JOIN sfx s ON s.f = upper(btrim(r.roadtype))
+                        WHERE r.roadname IS NOT NULL AND btrim(r.roadname) <> ''
+                        GROUP BY 1
+                    ),
+                    z AS (SELECT geom FROM public.zones WHERE UPPER(map_name) = UPPER(:grid))
+                    SELECT ST_AsGeoJSON(ST_Intersection(street.geom, z.geom)) AS seg,
+                           ST_Length(ST_Intersection(street.geom, z.geom)::geography) AS len_m,
+                           ST_Y(ST_PointOnSurface(ST_Intersection(street.geom, z.geom))) AS mid_lat,
+                           ST_X(ST_PointOnSurface(ST_Intersection(street.geom, z.geom))) AS mid_lng
+                    FROM street, z
+                    WHERE street.canon = UPPER(:street)
+                      AND NOT ST_IsEmpty(ST_Intersection(street.geom, z.geom))
+                    LIMIT 1;
+                """), {"street": street.strip().upper(), "grid": clean_grid}).mappings().fetchone()
+                if not row or not row["seg"]:
+                    return None
+
+                import json
+                geo = json.loads(row["seg"])
+                lines = (geo["coordinates"] if geo["type"] == "MultiLineString"
+                         else [geo["coordinates"]] if geo["type"] == "LineString" else [])
+                if not lines:
+                    return None
+                # Every piece's two ends, so routing can send apparatus to whichever is
+                # nearest the responding hall. The section is usually a MultiLineString
+                # -- 4 disjoint pieces for Lougheed Hwy in grid 49, where ramps and the
+                # zone edge split it -- so taking only the first and last point of the
+                # whole collection is wrong: those two happened to lie 36 m apart on the
+                # same piece, not at the extremes of the 533 m section.
+                endpoints = []
+                for line in lines:
+                    if not line:
+                        continue
+                    for pt in (line[0], line[-1]):
+                        if pt not in endpoints:
+                            endpoints.append(pt)
+
+                return {
+                    "location_type": "street_section",
+                    "street": street.strip().upper(),
+                    "grid": clean_grid,
+                    "segment": lines,                 # [[ [lng,lat], ... ], ...]
+                    "endpoints": endpoints,           # [[lng,lat], ...] every piece's ends
+                    "length_m": round(float(row["len_m"] or 0)),
+                    # Representative point for map centring and zone lookup ONLY. It is
+                    # NOT the incident location and must not be used as a routing target.
+                    "lat": float(row["mid_lat"]),
+                    "lng": float(row["mid_lng"]),
+                }
+        except Exception as e:
+            logging.error(f"Street-section-in-grid lookup failed: {e}", exc_info=True)
+            return None
+
     def validate_point_in_grid(self, lat: float, lng: float = None, grid_id: str = None, lon: float = None) -> bool:
         """Determines if a given coordinate lies within the boundaries of a specific response grid map."""
         target_lng = lng if lng is not None else lon
@@ -37,11 +132,14 @@ class SpatialQueryEngine:
             return None
         try:
             with self.engine.connect() as conn:
+                # public.zone_for_point is the single canonical definition (see
+                # backend/migrations/2026-08-22_canonical_zone_for_point.sql). This used
+                # ST_Contains, which tests the strict interior; zone polygons are bounded
+                # by roads, so a point at an intersection sits ON a boundary and returned
+                # NULL. That silently cost 155 of 1,784 intersections their map grid.
                 res = conn.execute(text("""
-                    SELECT map_name 
-                    FROM public.zones 
-                    WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
-                    LIMIT 1;
+                    SELECT public.zone_for_point(
+                        ST_SetSRID(ST_MakePoint(:lng, :lat), 4326));
                 """), {"lat": float(lat), "lng": float(target_lng)}).fetchone()
                 if res:
                     return str(res[0]).strip()

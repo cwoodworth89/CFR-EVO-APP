@@ -919,6 +919,25 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
             {/* Active Target Address Marker & Suggested Route Overlay */}
             {appMode === "EXPLORE" && targetAddress && (
               <>
+                {/* Street section: a "<street> and <street>" dispatch has no point
+                    location, so the stretch of road inside the announced map grid is
+                    highlighted instead. Amber, thick and dashed so it reads as an area
+                    of search rather than as a route line or a parcel outline. */}
+                {targetAddress.location_type === 'street_section'
+                  && Array.isArray(targetAddress.segment)
+                  && targetAddress.segment.map((line, i) => (
+                    <Polyline
+                      key={`street-section-${i}`}
+                      positions={line.map(([lng, lat]) => [lat, lng])}
+                      pathOptions={{
+                        color: '#f59e0b',
+                        weight: 10,
+                        opacity: 0.75,
+                        dashArray: '14,10',
+                        lineCap: 'round'
+                      }}
+                    />
+                  ))}
                 {targetPolygon && (
                   <Polygon 
                     positions={targetPolygon} 

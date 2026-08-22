@@ -10,7 +10,7 @@ Imports authoritative City of Coquitlam GIS layers into containerized PostgreSQL
   4. City Boundary (GeoJSON -> public.city_boundary)
   5. Road Names Dictionary (JSON -> public.road_names)
   7. Radio & Dispatch Vocabulary (.txt -> public.vocabulary)
-  8. Topological Road Intersections (Shapely intersection computation -> public.intersections)
+  8. Topological Road Intersections (PostGIS, derived from public.roads -> public.intersections)
   9. Parcel Road Frontage Point Backfill (ST_ClosestPoint)
   10. Parcel Point Geometry Indexing (ST_MakePoint -> public.parcels.geom)
 """
@@ -485,227 +485,45 @@ def step7_import_vocabulary(engine, vocab_dir: str = None, batch_size: int = 500
         return {}
 
 
-def step8_compute_intersections(engine, road_features: list, intersections_json_path: str = None, batch_size: int = 1000) -> int:
-    """Step 8: Import or Compute Topological Road Intersections -> public.intersections."""
+def step8_compute_intersections(engine, road_features: list = None, batch_size: int = 1000) -> int:
+    """Step 8: Derive topological road intersections from public.roads -> public.intersections.
+
+    Delegates to backend/scripts/derive_intersections.py, which computes junctions from
+    the road centreline geometry already in PostGIS.
+
+    Two former paths were removed on 2026-08-22:
+
+    * Loading backend/data/gis/intersections.json. That file came from
+      extract_all_intersections_from_gis.py, which derived "intersections" from PARCEL
+      proximity -- pairs of houses within 40 m on differently-named streets -- and never
+      consulted a road centreline. It produced 3,086 rows whose streets never meet (1,777
+      of those pairs more than 60 m apart), a median 63 m coordinate error even where the
+      streets do meet, and 113 rows on a street literally named "NAN". It also wrote
+      suffixes ('SUNSET SQ') that the geocoder's normalization could never match
+      ('SUNSET SQUARE').
+    * Computing from in-memory shapefile features with Shapely. Correct in method, but it
+      re-derived from files what public.roads already holds authoritatively (CLAUDE.md
+      6.2), and it could not populate zone_id.
+
+    Deriving in PostGIS from public.roads makes a false intersection structurally
+    impossible, which is what punch-list #13 asked for.
+    """
     logging.info("=" * 60)
-    logging.info("Step 8: Importing / Computing Topological Road Intersections...")
+    logging.info("Step 8: Deriving Road Intersections from public.roads geometry...")
 
-    if intersections_json_path and os.path.exists(intersections_json_path):
-        logging.info(f"  Loading authoritative intersections from: {intersections_json_path}")
-        try:
-            with open(intersections_json_path, "r", encoding="utf-8") as f:
-                raw_data = json.load(f)
-            from gis_service.geocoder import split_intersection_parts, normalize_intersection_key
-            records = []
-            for key, candidates in raw_data.items():
-                parts = split_intersection_parts(key)
-                if parts:
-                    street_a, street_b = sorted([parts[0], parts[1]])
-                    norm_key = normalize_intersection_key(street_a, street_b)
-                else:
-                    words = key.split('&')
-                    if len(words) >= 2:
-                        street_a, street_b = sorted([words[0].strip(), words[1].strip()])
-                        norm_key = normalize_intersection_key(street_a, street_b)
-                    else:
-                        street_a = key
-                        street_b = key
-                        norm_key = key.strip().upper()
-                cand_list = candidates if isinstance(candidates, list) else [candidates]
-                for idx, c in enumerate(cand_list):
-                    records.append({
-                        "street_a": street_a,
-                        "street_b": street_b,
-                        "intersection_key": norm_key,
-                        "lat": float(c["lat"]),
-                        "lng": float(c["lng"]),
-                        "zone_id": str(c.get("grid", "")).strip() if c.get("grid") is not None and str(c.get("grid")).strip() != "" else None,
-                        "candidate_index": idx
-                    })
-            insert_sql = text("""
-            INSERT INTO public.intersections (
-                street_a, street_b, intersection_key, lat, lng, zone_id, geom, candidate_index
-            ) VALUES (
-                :street_a, :street_b, :intersection_key, :lat, :lng, :zone_id,
-                ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
-                :candidate_index
-            )
-            ON CONFLICT (intersection_key, candidate_index) DO UPDATE SET
-                street_a = EXCLUDED.street_a,
-                street_b = EXCLUDED.street_b,
-                lat = EXCLUDED.lat,
-                lng = EXCLUDED.lng,
-                zone_id = EXCLUDED.zone_id,
-                geom = EXCLUDED.geom;
-            """)
-            with engine.begin() as conn:
-                conn.execute(text("TRUNCATE TABLE public.intersections RESTART IDENTITY CASCADE;"))
-                for i in range(0, len(records), batch_size):
-                    batch = records[i:i + batch_size]
-                    conn.execute(insert_sql, batch)
-            with engine.connect() as conn:
-                count = conn.execute(text("SELECT COUNT(*) FROM public.intersections;")).scalar()
-            logging.info(f"  ✓ Successfully imported {count} authoritative intersections into public.intersections.")
-            return count
-        except Exception as e:
-            logging.warning(f"  Failed to import intersections from JSON ({e}), falling back to shape computation.")
+    _scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if _scripts_dir not in sys.path:
+        sys.path.insert(0, _scripts_dir)
+    from derive_intersections import REBUILD_SQL, ENDPOINT_SNAP_M, JUNCTION_CLUSTER_EPS_M
 
-    start_t = time.time()
-
-    # 1. Group road segments by normalized road name and merge with unary_union
-    road_geoms = {}
-    for feature in road_features:
-        props = feature.get("properties", {})
-        status = props.get("STATUS")
-        if status and str(status).strip().upper() != "OPERATING":
-            continue
-        name = props.get("FULLNAME", "").strip()
-        if not name:
-            continue
-        geom = to_2d(shape(feature["geometry"]))
-        name_upper = name.upper()
-        if name_upper in road_geoms:
-            road_geoms[name_upper] = unary_union([road_geoms[name_upper], geom])
-        else:
-            road_geoms[name_upper] = geom
-
-    road_names_list = sorted(road_geoms.keys())
-    total_roads = len(road_names_list)
-    logging.info(f"  Unified {total_roads} unique operating roads for intersection analysis.")
-
-    # Pre-cache bounding boxes for fast candidate filtering
-    bounds_dict = {name: road_geoms[name].bounds for name in road_names_list}
-
-    intersection_results = []
-
-    # 2. Pairwise intersection with bounding box pre-filtering
-    for i in range(total_roads):
-        if i > 0 and i % 100 == 0:
-            logging.info(f"  Progress: {i}/{total_roads} roads evaluated ({len(intersection_results)} intersection points found)...")
-
-        name_a = road_names_list[i]
-        geom_a = road_geoms[name_a]
-        b_a = bounds_dict[name_a]
-
-        for j in range(i + 1, total_roads):
-            name_b = road_names_list[j]
-            b_b = bounds_dict[name_b]
-
-            # Fast bounding box rejection (minx, miny, maxx, maxy)
-            if b_a[0] > b_b[2] or b_a[2] < b_b[0] or b_a[1] > b_b[3] or b_a[3] < b_b[1]:
-                continue
-
-            if not geom_a.intersects(geom_b := road_geoms[name_b]):
-                continue
-
-            result = geom_a.intersection(geom_b)
-            if result.is_empty:
-                continue
-
-            points = []
-            if result.geom_type == "Point":
-                points = [result]
-            elif result.geom_type == "MultiPoint":
-                points = list(result.geoms)
-            elif result.geom_type == "GeometryCollection":
-                points = [g for g in result.geoms if g.geom_type == "Point"]
-
-            if not points:
-                continue
-
-            sorted_names = sorted([name_a, name_b])
-            key = f"{sorted_names[0]} & {sorted_names[1]}"
-
-            # Deduplicate points within ~10m of each other (0.0001 deg)
-            unique_points = []
-            for pt in points:
-                is_dup = False
-                for upt in unique_points:
-                    if pt.distance(upt) < 0.0001:
-                        is_dup = True
-                        break
-                if not is_dup:
-                    unique_points.append(pt)
-
-            for idx, pt in enumerate(unique_points):
-                intersection_results.append({
-                    "street_a": sorted_names[0],
-                    "street_b": sorted_names[1],
-                    "intersection_key": key,
-                    "lat": pt.y,
-                    "lng": pt.x,
-                    "candidate_index": idx
-                })
-
-    calc_elapsed = time.time() - start_t
-    logging.info(f"  Computed {len(intersection_results)} intersection points across {total_roads} roads in {calc_elapsed:.2f}s.")
-
-    # 3. Insert into public.intersections
-    insert_sql = text("""
-    INSERT INTO public.intersections (
-        street_a, street_b, intersection_key, lat, lng, geom, candidate_index
-    ) VALUES (
-        :street_a, :street_b, :intersection_key, :lat, :lng,
-        ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
-        :candidate_index
-    );
-    """)
-
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("TRUNCATE TABLE public.intersections RESTART IDENTITY CASCADE;"))
-            for i in range(0, len(intersection_results), batch_size):
-                batch = intersection_results[i:i + batch_size]
-                conn.execute(insert_sql, batch)
-
-        # 4. Spatial join to update zone_id from public.zones
-        logging.info("  Associating emergency response zone_id to intersections...")
-        with engine.begin() as conn:
-            conn.execute(text("""
-                UPDATE public.intersections i
-                SET zone_id = z.map_name
-                FROM public.zones z
-                WHERE ST_Contains(z.geom, i.geom);
-            """))
-
-        with engine.connect() as conn:
-            total_db = conn.execute(text("SELECT COUNT(*) FROM public.intersections;")).scalar()
-            assigned_zones = conn.execute(text("SELECT COUNT(*) FROM public.intersections WHERE zone_id IS NOT NULL;")).scalar()
-
-        logging.info(f"  ✓ Successfully stored {total_db} intersections ({assigned_zones} with zone_id).")
-
-        # 5. Validation checks
-        with engine.connect() as conn:
-            # Check Christmas Way & Westwood St
-            res_xmas = conn.execute(text("""
-                SELECT intersection_key, lat, lng, zone_id 
-                FROM public.intersections 
-                WHERE intersection_key LIKE '%CHRISTMAS WAY%' AND intersection_key LIKE '%WESTWOOD ST%';
-            """)).fetchall()
-
-            # Check David Ave & Panorama Dr (parallel roads)
-            res_david = conn.execute(text("""
-                SELECT intersection_key, lat, lng, zone_id 
-                FROM public.intersections 
-                WHERE intersection_key LIKE '%DAVID AVE%' AND intersection_key LIKE '%PANORAMA DR%';
-            """)).fetchall()
-
-            logging.info("  Intersection Validation Results:")
-            if res_xmas:
-                logging.info(f"    ✓ Found expected intersection: '{res_xmas[0][0]}' at ({res_xmas[0][1]:.5f}, {res_xmas[0][2]:.5f}), Zone: {res_xmas[0][3]}")
-            else:
-                logging.warning("    ✗ Expected intersection 'CHRISTMAS WAY & WESTWOOD ST' NOT found!")
-
-            if not res_david:
-                logging.info("    ✓ Correctly rejected parallel roads: 'DAVID AVE & PANORAMA DR' (0 intersections)")
-            else:
-                logging.warning(f"    ✗ Unexpected intersections found for parallel roads 'DAVID AVE & PANORAMA DR': {len(res_david)}")
-
-        return total_db
-    except Exception as e:
-        logging.error(f"  ✗ Step 8 error computing/storing intersections: {e}")
-        return 0
-
+    with engine.begin() as conn:
+        conn.execute(text(REBUILD_SQL),
+                     {"snap_m": ENDPOINT_SNAP_M, "eps_m": JUNCTION_CLUSTER_EPS_M})
+        count = conn.execute(text("SELECT COUNT(*) FROM public.intersections;")).scalar()
+        manual = conn.execute(text(
+            "SELECT COUNT(*) FROM public.intersections WHERE source='manual';")).scalar()
+    logging.info(f"  ✓ Derived {count} intersections ({manual} manual rows preserved).")
+    return count
 
 def step9_backfill_parcel_frontage(engine) -> int:
     """Step 9: Backfill Parcel Frontage Points using ST_ClosestPoint to Road Centrelines."""
@@ -804,7 +622,6 @@ def run_full_import(
     zones_path = os.path.join(staging_dir, "emergency_zones.geojson")
     boundary_path = os.path.join(staging_dir, "city_boundary.geojson")
     road_names_path = os.path.join(staging_dir, "road_names.json")
-    intersections_path = os.path.join(data_dir, "gis", "intersections.json")
 
     logging.info("=" * 70)
     logging.info("  CFR EVO MASTER GIS POSTGIS INGESTION PIPELINE")
@@ -843,11 +660,7 @@ def run_full_import(
         if not road_features and os.path.exists(roads_path):
             with open(roads_path, "r", encoding="utf-8") as f:
                 road_features = json.load(f).get("features", [])
-        intersections_count = step8_compute_intersections(
-            engine, road_features,
-            intersections_json_path=intersections_path,
-            batch_size=batch_size
-        )
+        intersections_count = step8_compute_intersections(engine, batch_size=batch_size)
     else:
         logging.info("Step 8: Skipped (--skip-intersections).")
         intersections_count = 0

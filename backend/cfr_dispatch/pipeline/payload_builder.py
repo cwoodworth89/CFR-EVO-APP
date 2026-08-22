@@ -115,6 +115,14 @@ def build_dispatch_payload(
                     "lng": res["lng"],
                     "rings": res.get("rings", [])
                 }
+                # A "<street> and <street>" dispatch resolves to a street SECTION rather
+                # than a point. These fields are what let the kiosk highlight the stretch
+                # and warn that it is not a located incident; dropping them here would
+                # leave the representative midpoint looking like an exact match.
+                for k in ("location_type", "segment", "endpoints", "length_m",
+                          "resolution_note", "requested_address"):
+                    if res.get(k) is not None:
+                        local_geocode_result[k] = res[k]
                 confidence_score = float(conf)
                 break
         
@@ -176,7 +184,9 @@ def build_dispatch_payload(
             from gis_service.routing_engine import EVORoutingEngine
             router = EVORoutingEngine()
             detected_resp = next((d.response_type for d in all_candidates if d.response_type), "emergency")
-            routing_metrics = router.calculate_units_routing(responding_units, lat, lng, response_type=detected_resp)
+            routing_metrics = router.calculate_units_routing(
+                responding_units, lat, lng, response_type=detected_resp,
+                destination_options=local_geocode_result.get("endpoints"))
             logging.info(f"[{dispatch_id}] Computed {detected_resp} routing metrics for {len(routing_metrics)} responding units.")
         except Exception as route_err:
             logging.warning(f"[{dispatch_id}] Could not compute routing metrics: {route_err}")
@@ -192,6 +202,10 @@ def build_dispatch_payload(
         "routing_metrics": routing_metrics,
         "cross_streets": target_cross_streets
     }
+    for k in ("location_type", "segment", "endpoints", "length_m",
+              "resolution_note", "requested_address"):
+        if local_geocode_result.get(k) is not None:
+            target_payload[k] = local_geocode_result[k]
     if subaddress:
         target_payload["subaddress"] = subaddress
     if tone_name:

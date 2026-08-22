@@ -310,14 +310,52 @@ class EVORoutingEngine:
             "calculated_at": datetime.now(timezone.utc).isoformat()
         }
 
+    def _nearest_destination(self, unit: str,
+                             options: List[List[float]]) -> Optional[List[float]]:
+        """The [lng, lat] option closest to this unit's hall, by straight-line distance.
+
+        Straight-line rather than a routed distance on purpose: this only has to pick
+        which end of a section to aim at, and asking OSRM for a route to every endpoint
+        of every section for every unit would multiply routing calls for a choice that
+        the crow-flies answer gets right. The route that is actually reported is still
+        OSRM's, to the chosen end (CLAUDE.md 6.2).
+        """
+        import math
+        if not options:
+            return None
+        hall = self.get_hall_location(get_unit_station_id(str(unit).strip().upper()))
+        o_lat = (hall or {}).get('lat')
+        o_lng = (hall or {}).get('lng')
+        if o_lat is None or o_lng is None:
+            return options[0]
+
+        def d(opt):
+            R = 6371000.0
+            p1, p2 = math.radians(float(o_lat)), math.radians(float(opt[1]))
+            dp = p2 - p1
+            dl = math.radians(float(opt[0]) - float(o_lng))
+            h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+            return 2 * R * math.asin(math.sqrt(h))
+
+        return min(options, key=d)
+
     def calculate_units_routing(
         self,
         responding_units: List[str],
         dest_lat: Optional[float],
         dest_lng: Optional[float],
-        response_type: str = "emergency"
+        response_type: str = "emergency",
+        destination_options: Optional[List[List[float]]] = None
     ) -> List[Dict[str, Any]]:
-        """Calculates routing metrics for a list of responding units."""
+        """Calculates routing metrics for a list of responding units.
+
+        `destination_options` is used when the location is a street SECTION rather than a
+        point (a "<street> and <street>" dispatch with no cross street -- see
+        SpatialQueryEngine.resolve_street_section_in_grid). Each entry is a [lng, lat]
+        end of the highlighted section, and every unit is routed to whichever end is
+        nearest ITS OWN hall, so a crew arrives at the near edge of the section and works
+        along it rather than driving to a midpoint that may already be past the incident.
+        """
         if not dest_lat or not dest_lng or not responding_units:
             return []
 
@@ -328,7 +366,17 @@ class EVORoutingEngine:
             if clean and clean not in seen:
                 seen.add(clean)
                 try:
-                    m = self.calculate_unit_metrics(clean, dest_lat, dest_lng, response_type=response_type)
+                    u_lat, u_lng = dest_lat, dest_lng
+                    if destination_options:
+                        picked = self._nearest_destination(clean, destination_options)
+                        if picked:
+                            u_lng, u_lat = picked
+                    m = self.calculate_unit_metrics(clean, u_lat, u_lng, response_type=response_type)
+                    if destination_options:
+                        m['destination_note'] = (
+                            'Street section: routed to the nearer end of the highlighted '
+                            'stretch, not to a located incident.'
+                        )
                     metrics.append(m)
                 except Exception as e:
                     logging.warning(f"Failed to calculate routing for unit {clean}: {e}")

@@ -31,7 +31,7 @@ What differs is which layers mount, not how they are drawn.
 | Base map, municipal overlays, stations, hydrants | ✅ | ✅ |
 | Dispatch target, routing overlay | ✅ | ✅ |
 | Response zones + map-grid labels | ✅ | — |
-| Road closures | ✅ | — |
+| Road closures | ✅ | **should be — see below** |
 | Railroad crossings | ✅ | — |
 | Auto-fit to route, candidate selector | — | ✅ |
 
@@ -73,6 +73,26 @@ copied between two representations of the same dispatch.
 and parse the same message independently. This is the surface where the
 `payload.eventType` vs `event` field-name defect produced divergent behaviour between
 listeners — one path silently received nulls while another worked.
+
+### Road closures belong in dispatch mode too
+
+Decided 2026-08-22. Closures are currently standby-only, which is backwards: a closure
+matters *most* when apparatus is being routed through it.
+
+Two levels, and the cheap one is worth doing first:
+
+1. **Show all active closures in both modes.** Effectively free — the layer already exists
+   and `useRoadClosures` already fetches and filters. It is a one-line composition change
+   once `MapSurface` exists.
+2. **Highlight closures that intersect the route.** The useful version, and the one worth
+   treating as a feature rather than a refactor. The data is already there: closures carry
+   a `geom` column in PostGIS (added with the road-closure rewrite), and OSRM returns the
+   route geometry, so "does this closure touch this route" is a `ST_Intersects` between two
+   geometries we already hold. What needs deciding is the *behaviour* — whether an
+   intersecting closure is a warning banner, a re-route, or a marker the driver reads — and
+   that is an operations decision, not an engineering one.
+
+Level 1 lands with the unification. Level 2 is tracked separately so it does not hold it up.
 
 ---
 
@@ -149,9 +169,10 @@ Steps 1–3 are mechanical and independently shippable. Step 4 is the one with r
   PropertySatellitePanel, BlockParcelPanel, SatelliteMiniMap). This proposal removes one.
   Whether the remaining PIP maps should share a renderer is a separate question and should
   be **measured on kiosk hardware** before being treated as a problem.
-* **Giving the kiosk the full layer set is a product decision, not an engineering one.**
-  Zones, closures and railroad crossings are currently standby-only. Whether a crew wants
-  them during a call is for operations to say — this document does not assume an answer.
+* **Giving the kiosk the rest of the layer set is a product decision.** Road closures are
+  decided (both modes — see above). Whether a crew wants *zones* and *railroad crossings*
+  during a call is still for operations to say, and this document does not assume an
+  answer.
 
 ## Non-goals
 

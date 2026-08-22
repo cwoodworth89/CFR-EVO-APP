@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import RouteOverviewPanel from './RouteOverviewPanel';
 import BlockParcelPanel from './BlockParcelPanel';
-import PropertySatellitePanel from './PropertySatellitePanel';
-import StreetViewPanel from './StreetViewPanel';
+import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
@@ -238,17 +237,15 @@ export default function KioskView({ kioskState }) {
         </section>
 
         {/* Right ~1/3 Equal-Height 3-Panel Detail Stack */}
-        <section className="col-span-4 h-full min-h-0 flex flex-col gap-3 overflow-hidden">
-          <div className="flex-1 min-h-0 relative">
-            <BlockParcelPanel activeCall={activeCall} />
-          </div>
-          <div className="flex-1 min-h-0 relative">
-            <PropertySatellitePanel activeCall={activeCall} />
-          </div>
-          <div className="flex-1 min-h-0 relative">
-            <StreetViewPanel activeCall={activeCall} />
-          </div>
-        </section>
+        <DetailStack
+          call={activeCall}
+          className="col-span-4"
+          topCard={
+            <div className="flex-1 min-h-0 relative">
+              <BlockParcelPanel activeCall={activeCall} />
+            </div>
+          }
+        />
       </main>
 
       {/* Pre-Incident Construction Plan PDF Viewer Modal */}

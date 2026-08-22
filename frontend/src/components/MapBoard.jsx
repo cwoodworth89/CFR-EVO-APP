@@ -17,6 +17,7 @@ import RoadClosureMarker from './map/RoadClosureMarker';
 import ZonesLayer from './map/ZonesLayer';
 import MapViewControls from './map/MapViewControls';
 import TargetAddressCard from './hud/TargetAddressCard';
+import DetailStack from './DetailStack';
 import MapSurface from './map/MapSurface';
 import RoadClosuresLayer from './map/RoadClosuresLayer';
 import DispatchTargetLayer from './map/DispatchTargetLayer';
@@ -24,8 +25,6 @@ import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
 import { useRoadClosures } from '../hooks/useRoadClosures';
 
 import { RoutingOverlay } from './RoutingOverlay';
-import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
-import StreetViewPanel from './kiosk/StreetViewPanel';
 import { calculateEVORouteMetrics, DEFAULT_ROUTING_CONFIG } from '../utils/EVORoutingEngine';
 
 // Lazy-load heavy administrative and configuration modals to reduce initial kiosk bundle size
@@ -502,24 +501,17 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
 
         {/* Right 1/3 Spatial Inspection Stack Panel (Target Address, 3D Satellite, Street View) */}
         {appMode === "EXPLORE" && targetAddress && (
-          <aside className="w-[380px] h-full bg-slate-950 border-l border-slate-800 p-3 flex flex-col gap-3 z-[1000] flex-shrink-0 shadow-2xl animate-in slide-in-from-right duration-300">
-            {/* Top 1/3 Address Information Card */}
-            <TargetAddressCard
-              targetAddress={targetAddress}
-              nearestHydrants={nearestHydrants}
-              onClose={() => setTargetAddress(null)}
-            />
-
-            {/* Middle 1/3 3D Property Satellite View */}
-            <div className="flex-1 min-h-0 relative">
-              <PropertySatellitePanel activeCall={targetAddress} />
-            </div>
-
-            {/* Bottom 1/3 Google Street View */}
-            <div className="flex-1 min-h-0 relative">
-              <StreetViewPanel activeCall={targetAddress} />
-            </div>
-          </aside>
+          <DetailStack
+            call={targetAddress}
+            className="w-[380px] bg-slate-950 border-l border-slate-800 p-3 z-[1000] flex-shrink-0 shadow-2xl animate-in slide-in-from-right duration-300"
+            topCard={
+              <TargetAddressCard
+                targetAddress={targetAddress}
+                nearestHydrants={nearestHydrants}
+                onClose={() => setTargetAddress(null)}
+              />
+            }
+          />
         )}
 
         {/* Right Sidebar Alerts Panel */}

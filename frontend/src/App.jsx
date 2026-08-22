@@ -15,12 +15,29 @@ const ViewLoadingFallback = () => (
   </div>
 );
 
+/**
+ * The two things this app can be showing.
+ *
+ * DISPATCH is entered by any of three routes, which is why it was previously three
+ * booleans OR'd together at the point of use: a live call arrives, a historical call is
+ * replayed for review, or the operator opens the kiosk deliberately from the console.
+ */
+// Not exported: App.jsx also exports a component, and a non-component export here trips
+// react-refresh/only-export-components. Move this to its own module when a second file
+// needs it.
+const MODE = {
+  STANDBY: 'STANDBY',   // console: map, layer controls, search
+  DISPATCH: 'DISPATCH', // kiosk: active or replayed incident
+};
+
 function App() {
   const kioskState = useKioskQueue();
   const [explicitKioskMode, setExplicitKioskMode] = useState(false);
   const [returnMode, setReturnMode] = useState('EXPLORE');
 
-  const shouldRenderKiosk = explicitKioskMode || !!kioskState.activeCall || kioskState.isReviewMode;
+  const mode = (explicitKioskMode || kioskState.activeCall || kioskState.isReviewMode)
+    ? MODE.DISPATCH
+    : MODE.STANDBY;
 
   // Replay a real historical dispatch in Kiosk view exactly as it was received.
   //
@@ -48,7 +65,7 @@ function App() {
   return (
     <div className="App w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 relative">
       <Suspense fallback={<ViewLoadingFallback />}>
-        {shouldRenderKiosk ? (
+        {mode === MODE.DISPATCH ? (
           <KioskView kioskState={extendedKioskState} />
         ) : (
           <MapBoard

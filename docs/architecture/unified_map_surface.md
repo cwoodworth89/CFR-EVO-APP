@@ -1,7 +1,7 @@
 # Unified Map Surface — Design Proposal
 
-**Status: proposal, not implemented.** Written 2026-08-22 after the MapBoard decomposition
-pass. Nothing in `App.jsx` or the dispatch state model has been changed.
+**Status: implemented 2026-08-22**, with step 5 deliberately reduced in scope — see below.
+Written after the MapBoard decomposition pass.
 
 This proposes collapsing the two top-level surfaces — the workstation map and the kiosk
 dispatch display — into **one map surface with two modes**, and unifying the two parallel
@@ -160,18 +160,45 @@ the on-ramp to this, not a separate effort:
    hand-written translations, not two, and the third was silently dropping the
    street-section fields on the live path (punch-list #23). Verified against 421 real
    dispatch records, 0 field mismatches, by `frontend/scripts/verify_dispatch_model.mjs`.
-5. **`App.jsx` shell** — ⏳ **remaining.** Render one shell with a mode instead of swapping
-   `MapBoard` and `KioskView`.
+5. **Shared detail stack and an explicit mode** — ✅ done 2026-08-22, but **not as
+   originally specified.** See below.
 
-### What step 5 still involves
+### Step 5 was partly wrong, and this is what was done instead
 
-The state and the map are now shared, so what is left is purely the component tree.
-`MapBoard` is a 567-line container and `KioskView` a 264-line layout; merging them means
-one shell that selects header, sidebar and detail-stack card by mode.
+The original step 5 said "render one shell with a mode instead of swapping two
+components". Written with the code in front of me, that was the wrong target.
 
-This is the step whose failure mode is **visual rather than functional** — a broken layout
-on the dispatch display, not a wrong coordinate. It is worth doing with the app actually
-running and the two modes compared side by side, rather than on build-passes alone.
+`MapBoard` **is** the standby chrome and `KioskView` **is** the dispatch chrome. Section
+"Three rules" above already says chrome that differs by *kind* should stay as separate
+components. Merging them into one shell would have contradicted that rule to satisfy a
+sentence written earlier in the same document — and produced a single container carrying
+both sets of chrome, which is the `isKiosk`-threaded failure mode the rule exists to
+prevent.
+
+**The problem was never the swap. It was the duplication behind it**, and steps 1–4
+removed that: one map, one layer library, one dispatch translation, one set of view state.
+
+So what step 5 actually delivered:
+
+* **`components/DetailStack.jsx`** — the right-hand inspection stack was the last real
+  duplication. Both surfaces rendered three equal cells where only the top one differed
+  (target address card versus cadastral block). Now one component with a `topCard`.
+* **An explicit `MODE`** in `App.jsx`. Three booleans OR'd together at the point of use
+  became one named value, so "why is the kiosk showing" is answerable by reading it.
+
+The swap itself is retained deliberately. Two lazy-loaded chrome components selected by
+one named mode, over shared state, a shared map and a shared stack, is the correct end
+state — not an unfinished one.
+
+### Still genuinely open
+
+* **Route-intersecting closure highlighting** (level 2 above).
+* **`useKioskQueue` owns more than state** — timers, timeout clock, queue advancement, TV
+  mode. Untouched, and not obviously wrong where it is.
+* **Return mode after an interrupted review.** Starting a review sets the return mode to
+  `ADMIN_DISPATCHES`; if a live call then interrupts and is later dismissed, the crew
+  lands in the admin panel rather than the map. Defensible either way — an operations
+  decision, not an engineering one.
 
 ---
 

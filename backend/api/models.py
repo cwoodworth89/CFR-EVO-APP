@@ -90,6 +90,9 @@ class RoadClosureModel(Base):
     coordinates = Column(SafeArray, nullable=False)
     zone_id = Column(String(16), index=True, nullable=True)
     affected_zones = Column(SafeArray, nullable=True)
+    # Resolved server-side from public.zones so the kiosk can group closures by hall
+    # without fetching zones.json.
+    hall_id = Column(String(4), index=True, nullable=True)
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)
     active = Column(Boolean, default=True, index=True)

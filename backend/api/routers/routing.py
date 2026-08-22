@@ -31,7 +31,13 @@ def get_calculated_route(
     station_id: Optional[str] = "1",
     response_type: str = "emergency"
 ):
-    """Calculates optimal turn-by-turn emergency routing with apparatus speed profiles and live road closure avoidance."""
+    """Calculates turn-by-turn emergency routing via stock OSRM.
+
+    Returns OSRM's own distance and duration. Apparatus speed profiles are NOT applied
+    (see APPARATUS_TIERS, staged for PROJECT_IDEAS #6) and road closures are NOT avoided
+    (public.road_closures is display-only today; see docs/road_closure_integration.md).
+    The previous docstring claimed both.
+    """
     try:
         from gis_service.routing_engine import EVORoutingEngine
         router_instance = EVORoutingEngine(default_station_id=station_id or "1")

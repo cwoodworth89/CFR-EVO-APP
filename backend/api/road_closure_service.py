@@ -5,6 +5,7 @@ import math
 import logging
 import urllib.request
 from datetime import datetime, timezone, timedelta
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 try:
@@ -14,75 +15,19 @@ except ModuleNotFoundError:
 
 logger = logging.getLogger(__name__)
 
-# --- RAY-CASTING POINT-IN-POLYGON & EMERGENCY ZONE MATCHING ---
+# Spatial resolution is handled by PostGIS against the authoritative municipal layers
+# (public.zones, public.city_boundary). The previous implementation loaded zones.json
+# off disk and ran a hand-rolled ray-casting point_in_polygon; it predated the
+# transportation-layer import. See backend/api/closure_spatial.py.
+try:
+    from backend.api.closure_spatial import (
+        build_geojson_geometry, is_within_city, resolve_zones_and_hall,
+    )
+except ModuleNotFoundError:
+    from api.closure_spatial import (
+        build_geojson_geometry, is_within_city, resolve_zones_and_hall,
+    )
 
-_ZONES_CACHE = []
-
-def _load_emergency_zones():
-    global _ZONES_CACHE
-    if _ZONES_CACHE:
-        return _ZONES_CACHE
-
-    possible_paths = [
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "frontend", "public", "data", "zones.json"),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "zones.json"),
-        "frontend/public/data/zones.json"
-    ]
-
-    for p in possible_paths:
-        abs_p = os.path.abspath(p)
-        if os.path.exists(abs_p):
-            try:
-                with open(abs_p, "r", encoding="utf-8") as f:
-                    _ZONES_CACHE = json.load(f)
-                logger.info(f"Loaded {len(_ZONES_CACHE)} Emergency Zone polygons for spatial matching.")
-                return _ZONES_CACHE
-            except Exception as e:
-                logger.warning(f"Failed to load zones from {abs_p}: {e}")
-
-    logger.error("Could not locate zones.json for spatial enrichment.")
-    return []
-
-def point_in_polygon(lng: float, lat: float, polygon_coords: list) -> bool:
-    """Ray-casting algorithm to test if (lng, lat) lies inside polygon_coords."""
-    inside = False
-    n = len(polygon_coords)
-    if n < 3:
-        return False
-    p1x, p1y = polygon_coords[0]
-    for i in range(n + 1):
-        p2x, p2y = polygon_coords[i % n]
-        if lat > min(p1y, p2y):
-            if lat <= max(p1y, p2y):
-                if lng <= max(p1x, p2x):
-                    if p1y != p2y:
-                        xinters = (lat - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-                    if p1x == p2x or lng <= xinters:
-                        inside = not inside
-        p1x, p1y = p2x, p2y
-    return inside
-
-def resolve_affected_zones(pts: list) -> list:
-    """
-    Given a list of points (each [lat, lng] or [lng, lat]) for a point or polyline hazard,
-    returns a sorted list of unique zone_id strings touched by the hazard geometry.
-    """
-    zones = _load_emergency_zones()
-    affected = set()
-    for pt in pts:
-        val1, val2 = pt[0], pt[1]
-        # If val1 is latitude (~49) and val2 is longitude (~-122)
-        if 40 <= val1 <= 60 and -130 <= val2 <= -110:
-            lat, lng = val1, val2
-        else:
-            lng, lat = val1, val2
-
-        for z in zones:
-            coords = z.get("geometry", {}).get("coordinates", [])
-            if coords and point_in_polygon(lng, lat, coords[0]):
-                affected.add(str(z.get("zone_id")))
-
-    return sorted(list(affected), key=lambda x: int(x) if x.isdigit() else x)
 
 class PythonGeometryDecoder:
     def __init__(self, encoded: str):
@@ -157,30 +102,30 @@ def sync_road_closures_to_db(db: Session):
             else:
                 continue
 
-            lat, lng = 49.28, -122.80
-            polyline = []
+            # Build geometry from the feed. No default coordinate: a closure whose
+            # geometry cannot be parsed is dropped, never pinned to a placeholder
+            # location, which would file it under an arbitrary zone and hall
+            # (CLAUDE.md §6.1).
             if t == 'Point':
-                lng, lat = coords[0], coords[1]
-            elif t == 'LineString':
-                polyline = [[pt[1], pt[0]] for pt in coords]
-                mid = len(coords) // 2
-                lng, lat = coords[mid][0], coords[mid][1]
+                all_pts = [[coords[1], coords[0]]]
+            else:
+                all_pts = [[pt[1], pt[0]] for pt in coords]
 
-            # Strict geographic checks: Exclude events south of Fraser River (lat < 49.231) or referencing neighboring cities
-            all_pts = polyline if polyline else [[lat, lng]]
-            if any(pt[0] < 49.231 for pt in all_pts):
+            geo = build_geojson_geometry(all_pts)
+            if not geo:
                 continue
 
-            text_content = f"{evt.get('headline', '')} {evt.get('description', '')} {evt.get('road_name', '')}".lower()
-            if any(city in text_content for city in ["surrey", "delta", "langley", "richmond", "pattullo"]):
+            # Municipal boundary containment via PostGIS, replacing the Fraser River
+            # latitude threshold and the neighbouring-city description blocklist.
+            if not is_within_city(db, geo):
                 continue
 
-            # Perform PIP check across all vertices
-            affected_zones = resolve_affected_zones(all_pts)
+            affected_zones, primary_zone, hall_id = resolve_zones_and_hall(db, geo)
             if not affected_zones:
-                continue  # Skip items outside Coquitlam emergency zones!
+                continue  # Outside every Coquitlam emergency response zone.
 
-            primary_zone = affected_zones[0]
+            mid = len(all_pts) // 2
+            lat, lng = all_pts[mid][0], all_pts[mid][1]
 
             sev = (evt.get('severity') or 'MINOR').upper()
             emergency_access = 'NO_ACCESS' if sev == 'MAJOR' else 'CAUTION'
@@ -223,10 +168,11 @@ def sync_road_closures_to_db(db: Session):
                 "emergency_access": emergency_access,
                 "headline": (evt.get('headline') or "TRAFFIC ALERT").strip(),
                 "description": (evt.get('description') or "Active traffic event.").strip(),
-                "geometry": geog,
+                "geometry": geo,
                 "coordinates": [lat, lng],
                 "zone_id": primary_zone,
                 "affected_zones": affected_zones,
+                "hall_id": hall_id,
                 "start_time": start_dt,
                 "end_time": end_dt
             })
@@ -258,24 +204,21 @@ def sync_road_closures_to_db(db: Session):
                         num_points = geom.get('NumPoints', 0)
                         path_pts = decoder.get_n_points(num_points)
 
-                        lat, lng = 49.28, -122.80
-                        polyline = []
-                        if len(path_pts) == 1:
-                            lat, lng = path_pts[0][0], path_pts[0][1]
-                        elif len(path_pts) > 1:
-                            polyline = path_pts
-                            mid = len(path_pts) // 2
-                            lat, lng = path_pts[mid][0], path_pts[mid][1]
-                        else:
+                        # No default coordinate: an unparseable geometry is dropped
+                        # rather than pinned to a placeholder (CLAUDE.md §6.1).
+                        geo = build_geojson_geometry(path_pts)
+                        if not geo:
                             continue
 
-                        # Perform PIP check across all vertices
-                        all_pts = polyline if polyline else [[lat, lng]]
-                        affected_zones = resolve_affected_zones(all_pts)
-                        if not affected_zones:
-                            continue  # Skip items outside Coquitlam emergency zones!
+                        if not is_within_city(db, geo):
+                            continue
 
-                        primary_zone = affected_zones[0]
+                        affected_zones, primary_zone, hall_id = resolve_zones_and_hall(db, geo)
+                        if not affected_zones:
+                            continue  # Outside every Coquitlam emergency response zone.
+
+                        mid = len(path_pts) // 2
+                        lat, lng = path_pts[mid][0], path_pts[mid][1]
                         rct = geom.get('MarkerInfo', {}).get('RoadClosureType', 0)
                         highest_bit = 0
                         if rct > 0:
@@ -306,11 +249,6 @@ def sync_road_closures_to_db(db: Session):
                         headline_text = desc.get('Headline') or loc_name
                         desc_text = (desc.get('BaseDescription') or "").strip() or "Local road construction or restriction."
 
-                        geom_json = {
-                            "type": "LineString" if len(polyline) > 1 else "Point",
-                            "coordinates": polyline if len(polyline) > 1 else [lng, lat]
-                        }
-
                         raw_notices.append({
                             "closure_id": f"muni_{issue.get('IssueId')}_{geom_idx}",
                             "street_name": loc_name.strip(),
@@ -319,10 +257,11 @@ def sync_road_closures_to_db(db: Session):
                             "emergency_access": emergency_access,
                             "headline": headline_text.strip(),
                             "description": desc_text.strip(),
-                            "geometry": geom_json,
+                            "geometry": geo,
                             "coordinates": [lat, lng],
                             "zone_id": primary_zone,
                             "affected_zones": affected_zones,
+                            "hall_id": hall_id,
                             "start_time": start_dt,
                             "end_time": end_dt
                         })
@@ -362,6 +301,7 @@ def sync_road_closures_to_db(db: Session):
             existing.coordinates = item["coordinates"]
             existing.zone_id = item["zone_id"]
             existing.affected_zones = item["affected_zones"]
+            existing.hall_id = item.get("hall_id")
             existing.start_time = item["start_time"]
             existing.end_time = end_time
             existing.active = is_active
@@ -379,6 +319,7 @@ def sync_road_closures_to_db(db: Session):
                 coordinates=item["coordinates"],
                 zone_id=item["zone_id"],
                 affected_zones=item["affected_zones"],
+                hall_id=item.get("hall_id"),
                 start_time=item["start_time"],
                 end_time=end_time,
                 active=is_active
@@ -408,6 +349,17 @@ def sync_road_closures_to_db(db: Session):
         RoadClosureModel.active == False,
         RoadClosureModel.updated_at < purge_cutoff
     ).delete(synchronize_session=False)
+
+    db.flush()
+
+    # Mirror the jsonb geometry into the PostGIS geom column so spatial queries have a
+    # real, GiST-indexed geometry to work against.
+    db.execute(text("""
+        UPDATE public.road_closures
+           SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
+         WHERE geometry IS NOT NULL
+           AND (geom IS NULL OR updated_at >= :since)
+    """), {"since": now_utc - timedelta(minutes=5)})
 
     db.commit()
     logger.info(f"Successfully differentials-synced {len(active_closure_ids)} road closures. Purged {deleted_count} stale records older than 30 days.")

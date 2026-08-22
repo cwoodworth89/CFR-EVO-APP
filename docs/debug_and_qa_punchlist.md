@@ -114,3 +114,50 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
   `ST_Intersects` (touching counts), not `ST_Contains`, so a boundary-straddling closure
   should still be admitted. If those disappear, the check is too strict.
 
+---
+
+## 📍 Custom Places Data Quality
+
+### 7. `custom_places.json` coordinates are hand-entered and some are badly wrong
+> **Status**: ⚠️ **Open — confirmed.** Measured 2026-08-21 against `public.parcels`.
+
+* **What it is**: `backend/data/vocabulary/custom_places.json` holds 152 named places
+  (parks, schools, civic buildings) keyed by lowercase name. It seeds
+  `public.custom_places`, which is **Step 7 of the 8-step geocoder cascade** — the
+  fallback used when a dispatch names a place rather than an address.
+* **The problem**: coordinates appear hand-entered and are not validated against any
+  authoritative source. Three secondary schools, cross-checked against `public.parcels`
+  (municipal `Addresses.shp`):
+
+  | Place | `custom_places.json` error | `MapLayers.jsx` error |
+  |:--|--:|--:|
+  | Centennial Secondary | **1,774 m** | 92 m |
+  | Gleneagle Secondary | 537 m | 14 m |
+  | Pinetree Secondary | 309 m | 28 m |
+
+* **Operational impact**: a dispatch naming "Centennial Secondary" that falls through to
+  Step 7 resolves ~1.8 km from the actual school. Apparatus routes to the wrong place,
+  and nothing flags it — the coordinates are inside Coquitlam, so the §5 bounds check
+  passes and tiles render normally.
+* **Scope of the sample**: 140 of 152 entries carry a civic address in parentheses.
+  Only **14** matched a parcel on exact address string (formats differ), so the
+  distribution below is indicative, not a full audit: 8 within 50 m, 1 at 50–200 m,
+  2 at 200–500 m, 3 over 500 m.
+* **Second source of truth**: `MapLayers.jsx` carries its own hardcoded school list with
+  *different* coordinates for the same schools. It is consistently closer to the parcel
+  data (14–92 m). Two hand-maintained lists disagreeing is itself the defect.
+
+* **Do NOT blind-snap to parcels.** For a school or civic building the parcel centroid is
+  right. For a park, a lake, or a trailhead the useful dispatch point may deliberately be
+  an entrance or muster point rather than the parcel centroid — some hand-placed values
+  may be intentional. This needs a per-category decision:
+  - **Buildings** (schools, hospitals, civic): resolve through the geocoder cascade
+    against `public.parcels` and replace.
+  - **Open spaces** (parks, lakes, trails): confirm with operations whether the stored
+    point is a deliberate access point; if so, record that in `public.custom_places` as
+    provenance rather than leaving it looking like an unverified guess.
+  - Reconcile `MapLayers.jsx`'s school list against `public.custom_places` so there is
+    one source.
+* **Suggested check** — run the 140 addresses through the geocoder rather than exact
+  string match, which will resolve far more than 14 and give a real error distribution.
+

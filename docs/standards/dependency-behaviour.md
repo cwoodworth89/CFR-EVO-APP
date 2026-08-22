@@ -18,6 +18,7 @@ not the behaviour**, and the code was written against the name.
 | `hotwords=` | these words are boosted | keeps the first 223 tokens, silently discards the rest |
 | `token_set_ratio` | a similarity ratio | returns **100** when one token set is a subset of the other |
 | `ST_Contains` | the point is in the polygon | excludes the boundary, so a point on a zone edge is *not* contained |
+| `multiprocessing.Process` | the child continues where the parent left off | on Python 3.14 it does not inherit logging config -- the default start method became `forkserver` |
 
 None of these are bugs in the libraries. All are documented or evident in source. The
 defect was on our side: **we trusted the name.**
@@ -120,6 +121,42 @@ This is also the shape of an earlier live defect: block interpolation had never 
 because `public.roads.geom` is `MULTILINESTRING` and `ST_LineInterpolatePoint` requires
 `LINESTRING`, so step 3 of the geocoder cascade threw on every call and silently fell
 through to coarser steps.
+
+### Python 3.14 — `multiprocessing` defaults to `forkserver`, so children inherit nothing
+
+```
+python 3.14.4
+multiprocessing.get_start_method() -> 'forkserver'
+available: ['forkserver', 'fork', 'spawn']
+```
+
+Python 3.14 changed the default start method on Linux from `fork` to **`forkserver`**. A
+forked child inherits the parent's memory, including any configured logging; a forkserver
+child does not — it starts fresh with the root logger at **WARNING**, writing to stderr in
+the default `WARNING:root:` format.
+
+`orchestration.run_dispatch_system` called `setup_logging()` and *then* spawned the
+pipeline worker, which was correct under `fork` and silently stopped working on 3.14.
+
+**Consequence when unverified**: every `logging.info` in the two-phase dispatch pipeline was
+discarded — no `Published … to Mosquitto` lines, no `[METRICS] Phase 1 TTA` timings, no
+geocoder resolution notes. Only WARNING and above survived. The system was not diagnosable
+from its logs for anything that did not raise a warning, which is what blocked the
+investigation of punch-list #25. Punch-list #26.
+
+**The tell was the log format**, not the missing lines: `WARNING:root:[DISP-…]` in the same
+journal as `2026-08-22 14:34:04,724 - INFO - TONES CONFIRMED`. Two formats means two logging
+configurations, and the default one means nobody configured it.
+
+Two further forkserver consequences worth knowing:
+
+* The child re-imports the target module, so **module-level side effects run again** in the
+  child.
+* The target must be **picklable by qualified name** — a function defined in an inline
+  `python -c` script fails with `AttributeError: module '__main__' has no attribute …`.
+
+Configure logging *inside* each process rather than relying on inheritance; that is correct
+under every start method.
 
 ## Unverified — assumptions still resting on names
 

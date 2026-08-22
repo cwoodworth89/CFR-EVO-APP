@@ -18,13 +18,13 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > same pass.
 >
 > Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**,
-> **#22**, **#26**.
+> **#22**.
 >
 > **Found from live operation 2026-08-22**, none of them reachable from the test corpus —
 > all three came from one operator screenshot of a real dispatch: **#24** (an invented
 > hydrant shown on every call, closed), **#25** (a corrected re-broadcast queueing itself
 > as a second call, closed on the kiosk side with a latent backend ordering defect
-> recorded), **#26** (the pipeline's INFO logging is discarded, open — and the reason #25
+> recorded), **#26** (the pipeline's INFO logging is discarded, closed — and the reason #25
 > could not be diagnosed from logs).
 >
 > Closed 2026-08-22 during decomposition: **#22** (closure timeframe filters matched nothing).
@@ -1062,7 +1062,30 @@ plausible.
 **Whether this is what happened was not established** — see #26.
 
 ### 26. The dispatch pipeline's INFO logging is discarded
-> **Status**: ⚠️ **Open — found 2026-08-22 while trying to diagnose #25.**
+> **Status**: ✅ **Closed 2026-08-22.** Root cause found and fixed; **requires an agent
+> restart to take effect**.
+>
+> **Cause**: Python 3.14 changed the default multiprocessing start method on Linux from
+> `fork` to `forkserver` (verified on the kiosk: `get_start_method()` → `forkserver` under
+> 3.14.4). A forked child inherits the parent's configured logging; a forkserver child does
+> not. `orchestration.run_dispatch_system` configured logging and *then* spawned the
+> worker — correct under `fork`, silently broken on 3.14.
+>
+> **Fix**: `setup_logging` moved to `cfr_dispatch/logging_setup.py` and called *inside*
+> `background_worker_loop`, which is correct under any start method. The worker writes
+> `dispatch-worker.log` rather than sharing the orchestrator's file, because a
+> `TimedRotatingFileHandler` is not safe across processes — both would race on the
+> rotation rename.
+>
+> **Verified** with a forkserver child on the kiosk: INFO now appears in the configured
+> format on stderr (so systemd captures it) and in the worker's own file, where previously
+> only `WARNING:root:` survived.
+>
+> Recorded in `docs/standards/dependency-behaviour.md`.
+>
+> Original finding follows.
+>
+> ⚠️ **Open — found 2026-08-22 while trying to diagnose #25.**
 
 The two-phase pipeline runs in a **separate process** from the audio agent, and that
 process never configures logging. It therefore uses the default root logger at **WARNING**,

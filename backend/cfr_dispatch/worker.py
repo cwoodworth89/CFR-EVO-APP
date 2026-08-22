@@ -11,6 +11,7 @@ from cfr_dispatch.config.cloud import (
 from cfr_dispatch.stt import get_whisper_model
 from cfr_dispatch.pipeline import process_phase_1_check, process_phase_2_finalize
 from gis_service import CoquitlamDataValidator
+from cfr_dispatch.logging_setup import setup_logging
 
 class DispatchSessionManager:
     """
@@ -94,6 +95,17 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
     Background worker loop executing in a dedicated multiprocessing Process.
     Loads GIS validator and Whisper int8 model once, then routes Phase 1 checks and Phase 2 finalizations.
     """
+    # Configure logging IN this process. It is not inherited: Python 3.14 changed the
+    # default multiprocessing start method on Linux from fork to forkserver, and a
+    # forkserver child starts with the default root logger at WARNING. Without this every
+    # logging.info in the two-phase pipeline is discarded -- no MQTT publish lines, no
+    # [METRICS] TTA timings, no geocoder resolution notes -- which left the system
+    # undiagnosable from its logs for anything that did not raise a warning (punch-list #26).
+    #
+    # A separate file from the orchestrator on purpose: a TimedRotatingFileHandler is not
+    # safe to share across processes, which would race on the rotation rename.
+    setup_logging(log_file='dispatch-worker.log')
+
     logging.info("Background Dispatch Worker process starting...")
     validator = get_shared_validator()
     stt_model = get_whisper_model()

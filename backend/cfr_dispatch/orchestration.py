@@ -3,9 +3,8 @@ import time
 import datetime
 import logging
 import multiprocessing
-from logging.handlers import TimedRotatingFileHandler
 
-from cfr_dispatch.config.cloud import VERBOSITY_LEVEL
+from cfr_dispatch.logging_setup import setup_logging
 from cfr_dispatch.worker import background_worker_loop, get_shared_validator
 from cfr_dispatch.audio_listener import run_audio_listener_loop
 from cfr_dispatch.pipeline import (
@@ -13,45 +12,9 @@ from cfr_dispatch.pipeline import (
     process_full_dispatch
 )
 
-def setup_logging():
-    """Configures global daily 08:00 shift rotation log handlers and stream formatters."""
-    logging.Formatter.converter = time.localtime
-    logger = logging.getLogger()
-    
-    if VERBOSITY_LEVEL == 0:
-        log_level = logging.ERROR
-    elif VERBOSITY_LEVEL == 1:
-        log_level = logging.INFO
-    else:
-        log_level = logging.DEBUG
-        
-    logger.setLevel(log_level)
-    if logger.hasHandlers():
-        logger.handlers.clear()
-        
-    # Timed Rotating File Handler (rotates daily at 08:00, retains 10 backups)
-    file_handler = TimedRotatingFileHandler(
-        'dispatch.log',
-        when='D',
-        interval=1,
-        backupCount=10,
-        atTime=datetime.time(8, 0, 0)
-    )
-    file_handler.setLevel(logging.DEBUG if VERBOSITY_LEVEL >= 2 else logging.INFO)
-    file_formatter = logging.Formatter('%(asctime)s - %(levelname)-8s - %(message)s')
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-    
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO if VERBOSITY_LEVEL >= 1 else logging.WARNING)
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)-8s - %(message)s')
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
-
-    # Silence verbose third-party loggers
-    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-
+# setup_logging moved to cfr_dispatch.logging_setup so the worker process can call it too.
+# It is not inherited across a multiprocessing spawn on Python 3.14, whose default start
+# method on Linux is forkserver -- see that module for the full explanation.
 def process_and_post_payload(*args, **kwargs):
     """Backward compatibility alias for build_dispatch_payload."""
     return build_dispatch_payload(*args, **kwargs)

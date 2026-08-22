@@ -68,3 +68,49 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 * **Observed Problem**: The custom canvas-based `AudioWaveformPlayer` is overly complex; user prefers a simple, clean, dependable native audio player.
 * **Fix**: Revert to the clean, streamlined audio player in `VerificationSidebar.jsx`.
 
+---
+
+## 🛣️ Road Closure Ingestion
+
+### 6. Verify first live ingest through the new PostGIS path
+> **Status**: ⚠️ **Open — unverified.** The PostGIS rewrite (`206af55`) is deployed and the
+> API is healthy, but no full ingest cycle has been observed since. A forced sync POST
+> timed out during the deploy session, so the daily scheduled run is the first real test.
+
+* **What changed**: `road_closure_service.py` now resolves zones and municipal
+  containment via `ST_Intersects` / `ST_Contains` against `public.city_boundary` and
+  `public.zones`, instead of ray-casting over `zones.json`. Closures with unparseable
+  geometry are now **dropped** rather than pinned to a placeholder coordinate.
+* **How to verify** — check the ingest actually ran and succeeded:
+  ```bash
+  # 1. Did a sync run, and when?
+  ssh tcfire@100.95.146.94 "docker logs cfr_api 2>&1 | grep -i 'differentials-synced' | tail -5"
+
+  # 2. Freshness: updated_at should be within the last 24h (check_and_sync_if_stale
+  #    uses max_age_seconds=86400)
+  ssh tcfire@100.95.146.94 "docker exec cfr_postgres sh -c 'psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"
+    SELECT max(updated_at) AS last_sync,
+           now() - max(updated_at) AS age,
+           count(*) FILTER (WHERE active) AS active_closures
+    FROM public.road_closures;\"'"
+
+  # 3. Did the new columns populate? hall_id and geom should be non-null on
+  #    freshly-synced active rows.
+  ssh tcfire@100.95.146.94 "docker exec cfr_postgres sh -c 'psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"
+    SELECT hall_id, count(*) AS closures,
+           count(geom) AS with_geometry
+    FROM public.road_closures WHERE active
+    GROUP BY hall_id ORDER BY hall_id NULLS LAST;\"'"
+  ```
+* **Pass criteria**:
+  - `last_sync` age < 24h, and a `differentials-synced` line appears in the API log.
+  - Active closure count is non-zero and in the same order of magnitude as the previous
+    103 — a large drop would suggest the new containment check is over-filtering.
+  - `hall_id` is populated (1–4) on most rows; a large `NULL` group means centroid
+    containment is failing and needs review.
+  - `with_geometry` equals `closures` — a shortfall means the `geom` mirror UPDATE is
+    not firing.
+* **Watch for**: closures legitimately spanning the city edge. `is_within_city` uses
+  `ST_Intersects` (touching counts), not `ST_Contains`, so a boundary-straddling closure
+  should still be admitted. If those disappear, the check is too strict.
+

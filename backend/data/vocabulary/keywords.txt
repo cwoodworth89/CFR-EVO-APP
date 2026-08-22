@@ -1,7 +1,0 @@
-near
-and
-use
-respond
-emergency
-routine
-map grid

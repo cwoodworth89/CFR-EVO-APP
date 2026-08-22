@@ -13,5 +13,4 @@ This directory contains utility scripts for system calibration, geographic prepr
 | `feed_recorded_call.py` | Simulates a live call by streaming a pre-recorded WAV file through the system's microphone loopback device. | `python scripts/feed_recorded_call.py` |
 | `fingerprint_source.py` | Analyzes raw dispatcher tones and outputs frequency peaks to build golden tone matching configuration templates. | `python scripts/fingerprint_source.py` |
 | `fix_shapefiles.py` | Checks spatial shapefile geometries for indexing errors and formats coordinate rings. | `python scripts/fix_shapefiles.py` |
-| `generate_street_list.py` | Helper script to extract a clean, unique list of Coquitlam streets from shapefile files or geocoders. | `python scripts/generate_street_list.py` |
 | `update_gis_data.py` | Automated CLI tool that downloads and updates raw shapefile datasets from Coquitlam's Open Data API. | `python scripts/update_gis_data.py` |

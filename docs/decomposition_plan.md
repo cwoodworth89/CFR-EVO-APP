@@ -22,9 +22,24 @@ compliance (no fabricated data, sourced constants), error handling, and document
 
 ## Tier 1 — Live dispatch path (highest risk)
 
-### 1.1 `backend/api/road_closure_service.py` (449 lines)
+### 1.1 `backend/api/road_closure_service.py` (449 lines) — ✅ DONE (`206af55`)
 
-**Start here.** This is the clearest architectural regression in the codebase.
+Completed 2026-08-21. Hand-rolled ray-casting, `zones.json` disk loading, the Fraser
+River latitude threshold, the neighbouring-city string blocklist, the coordinate-order
+guessing heuristic, and both `lat, lng = 49.28, -122.80` placeholders are gone.
+Replaced by `backend/api/closure_spatial.py` using `ST_Intersects` / `ST_Contains`
+against `public.city_boundary` and `public.zones`.
+
+Also added `zones.unit_id/station/hall_id` (backfilled by
+`backend/scripts/import_zone_units.py`, 134/134 zones) and
+`road_closures.geom` + `hall_id`, so hall grouping is resolved server-side instead of
+the kiosk fetching `zones.json`.
+
+Measured justification for using the real polygon over a bounding box: the §5 bbox
+covers 338.1 km² against the city's actual 129.7 km² — **61.6% of that rectangle is not
+Coquitlam**, admitting Port Moody, Port Coquitlam, Burnaby, New Westminster and Anmore.
+
+*Original finding, for reference:*
 
 - Uses **zero PostGIS** (`grep -c "ST_"` returns 0) despite `public.zones` holding all
   134 authoritative zone polygons with real geometry.
@@ -71,16 +86,28 @@ A dispatch misclassified as a PA page is discarded before recording.
 
 All four crash-class bugs found on 2026-08-21 were in this tier.
 
-### 2.1 `frontend/src/components/DashboardHUD.jsx` (1083 lines, 5 components)
+### 2.1 `frontend/src/components/DashboardHUD.jsx` (1083 lines, 5 components) — ✅ DONE
 
-**Best effort-to-payoff ratio in the frontend.** One file exports five separate
-components: `Header`, `LeftSidebar`, `RightSidebar`, `ActiveDispatchPanel`, and a
-private `SatelliteMiniMap`. Splitting them into five files is mechanical and resolves a
-large share of the 15 outstanding `react-refresh/only-export-components` warnings.
+Split into `components/hud/`: `Header.jsx` (93), `SatelliteMiniMap.jsx` (43),
+`ActiveDispatchPanel.jsx` (184), `LeftSidebar.jsx` (485), `RightSidebar.jsx` (263).
+`DashboardHUD.jsx` deleted; `MapBoard.jsx` imports the three exported components
+directly. Four of the five files are now completely lint-clean.
 
-Note: `SatelliteMiniMap` here duplicates the standalone component deleted in `d5fbdcc`.
-This copy **does** guard coordinates correctly (`if (!lat || !lng) return null`), so it
-is not a §5 defect — but decide whether it should exist at all.
+**Correction to this plan's original claim:** the split did *not* reduce the 15
+`react-refresh/only-export-components` warnings, because none of them were in
+DashboardHUD. They are in `MapLayers.jsx` (5), `hud/ActiveAlertBanner.jsx` (3),
+`hud/RoutingConfigModal.jsx` (1), `review/ReviewTable.jsx` (3) and
+`review/VerificationSidebar.jsx` (2) — files that export helper functions and constants
+alongside components. Clearing them means moving those helpers to their own modules,
+which is a separate task from splitting multi-component files.
+
+`RightSidebar.jsx` still carries 4 issues that came with the component: three
+`preserve-manual-memoization` and one `exhaustive-deps` on the closure-grouping
+`useMemo`. Worth addressing when that component is reviewed.
+
+Note: `SatelliteMiniMap` duplicates the standalone component deleted in `d5fbdcc`. This
+copy **does** guard coordinates correctly (`if (!lat || !lng) return null`), so it is
+not a §5 defect — but decide whether it should exist at all.
 
 ### 2.2 `frontend/src/components/MapBoard.jsx` (1155 lines, **52 hook calls**)
 
@@ -165,9 +192,17 @@ Not tied to a single file — worth handling as their own passes.
 
 ## Suggested first three sessions
 
-1. **`road_closure_service.py` → PostGIS.** Self-contained, removes a real architectural
-   regression, and is verifiable against `public.zones`.
-2. **`DashboardHUD.jsx` → five files.** Mechanical, no logic change, clears most of the
-   remaining lint.
+1. ~~`road_closure_service.py` → PostGIS.~~ **Done** (`206af55`).
+2. ~~`DashboardHUD.jsx` → five files.~~ **Done.**
 3. **`parser.py` → four modules.** Highest-value backend split; pair with
    `destructive_parser.py` to check for divergence.
+4. **Helper extraction for `react-refresh`.** Move non-component exports out of
+   `MapLayers.jsx`, `ActiveAlertBanner.jsx`, `ReviewTable.jsx` and
+   `VerificationSidebar.jsx` into sibling modules. Mechanical, clears 14 of the
+   remaining 22 lint issues.
+
+### Lesson recorded
+`wc -l` counts newlines, not lines. `DashboardHUD.jsx` ended without a trailing newline,
+so its final `}` sat on line 1084 while `wc -l` reported 1083 — the first extraction
+silently truncated `RightSidebar`. When splitting by line range, verify brace and paren
+balance per output file before trusting the build.

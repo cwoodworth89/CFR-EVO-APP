@@ -9,7 +9,9 @@ import L from 'leaflet';
 // Import from your other components
 import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
-import { Header, LeftSidebar, RightSidebar } from './DashboardHUD';
+import { Header } from './hud/Header';
+import { LeftSidebar } from './hud/LeftSidebar';
+import { RightSidebar } from './hud/RightSidebar';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
 import { apiClient } from '../apiClient';
 

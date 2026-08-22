@@ -161,3 +161,67 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 * **Suggested check** — run the 140 addresses through the geocoder rather than exact
   string match, which will resolve far more than 14 and give a real error distribution.
 
+---
+
+## 🧪 Test Suite Debt
+
+### 8. The 11 test failures are NOT environmental — correcting the record
+> **Status**: ⚠️ **Open.** Run on the kiosk 2026-08-21 with PostGIS reachable, `librosa`
+> present and `XDG_RUNTIME_DIR` set: **identical 11 failures, 72 passed.** Earlier commit
+> messages this session described all 11 as "pre-existing and environmental". The
+> pre-existing half was verified by stashing; **the environmental half was inferred and
+> is wrong.**
+
+Actual causes:
+
+* **1 stale test causing ~6 cascading failures.** `test_landmarks_count` queries
+  `public.landmarks`, renamed to `custom_places` in Phase D and dropped entirely on
+  2026-08-21. The `UndefinedTable` error aborts the transaction, so every later test on
+  that connection fails with `InFailedSqlTransaction` — `test_vocabulary_units`,
+  `test_vocabulary_call_types`, `test_zone_spatial_query`,
+  `test_city_boundary_contains_coquitlam`, `test_city_boundary_excludes_burnaby`,
+  `test_parcels_have_geometry`. Fixing the one stale test likely clears all of them.
+* **`test_intersections_count`**: asserts 400–2500, actual is **6,499**. Either the
+  bound is stale or the intersection set grew. `docs/development_freeze_summary.md`
+  documents 3,947, which matches neither.
+* **`test_fault_injection::test_04_unknown_address_fallback_safety`**: imports
+  `ADDRESS_SHAPEFILE_PATH` / `ZONES_SHAPEFILE_PATH` from `cfr_dispatch.config`. Removed
+  in the Phase A PostGIS migration. Stale test, not a product bug.
+* **`test_pipeline_unit::test_build_dispatch_payload_option2`**: its `MockValidator`
+  lacks the `target_map_grid` keyword the real `local_geocode` gained in the geocoder 2.0
+  work. Stale mock signature.
+
+### 9. False intersection: DAVID AVE & PANORAMA DR
+> **Status**: ⚠️ **Open — confirmed for this one pair. Scope unknown.**
+
+`test_no_false_intersections` asserts these parallel streets never meet. `public.intersections`
+holds **2 rows** for them, and PostGIS confirms the road geometries do **not** intersect:
+
+```sql
+SELECT EXISTS (SELECT 1 FROM public.roads a, public.roads b
+  WHERE a.fullname ILIKE 'DAVID AVE%' AND b.fullname ILIKE 'PANORAMA DR%'
+    AND ST_Intersects(a.geom, b.geom));   -- returns false
+```
+
+A dispatch to that intersection geocodes to a fabricated point with no warning.
+
+**Scope is not established.** A bulk check comparing every stored intersection against
+road geometry was attempted and is invalid: `intersections.street_a/street_b` use
+abbreviated suffixes (`ABBEY LN`) while `roads.fullname` uses full words
+(`Waterford Place`), so only 317 of 6,499 join at all. A real audit must normalise
+suffixes first — reuse `normalize_street_suffix` from `parser/location.py` rather than
+joining raw strings.
+
+Also observed: duplicate rows (`ABBEY LN & GLENBROOK ST` twice). May be legitimate
+multi-candidate entries distinguished by `candidate_index`, or may be duplicates —
+not yet determined.
+
+### 10. Three test modules have never run in review
+> **Status**: ⚠️ **Open.**
+
+`test_database_integration`, `test_listener` and `test_keyword_spotter` were excluded all
+session with `--ignore` because `librosa` (local) and `pvporcupine` (kiosk) are missing.
+"72 passed" therefore does not represent the full suite. `pvporcupine` is a Picovoice
+wake-word dependency that is not installed on the kiosk at all — worth deciding whether
+that feature is live before keeping a test for it.
+

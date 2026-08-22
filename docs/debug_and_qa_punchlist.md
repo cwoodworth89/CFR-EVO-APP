@@ -3,14 +3,25 @@
 This document tracks identified bugs, routing anomalies, edge cases, and feature refinements to investigate and resolve during the final bug squashing and testing phase.
 
 > [!NOTE]
-> **Status key (as of 2026-08-20)**: Items marked ✅ have been independently verified against the current working tree. Items marked ⚠️ are confirmed still open.
+> **Status key (reconciled 2026-08-21, commit `0db0b75`)**: ✅ = verified against the
+> current working tree *and*, where the item touches data, the running kiosk database.
+> ⚠️ = confirmed still open. Each status line states what was checked, so a later reader
+> can tell **reported** from **confirmed** (CLAUDE.md §6.6).
+>
+> Items closed at this reconciliation: **#7** (obsolete — the cascade step was removed),
+> **#11** (fixed and re-synced). Item **#2 has been reopened**: one coordinate fallback
+> survived the sweep. Items #1, #6, #8, #9, #10, #12, #13, #14 remain open.
 
 ---
 
 ## 🧭 Routing Engine & Pathfinding Anomalies
 
 ### 1. Erratic Routing Loops & Intra-Municipal Path Preference
-> **Status**: ⚠️ **Still open.** Turn-by-turn routing functions, but OSRM Lua profile arterial-vs-alleyway weighting has not been re-tuned.
+> **Status**: ⚠️ **Still open — not re-examined at the 2026-08-21 reconciliation.** Turn-by-turn
+> routing functions, but the OSRM Lua profile arterial-vs-alleyway weighting has not been
+> re-tuned. No new evidence was gathered this pass; the description below is as originally
+> reported and the loops have **not** been re-observed since routing moved to stock OSRM.
+> Re-confirm the behaviour still reproduces before spending time on profile tuning.
 * **Incident / Path**: `1300 Pinetree Way` (Town Centre Fire Hall / Hall 1) $\rightarrow$ `428 Nelson St`.
 * **Reported Behavior**:
   * The calculated apparatus route exhibits erratic pathing with unnatural loops, parking lot / back-alley cut-throughs, and unnecessary detours (see visual trace below).
@@ -30,7 +41,28 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ---
 
 ### 2. Intersection Geocoding & Hardcoded Port Moody Fallback (`DISP-2026-F1F345`)
-> **Status**: ✅ **Resolved (2026-08-20).** The prior "fix" only swapped the Port Moody coordinates for Coquitlam City Centre — still a silent guess, and a more dangerous one because it renders as a fully valid in-coverage dispatch. All hardcoded coordinate fallbacks have now been removed frontend-wide; unresolved coordinates stay `null` and surface the CLAUDE.md §5 Tier 1 warning with routing suppressed.
+> **Status**: ⚠️ **REOPENED 2026-08-21.** Mostly fixed, but **one fallback survived the
+> sweep** — and it is on the live new-dispatch path. `frontend/src/components/MapBoard.jsx:471`:
+>
+> ```js
+> const target = newCall.target || (newCall.address
+>   ? { address: newCall.address, lat: newCall.lat || COQUITLAM_CENTER[0],
+>                                 lng: newCall.lng || COQUITLAM_CENTER[1] } : null);
+> ```
+>
+> This is the exact defect this item describes, one commit short of closed: a null
+> coordinate silently becomes `49.2838, -122.7907` (City Centre), inside the §5 bounds
+> check, so tiles render and routing proceeds and nothing warns. It is the same shape as
+> the bug that routed **every live MQTT call** to Town Centre.
+>
+> The claim "all hardcoded coordinate fallbacks have now been removed frontend-wide" was
+> **reported, not verified**, and is wrong.
+>
+> The other four `COQUITLAM_CENTER` uses in `MapBoard.jsx` were checked and are
+> legitimate — initial map view (`:176`, `:836`), a distance comparison (`:380–381`), and
+> an idle "reset view" `flyTo` (`:998`). None of them stand in for a dispatch coordinate.
+> **Only line 471 needs to change**: drop the `||` defaults so `lat`/`lng` propagate as
+> `null` and the Tier 1 card fires.
 * **Incident**: `CHRISTMAS WAY AND WESTWOOD ST` (Grid 68, Motor Vehicle Incident).
 * **Observed Problem**:
   * The call routed from Hall 1 all the way out into **Port Moody** (`49.27305, -122.88452`).
@@ -47,7 +79,9 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ---
 
 ### 3. Missing `responding_units` in Replayed Dispatches
-> **Status**: ✅ **Confirmed fixed** — independently verified in `App.jsx`; `verified_units` → `responding_units` → `[]` resolution is passed through explicitly. The `['SQ1','E1','L1']` invented-apparatus fallbacks have additionally been removed from `EVORoutingEngine.js`, `RouteOverviewPanel.jsx`, and `MapBoard.jsx`.
+> **Status**: ✅ **Confirmed fixed (re-verified 2026-08-21).** A tree-wide `SQ1` grep now
+> returns exactly one hit — `EVORoutingEngine.js:27`, a descriptive subtitle string in the
+> staged `APPARATUS_TIERS` seed data (§6.4), not a fallback. Originally verified in `App.jsx`; `verified_units` → `responding_units` → `[]` resolution is passed through explicitly. The `['SQ1','E1','L1']` invented-apparatus fallbacks have additionally been removed from `EVORoutingEngine.js`, `RouteOverviewPanel.jsx`, and `MapBoard.jsx`.
 * **Observed Problem**: Simulated calls in Kiosk view display `SQ1, E1, L1` regardless of what units were dispatched (e.g. `DISP-2026-F1F345` had `E1, E2, R2, C8`).
 * **Root Cause**: `handleSimulateCall` in `frontend/src/App.jsx` omitted `responding_units: call.verified_units || call.responding_units || []` when building `mockCall`, causing `EVORoutingEngine.js` to trigger its `['SQ1', 'E1', 'L1']` fallback.
 * **Fix**: Pass `responding_units` explicitly in `App.jsx`.
@@ -57,13 +91,29 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ## 🎨 Kiosk & Review Panel UI/UX Refinements
 
 ### 4. Remove Satellite View from Call Review Panel
-> **Status**: ✅ Reported fixed — `SatelliteMiniMap.jsx` deleted entirely (removed as an orphaned component alongside the v1.0.0 training-mode cleanup, commit `d5fbdcc`).
+> **Status**: ✅ **Fixed, but the record was wrong.** The defect is gone: `SatelliteMiniMap`
+> is no longer in `VerificationSidebar.jsx`, and the Burlington & Pinetree pin is
+> impossible — the component early-returns `null` on falsy `lat`/`lng`
+> (`hud/SatelliteMiniMap.jsx:7`) and its one caller guards as well, rendering
+> "Coordinates missing" instead (`hud/ActiveDispatchPanel.jsx:120–126`).
+>
+> **The claim "deleted entirely" is false.** The file exists at
+> `frontend/src/components/hud/SatelliteMiniMap.jsx` and is used by
+> `ActiveDispatchPanel.jsx` — a different, intended surface. It was removed from the
+> review panel, not from the codebase.
+>
+> Cosmetic follow-up, not a data defect: that panel is labelled
+> `🛰️ GOOGLE SATELLITE VIEW`, but the layer is the local offline MBTiles service
+> (`TILE_BASE_URL/services/satellite/...`). The label names a cloud provider this
+> architecture deliberately does not use.
 
 * **Observed Problem**: `VerificationSidebar.jsx` includes a `<SatelliteMiniMap />` component that was never intended in the plan. When target coordinates are missing, it persistently defaults to pinning at Burlington Ave & Pinetree Way (`49.2838, -122.7932`).
 * **Fix**: Remove `SatelliteMiniMap` from `VerificationSidebar.jsx`.
 
 ### 5. Audio Player Simplification in Call Review Panel
-> **Status**: ✅ Reported fixed — `AudioWaveformPlayer.jsx` deleted; reverted to native audio controls (also removed alongside commit `d5fbdcc`).
+> **Status**: ✅ **Confirmed fixed (verified 2026-08-21).** A tree-wide grep for
+> `AudioWaveformPlayer` returns no hits; the file and every reference are gone. Reverted to
+> native audio controls (removed alongside commit `d5fbdcc`).
 
 * **Observed Problem**: The custom canvas-based `AudioWaveformPlayer` is overly complex; user prefers a simple, clean, dependable native audio player.
 * **Fix**: Revert to the clean, streamlined audio player in `VerificationSidebar.jsx`.
@@ -73,9 +123,29 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ## 🛣️ Road Closure Ingestion
 
 ### 6. Verify first live ingest through the new PostGIS path
-> **Status**: ⚠️ **Open — unverified.** The PostGIS rewrite (`206af55`) is deployed and the
-> API is healthy, but no full ingest cycle has been observed since. A forced sync POST
-> timed out during the deploy session, so the daily scheduled run is the first real test.
+> **Status**: ⚠️ **Open — still unverified (re-checked 2026-08-21).** Correct as written.
+> The rewrite **is** live in the running container — `docker exec cfr_api grep -c
+> resolve_zones_and_hall /app/backend/api/road_closure_service.py` returns 4 — but no
+> ingest cycle has run against it yet.
+>
+> **Read the current table with care — it is pre-rewrite residue, not a failed new run.**
+> Today's snapshot looks like a total failure of the new path and is not:
+>
+> | Measure | Now | Pass criterion |
+> |:--|--:|:--|
+> | `last_sync` | 2026-08-21 01:39 PDT (20 h) | < 24 h ✅ |
+> | active closures | 103 | ~103 ✅ |
+> | rows with `geom` | **0** | should equal 103 ❌ |
+> | active rows with `hall_id IS NULL` | **103** | should be mostly 1–4 ❌ |
+>
+> The two failures are explained by timing, not by a bug: the `cfr_api` image was rebuilt
+> at **21:21 PDT**, and the last sync ran at **01:39 PDT** — twenty hours *before* the new
+> code existed on the box. Every current row was written by the old service, which had no
+> `geom`/`hall_id` logic. The columns themselves exist and the new code writes them
+> (`road_closure_service.py:123`, `:175`, `:355–361`).
+>
+> **The first sync after 2026-08-21 21:21 PDT is the real test.** Until then these two
+> columns carry no information about the rewrite. Re-run the queries below afterwards.
 
 * **What changed**: `road_closure_service.py` now resolves zones and municipal
   containment via `ST_Intersects` / `ST_Contains` against `public.city_boundary` and
@@ -119,7 +189,30 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ## 📍 Custom Places Data Quality
 
 ### 7. `custom_places.json` coordinates are hand-entered and some are badly wrong
-> **Status**: ⚠️ **Open — confirmed.** Measured 2026-08-21 against `public.parcels`.
+> **Status**: ✅ **Closed 2026-08-21 — obsolete, resolved by removal.** The problem was not
+> fixed by correcting the coordinates; **the entire cascade step was deleted** (commit
+> `2ef12b7`), which moots the item. Verified on all four surfaces:
+>
+> * `backend/data/vocabulary/custom_places.json` — deleted.
+> * `public.custom_places` — dropped (`to_regclass` returns `NULL` on the kiosk).
+> * The geocoder cascade no longer has a custom-places step; `geocoder.py` documents the
+>   removal in place, citing the ≤1.8 km error and the fact that Locution always speaks
+>   the civic address first, so the step was effectively unreachable anyway.
+> * The competing hardcoded school list in `MapLayers.jsx` is gone — the "two
+>   hand-maintained lists disagreeing" defect no longer has two lists.
+>
+> No references to `custom_places` remain anywhere in the tree.
+>
+> **What this does not resolve**: the underlying need. A dispatch that names a place rather
+> than an address now returns `None` and surfaces the §5 Tier 1 card instead of resolving
+> ~1.8 km off. That is the correct failure under §6.1 — visibly unknown beats confidently
+> wrong — but it is a *capability gap*, not a capability. If place-name dispatches turn out
+> to matter operationally, the fix is authoritative records in `public.parcels`, per §6.2 —
+> never a re-imported hand-keyed list.
+>
+> The original analysis is kept below as the rationale for the removal.
+
+**Original finding (2026-08-21, measured against `public.parcels`):**
 
 * **What it is**: `backend/data/vocabulary/custom_places.json` holds 152 named places
   (parks, schools, civic buildings) keyed by lowercase name. It seeds
@@ -166,11 +259,31 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ## 🧪 Test Suite Debt
 
 ### 8. The 11 test failures are NOT environmental — correcting the record
-> **Status**: ⚠️ **Open.** Run on the kiosk 2026-08-21 with PostGIS reachable, `librosa`
+> **Status**: ⚠️ **Open — every stated cause re-confirmed 2026-08-21 against the kiosk
+> database and the working tree.** Run on the kiosk with PostGIS reachable, `librosa`
 > present and `XDG_RUNTIME_DIR` set: **identical 11 failures, 72 passed.** Earlier commit
 > messages this session described all 11 as "pre-existing and environmental". The
 > pre-existing half was verified by stashing; **the environmental half was inferred and
 > is wrong.**
+>
+> Confirmation of each cause below, so this can be picked up without re-deriving it:
+>
+> | Claim | Check | Result |
+> |:--|:--|:--|
+> | `public.landmarks` is gone | `to_regclass('public.landmarks')` | `NULL` — dropped ✅ |
+> | a test still queries it | `test_postgis_migration.py:52–54` | still `SELECT COUNT(*) FROM public.landmarks` ✅ |
+> | intersection bound is stale | `SELECT count(*) FROM public.intersections` | **6,499** vs asserted 400–2,500 ✅ |
+> | shapefile constants removed | `test_fault_injection.py:65` | still imports `ADDRESS_SHAPEFILE_PATH` / `ZONES_SHAPEFILE_PATH` ✅ |
+>
+> `test_database_integration.py:29–30` defines those two shapefile paths as **module-level
+> literals** rather than importing them, so it fails differently from `test_fault_injection.py`
+> — it will not raise `ImportError`, it will look for files that the PostGIS migration
+> removed. Worth fixing in the same pass.
+>
+> Note the ordering trap on the cascade: the six `InFailedSqlTransaction` failures are
+> collateral from `test_landmarks_count` aborting the shared connection's transaction. Fix
+> that one test first, then re-run before judging the rest — the remaining count will drop
+> before any of them are touched.
 
 Actual causes:
 
@@ -192,7 +305,9 @@ Actual causes:
   work. Stale mock signature.
 
 ### 9. False intersection: DAVID AVE & PANORAMA DR
-> **Status**: ⚠️ **Open — confirmed for this one pair. Scope unknown.**
+> **Status**: ⚠️ **Open — re-confirmed 2026-08-21. Scope still unknown.** The two rows are
+> still present on the kiosk: `SELECT count(*) FROM public.intersections WHERE
+> intersection_key = 'DAVID AVE & PANORAMA DR'` returns **2**, against a table of **6,499**.
 
 `test_no_false_intersections` asserts these parallel streets never meet. `public.intersections`
 holds **2 rows** for them, and PostGIS confirms the road geometries do **not** intersect:
@@ -217,7 +332,8 @@ multi-candidate entries distinguished by `candidate_index`, or may be duplicates
 not yet determined.
 
 ### 10. Three test modules have never run in review
-> **Status**: ⚠️ **Open.**
+> **Status**: ⚠️ **Open — unchanged 2026-08-21.** No attempt was made to run them this pass;
+> the missing dependencies have not been installed.
 
 `test_database_integration`, `test_listener` and `test_keyword_spotter` were excluded all
 session with `--ignore` because `librosa` (local) and `pvporcupine` (kiosk) are missing.
@@ -230,10 +346,32 @@ that feature is live before keeping a test for it.
 ## 🚰 Hydrant Data
 
 ### 11. Private hydrants defaulted to NFPA 291 class AA — fabricated flow rating
-> **Status**: ⚠️ **Open — confirmed 2026-08-21.** Safety-relevant.
+> **Status**: ✅ **Closed 2026-08-21 — fixed, re-synced and verified end to end**
+> (commits `7b684eb`, `4122628`). All three required steps were completed and each was
+> checked independently:
+>
+> | Required step | Verification | Result |
+> |:--|:--|:--|
+> | 1. Remove the `or "AA"` default | `sync_hydrants.py:77` | now `"flowClass": attribs.get("flow_class")` ✅ |
+> | 2. Re-sync — a code fix alone changes nothing | `public.hydrants` on the kiosk | **853 of 3,390** rows carry `flow_class IS NULL` ✅ |
+> | 3. Explicit unknown rendering | hydrant layer | renders `⚠️ UNRATED`, distinct from all four NFPA colours ✅ |
+>
+> Step 2 is the one that mattered and it is the one that is easy to skip: the fabricated
+> values lived in cached data, not in code. **853 unrated hydrants** is the direct
+> counterpart of the 462 + 68 + 9 + 8 = 547 non-OPERATING AA rows plus the OPERATING
+> unrated remainder — they now read as unknown instead of as the best available supply.
+>
+> The stale `frontend/public/data/hydrants.json` cache was deleted rather than
+> regenerated; the kiosk now reads `/api/hydrants` from `public.hydrants`, so there is one
+> source and no cache to drift.
+>
+> The `sync_hydrants.py:77` fix carries a provenance comment (`:72`) explaining why the
+> default was dangerous, per §6.3.
 
-`backend/scripts/sync_hydrants.py:80` substitutes the highest flow class when the
-municipal source has none:
+**Historical record of the defect (as originally found):**
+
+`backend/scripts/sync_hydrants.py:80` substituted the highest flow class when the
+municipal source had none:
 
 ```python
 "flowClass": attribs.get("flow_class") or "AA",
@@ -247,7 +385,8 @@ municipal source has none:
 
 The two scripts disagree, and the fabricating one produced the cached data.
 
-Distribution in `frontend/public/data/hydrants.json` (3,387 hydrants):
+Distribution in the since-deleted `frontend/public/data/hydrants.json` (3,387 hydrants),
+which is what made the default visible:
 
 | status | AA | A | B | C |
 |:--|--:|--:|--:|--:|
@@ -280,7 +419,9 @@ violation.
 ## 🧭 Geocoder Honesty Gaps
 
 ### 12. Street centroid reports the requested address as though exact
-> **Status**: ⚠️ **Open.** Noted during the step 4b work.
+> **Status**: ⚠️ **Open — re-confirmed in the working tree 2026-08-21.** Both overwrites are
+> still present: `geocoder.py:170–174` (step 5, street centroid) and `:177–181` (step 6,
+> road centroid). Unchanged since the item was written.
 
 `geocoder.py` step 5 overwrites the result address with the address that was asked for:
 
@@ -299,7 +440,9 @@ reports the parcel actually used, keeps the dispatched string in `requested_addr
 explains the substitution in `resolution_note`. Steps 5 and 6 should follow that pattern.
 
 ### 13. `public.intersections` needs the same data-integrity pass
-> **Status**: ⚠️ **Open.** Extends item #9.
+> **Status**: ⚠️ **Open — re-confirmed 2026-08-21.** Extends item #9. `public.intersections`
+> still holds **6,499** rows and still contains the false `DAVID AVE & PANORAMA DR` pair.
+> No integrity pass has been run.
 
 The nearest-civic work fixed the *address* side of unresolvable locations. The
 intersection side has had no equivalent review:
@@ -325,7 +468,14 @@ intersections structurally impossible.
 ## 📢 PA Page Leakage
 
 ### 14. PA announcements are being captured as dispatches
-> **Status**: ⚠️ **Open — reported by operator, mechanism identified.**
+> **Status**: ⚠️ **Open — mechanism identified; blocked on corpus.** Re-checked 2026-08-21:
+> **0 of 408** dispatches carry the `[PA]` tag
+> (`count(*) FILTER (WHERE review_notes LIKE '%[PA]%')`).
+>
+> The negative-control suite described below cannot start until the operator has tagged
+> some captures, so this item is **waiting on data, not on engineering**. The
+> post-transcription retraction option is the one that can be designed in the meantime,
+> since it depends on the Locution template rather than on audio fingerprints.
 
 Several PA (station paging) announcements have been captured and persisted as real
 dispatches. The likely mechanism is in `audio_listener.py`:

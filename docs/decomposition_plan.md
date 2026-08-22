@@ -125,7 +125,24 @@ Note: `SatelliteMiniMap` duplicates the standalone component deleted in `d5fbdcc
 copy **does** guard coordinates correctly (`if (!lat || !lng) return null`), so it is
 not a §5 defect — but decide whether it should exist at all.
 
-### 2.2 `frontend/src/components/MapBoard.jsx` (1155 lines, **52 hook calls**)
+### 2.2 `frontend/src/components/MapBoard.jsx` — ✅ DONE (2026-08-22), 1,184 → 662 lines
+
+Extracted to `components/map/`: `ZonesLayer`, `RoadClosuresLayer`, `DispatchTargetLayer`,
+`MapViewControls`, `RoadClosureMarker`, plus `mapIcons`, `mapGeometry`, `layerIcons` and
+`railroadCrossings`. State lifted into `hooks/useMapLayerPreferences` and
+`hooks/useRoadClosures`. Two dead exports deleted (`GeometryDecoder`, `createSchoolIcon`).
+
+Found while decomposing: the closure "Next 24h"/"Next 7d" filters matched nothing
+(punch-list #22), `TALK_GROUPS` duplicates the database (#20), and the rail crossing list
+is hand-entered (#21).
+
+The remaining work is architectural rather than mechanical — see
+[`architecture/unified_map_surface.md`](architecture/unified_map_surface.md), which
+proposes collapsing MapBoard and KioskView into one mode-selected surface. The layer
+extraction above is step one of it.
+
+<details><summary>Original entry (1155 lines, 52 hook calls)</summary>
+
 
 Largest file in the project and the densest state container by a wide margin. Two of
 the four runtime crashes fixed on 2026-08-21 originated here, both from identifiers
@@ -133,6 +150,8 @@ left behind by the training-mode removal.
 
 Candidate extractions: road-closure marker and state, layer-toggle state,
 target-address resolution, and the already-exported `enrichAddressWithBuilding` helper.
+
+</details>
 
 ### 2.3 `frontend/src/components/kiosk/RouteOverviewPanel.jsx` (430 lines)
 

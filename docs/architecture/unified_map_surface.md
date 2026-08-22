@@ -195,10 +195,11 @@ state — not an unfinished one.
 * **Route-intersecting closure highlighting** (level 2 above).
 * **`useKioskQueue` owns more than state** — timers, timeout clock, queue advancement, TV
   mode. Untouched, and not obviously wrong where it is.
-* **Return mode after an interrupted review.** Starting a review sets the return mode to
-  `ADMIN_DISPATCHES`; if a live call then interrupts and is later dismissed, the crew
-  lands in the admin panel rather than the map. Defensible either way — an operations
-  decision, not an engineering one.
+* ~~**Return mode after an interrupted review.**~~ **Decided 2026-08-22: a live call that
+  interrupts a review returns to the map.** Starting a review still sets the return mode to
+  `ADMIN_DISPATCHES` so closing a replay returns to the list being worked through — but
+  once a real dispatch has taken over, that context is gone. The crew responded to an
+  incident; dropping them into a review table afterwards is wrong.
 
 ---
 

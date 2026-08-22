@@ -39,6 +39,21 @@ function App() {
     ? MODE.DISPATCH
     : MODE.STANDBY;
 
+  // A live call interrupting a review sends the operator back to the MAP when it is
+  // dismissed, not to the admin panel the review was launched from.
+  //
+  // Starting a review sets returnMode to ADMIN_DISPATCHES so closing the replay returns
+  // to the list being worked through. But once a real dispatch has taken over, that
+  // context is gone: the crew responded to an incident, and dropping them into a review
+  // table afterwards is wrong. Decided 2026-08-22.
+  //
+  // Synced during render rather than in an effect: an effect renders the stale mode once
+  // before correcting itself, which is a visible flash of the admin panel.
+  const activeIsLive = !!kioskState.activeCall && !kioskState.activeCall.isReview;
+  if (activeIsLive && returnMode !== 'EXPLORE') {
+    setReturnMode('EXPLORE');
+  }
+
   // Replay a real historical dispatch in Kiosk view exactly as it was received.
   //
   // No data is invented here: toActiveCall passes every field through from the database

@@ -3,6 +3,8 @@ import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
 import MapSurface from '../map/MapSurface';
+import RoadClosuresLayer from '../map/RoadClosuresLayer';
+import { useRoadClosures } from '../../hooks/useRoadClosures';
 import { BASE_LAYERS } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
@@ -127,6 +129,12 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const destLat = hasValidCoords ? Number(rawDestLat) : null;
   const destLng = hasValidCoords ? Number(rawDestLng) : null;
   const destination = hasValidCoords ? { lat: destLat, lng: destLng } : null;
+
+  // All severities, active now. No filter controls on the dispatch map by design.
+  const { activeClosures } = useRoadClosures({
+    filterNoAccess: true, filterAccessOnly: true, filterCaution: true,
+    showActiveNow: true, showNext24h: false, showNext7d: false,
+  });
 
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
@@ -358,6 +366,19 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         showFireHalls
       >
         <MapInteractivity onPan={() => setUserPanned(true)} />
+
+        {/* Road closures. A closure matters most when apparatus is being routed through
+            it, so the dispatch map shows them too -- they were previously standby-only.
+            All severities and the active-now window; the console's filter controls are
+            deliberately not reproduced here, because a driver should not be able to hide
+            a closure. Highlighting the ones that actually intersect the route is the next
+            step and is tracked separately. */}
+        <RoadClosuresLayer
+          closures={activeClosures}
+          visible
+          selectedClosure={null}
+          onSelect={() => {}}
+        />
 
         {/* Live OSRM Emergency Response Routing Overlay */}
         {hasValidCoords && (

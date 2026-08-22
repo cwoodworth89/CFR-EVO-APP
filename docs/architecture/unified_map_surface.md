@@ -92,7 +92,10 @@ Two levels, and the cheap one is worth doing first:
    intersecting closure is a warning banner, a re-route, or a marker the driver reads — and
    that is an operations decision, not an engineering one.
 
-Level 1 lands with the unification. Level 2 is tracked separately so it does not hold it up.
+**Level 1 landed 2026-08-22.** `RouteOverviewPanel` mounts `RoadClosuresLayer` with all
+severities and the active-now window. The console's filter controls are deliberately *not*
+reproduced on the dispatch map — a driver should not be able to hide a closure. Level 2
+remains open.
 
 ---
 
@@ -150,17 +153,25 @@ the on-ramp to this, not a separate effort:
 
 ## What remains, in dependency order
 
-1. **`useMapInstance`** — map handle, pan tracking, re-centre, fit-bounds. Currently
-   written twice. Pure consolidation, no behaviour change, and it is the smallest useful
-   step.
-2. **`TargetAddressCard`** — the last inline panel in MapBoard's right stack.
-3. **`MapSurface`** — one `<MapContainer>` taking a layer set. At this point
-   `RouteOverviewPanel` becomes chrome around `MapSurface` rather than its own map.
-4. **`DispatchProvider`** — the state unification. **Touches the live dispatch path** and
-   should be reviewed on its own, not folded into a refactor.
-5. **`App.jsx`** — render one shell with a mode instead of swapping two components.
+1. ~~**`useMapInstance`**~~ — ✅ done 2026-08-22.
+2. ~~**`TargetAddressCard`**~~ — ✅ done 2026-08-22.
+3. ~~**`MapSurface`**~~ — ✅ done 2026-08-22. Both surfaces now build their map from it.
+4. ~~**One dispatch translation**~~ — ✅ done 2026-08-22. There turned out to be *three*
+   hand-written translations, not two, and the third was silently dropping the
+   street-section fields on the live path (punch-list #23). Verified against 421 real
+   dispatch records, 0 field mismatches, by `frontend/scripts/verify_dispatch_model.mjs`.
+5. **`App.jsx` shell** — ⏳ **remaining.** Render one shell with a mode instead of swapping
+   `MapBoard` and `KioskView`.
 
-Steps 1–3 are mechanical and independently shippable. Step 4 is the one with risk.
+### What step 5 still involves
+
+The state and the map are now shared, so what is left is purely the component tree.
+`MapBoard` is a 567-line container and `KioskView` a 264-line layout; merging them means
+one shell that selects header, sidebar and detail-stack card by mode.
+
+This is the step whose failure mode is **visual rather than functional** — a broken layout
+on the dispatch display, not a wrong coordinate. It is worth doing with the app actually
+running and the two modes compared side by side, rather than on build-passes alone.
 
 ---
 

@@ -29,7 +29,22 @@ def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None
         active_model = model or get_whisper_model()
         is_faster_whisper = hasattr(active_model, 'transcribe') and not hasattr(active_model, 'load_model')
         
-        initial_prompt, hotwords_str = build_stt_bias_words(validator, UNITS_VOCABULARY)
+        # Supply the loaded model's real max_length and tokenizer so the hotword budget
+        # is MEASURED against what faster-whisper will actually keep, rather than guessed
+        # from a term count. Overshooting is silent -- it cost every arterial in the city
+        # its biasing (punch-list #18).
+        _encoder = None
+        _max_length = 448
+        try:
+            _max_length = int(getattr(active_model, 'max_length', 448))
+            from faster_whisper.tokenizer import Tokenizer
+            _tok = Tokenizer(active_model.hf_tokenizer, active_model.model.is_multilingual,
+                             task='transcribe', language='en')
+            _encoder = _tok.encode
+        except Exception as e:
+            logging.debug(f"STT hotword budget falling back to estimate: {e}")
+        initial_prompt, hotwords_str = build_stt_bias_words(
+            validator, UNITS_VOCABULARY, max_length=_max_length, encoder=_encoder)
         
         # Ensure float32 normalized between -1.0 and 1.0 for numpy arrays
         if isinstance(audio_data, np.ndarray) and audio_data.dtype != np.float32:

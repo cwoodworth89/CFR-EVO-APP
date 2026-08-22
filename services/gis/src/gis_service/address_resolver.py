@@ -215,6 +215,70 @@ class AddressResolver:
             logging.error(f"Error in cross-road narrowing: {e}", exc_info=True)
         return None
 
+    def resolve_nearest_civic(self, house: str, street: str, street_type: str) -> dict | None:
+        """Step 4b: Nearest civic address on the street, by house number.
+
+        Used when a dispatched address is not in the municipal records and its house
+        number falls outside the road segment's address range, so block interpolation
+        cannot place it (e.g. 3080 Gordon Ave: the segment carries 3001-3061 and
+        3030-3030, and no 3080 parcel exists).
+
+        Returns the *actual* nearest parcel and says so. The address string is the
+        parcel that was used, not the one that was asked for, and `resolution_note`
+        carries the reason -- an operator must be able to see that a substitution
+        happened and why (CLAUDE.md §6.1).
+
+        Preferred over the street centroid, which averages the whole street and can sit
+        far from the target: for 3080 Gordon Ave the centroid is 178 m from the nearest
+        civic address on a 308 m street, and on the wrong side of it.
+        """
+        if not house or not str(house).isdigit():
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text("""
+                    SELECT address, house, lat, lng,
+                           ABS((house)::int - (:house)::int) AS house_delta
+                    FROM public.parcels
+                    WHERE UPPER(street) = UPPER(:street)
+                      AND (UPPER(streettype) = UPPER(:stype) OR :stype = '')
+                      AND house ~ '^[0-9]+$'
+                      AND (unit IS NULL OR unit = '')
+                      AND lat IS NOT NULL AND lng IS NOT NULL
+                    ORDER BY house_delta ASC, (house)::int ASC
+                    LIMIT 1;
+                """), {"house": str(house), "street": street, "stype": street_type or ''}).mappings().fetchone()
+
+                if not row:
+                    return None
+
+                requested = f"{house} {street} {street_type}".strip().title()
+                delta = int(row['house_delta'])
+
+                # Confidence degrades with how far the substituted number is from the
+                # one dispatched. Deliberately never approaches the 100.0 an exact
+                # parcel match earns.
+                confidence = 70.0 if delta <= 20 else (60.0 if delta <= 100 else 55.0)
+
+                return {
+                    "address": row['address'],
+                    "lat": float(row['lat']),
+                    "lng": float(row['lng']),
+                    "rings": [],
+                    "confidence": confidence,
+                    "is_nearest_civic": True,
+                    "requested_address": requested,
+                    "resolution_note": (
+                        f"{requested} is not in City of Coquitlam address records. "
+                        f"Routed to {row['address']}, the nearest civic address on this "
+                        f"street ({delta} off the dispatched number). Verify on arrival."
+                    ),
+                    "is_ambiguous": False
+                }
+        except Exception as e:
+            logging.error(f"Error in nearest civic address fallback: {e}", exc_info=True)
+        return None
+
     def resolve_street_centroid(self, street: str, street_type: str) -> dict | None:
         """Step 5: Fallback — average of all parcel centroids on this street."""
         try:

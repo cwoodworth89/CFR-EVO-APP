@@ -155,6 +155,17 @@ class CoquitlamDataValidator:
             if result:
                 return result
 
+        # === STEP 4b: Nearest civic address on the street ===
+        # For a numbered address that exists in neither the parcel table nor any road
+        # segment's address range, the nearest real civic number beats a whole-street
+        # average. Deliberately does NOT overwrite result['address'] with the requested
+        # address: the operator must see which parcel was actually used, and
+        # resolution_note says why.
+        if parsed and parsed.house:
+            result = self.address.resolve_nearest_civic(parsed.house, parsed.street, parsed.street_type)
+            if result:
+                return result
+
         # === STEP 5: Street centroid fallback ===
         if parsed:
             result = self.address.resolve_street_centroid(parsed.street, parsed.street_type)

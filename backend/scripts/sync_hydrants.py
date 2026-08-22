@@ -9,20 +9,12 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 def sync_hydrants(mode="full"):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_dir = os.path.join(script_dir, "..", "..", "frontend", "public", "data")
-    output_path = os.path.join(output_dir, "hydrants.json")
-    os.makedirs(output_dir, exist_ok=True)
+    """Syncs the municipal hydrant inventory from ArcGIS into public.hydrants.
 
-    old_hydrants = {}
-    if os.path.exists(output_path):
-        try:
-            with open(output_path, "r", encoding="utf-8") as f:
-                old_list = json.load(f)
-                old_hydrants = {h["id"]: h for h in old_list if "id" in h}
-            logging.info(f"Loaded {len(old_hydrants)} existing hydrants from local cache.")
-        except Exception as e:
-            logging.warning(f"Could not read existing hydrants file: {e}")
+    The database is the only destination. The previous JSON cache under
+    frontend/public/data/ was fetched directly by the browser and has been removed --
+    the kiosk reads GET /api/hydrants, so a file on disk could only drift.
+    """
 
     url = "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query"
     fresh_features = []
@@ -89,11 +81,8 @@ def sync_hydrants(mode="full"):
         }
         new_hydrants_list.append(hyd)
 
-    with open(output_path, "w", encoding="utf-8") as out_f:
-        json.dump(new_hydrants_list, out_f, indent=2)
-
-    logging.info(f"Successfully saved {len(new_hydrants_list)} hydrants to {output_path}!")
-
+    # The JSON cache was removed: the kiosk now reads public.hydrants through
+    # GET /api/hydrants, so a file on disk could only drift from the database.
     unrated = sum(1 for h in new_hydrants_list if not h["flowClass"])
     no_status = sum(1 for h in new_hydrants_list if not h["status"])
     logging.info(

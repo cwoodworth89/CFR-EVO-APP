@@ -3,7 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { Marker, CircleMarker, Tooltip, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
-import { TILE_BASE_URL } from '../apiClient';
+import { API_BASE_URL, TILE_BASE_URL } from '../apiClient';
 
 
 
@@ -266,21 +266,22 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
       };
     }, [map, visible]);
 
-    // Load local cached hydrant database once when visible
+    // Load the hydrant inventory from public.hydrants via the API.
+    // Previously fetched frontend/public/data/hydrants.json directly, which could drift
+    // from the database and bypassed the null-flow_class contract.
     React.useEffect(() => {
       if (!visible) return;
 
-      const baseUrl = import.meta.env.BASE_URL;
-      fetch(`${baseUrl}data/hydrants.json`)
+      fetch(`${API_BASE_URL}/api/hydrants`)
         .then(r => {
           if (!r.ok) throw new Error("HTTP " + r.status);
           return r.json();
         })
         .then(data => {
-          setAllHydrants(data);
+          setAllHydrants(Array.isArray(data) ? data : []);
         })
         .catch(err => {
-          console.warn("Failed to load local cached hydrants:", err);
+          console.warn("Failed to load hydrants from API:", err);
         });
     }, [visible]);
 

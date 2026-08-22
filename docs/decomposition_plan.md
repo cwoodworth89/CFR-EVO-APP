@@ -178,7 +178,36 @@ Note it applies `ST_Multi(geom)` to every road — the cause of the block interp
 outage fixed on 2026-08-21. Worth deciding whether `MultiLineString` is the right
 storage type at all, given only 30 of 3,214 roads are genuinely disjoint.
 
-### 4.2 Other scripts
+### 4.2 Maintenance and sync scripts — architecture conformance pass
+
+**Required before the review is considered complete.** Several scripts predate the
+PostGIS migration and still read or write JSON/shapefiles instead of the database. Each
+one found so far was carrying a real defect:
+
+| Script | Finding |
+|:--|:--|
+| `sync_hydrants.py` | Defaulted missing `flow_class` to `"AA"` (highest NFPA 291 class) and missing `status` to `"OPERATING"`. Fixed 2026-08-21; now writes `public.hydrants` with nulls preserved. |
+| `generate_street_list.py` | Read `Addresses.shp` and wrote a `.txt` nothing consumed. Deleted. |
+| `import_gis_data.py` step7 | `TRUNCATE`d `public.vocabulary` before re-importing from `.txt`, destroying HITL-learned terms. Now applies an additive seed migration. |
+| `update_gis_data.py` | Uses `or ""` for `flow_class` where `sync_hydrants.py` used `or "AA"` — the two disagreed on the same field. Not yet reviewed. |
+
+Every remaining script needs the same three questions asked:
+1. Does it read or write a JSON/shapefile that a database table now owns?
+2. Does it substitute a default for a missing source value (CLAUDE.md §6.1)?
+3. Is it destructive on re-run (`TRUNCATE`, overwrite) in a way that discards data
+   added since the last run?
+
+Scripts still to audit: `update_gis_data.py`, `import_parcels.py`, `download_gis_data.py`,
+`compile_mbtiles.py`, `crawl_cadastral_tiles.py`, `extract_all_intersections_from_gis.py`,
+`precache_satellite_tiles.py`, `ingest_coquitlam_orthos.py`, `backfill_routing_metrics.py`,
+`backfill_audio_urls.py`, `extract_training_data.py`.
+
+Remaining JSON under `frontend/public/data/`: `zones.json`, `coquitlam_city_boundary.json`,
+`coquitlam_boundary_opt.json` — all three duplicate data already in PostGIS
+(`public.zones`, `public.city_boundary`) and are candidates for the same treatment
+hydrants just received.
+
+### 4.3 Other scripts
 
 `import_parcels.py` (566), `compile_mbtiles.py` (538), `crawl_cadastral_tiles.py` (491),
 `extract_all_intersections_from_gis.py` (462), `precache_satellite_tiles.py` (458),

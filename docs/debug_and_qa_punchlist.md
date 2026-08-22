@@ -17,7 +17,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
 > same pass.
 >
-> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**.
+> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**, **#22**.
 >
 > Closed 2026-08-22 during decomposition: **#22** (closure timeframe filters matched nothing).
 
@@ -911,3 +911,33 @@ Fixed by carrying `start` and `end` onto the returned object in
 This is the second defect of the shape "a guard tests a field that is never populated" —
 see also the `cross_streets` plumbing, which is wired end to end but reached 1 of 410
 dispatches. A truthy check on an absent field fails silently and looks like "no results".
+
+### 23. Live dispatches lost their street-section fields on the way to the kiosk
+> **Status**: ✅ **Closed 2026-08-22.** Found while unifying the dispatch state model.
+
+`useMqttListener.formatDispatchPayload` was a **third** hand-written dispatch translation,
+alongside `App.jsx:handleReviewCall` and MapBoard's own handling. It built an explicit
+object with **no spread**, so every field it did not know about was silently dropped.
+
+**The live defect**: `location_type`, `segment`, `endpoints`, `length_m` and
+`resolution_note` were absent from it, so a street-section dispatch (#16) arriving over
+MQTT reached the kiosk without them. `StreetSectionBanner` checks
+`activeCall?.location_type`, so the amber banner and the highlighted road section **never
+appeared for a real call** — only for a review replay, which went through `App.jsx`
+instead. The fields were plumbed through the geocoder, payload builder, App.jsx and the
+panels the same day and this path was missed.
+
+Two further §6.1 violations in the same function:
+
+* `address: ... || 'Unknown Location'` and `incident_type: ... || 'EMERGENCY DISPATCH'` —
+  fabricated defaults standing in for missing data.
+* `priority_code: record.priority_code ?? record.response_type ?? 1` — and `KioskView`
+  treats `priority_code <= 2` as an emergency, so **a dispatch with no priority was
+  rendered as an emergency**.
+
+It also ignored `verified_address` and `verified_incident` entirely, so an operator's
+correction never reached a live kiosk call.
+
+**Fix**: one translation, `frontend/src/utils/dispatchModel.js`, used by the MQTT listener,
+`App.jsx` and `MapBoard`. Verified with `frontend/scripts/verify_dispatch_model.mjs`
+against **421 real dispatch records: 0 field mismatches** before and after.

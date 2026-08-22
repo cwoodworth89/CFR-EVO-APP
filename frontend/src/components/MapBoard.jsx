@@ -44,6 +44,7 @@ const ModalLoadingFallback = () => (
 import { sanitizeAddress } from '../utils/addressUtils';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import { useMapInstance } from '../hooks/useMapInstance';
+import { toActiveCall, toMapTarget, isSameDispatch } from '../utils/dispatchModel';
 
 // helper for road closure type names from Municipal 511
 
@@ -198,15 +199,14 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   useDispatchListener({
     enabled: true,
     onInsert: (dispatch) => {
-      const newCall = dispatch.rawRecord || dispatch;
+      const newCall = toActiveCall(dispatch);
       if (newCall) {
         setActiveDispatch(newCall);
-        // No default coordinate (CLAUDE.md 6.1 / 5). These two fields previously fell back
-        // to COQUITLAM_CENTER, so a dispatch with unresolved coordinates was routed and
-        // rendered as a valid incident at City Centre -- inside the isWithinCoquitlam
-        // bounds check, so no Tier 1 warning fired and nothing told the crew. Null must
-        // propagate so the unresolved-location card shows and routing stays suppressed.
-        const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.lat ?? null, lng: newCall.lng ?? null } : null);
+        // toMapTarget keeps unresolved coordinates null (CLAUDE.md 6.1 / 5). They used to
+        // fall back to COQUITLAM_CENTER here, which put the incident at City Centre inside
+        // the isWithinCoquitlam bounds check, so no Tier 1 warning fired and nothing told
+        // the crew.
+        const target = toMapTarget(newCall);
         if (target) {
           updateTargetAddress(target);
           if (map && target.lat && target.lng) {
@@ -218,9 +218,9 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       }
     },
     onUpdate: (dispatch) => {
-      const updatedCall = dispatch.rawRecord || dispatch;
+      const updatedCall = toActiveCall(dispatch);
       setActiveDispatch(curr => {
-        if (curr && (curr.id === updatedCall.id || curr.dispatch_id === updatedCall.dispatch_id)) {
+        if (isSameDispatch(curr, updatedCall)) {
           const oldTarget = curr.target;
           const newTarget = updatedCall.target;
           if (newTarget && (!oldTarget || oldTarget.lat !== newTarget.lat || oldTarget.lng !== newTarget.lng)) {
@@ -235,9 +235,9 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       });
     },
     onDelete: (dispatch) => {
-      const deletedCall = dispatch.rawRecord || dispatch;
+      const deletedCall = toActiveCall(dispatch);
       setActiveDispatch(curr => {
-        if (curr && (curr.id === deletedCall.id || curr.dispatch_id === deletedCall.dispatch_id)) {
+        if (isSameDispatch(curr, deletedCall)) {
           updateTargetAddress(null);
           return null;
         }

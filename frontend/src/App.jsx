@@ -1,5 +1,6 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { useKioskQueue } from './hooks/useKioskQueue';
+import { toActiveCall } from './utils/dispatchModel';
 
 // Code-split primary views to optimize kiosk initial bundle size and memory profile
 const MapBoard = lazy(() => import('./components/MapBoard'));
@@ -22,49 +23,18 @@ function App() {
   const shouldRenderKiosk = explicitKioskMode || !!kioskState.activeCall || kioskState.isReviewMode;
 
   // Replay a real historical dispatch in Kiosk view exactly as it was received.
-  // No data is invented here: every field is passed through from the database record,
-  // and unresolved coordinates stay null so the kiosk renders the Tier 1 warning
-  // instead of routing to a guessed location (see CLAUDE.md §5).
+  //
+  // No data is invented here: toActiveCall passes every field through from the database
+  // record, and unresolved coordinates stay null so the kiosk renders the Tier 1 warning
+  // instead of routing to a guessed location (CLAUDE.md §5).
+  //
+  // This used to be a thirty-line field-by-field translation living here, one of three
+  // that disagreed with each other. It is now the same function the live MQTT path uses,
+  // so a review replay and a live call reach the kiosk in exactly the same shape.
   const handleReviewCall = (call) => {
     if (!call) return;
-
-    // Track that we originated from Admin Dispatch Review panel
     setReturnMode('ADMIN_DISPATCHES');
-
-    const units = (call.verified_units && call.verified_units.length > 0)
-      ? call.verified_units
-      : (call.responding_units && call.responding_units.length > 0 ? call.responding_units : []);
-
-    const reviewCall = {
-      ...call,
-      id: call.id,
-      dispatch_id: call.dispatch_id,
-      address: call.verified_address || call.target?.address || call.address || null,
-      subaddress: call.target?.subaddress || '',
-      intersection: call.target?.intersection || '',
-      lat: call.target?.lat ?? call.lat ?? null,
-      lng: call.target?.lng ?? call.lng ?? null,
-      rings: call.target?.rings || call.rings || [],
-      // Street-section fields. A "<street> and <street>" dispatch has no point location;
-      // these drive the amber section banner and the highlighted polyline. Dropping them
-      // would make the section's representative midpoint look like an exact match.
-      location_type: call.target?.location_type || null,
-      segment: call.target?.segment || null,
-      endpoints: call.target?.endpoints || null,
-      length_m: call.target?.length_m ?? null,
-      street: call.target?.street || null,
-      resolution_note: call.target?.resolution_note || null,
-      incident_type: call.verified_incident || call.incident_type || null,
-      responding_units: units,
-      priority_code: call.priority_code,
-      verify_location: call.verify_location ?? (call.confidence_score ? call.confidence_score >= 90 : true),
-      map_grid: call.target?.verified_map_grid || call.target?.map_grid || '',
-      radio_channel: call.target?.verified_talkgroup || call.target?.radio_channel || '',
-      tone_name: call.target?.tone_name || '',
-      isReview: true
-    };
-
-    kioskState.triggerReviewCall(reviewCall);
+    kioskState.triggerReviewCall({ ...toActiveCall(call), isReview: true });
   };
 
   const extendedKioskState = {

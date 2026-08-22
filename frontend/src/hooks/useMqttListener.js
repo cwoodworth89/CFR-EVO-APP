@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import mqtt from 'mqtt';
 import { API_BASE_URL } from '../apiClient';
+import { toActiveCall } from '../utils/dispatchModel';
 
 const getMqttBrokerUrl = () => {
   if (import.meta.env.VITE_MQTT_BROKER_URL) {
@@ -112,39 +113,26 @@ export function useMqttListener({ onInsert, onUpdate, onDelete, enabled = true }
 
 }
 
-// Standardize raw dispatch payload structure for components
+/**
+ * Standardize a raw dispatch record for components.
+ *
+ * Delegates to toActiveCall, the single dispatch translation (see
+ * frontend/src/utils/dispatchModel.js and docs/architecture/unified_map_surface.md).
+ *
+ * The previous implementation here was a THIRD hand-written translation and it disagreed
+ * with the other two in ways that mattered:
+ *
+ *  * It built an explicit object with no spread, so every field it did not know about was
+ *    silently dropped. Street-section dispatches lost location_type, segment, endpoints,
+ *    length_m and resolution_note on the LIVE path, so the amber section banner never
+ *    appeared for a real call -- only for a review replay, which went through App.jsx
+ *    instead. Punch-list #23.
+ *  * It ignored verified_address and verified_incident, so an operator's correction never
+ *    reached a live kiosk call.
+ *  * It substituted 'Unknown Location', 'EMERGENCY DISPATCH' and priority_code 1 for
+ *    missing values. Priority 1 renders as an emergency in KioskView, so a dispatch with
+ *    no priority was displayed as one (CLAUDE.md 6.1).
+ */
 export function formatDispatchPayload(record) {
-  if (!record) return null;
-
-  const payloadObj = typeof record.target === 'object' && record.target !== null 
-    ? record.target 
-    : {};
-
-  let audioUrl = record.audio_url || '';
-  if (audioUrl && !audioUrl.startsWith('http')) {
-    audioUrl = `${API_BASE_URL}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
-  }
-
-  return {
-    id: record.id,
-    dispatch_id: record.dispatch_id,
-    created_at: record.created_at || record.timestamp || new Date().toISOString(),
-    address: record.address || payloadObj.address || 'Unknown Location',
-    subaddress: payloadObj.subaddress || record.subaddress || '',
-    intersection: payloadObj.intersection || record.intersection || '',
-    lat: record.lat ?? payloadObj.lat ?? null,
-    lng: record.lng ?? payloadObj.lng ?? null,
-    rings: record.rings || payloadObj.rings || [],
-    incident_type: record.incident_type || payloadObj.call_type || 'EMERGENCY DISPATCH',
-    priority_code: record.priority_code ?? record.response_type ?? 1,
-    verify_location: record.verify_location ?? false,
-    map_grid: record.map_grid || payloadObj.map_grid || '',
-    radio_channel: record.radio_channel || payloadObj.radio_channel || '',
-    tone_name: payloadObj.tone_name || record.tone_name || '',
-    audio_url: audioUrl,
-    raw_transcript: record.raw_transcript || '',
-    sanitized_transcript: record.sanitized_transcript || '',
-    is_test: Boolean(record.is_test ?? payloadObj.is_test ?? false),
-    rawRecord: record,
-  };
+  return toActiveCall(record, { apiBaseUrl: API_BASE_URL });
 }

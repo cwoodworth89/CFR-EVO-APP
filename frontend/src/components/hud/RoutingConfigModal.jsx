@@ -1,11 +1,5 @@
 import React from 'react';
-
-export const APPARATUS_PROFILES = [
-  { id: 'ENGINE', name: 'Engine (E1/E2/E3/E4)', icon: '🚒', speedRatio: 1.0, weight: 'Heavy Pumper' },
-  { id: 'LADDER', name: 'Aerial Ladder (L1)', icon: '🪜', speedRatio: 0.88, weight: '100ft Heavy Tower (Turn Restrictions)' },
-  { id: 'RESCUE', name: 'Heavy Rescue (R1)', icon: '🛟', speedRatio: 0.95, weight: 'Tandem Axle Rescue' },
-  { id: 'TENDER', name: 'Water Tender (WT1)', icon: '💧', speedRatio: 0.82, weight: 'Bulk Liquid Pumper' },
-];
+import { APPARATUS_PROFILES } from './apparatusProfiles';
 
 export default function RoutingConfigModal({
   isOpen,

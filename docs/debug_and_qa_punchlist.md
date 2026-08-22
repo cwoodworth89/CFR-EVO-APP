@@ -17,7 +17,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
 > same pass.
 >
-> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#19**.
+> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**.
 
 ---
 
@@ -839,3 +839,48 @@ MOUNTAIN` 93):
 are deterministic and auditable, but should be checked for the same collision property:
 a correction that rewrites one real street into another real street would be worse than
 any fuzzy match, because nothing scores it.
+
+---
+
+## 🧱 Duplicated & Unsourced Frontend Constants
+
+### 20. `TALK_GROUPS` duplicates `public.vocabulary`
+> **Status**: ⚠️ **Open — found 2026-08-22 during the MapBoard decomposition.**
+
+`frontend/src/components/review/verificationConstants.js` hardcodes eight talk groups.
+`public.vocabulary` category `radio_channel` holds **the same eight**, and is what the
+dispatch parser matches against. They have already drifted in format:
+
+| Database | Frontend |
+|:--|:--|
+| `Talk Group 5 Coquitlam` | `5` |
+| `Talk Group 10 Combined Response Coquitlam` | `10 Combined Response` |
+
+Same defect class as the street-suffix vocabulary moved into the database earlier the same
+day: two hand-maintained lists of one fact, free to diverge, with nothing reporting it when
+they do. The operator's HITL dropdown reads the hardcoded list while the parser reads the
+database, so a talk group change corrects one and not the other.
+
+**Fix**: serve `radio_channel` from the API and have the sidebar consume it, as the kiosk
+already does for hydrants. Left in place rather than changed as a side effect of a lint
+extraction; the constant now carries a comment saying so.
+
+### 21. Rail crossing list is hand-entered and probably incomplete
+> **Status**: ⚠️ **Open — found 2026-08-22.**
+
+`frontend/src/components/map/railroadCrossings.js` holds **four** level crossings with
+seven-decimal coordinates and `avoidable` flags, none of which carry provenance (§6.3).
+
+CLAUDE.md §6.2 already names the authoritative source for exactly this data — *"rail
+crossings are `railway=level_crossing` in OSM, not `lat < 49.26`"*. This list is the same
+defect one level up: four hand-placed points standing in for the OSM layer. Coquitlam
+almost certainly has more than four level crossings, and **an incomplete hazard layer is
+worse than an absent one**, because a crew reading a clear map concludes there is no
+crossing.
+
+**Mitigating for now**: display only. The layer defaults to off and no route avoids these
+points, so no apparatus routing depends on them today.
+
+**Fix**: derive from OSM `railway=level_crossing` into a table, the way intersections are
+now derived from `public.roads`, and drop the `avoidable` judgement unless it can be
+attributed to someone.

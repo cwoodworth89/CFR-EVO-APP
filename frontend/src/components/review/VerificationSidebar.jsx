@@ -1,20 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-
-export const TALK_GROUPS = [
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10 Combined Response",
-  "Combined Venue Port Mann",
-  "Combined Venue Transit System"
-];
-
-export const toTitleCase = (str) => {
-  if (!str) return '';
-  return str.replace(/\b\w/g, c => c.toUpperCase());
-};
+import { TALK_GROUPS, toTitleCase } from './verificationConstants';
 
 export default function VerificationSidebar({
   selectedCall,

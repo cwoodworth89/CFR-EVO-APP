@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { apiClient, API_BASE_URL } from '../apiClient';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import SystemMetricsPanel from './admin/SystemMetricsPanel';
-import ReviewTable, { getCallTones } from './review/ReviewTable';
-import VerificationSidebar, { toTitleCase } from './review/VerificationSidebar';
+import ReviewTable from './review/ReviewTable';
+import { getCallTones } from './review/reviewFormat';
+import VerificationSidebar from './review/VerificationSidebar';
+import { toTitleCase } from './review/verificationConstants';
 
 export default function DispatchReview({ onClose, onReviewCall }) {
   const [calls, setCalls] = useState([]);

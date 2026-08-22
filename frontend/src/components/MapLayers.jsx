@@ -4,33 +4,14 @@ import { Marker, CircleMarker, Tooltip, Popup, Polygon, useMap } from 'react-lea
 import L from 'leaflet';
 import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
 import { API_BASE_URL, TILE_BASE_URL } from '../apiClient';
+import { createFireHallIcon, createRailroadCrossingIcon } from './map/layerIcons';
+import { COQUITLAM_RAILROAD_CROSSINGS } from './map/railroadCrossings';
 
 
 
 // 🚒 Custom Fire Hall Icon Loader (Memoized to prevent render flicker)
 const BASE_URL = import.meta.env.BASE_URL || '/';
-const STATION_ICON_CACHE = {};
 
-export const createFireHallIcon = (stationId = '1') => {
-  const key = String(stationId);
-  if (!STATION_ICON_CACHE[key]) {
-    STATION_ICON_CACHE[key] = L.divIcon({
-      className: 'custom-station-user-icon',
-      html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;opacity:0.95;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-        <img src="${BASE_URL}icons/fire_hall.png" 
-             style="width:38px;height:38px;max-width:38px;max-height:38px;object-fit:cover;border-radius:50%;overflow:hidden;background:transparent;border:none;display:block;" 
-             alt="Fire Hall ${key}" />
-        <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(15,23,42,0.92);color:#fbbf24;border:1.5px solid #fbbf24;border-radius:9999px;font-size:11px;font-weight:900;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-family:monospace;box-shadow:0 2px 5px rgba(0,0,0,0.8);pointer-events:none;">${key}</span>
-      </div>`,
-      iconSize: [38, 38],
-      iconAnchor: [19, 19],
-      popupAnchor: [0, -19]
-    });
-  }
-  return STATION_ICON_CACHE[key];
-};
-
-// 🗺️ BASEMAP COMPONENT
 export function BaseMap({ style, useLabelsFallback }) {
     const map = useMap();
     const layerRef = useRef(null);
@@ -380,7 +361,6 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
           // Unrated hydrants get a neutral grey, deliberately outside the four NFPA
           // 291 colours, so an unknown rating can never be mistaken for a class.
           const fc = (flowClass || "").toUpperCase();
-          const isRated = ['AA', 'A', 'B', 'C'].includes(fc);
           let borderColor = '#94a3b8';
           if (fc === 'AA') borderColor = '#38bdf8';
           else if (fc === 'A') borderColor = '#4ade80';
@@ -437,27 +417,6 @@ export function StationsLayer({ visible = true }) {
 
 
 // Custom Railroad Crossing Icon Loader (Loads custom user logo from /icons/railroad_crossing.png or /icons/railroad_crossing.svg)
-export const createRailroadCrossingIcon = () => L.divIcon({
-  className: 'custom-rr-user-icon',
-  html: `<div style="display:flex;align-items:center;justify-content:center;border-radius:50%;opacity:0.88;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-    <img src="${BASE_URL}icons/railroad_crossing.png" 
-         onerror="this.onerror=null; this.src='${BASE_URL}icons/railroad_crossing.svg';" 
-         style="width:34px;height:34px;max-width:34px;max-height:34px;object-fit:cover;border-radius:50%;overflow:hidden;display:block;" 
-         alt="Railroad Crossing" />
-  </div>`,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-  popupAnchor: [0, -17]
-});
-
-// Coquitlam At-Grade CP Rail Crossings (Verified Coquitlam Fire Rescue Coordinates)
-export const COQUITLAM_RAILROAD_CROSSINGS = [
-  { id: 'RR-01', name: 'Westwood St Crossing', lat: 49.2692679, lng: -122.7912637, location: 'Westwood St & Kingsway Ave', avoidable: true },
-  { id: 'RR-02', name: 'Kingsway Ave Crossing', lat: 49.2650819, lng: -122.7911077, location: 'Kingsway Ave (Riverbend Corridor)', avoidable: false, note: 'Difficult to avoid for Riverbend' },
-  { id: 'RR-03', name: 'Pitt River Rd Crossing', lat: 49.2505499, lng: -122.8016317, location: 'Pitt River Rd at CP Rail mainline', avoidable: true },
-  { id: 'RR-04', name: 'Colony Farm Rd Crossing', lat: 49.2397800, lng: -122.8142995, location: 'Colony Farm Rd (Sole Access)', avoidable: false, note: 'Sole access road - Cannot route around' }
-];
-
 export function RailroadCrossingsLayer({ visible }) {
   if (!visible) return null;
 
@@ -484,15 +443,3 @@ export function RailroadCrossingsLayer({ visible }) {
 }
 
 // 🏫 Custom School Icon Loader (Loads custom user logo from /icons/school.png or /icons/school.svg)
-export const createSchoolIcon = () => L.divIcon({
-  className: 'custom-school-user-icon',
-  html: `<div style="display:flex;align-items:center;justify-content:center;border-radius:50%;opacity:0.88;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.85));cursor:pointer;">
-    <img src="${BASE_URL}icons/school.png" 
-         onerror="this.onerror=null; this.src='${BASE_URL}icons/school.svg';" 
-         style="width:32px;height:32px;max-width:32px;max-height:32px;object-fit:cover;border-radius:50%;overflow:hidden;display:block;" 
-         alt="School" />
-  </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -16]
-});

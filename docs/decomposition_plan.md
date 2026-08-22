@@ -283,3 +283,46 @@ Not tied to a single file — worth handling as their own passes.
 so its final `}` sat on line 1084 while `wc -l` reported 1083 — the first extraction
 silently truncated `RightSidebar`. When splitting by line range, verify brace and paren
 balance per output file before trusting the build.
+
+---
+
+## Final phase — code hardening and review
+
+The last stage of this review. Not started as of 2026-08-21.
+
+### H1. PA page leakage (punch-list #14)
+PA announcements carrying apparatus tones are captured as dispatches, because
+`audio_listener.py` discards a page only when it matches the PA tone AND no apparatus
+tone. Operator is tagging accidental captures with `[PA]` in the HITL review notes; the
+field is already wired end to end, no code change needed. Once a corpus exists, pull the
+audio by dispatch_id from the canonical store and fingerprint against it.
+
+Most promising fix: post-transcription retraction. A real dispatch yields units, an
+address and a map grid under the Locution template; a PA page parses to nothing. That
+uses the structure of the announcement rather than trying to separate tones that may be
+genuinely identical.
+
+### H2. Maintenance and sync script conformance (§4.2 above)
+Eleven scripts unaudited. Every one reviewed so far carried a real defect.
+
+### H3. `public.intersections` integrity (punch-list #9, #13)
+One confirmed false intersection; scope unknown. Consider deriving intersections from
+`public.roads` geometry rather than importing a separate list.
+
+### H4. Geocoder honesty gaps (punch-list #12)
+Steps 5 and 6 report the requested address rather than what was actually resolved.
+
+### H5. Test suite repair (punch-list #8, #10)
+One stale test cascades into ~6 others. Three modules have never run in review.
+
+### H6. Hook-dependency lint (7 remaining)
+Per-case judgement; changes runtime behaviour; must not be bulk-edited.
+
+### H7. Deferred from earlier phases
+* `destructive_parser.py` divergence review — deferred from the parser split.
+* `EVORoutingConfigModal` controls reference values removed in `c332b81` and currently do
+  nothing; rebuild against PROJECT_IDEAS #6.
+* `isWithinCoquitlam()` uses a bounding box that is 61.6% larger than the real municipal
+  polygon; the backend could return an authoritative `in_city` flag now that
+  `public.city_boundary` is queryable.
+

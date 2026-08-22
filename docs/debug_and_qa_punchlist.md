@@ -17,7 +17,15 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
 > same pass.
 >
-> Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**, **#22**.
+> Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**,
+> **#22**, **#26**.
+>
+> **Found from live operation 2026-08-22**, none of them reachable from the test corpus —
+> all three came from one operator screenshot of a real dispatch: **#24** (an invented
+> hydrant shown on every call, closed), **#25** (a corrected re-broadcast queueing itself
+> as a second call, closed on the kiosk side with a latent backend ordering defect
+> recorded), **#26** (the pipeline's INFO logging is discarded, open — and the reason #25
+> could not be diagnosed from logs).
 >
 > Closed 2026-08-22 during decomposition: **#22** (closure timeframe filters matched nothing).
 
@@ -961,3 +969,127 @@ correction never reached a live kiosk call.
 **Fix**: one translation, `frontend/src/utils/dispatchModel.js`, used by the MQTT listener,
 `App.jsx` and `MapBoard`. Verified with `frontend/scripts/verify_dispatch_model.mjs`
 against **421 real dispatch records: 0 field mismatches** before and after.
+
+### 24. The kiosk displayed an invented hydrant on every dispatch
+> **Status**: ✅ **Closed 2026-08-22.** Found from an operator screenshot of a live call.
+
+The screenshot showed `City Hydrant: D-163 (42m)` in the alert banner and
+`City Hydrant: D-165 (42m)` in the route panel — **two different hydrants at the same
+distance**, for one incident. Neither is near the dispatch coordinate: the actual nearest
+hydrants to `49.26312, -122.79819` are `L-191` (72 m), `L-114` (85 m) and `L-221` (108 m).
+
+They were not data. They were string literals in the JSX:
+
+```jsx
+// ActiveAlertBanner.jsx
+{activeCall?.target?.nearest_city_hydrant || activeCall?.nearest_city_hydrant || 'D-163'}
+{activeCall?.target?.nearest_city_dist   || activeCall?.nearest_city_dist   || '42'}m
+
+// RouteOverviewPanel.jsx
+{activeCall?.hydrant || activeCall?.target?.hydrant || 'City Hydrant: D-165 (42m)'}
+```
+
+**The fallback fired on every call ever displayed.** Measured: **0 of 422** dispatches
+carry `nearest_city_hydrant`, `nearest_city_dist` or `hydrant`, and no such field exists
+anywhere in `backend/` or `services/`. The fields were always absent, so the kiosk always
+showed the invented values.
+
+This is the §6.1 defect in its most direct form: a specific hydrant ID and distance,
+presented to crews as the nearest water supply, invented in the view layer. Same class as
+the `or "AA"` flow rating (#11) and the `COQUITLAM_CENTER` coordinates (#2).
+
+**Fix**: both fallbacks removed. The banner chip renders only when the dispatch carries a
+hydrant; the route panel shows *"Nearest hydrant not computed"*.
+
+**Related, fixed in the same pass**: `MapBoard` still fetched
+`frontend/public/data/hydrants.json`, deleted when hydrants moved to the database. The
+request 404'd, the handler swallowed it into an empty array, and the console's
+nearest-hydrant panel was silently empty on every search. It now reads `/api/hydrants`, as
+`MapLayers` already did.
+
+**Still open**: nothing computes a nearest hydrant for a dispatch. `public.hydrants` and
+`/api/hydrants` exist, and the console already computes one for a searched address, so
+wiring it into the dispatch payload is a feature rather than a repair. Until then the
+kiosk correctly reports that it does not know.
+
+### 25. A corrected re-broadcast queued itself as a second call
+> **Status**: ✅ **Closed 2026-08-22 (kiosk side).** Reported by the operator from a live call.
+
+A call arrived, displayed correctly, and simultaneously raised the amber *"1 New Call
+Queued — Tap to View Next"* banner. Tapping it cleared the banner and appeared to do
+nothing else.
+
+`useKioskQueue.handleInsert` had **no de-duplication**: it queued any INSERT arriving while
+a call was active, without ever comparing `dispatch_id`. Phase 2 legitimately re-broadcasts
+a corrected payload once the full recording has been parsed, so that correction queued as
+though it were a second incident. Tapping "view next" activated a near-identical copy of
+the call already on screen, which reads as nothing happening.
+
+The two payloads genuinely differed. For `DISP-2026-282647` the screen showed **map grid
+61** while the stored record has **grid 68** — the operator was reading uncorrected phase 1
+values with the correction sitting unread in the queue.
+
+**Fix**: identity is `dispatch_id`. A re-broadcast of the active call merges and flashes
+"CALL UPDATED", a re-broadcast of a queued call replaces it in place, and only a genuinely
+different incident queues and chimes. Correct regardless of which event type carries the
+correction.
+
+**Fixed alongside**: `handleUpdate` matched on `id` **or `address`**. The corpus holds three
+separate overdose dispatches at `3030 Gordon Ave`, so two active at once would have
+overwritten each other's units, transcript and coordinates. It now matches on dispatch
+identity only.
+
+**Backend, not yet fixed — a latent ordering defect.** `phase1.py` broadcasts before it
+records its session:
+
+```
+publish_mqtt_dispatch(db_payload, event_type="INSERT")   # line 132
+...
+session_manager.record_phase_1_success(...)              # line 150
+```
+
+If anything in that broadcast block raises, an INSERT has been emitted with no phase 1
+session stored. Phase 2 then finds `p1_data` empty, takes the "Phase 1 was skipped"
+single-phase branch, and publishes a **second INSERT** (`phase2.py:135`) rather than the
+UPDATE the correction path uses. Recording the session *before* broadcasting would make an
+un-tracked INSERT impossible.
+
+Ruled out as causes: the correction paths publish `UPDATE` correctly
+(`phase2.py:222/305/336/351`); `cleanup_session` runs in a `finally` after phase 2, so the
+ordering is right; and the session TTL is 600 s against a 46 s dispatch, so eviction is not
+plausible.
+
+**Whether this is what happened was not established** — see #26.
+
+### 26. The dispatch pipeline's INFO logging is discarded
+> **Status**: ⚠️ **Open — found 2026-08-22 while trying to diagnose #25.**
+
+The two-phase pipeline runs in a **separate process** from the audio agent, and that
+process never configures logging. It therefore uses the default root logger at **WARNING**,
+so every `logging.info` in the pipeline is dropped.
+
+Evidence, from the same journal:
+
+```
+2026-08-22 14:34:04,724 - INFO - TONES CONFIRMED: 'Rescue Tone'        <- agent, configured
+WARNING:root:[DISP-2026-5AC92A] Phase 2 transcription returned empty   <- worker, default
+```
+
+Different format, and different PIDs (`cfr-agent[1949135]` vs `cfr-agent[1949225]`). Only
+WARNING and above survive from the worker.
+
+**What is lost:**
+
+* `Published {event_type} event to Mosquitto` — **zero** occurrences today despite
+  dispatches arriving. This is why the broadcast sequence for #25 could not be read back.
+* `[METRICS] Phase 1 TTA: …` and `[METRICS] Phase 2 Finalized …` — zero. These carry the
+  DSP / STT / GIS / MQTT timings, so the performance-metrics work has no source data.
+* Every geocoder and parser INFO line, including the ones added this session to report
+  why an address was unresolved.
+
+The system is therefore **not diagnosable from its logs** for anything that does not raise
+a warning. A dispatch that resolves to the wrong place leaves no trace of how it got there.
+
+**Fix**: configure logging in the worker process entry point with the same format and level
+as the agent. Until then, treat "the logs show nothing" as "the logs are not recording",
+not as evidence that nothing happened.

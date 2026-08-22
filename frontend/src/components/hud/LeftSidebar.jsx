@@ -24,8 +24,6 @@ export function LeftSidebar({
   setShowLabels,
   showRailroadCrossings,
   setShowRailroadCrossings,
-  showSchools,
-  setShowSchools,
   showFireHalls,
   setShowFireHalls,
   homeHall,
@@ -422,17 +420,6 @@ export function LeftSidebar({
                                 className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">🛤️ Railroad Crossings</span>
-                          </label>
-
-                          {/* 🏫 SCHOOLS OVERLAY */}
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
-                             <input 
-                                type="checkbox" 
-                                checked={showSchools} 
-                                onChange={(e) => setShowSchools && setShowSchools(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
-                             />
-                             <span className="flex items-center gap-1.5 font-semibold">🏫 Schools</span>
                           </label>
                        </div>
                     </div>

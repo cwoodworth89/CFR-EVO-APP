@@ -18,13 +18,7 @@ class TestGeocoderOrchestrator:
     @pytest.fixture
     def mock_validator(self):
         with patch.object(CoquitlamDataValidator, '_load_road_names', return_value=["GORDON AVE", "MARINER WAY", "LOUGHEED HWY"]), \
-             patch.object(CoquitlamDataValidator, '_load_custom_places', return_value={
-                 "mundy park": {
-                     "name": "Mundy Park", "name_normalized": "MUNDY PARK",
-                     "address": "641 Hillcrest St", "lat": 49.255, "lng": -122.825,
-                     "category": "Park", "metadata": {}
-                 }
-             }), \
+\
              patch.object(CoquitlamDataValidator, '_load_intersection_keys', return_value={
                  "CHRISTMAS WAY & WESTWOOD ST": [{
                      "name": "Christmas Way & Westwood St", "lat": 49.27832, "lng": -122.79354,
@@ -39,18 +33,15 @@ class TestGeocoderOrchestrator:
             validator.engine = MagicMock()
             validator.street_confidence_threshold = 80
             validator._road_names_cache = validator._load_road_names()
-            validator._custom_places_cache = validator._load_custom_places()
             validator._intersection_keys_cache = validator._load_intersection_keys()
 
             from gis_service.address_resolver import AddressResolver
             from gis_service.intersection_resolver import IntersectionResolver
             from gis_service.spatial_queries import SpatialQueryEngine
-            from gis_service.custom_places_resolver import CustomPlacesResolver
 
             validator.address = AddressResolver(validator.engine, 80)
             validator.intersection = IntersectionResolver(validator._intersection_keys_cache, 80)
             validator.spatial = SpatialQueryEngine(validator.engine, validator._road_names_cache)
-            validator.custom_places = CustomPlacesResolver(validator._custom_places_cache)
             return validator
 
     def test_step1_exact_address(self, mock_validator):
@@ -136,15 +127,23 @@ class TestGeocoderOrchestrator:
         assert res is not None
         mock_validator.address.resolve_road_centroid.assert_called_once()
 
-    def test_step7_custom_places(self, mock_validator):
+    def test_place_name_alone_does_not_geocode(self, mock_validator):
+        """A bare place name must not resolve to coordinates.
+
+        The custom-places fuzzy step was removed: its coordinates were script-generated
+        and unverified (up to 1.8 km off a parcel), and it had no reachable use case --
+        Locution always speaks the civic address before the place name
+        ("1240 Lansdowne Drive Scott Creek Middle School"), so Step 1 resolves it against
+        public.parcels and the name is carried as the sub-address.
+        """
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value=None)
-        res = mock_validator.get_coordinates("Mundy Park")
-        assert res is not None
-        assert res["address"] == "641 Hillcrest St"
-        assert res.get("is_custom_place") is True
+        mock_validator.address.resolve_cross_road_narrowing = MagicMock(return_value=None)
+        mock_validator.address.resolve_street_centroid = MagicMock(return_value=None)
+        mock_validator.address.resolve_road_centroid = MagicMock(return_value=None)
+        assert mock_validator.get_coordinates("Mundy Park") is None
 
-    def test_step8_manual_overrides(self, mock_validator):
+    def test_step7_manual_overrides(self, mock_validator):
         res_bridge = mock_validator.get_coordinates("Port Mann Bridge")
         assert res_bridge is not None
         assert "Port Mann" in res_bridge["address"]
@@ -156,11 +155,6 @@ class TestGeocoderOrchestrator:
         assert abs(res_rv["lat"] - 49.245830) < 0.001
 
     def test_validate_address_exists(self, mock_validator):
-        # Custom places match
-        score, addr = mock_validator.validate_address_exists("Mundy Park")
-        assert score >= 85
-        assert addr == "641 Hillcrest St"
-
         # Intersection match
         score, addr = mock_validator.validate_address_exists("Christmas Way & Westwood St")
         assert score == 100

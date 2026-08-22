@@ -9,7 +9,6 @@ try:
     from gis_service.address_resolver import AddressResolver
     from gis_service.intersection_resolver import IntersectionResolver
     from gis_service.spatial_queries import SpatialQueryEngine
-    from gis_service.custom_places_resolver import CustomPlacesResolver
 except ModuleNotFoundError:
     pass
 

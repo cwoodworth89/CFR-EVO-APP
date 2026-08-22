@@ -22,7 +22,7 @@ from .normalization import (
 from .address_resolver import AddressResolver
 from .intersection_resolver import IntersectionResolver
 from .spatial_queries import SpatialQueryEngine
-from .custom_places_resolver import CustomPlacesResolver
+from .manual_overrides import check_manual_overrides
 
 
 class CoquitlamDataValidator:
@@ -44,14 +44,12 @@ class CoquitlamDataValidator:
 
         # Pre-cache small tables
         self._road_names_cache = self._load_road_names()
-        self._custom_places_cache = self._load_custom_places()
         self._intersection_keys_cache = self._load_intersection_keys()
 
         # Initialize sub-resolvers
         self.address = AddressResolver(self.engine, self.street_confidence_threshold)
         self.intersection = IntersectionResolver(self._intersection_keys_cache, self.street_confidence_threshold)
         self.spatial = SpatialQueryEngine(self.engine, self._road_names_cache)
-        self.custom_places = CustomPlacesResolver(self._custom_places_cache)
 
     def _load_road_names(self) -> List[str]:
         """Loads all road names from public.road_names."""
@@ -64,39 +62,6 @@ class CoquitlamDataValidator:
         except Exception as e:
             logging.error(f"Failed to load road names: {e}")
             return []
-
-    def _load_custom_places(self) -> dict:
-        """Loads all custom places from public.custom_places."""
-        places = {}
-        try:
-            with self.engine.connect() as conn:
-                res = conn.execute(text("""
-                    SELECT name, name_normalized, address, lat, lng, category, metadata
-                    FROM public.custom_places;
-                """)).fetchall()
-                for row in res:
-                    name, name_norm, address, lat, lng, category, meta = row
-                    if isinstance(meta, str):
-                        try:
-                            meta = json.loads(meta)
-                        except Exception:
-                            pass
-                    entry = {
-                        "name": name,
-                        "name_normalized": name_norm or name.upper(),
-                        "address": address or name,
-                        "lat": float(lat),
-                        "lng": float(lng),
-                        "category": category,
-                        "metadata": meta
-                    }
-                    places[name.lower().strip()] = entry
-                    if name_norm and name_norm.lower() != name.lower():
-                        places[name_norm.lower().strip()] = entry
-                logging.info(f"Loaded {len(places)} custom places from PostgreSQL.")
-        except Exception as e:
-            logging.error(f"Failed to load custom places: {e}")
-        return places
 
     def _load_intersection_keys(self) -> dict:
         """Loads all topological intersections from public.intersections."""
@@ -204,13 +169,13 @@ class CoquitlamDataValidator:
                 result['address'] = f"{parsed.house} {parsed.raw}".strip().title() if parsed.house else result['address']
                 return result
 
-        # === STEP 7: Custom places (catch-all for named locations) ===
-        result = self.custom_places.resolve(parsed_address)
-        if result:
-            return result
-
-        # === STEP 8: Manual overrides (very last resort) ===
-        result = self.custom_places.check_manual_overrides(clean, self.get_coordinates)
+        # === STEP 7: Manual overrides (very last resort) ===
+        # The custom-places fuzzy step that sat here was removed: its coordinates were
+        # script-generated and unverified (up to 1.8 km off), and it was unnecessary --
+        # Locution always speaks the civic address before the place name
+        # ("1240 Lansdowne Drive Scott Creek Middle School"), so Step 1 resolves it
+        # against public.parcels and the name is captured as the sub-address.
+        result = check_manual_overrides(clean, self.get_coordinates)
         if result:
             return result
 
@@ -228,28 +193,6 @@ class CoquitlamDataValidator:
         """Checks if a parsed address exists in the local GIS database."""
         if not parsed_address:
             return 0, None
-
-        # Check custom places first
-        if self._custom_places_cache:
-            clean_lower = parsed_address.strip().lower()
-            try:
-                from thefuzz import fuzz as _fuzz
-            except ImportError:
-                import difflib
-                class _Fuzz:
-                    @staticmethod
-                    def token_set_ratio(s1, s2):
-                        return int(difflib.SequenceMatcher(None, str(s1).lower(), str(s2).lower()).ratio() * 100)
-                _fuzz = _Fuzz()
-            best_score = 0
-            best_match = None
-            for name, details in self._custom_places_cache.items():
-                score = _fuzz.token_set_ratio(clean_lower, name)
-                if score > best_score:
-                    best_score = score
-                    best_match = details
-            if best_score >= 85:
-                return best_score, best_match['address']
 
         # Check intersections
         cands, score = self.intersection.lookup(parsed_address)

@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer, RailroadCrossingsLayer, SchoolsLayer } from './MapLayers';
+import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer, RailroadCrossingsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
 import { Header } from './hud/Header';
 import { LeftSidebar } from './hud/LeftSidebar';
@@ -325,7 +325,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   const [showNext24h, setShowNext24h] = useState(false);
   const [showNext7d, setShowNext7d] = useState(false);
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
-  const [showSchools, setShowSchools] = useState(false);
   const [showFireHalls, setShowFireHalls] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
@@ -807,8 +806,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
           setShowLabels={setShowLabels}
           showRailroadCrossings={showRailroadCrossings}
           setShowRailroadCrossings={setShowRailroadCrossings}
-          showSchools={showSchools}
-          setShowSchools={setShowSchools}
           showFireHalls={showFireHalls}
           setShowFireHalls={setShowFireHalls}
           homeHall={homeHall}
@@ -859,7 +856,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
             <HydrantsLayer visible={showHydrants} />
             
             {/* Schools GIS Overlay */}
-            <SchoolsLayer visible={showSchools} />
             
             {/* 2. DEFINE CUSTOM PANES */}
             <Pane name="underlayPane" style={{ zIndex: 390 }} />

@@ -1,5 +1,14 @@
 # CFR EVO: Comprehensive Development Freeze & Architectural Review
 
+> [!IMPORTANT]
+> **Phases A–F below record the state at the freeze commit `d5fbdcc` (2026-08-20).**
+> Substantial work has landed since. Sections 3 and 4 have been corrected to match the
+> running system; the Phase A–F narrative is left as the historical record and is no
+> longer a description of current code.
+>
+> For current status, open questions and next steps, read
+> [`docs/review_status_handoff.md`](./review_status_handoff.md).
+
 **Freeze Timestamp**: August 20, 2026 (Commit: `d5fbdcc`, supersedes `f80f8a0`)  
 **Target Environment**: 100% Local Container Stack (`tcfire@100.95.146.94`, hostname `cfr-mapping-tcfh`) — currently single-hall; multi-hall rollout is tracked as future work (`docs/PROJECT_IDEAS.md` #5).  
 **Status**: All containers healthy, geocoder 2.0 active, full PostGIS single-source-of-truth live, training/game mode fully removed from the frontend.
@@ -53,7 +62,7 @@ flowchart TD
 * **Zero In-Memory Shapefiles**: Completely purged `shapefile_loader.py` and in-memory GeoDataFrames. All spatial queries (zones, parcels, intersections, city boundaries) run directly against PostgreSQL/PostGIS.
 * **Master GIS Ingestion**: Created [`backend/scripts/download_gis_data.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/scripts/download_gis_data.py) and [`backend/scripts/import_gis_data.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/scripts/import_gis_data.py):
   - `public.roads`: 3,214 operating road segments with address ranges
-  - `public.intersections`: 3,947 topological junction points
+  - `public.intersections`: 3,947 topological junction points *(6,499 as of 2026-08-21; integrity unverified — punch-list #9/#13)*
   - `public.zones`: 134 emergency response zones
   - `public.city_boundary`: Coquitlam municipal polygon
   - `public.road_names`: 1,079 official street names
@@ -88,10 +97,10 @@ flowchart TD
   2. [`address_resolver.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/address_resolver.py) (~200 lines): Exact parcel lookup, block interpolation, cross-road narrowing, parcel/road centroids.
   3. [`intersection_resolver.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/intersection_resolver.py) (~120 lines): Pre-cached topological intersection fuzzy matching & dual-junction disambiguation.
   4. [`spatial_queries.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/spatial_queries.py) (~120 lines): Zone polygon containment, grid validations, boundary checks.
-  5. [`custom_places_resolver.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/custom_places_resolver.py) (~60 lines): Named places fuzzy matching & hardcoded municipal overrides.
+  5. `custom_places_resolver.py` (~60 lines): Named places fuzzy matching & hardcoded municipal overrides. **DELETED 2026-08-21** — coordinates were script-generated and up to 1.8 km off a parcel, and the step was unreachable because Locution always speaks the civic address before the place name.
   6. [`geocoder.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/geocoder.py) (~150 lines): Thin orchestrator implementing the authoritative 8-step resolution cascade.
 
-#### Authoritative 8-Step Resolution Cascade:
+#### Resolution Cascade (as of the freeze — now 7 steps, see note below):
 ```
 1. Exact Address        → "3030 Gordon Ave" → parcel house + fuzzy street match (returns polygon rings)
 2. Intersection         → "Austin Ave & Mariner Way" → public.intersections lookup
@@ -102,6 +111,15 @@ flowchart TD
 7. Custom Places (LAST) → "Town Centre Park" → fuzzy match against manual entries
 8. Manual Overrides     → Port Mann Bridge, Riverview Hospital
 ```
+
+> **Current cascade (2026-08-21): 7 steps.** Steps 7 and 8 were both removed — custom
+> places for unverified coordinates and no reachable use case, manual overrides because
+> string-matching destinations in application code violates CLAUDE.md §6.2. A new
+> **step 4b (nearest civic address)** was inserted: when a numbered address exists in
+> neither `public.parcels` nor any road segment's address range, it resolves to the
+> nearest real civic number on that street, reports the parcel actually used, and
+> explains the substitution in `resolution_note`. An address that now resolves to
+> nothing returns `None` and surfaces as the Tier 1 warning rather than a guess.
 
 ### Phase F: Training/Game Mode Elimination (Commit `d5fbdcc`)
 * **Rationale**: The original 4-mode recruit map-training simulator (`TRAINING_ZONES`, `TRAINING_INTERSECTIONS`, `TRAINING_BLOCKS`, `TRAINING_ADDRESSES`) predated the PostGIS migration and depended on a deprecated data pipeline. Removed as part of the freeze rather than carried forward with legacy patterns.
@@ -119,18 +137,21 @@ flowchart TD
 |:---|:---|:---|:---|
 | `public.parcels` | 65,401 | `geom (Geometry, 4326)` | Complete property parcels with true boundary polygons, centroids, and snapped frontages |
 | `public.roads` | 3,214 | `geom (LineString, 4326)` | Operating road centrelines with left/right address ranges |
-| `public.intersections`| 3,947 | `geom (Point, 4326)` | Topological road junctions and candidate indexes |
+| `public.intersections`| 6,499 | `geom (Point, 4326)` | Topological road junctions and candidate indexes. **Integrity unverified** — at least one confirmed false intersection; see punch-list #9/#13 |
 | `public.zones` | 134 | `geom (Polygon, 4326)` | Official Coquitlam emergency response zones 1–134 |
 | `public.city_boundary`| 1 | `geom (MultiPolygon, 4326)`| Authoritative municipal boundary |
 | `public.road_names` | 1,079 | *None* | Canonical street names and aliases |
-| `public.custom_places`| 152 | `geom (Point, 4326)` | Manually curated facilities, schools, parks |
-| `public.vocabulary` | 256 | *None* | Units, call types, radio channels, map grids |
-| `public.dispatches` | Active | *None* | Live dispatches, audio links, transcripts |
+| `public.vocabulary` | 256 | *None* | Units, call types, radio channels, map grids. Sole source of truth; no file fallback |
+| `public.hydrants` | 3,390 | `geom (Point, 4326)` | Municipal hydrants. `flow_class` NULL = unrated (853 of them); must render UNRATED |
+| `public.dispatches` | 408 | *None* | Dispatch records, audio links, transcripts. Renamed from `live_calls` |
 | `public.road_closures`| Dynamic| `geom (Geometry, 4326)` | Active road closures & construction hazards |
 
 ---
 
-## 4. Current Verification Status (Remote Kiosk `100.95.146.94`)
+## 4. Verification Status at the Freeze (Remote Kiosk `100.95.146.94`)
+
+> Snapshot from 2026-08-20. For current status see
+> [`docs/review_status_handoff.md`](./review_status_handoff.md).
 
 * **Docker Containers Running & Healthy**:
   - `cfr_api`: Online (FastAPI on Port 8000)
@@ -150,9 +171,9 @@ flowchart TD
 
 ## 5. Ready-State Notes for Claude Code
 
-1. **Git State**: Everything is cleanly committed to `main` up to `d5fbdcc` and synced with remote origin and the physical kiosk.
+1. **Git State**: Clean at `d5fbdcc` as of the freeze. 30+ commits have landed since; see the handoff.
 2. **Local stack**: Docker Compose configuration uses `postgis/postgis:16-3.4-alpine`.
-3. **Next Candidate Work**:
+3. **Next Candidate Work** *(superseded — see [`review_status_handoff.md`](./review_status_handoff.md))*:
    - Monitor first live over-the-air dispatch on the new geocoder cascade.
    - Frontend UI audit of the newly populated parcel polygon rings (`rings` array in dispatch payload) on the Leaflet/MapLibre apparatus bay kiosk HUD.
    - Updating agent skill files ([`gis-spatial-analysis/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-spatial-analysis/SKILL.md) and [`gis-pipeline-sync/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-pipeline-sync/SKILL.md)) to reflect the PostGIS sub-resolver module structure.

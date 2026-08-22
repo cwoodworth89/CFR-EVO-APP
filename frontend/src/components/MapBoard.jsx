@@ -13,11 +13,11 @@ import { Header } from './hud/Header';
 import { LeftSidebar } from './hud/LeftSidebar';
 import { RightSidebar } from './hud/RightSidebar';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
-import { apiClient } from '../apiClient';
 import { targetIcon, createSoftZoneNumberIcon } from './map/mapIcons';
 import { getZoneCentroid, getAlphaSegment, enrichAddressWithBuilding } from './map/mapGeometry';
 import RoadClosureMarker from './map/RoadClosureMarker';
 import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
+import { useRoadClosures } from '../hooks/useRoadClosures';
 
 import { RoutingOverlay } from './RoutingOverlay';
 import PropertySatellitePanel from './kiosk/PropertySatellitePanel';
@@ -51,7 +51,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
 
   // RAW DATA STATES
   const [zones, setZones] = useState([]);
-  const [roadClosures, setRoadClosures] = useState([]);
   const [selectedClosure, setSelectedClosure] = useState(null);
   
   // APP/TERMINAL STATE
@@ -68,16 +67,20 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   // Layer visibility and road-closure filters live in one hook so the sidebars can be
   // given {...layers} rather than forty lines of individual prop pass-through.
   const layers = useMapLayerPreferences();
+  // Only the values MapBoard itself renders with. The closure time-window and access
+  // filters are not destructured: they are consumed by useRoadClosures, which takes the
+  // whole `layers` object, and reach the sidebars through {...layers}.
   const {
     mapStyle, showLabels, showHydrants, showZones, showRoadClosures,
     showRailroadCrossings, showFireHalls,
-    showActiveNow, showNext24h, showNext7d,
-    filterNoAccess, filterAccessOnly, filterCaution,
     // Header takes these three explicitly rather than by spread: it uses six of the
     // hook's values, so listing them keeps its interface visible.
     setMapStyle, setShowLabels, setShowRoadClosures,
     applyModeDefaults,
   } = layers;
+
+  // Road closures and the filtered subset the map and alert count render.
+  const { roadClosures, activeClosures } = useRoadClosures(layers);
   const [currentZoom, setCurrentZoom] = useState(12);
   const [cadastralError, setCadastralError] = useState(false); 
   
@@ -413,44 +416,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     }
   }, [map, leftSidebarOpen, rightSidebarOpen]);
 
-  // LOAD ROAD CLOSURES (Strictly local containerized FastAPI /api/road-closures)
-  useEffect(() => {
-    const loadClosures = () => {
-      apiClient.roadClosures.fetchAll()
-        .then(rawEvents => {
-          if (!Array.isArray(rawEvents)) return;
-          const now = new Date();
-          const processed = rawEvents.map(evt => {
-            const start = evt.startDate ? new Date(evt.startDate) : null;
-            const end = evt.endDate ? new Date(evt.endDate) : null;
-
-            let isActive = false, isFuture = false, isExpired = false;
-            if (start && now < start) {
-              isFuture = true;
-            } else if (end && now > end) {
-              isExpired = true;
-            } else {
-              isActive = true;
-            }
-            return {
-              ...evt,
-              isActive,
-              isFuture,
-              isExpired
-            };
-          });
-          setRoadClosures(processed);
-        })
-        .catch(err => {
-          console.warn("Failed to load local road closures:", err);
-        });
-    };
-
-    loadClosures();
-    const interval = setInterval(loadClosures, 300000); // 5 min interval
-    return () => clearInterval(interval);
-  }, []);
-
   const startMode = useCallback((mode) => {
       if (mode === "KIOSK_VIEW") {
         if (typeof onLaunchKiosk === 'function') {
@@ -484,27 +449,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       dashArray: "4 4"
     };
   };
- 
-  // Filter closures for map and alerts rendering based on access severity & timeframe window
-  const activeClosures = roadClosures.filter(closure => {
-    // 1. Access Severity Filter
-    if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
-    if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
-    if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
-
-    // 2. Timeframe Window Filter
-    const now = new Date();
-    const isCurrentlyActive = closure.isActive;
-    const is24hFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 24 * 3600 * 1000);
-    const is7dFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 7 * 86400 * 1000);
-
-    const matchesTimeframe = 
-      (showActiveNow && isCurrentlyActive) ||
-      (showNext24h && is24hFuture) ||
-      (showNext7d && is7dFuture);
-
-    return matchesTimeframe;
-  });
  
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">

@@ -1,20 +1,6 @@
 import os
 import re
 import logging
-from cfr_dispatch.config.paths import VOCAB_DIR
-
-def load_vocabulary_file(filename: str) -> list[str]:
-    """Reads a seed .txt file. Used by import_gis_data.py step7 to populate
-    public.vocabulary on a fresh install -- NOT a runtime fallback."""
-    filepath = VOCAB_DIR / filename
-    items = []
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    items.append(line)
-    return items
 
 def load_vocabulary_from_db(category: str) -> list[str]:
     """Load vocabulary terms from PostgreSQL by category."""

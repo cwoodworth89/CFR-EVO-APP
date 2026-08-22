@@ -508,72 +508,54 @@ def step6_import_custom_places(engine, custom_places_json_path: str, batch_size:
         return 0
 
 
-def step7_import_vocabulary(engine, vocab_dir: str, batch_size: int = 500) -> dict:
-    """Step 7: Import Vocabulary -> public.vocabulary from .txt files."""
+def step7_import_vocabulary(engine, vocab_dir: str = None, batch_size: int = 500) -> dict:
+    """Step 7: Seed public.vocabulary from the versioned SQL migration.
+
+    Previously this read five .txt files and TRUNCATEd public.vocabulary before
+    re-inserting. That made re-running the GIS import destructive: any term added since
+    the last run -- including everything learned from HITL corrections
+    (source='hitl_learned') -- was silently wiped.
+
+    The seed now lives in backend/migrations/2026-08-21_vocabulary_seed.sql and is
+    applied with ON CONFLICT DO NOTHING, so it is additive and safe to re-run. The .txt
+    files are gone; public.vocabulary is the sole source of truth.
+
+    `vocab_dir` is accepted for backwards compatibility and ignored.
+    """
     logging.info("=" * 60)
-    logging.info("Step 7: Importing Vocabulary -> public.vocabulary...")
+    logging.info("Step 7: Seeding public.vocabulary from migration...")
 
-    vocab_file_map = {
-        "unit": os.path.join(vocab_dir, "units_vocabulary.txt"),
-        "call_type": os.path.join(vocab_dir, "call_types.txt"),
-        "radio_channel": os.path.join(vocab_dir, "radio_channels.txt"),
-        "response_type": os.path.join(vocab_dir, "response_types.txt"),
-        "map_grid": os.path.join(vocab_dir, "map_grid_numbers.txt"),
-    }
-
-    category_counts = {}
-    records = []
-    seen = set()
-
-    for cat, filepath in vocab_file_map.items():
-        if not os.path.exists(filepath):
-            logging.warning(f"  Vocabulary file for {cat} not found: {filepath}")
-            category_counts[cat] = 0
-            continue
-
-        cat_order = 0
-        with open(filepath, "r", encoding="utf-8") as f:
-            for line in f:
-                term = line.strip()
-                if not term or term.startswith("#"):
-                    continue
-                if (cat, term) in seen:
-                    continue
-                seen.add((cat, term))
-                cat_order += 1
-                records.append({
-                    "category": cat,
-                    "term": term,
-                    "term_normalized": term.upper(),
-                    "sort_order": cat_order,
-                    "source": "import"
-                })
-        category_counts[cat] = cat_order
-
-    insert_sql = text("""
-    INSERT INTO public.vocabulary (category, term, term_normalized, sort_order, source, is_active)
-    VALUES (:category, :term, :term_normalized, :sort_order, :source, TRUE)
-    ON CONFLICT (category, term) DO UPDATE SET
-        term_normalized = EXCLUDED.term_normalized,
-        sort_order = EXCLUDED.sort_order,
-        updated_at = CURRENT_TIMESTAMP;
-    """)
+    seed_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "migrations", "2026-08-21_vocabulary_seed.sql"
+    )
+    if not os.path.exists(seed_path):
+        logging.error(f"  ✗ Vocabulary seed migration not found: {seed_path}")
+        return {}
 
     try:
-        with engine.begin() as conn:
-            conn.execute(text("TRUNCATE TABLE public.vocabulary RESTART IDENTITY CASCADE;"))
-            for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
-                conn.execute(insert_sql, batch)
+        with open(seed_path, "r", encoding="utf-8") as f:
+            seed_sql = f.read()
 
-        logging.info("  ✓ Vocabulary Import Breakdown:")
-        for cat, cnt in category_counts.items():
+        with engine.begin() as conn:
+            conn.execute(text(seed_sql))
+
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT category, count(*) AS n
+                FROM public.vocabulary WHERE is_active
+                GROUP BY category ORDER BY category
+            """)).mappings().all()
+
+        counts = {r["category"]: r["n"] for r in rows}
+        logging.info("  ✓ Vocabulary seeded (additive, existing terms preserved):")
+        for cat, cnt in counts.items():
             logging.info(f"    - {cat:15s}: {cnt} terms")
-        logging.info(f"    Total Vocabulary Records: {len(records)}")
-        return category_counts
+        logging.info(f"    Total Vocabulary Records: {sum(counts.values())}")
+        return counts
     except Exception as e:
-        logging.error(f"  ✗ Step 7 error importing vocabulary: {e}")
-        return category_counts
+        logging.error(f"  ✗ Step 7 error seeding vocabulary: {e}")
+        return {}
 
 
 def step8_compute_intersections(engine, road_features: list, intersections_json_path: str = None, batch_size: int = 1000) -> int:
@@ -928,7 +910,7 @@ def run_full_import(
     custom_places_count = step6_import_custom_places(engine, custom_places_path, batch_size=batch_size)
 
     # Step 7: Import Vocabulary
-    vocab_counts = step7_import_vocabulary(engine, vocab_dir, batch_size=batch_size)
+    vocab_counts = step7_import_vocabulary(engine)
     total_vocab = sum(vocab_counts.values())
 
     # Step 8: Compute Intersections

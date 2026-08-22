@@ -320,3 +320,60 @@ Worth considering whether intersections should be *derived* from `public.roads` 
 via `ST_Intersects` rather than imported as a separate list — that would make false
 intersections structurally impossible.
 
+---
+
+## 📢 PA Page Leakage
+
+### 14. PA announcements are being captured as dispatches
+> **Status**: ⚠️ **Open — reported by operator, mechanism identified.**
+
+Several PA (station paging) announcements have been captured and persisted as real
+dispatches. The likely mechanism is in `audio_listener.py`:
+
+```python
+pa_matches        = [m for m in all_matches if m[0] == "PA Tone"]
+apparatus_matches = [m for m in all_matches if m[0] in ("Chief Tone", "Engine Tone", "Rescue Tone")]
+
+if pa_matches and not apparatus_matches:
+    # disregard, reset listener
+elif apparatus_matches:
+    # CAPTURE
+```
+
+A PA page is only discarded when it matches the PA tone **and no apparatus tone**. The
+operator has confirmed that PA announcements can themselves carry apparatus tones. Any
+such page satisfies `apparatus_matches` and is captured as a dispatch — the `elif`
+branch wins.
+
+That ordering is deliberate for the opposite case (a real dispatch preceded by a PA
+chime must not be discarded), so the fix is not simply reversing the precedence. Options
+worth evaluating against real audio:
+
+* Whether a PA page's apparatus tones differ measurably from a dispatch's — the DSP
+  already logs peak frequencies and Z-scores per capture.
+* Whether the announcement that follows the tones can disambiguate: a dispatch always
+  states units, an address and a map grid in the Locution template, a PA page does not.
+  A post-transcription check could retract a capture that parses to nothing.
+* Tightening `FREQUENCY_TOLERANCE_HZ` (currently 8 Hz) — but note item #1.4, where an
+  event matched PA Tone on peaks 588/647 against golden 595/647, inside tolerance by a
+  single hertz. Tolerance is implicated in **both** directions.
+
+**Tagging convention (current, no code change needed)**: accidental PA captures are
+marked by putting `[PA]` in the HITL **review notes** field. That field is already wired
+end to end — editable in `VerificationSidebar.jsx`, submitted by `DispatchReview.jsx`,
+accepted by `DispatchUpdateSchema`, returned by the API. A dedicated checkbox was
+considered and rejected as not worth the UI weight for how rare these are.
+
+Once a corpus of `[PA]`-tagged dispatches exists, their audio can be pulled from
+`backend/audio_files/recordings/` by dispatch_id and run against the fingerprinting code
+as a negative-control suite:
+
+```sql
+SELECT dispatch_id, audio_url FROM public.dispatches WHERE review_notes LIKE '%[PA]%';
+```
+
+As of 2026-08-21 no dispatches carry the tag yet, and the single
+`pa_page_DISP-2026-AB76A8.wav` fixture was deleted rather than kept as a separate file —
+its dispatch had no row in `public.dispatches`, and the corpus will come from tagged
+captures instead.
+

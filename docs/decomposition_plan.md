@@ -231,10 +231,11 @@ in `phase2.py` is removed, so none of these regenerate.
 a second copy of the audio. `backend/data/training/audio/` was that second copy and had
 no code reading it — likely residue from the Whisper/LoRA training experiment.
 
-Still to confirm: `backend/tests/audio_samples/negative_controls/pa_page_DISP-2026-AB76A8.wav`
-is the only `.wav` tracked in git and nothing references it. Its filename carries a real
-dispatch ID, so it looks like a genuine PA page kept as a tone-rejection negative control
-rather than a synthetic sample — retained pending confirmation.
+`backend/tests/audio_samples/` was removed. Its single fixture,
+`pa_page_DISP-2026-AB76A8.wav`, was the only `.wav` tracked in git, nothing referenced it,
+and its dispatch had no row in `public.dispatches`. The PA negative-control corpus will
+instead come from accidental captures tagged `[PA]` in the HITL review notes, whose audio
+is already in the canonical store (punch-list #14).
 `backend/tests/test_calls/` (8 `.wav` + paired `.txt` ground truth) is actively read by
 `run_test_suite.py` and stays.
 

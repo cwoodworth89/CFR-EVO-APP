@@ -17,7 +17,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
 > same pass.
 >
-> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#18**, **#19**.
+> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#19**.
 
 ---
 
@@ -742,7 +742,29 @@ column says so. Needs review by whoever owns response geography.
 ## 🎙️ STT Vocabulary Biasing
 
 ### 18. 96% of the Whisper hotword list is silently discarded
-> **Status**: ⚠️ **Open — measured 2026-08-22 on the kiosk model.** This is the upstream
+> **Status**: ✅ **Closed 2026-08-22 — budget restored and measured.** Terms are now
+> ranked by value and trimmed against the model's real token cap: **58 terms, 221 of 223
+> tokens**, and `Lougheed`, `Westwood`, `Pinetree`, `Barnet`, `Como Lake` and `Guildford`
+> are biased where previously **no** arterial was. The trim is logged every build, and a
+> warning fires if no HITL-corrected street survives.
+>
+> Ranking, in priority order: core terms → units → HITL-corrected streets → streets by
+> dispatch count (`public.dispatches`) → streets by parcel count (`public.parcels`) → call
+> types. The parcel-count ranking is the one commit `79808cc` used before it was removed.
+> `transcriber.py` supplies the loaded model's real `max_length` and tokenizer so the
+> budget is measured rather than guessed from a term count — the earlier fix capped at 120
+> terms, which is still roughly double the real cap.
+>
+> **Known remaining limit**: 58 terms is tight, so `Mariner` and `Austin` still miss the
+> cut. An untested idea worth measuring — bias on the distinctive name alone
+> (`Lougheed` rather than `Lougheed Highway`), since "Highway"/"Avenue" are common words
+> the model already handles. That should roughly halve the per-street cost and about
+> double coverage, but it changes what the model is primed for and needs a WER backtest
+> before adoption, not a guess.
+>
+> The original finding follows.
+>
+> ⚠️ **Open — measured 2026-08-22 on the kiosk model.** This is the upstream
 > cause of the transcription errors that #15 was trying to repair downstream.
 
 `build_stt_bias_words` assembles every road name, unit, core term and call type into one

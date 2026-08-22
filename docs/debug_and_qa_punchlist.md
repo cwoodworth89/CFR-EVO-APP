@@ -17,7 +17,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
 > same pass.
 >
-> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**.
+> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#18**, **#19**.
 
 ---
 
@@ -736,3 +736,84 @@ between the two centrelines (`49.240487, -122.816114`, map grid 49) — a defens
 derivation, but nobody has decided whether the centre of the gap is where apparatus should
 be sent rather than a specific ramp head or the Mariner Way overpass. The row's `notes`
 column says so. Needs review by whoever owns response geography.
+
+---
+
+## 🎙️ STT Vocabulary Biasing
+
+### 18. 96% of the Whisper hotword list is silently discarded
+> **Status**: ⚠️ **Open — measured 2026-08-22 on the kiosk model.** This is the upstream
+> cause of the transcription errors that #15 was trying to repair downstream.
+
+`build_stt_bias_words` assembles every road name, unit, core term and call type into one
+`hotwords` string — 1,173 entries, 5,172 tokens — with the comment *"Build complete
+hotword list — NO artificial truncation"*, having replaced an earlier top-25 limit.
+
+**faster-whisper truncates it anyway**, and keeps the *head*
+(`faster_whisper/transcribe.py:1546-1547`, version installed on the kiosk):
+
+```python
+if len(hotwords_tokens) >= self.max_length // 2:
+    hotwords_tokens = hotwords_tokens[: self.max_length // 2 - 1]
+```
+
+Measured against the loaded model (`max_length` 448, so the cap is 223 tokens):
+
+| | |
+|:--|--:|
+| Hotword entries supplied | 1,173 |
+| Tokens supplied | 5,172 |
+| Tokens kept | **223** |
+| Tokens discarded | **4,949 (95.7%)** |
+| Entries actually surviving | **61 of 1,173** |
+
+Because `all_streets` arrives alphabetically, the surviving set ends at **"Archworth
+Avenue"** and everything from **"Argyle Street"** onward is dropped. Street biasing
+therefore covers part of the letter A and nothing else. **Westwood, Lougheed, Pinetree,
+Barnet, Mariner — every arterial in the city — receives no biasing at all.** Call types
+sit last in the list and never survive.
+
+Removing the top-25 limit made this *worse* than it was: a curated 25 was at least chosen;
+an alphabetical prefix of 61 is arbitrary.
+
+**This is why "Lowheed" and "Tasis" reached the geocoder.** #15 removed the dangerous
+downstream guessing, which was right, but the errors themselves are produced here.
+
+**Fix direction** — spend the 223-token budget on the highest-value terms, and measure the
+spend rather than assuming it:
+1. Core dispatch terms and unit names (small, always needed).
+2. HITL-corrected streets — empirically demonstrated to be misheard, so the highest value
+   per token. `get_hitl_verified_streets()` already tallies them and they are already
+   ordered ahead of `all_streets`.
+3. Remaining streets ranked by **dispatch frequency** from `public.dispatches`, not
+   alphabetically.
+4. Assert the encoded token count against the model's real cap at build time, so a future
+   change that overflows the budget fails loudly instead of silently dropping arterials.
+
+**Also unverified**: no Whisper or faster-whisper documentation is referenced anywhere in
+the project, and the figures above were taken from the installed source and the loaded
+model rather than from docs. Worth confirming against the faster-whisper release notes for
+the pinned version before treating the 223-token cap as stable across upgrades.
+
+### 19. Remaining fuzzy-match sites have not been reviewed
+> **Status**: ⚠️ **Open — inventoried 2026-08-22, not yet reviewed.**
+
+#15 fixed `intersection_resolver.lookup`. Five other similarity-matching sites share the
+same exposure and have **not** been examined against the Coquitlam street-collision
+measurements (`HAMBER`/`AMBER` 96, `WESTWOOD`/`EASTWOOD` 93, `BURKE MOUNTAIN`/`BLUE
+MOUNTAIN` 93):
+
+| Site | Call | Risk |
+|:--|:--|:--|
+| `address_resolver.py:44` | `token_set_ratio(parsed_street, db_norm)` | **Highest** — same metric and same subset trap as #15, on the main address path rather than only intersections |
+| `address_resolver.py:345` | `token_set_ratio(parsed_street, db_norm)` | As above, second call site |
+| `parser/location.py:196` | `fuzz.ratio(clean_base, ks_lower)` | Feeds `fuzzy_correct_cross_roads`, invoked from `announcement.py:123` |
+| `parser/call_types.py:38` | `token_set_ratio(ct.lower(), transcript)` | Different class (classification, not location) — a wrong call type is serious but not a wrong address |
+| `parser/channels.py:42` | `token_set_ratio(raw_clean, chan_clean)` | Radio channel selection |
+
+`token_set_ratio` scoring a short string against a longer one that contains it returns 100
+(#15), so any site comparing a street fragment against a full street name is exposed.
+`sanitize_transcript`'s phonetic corrections are hardcoded regex rather than fuzzy — they
+are deterministic and auditable, but should be checked for the same collision property:
+a correction that rewrites one real street into another real street would be worse than
+any fuzzy match, because nothing scores it.

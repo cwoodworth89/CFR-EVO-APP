@@ -36,7 +36,7 @@ python backend/scripts/backtest_regression.py
 
 ## 3. Comparative Parser Backtesting
 
-Benchmark the production parser ([`backend/cfr_dispatch/parser.py`](../../backend/cfr_dispatch/parser.py)) against alternative parsing modules:
+Benchmark the production parser ([`backend/cfr_dispatch/parser/`](../../backend/cfr_dispatch/parser/), a 6-module package since the 1,053-line `parser.py` was split) against alternative parsing modules:
 ```powershell
 python backend/scripts/backtest_parser.py
 ```

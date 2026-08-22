@@ -17,7 +17,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > substitution) and **#16** (`<street> and <street>` CAD artifact) found and fixed in the
 > same pass.
 >
-> Still open: **#1**, **#6**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**, **#22**.
+> Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**, **#22**.
 >
 > Closed 2026-08-22 during decomposition: **#22** (closure timeframe filters matched nothing).
 
@@ -172,7 +172,27 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 ## 🛣️ Road Closure Ingestion
 
 ### 6. Verify first live ingest through the new PostGIS path
-> **Status**: ⚠️ **Open — still unverified (re-checked 2026-08-21).** Correct as written.
+> **Status**: ✅ **Closed 2026-08-22 — verified, every pass criterion met.**
+>
+> | Pass criterion | Result |
+> |:--|:--|
+> | `last_sync` age < 24h | 12h ✅ |
+> | Active closures, same magnitude as the previous 103 | **94** ✅ |
+> | `with_geometry` equals `closures` | **94 / 94** ✅ |
+> | `hall_id` populated 1–4 on most rows | 93 of 94 ✅ |
+>
+> Distribution: hall 1 → 13, hall 2 → 22, hall 3 → 40, hall 4 → 18, null → 1. The single
+> null is a boundary-straddling closure whose centroid falls outside every zone, which is
+> exactly the case this item's "watch for" note anticipated — `is_within_city` admits it
+> via `ST_Intersects` while centroid containment cannot place it.
+>
+> The 2026-08-21 snapshot that read as a total failure (0 rows with `geom`, 103 with a null
+> `hall_id`) was pre-rewrite residue, as recorded below. A sync has since run against the
+> new code and populates both columns.
+>
+> Original entry follows.
+>
+> ⚠️ **Open — still unverified (re-checked 2026-08-21).** Correct as written.
 > The rewrite **is** live in the running container — `docker exec cfr_api grep -c
 > resolve_zones_and_hall /app/backend/api/road_closure_service.py` returns 4 — but no
 > ingest cycle has run against it yet.

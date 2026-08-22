@@ -92,7 +92,7 @@ When an address fails to parse or is parsed incorrectly, run the parser hypothes
 
 | Symptom | Probable Cause | Corrective Action |
 | :--- | :--- | :--- |
-| **Phonetic Mishearing** (e.g. *"low heat highway"*) | Whisper speech-to-text ambiguity | Add replacement to `phonetic_corrections` in `backend/cfr_dispatch/parser.py` |
+| **Phonetic Mishearing** (e.g. *"low heat highway"*) | Whisper speech-to-text ambiguity | Add replacement to `phonetic_corrections` in `backend/cfr_dispatch/parser/sanitize.py` |
 | **Street Suffix Dropped** (e.g. *"sandstone"* vs *"sandstone crescent"*) | Dispatcher spoke abbreviation | Check fuzzy street matcher in `gis_service.CoquitlamDataValidator` |
 | **Speech Cutoff in Phase 1** | Preliminary audio buffer sliced before address spoken | Verify `MIN_PHASE_1_DURATION_S` ($\ge 20$s) and `is_round_1_complete_check()` |
 | **Unknown Incident Type** | Novel phrasing used by dispatcher | Add incident keyword mapping to `CALL_TYPES` in `backend/cfr_dispatch/parser/` |

@@ -1,6 +1,6 @@
 ---
 name: gis-pipeline-sync
-description: Procedures for updating Coquitlam ESRI shapefiles, caching NFPA 291 fire hydrants, compacting GIS JSON datasets, and verifying 1..134 emergency zone spatial boundaries.
+description: Procedures for updating Coquitlam ESRI shapefiles, syncing NFPA 291 fire hydrants into public.hydrants, packaging MBTiles archives, and verifying 1..134 emergency zone spatial boundaries.
 ---
 
 # GIS Pipeline & Spatial Sync
@@ -20,22 +20,53 @@ python backend/scripts/update_gis_data.py
 
 ---
 
-## 2. Sync & Compact NFPA 291 Hydrant Cache
+## 2. Sync NFPA 291 Hydrants
 
-Download and serialize Coquitlam's 3,381 fire hydrants into compact JSON:
+Hydrants sync from the municipal source into **`public.hydrants`**; the kiosk reads them
+from `/api/hydrants`.
 ```powershell
 python backend/scripts/sync_hydrants.py
 ```
-* **Serialization Constraint**: Enforce `separators=(',', ':')` in JSON dumping to keep payload under $1.0\text{ MB}$.
-* **Color Ratings**: Verify Class AA Blue ($\ge 1500\text{ GPM}$), Class A Green ($1000\text{--}1499$), Class B Orange ($500\text{--}999$), Class C Red ($<500$).
+
+> [!WARNING]
+> **Corrected 2026-08-22.** This previously described serializing hydrants into a compact
+> JSON cache with a 1 MB payload budget. That cache (`frontend/public/data/hydrants.json`)
+> was deleted when hydrants moved to the database. The cache mattered: a code fix alone
+> changed nothing while fabricated values lived in a file nobody re-generated.
+
+* **UNRATED IS A VALID STATE, AND THE ONE MOST IMPORTANT TO GET RIGHT.** `flow_class` is
+  `NULL` for **853 of 3,390** hydrants -- the municipal source has no rating for them.
+  They must render as an explicit unknown (grey, `WARNING: UNRATED`), never as a class.
+  `sync_hydrants.py` previously substituted `"AA"`, the *highest* class, telling crews an
+  unrated hydrant was the best available water supply. Punch-list #11, CLAUDE.md 6.1.
+* **Colour ratings, only where a rating exists**: Class AA Blue (>= 1500 GPM), Class A
+  Green (1000-1499), Class B Orange (500-999), Class C Red (< 500). NFPA 291 itself is
+  **not held** -- see `docs/standards/README.md`.
+* Counts drift as the municipal source updates. Read them from the table rather than
+  trusting a number written here.
 
 ---
 
 ## 3. Spatial Boundary Checks
 
-Verify that CAD boundary slicing matches Coquitlam Emergency Response Zones ($1 \le N \le 134$) and ensure `coquitlam_boundary_opt.json` vector points remain within bounds:
-* **Lat range**: `49.20` to `49.38`
-* **Lng range**: `-122.88` to `-122.70`
+Verify that CAD boundary slicing matches Coquitlam Emergency Response Zones
+($1 \le N \le 134$).
+
+**Use the bounding box in CLAUDE.md §5 — `isWithinCoquitlam(lat, lng)` — as the single
+source. Do not restate it here.**
+
+> [!WARNING]
+> **Corrected 2026-08-22.** This section previously stated a *narrower* box than CLAUDE.md
+> §5: lat `49.20`–`49.38` and lng `-122.88`–`-122.70`, against the canonical
+> `lat < 49.20 || lat > 49.39 || lng < -122.92 || lng > -122.70`.
+>
+> Measured against `public.intersections`: **168 of 1,785 real intersections fall outside
+> the box this file used to state and inside the canonical one.** They are the entire
+> North Rd / Clarke Rd corridor — the Coquitlam/Burnaby boundary, a major arterial. An
+> agent following the old figures would have rejected the western edge of the city as
+> out-of-bounds.
+>
+> This is why a boundary is defined in exactly one place.
 
 ---
 

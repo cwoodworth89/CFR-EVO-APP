@@ -171,13 +171,18 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
   if (closure.emergencyAccess === "ACCESS_ONLY") color = "#f59e0b"; // ACCESS_ONLY
   if (closure.emergencyAccess === "CAUTION") color = "#eab308"; // CAUTION
 
-  const markerPos = Array.isArray(closure.coordinates) && closure.coordinates.length >= 2 
-    ? [parseFloat(closure.coordinates[0]), parseFloat(closure.coordinates[1])] 
-    : COQUITLAM_CENTER;
-
   const polylinePos = Array.isArray(closure.polyline) && closure.polyline.length > 0
     ? closure.polyline.map(pt => [parseFloat(pt[0]), parseFloat(pt[1])])
     : [];
+
+  // No default coordinate (CLAUDE.md 6.1). A closure with no usable point coordinate
+  // previously rendered its marker at COQUITLAM_CENTER, which drew a road closure across
+  // City Centre that the municipal feed never reported. Fall back only to the first
+  // vertex of the closure's own polyline -- real data from the same record -- and
+  // otherwise render no marker at all. The polyline alone still shows the closure.
+  const markerPos = Array.isArray(closure.coordinates) && closure.coordinates.length >= 2
+    ? [parseFloat(closure.coordinates[0]), parseFloat(closure.coordinates[1])]
+    : (polylinePos.length > 0 ? polylinePos[0] : null);
 
   return (
     <React.Fragment>
@@ -192,6 +197,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
           }} 
         />
       )}
+      {markerPos && (
       <Marker 
         ref={markerRef}
         position={markerPos} 
@@ -245,6 +251,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
         </Popup>
 
       </Marker>
+      )}
     </React.Fragment>
   );
 }
@@ -468,7 +475,12 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       const newCall = dispatch.rawRecord || dispatch;
       if (newCall) {
         setActiveDispatch(newCall);
-        const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.lat || COQUITLAM_CENTER[0], lng: newCall.lng || COQUITLAM_CENTER[1] } : null);
+        // No default coordinate (CLAUDE.md 6.1 / 5). These two fields previously fell back
+        // to COQUITLAM_CENTER, so a dispatch with unresolved coordinates was routed and
+        // rendered as a valid incident at City Centre -- inside the isWithinCoquitlam
+        // bounds check, so no Tier 1 warning fired and nothing told the crew. Null must
+        // propagate so the unresolved-location card shows and routing stays suppressed.
+        const target = newCall.target || (newCall.address ? { address: newCall.address, lat: newCall.lat ?? null, lng: newCall.lng ?? null } : null);
         if (target) {
           updateTargetAddress(target);
           if (map && target.lat && target.lng) {

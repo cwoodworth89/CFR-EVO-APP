@@ -3,12 +3,12 @@
 **Written 2026-08-21, at commit `9396ebb`. Punch-list reconciled 2026-08-21 at `0db0b75`.**
 Read this first if you are picking up the review in a new session.
 
-> [!IMPORTANT]
-> **One live defect was found by the reconciliation and is not yet fixed.**
-> `frontend/src/components/MapBoard.jsx:471` still substitutes City Centre coordinates for
-> a dispatch with null `lat`/`lng` — the same class of bug as the Town Centre routing
-> defect below, on the same live path. Punch-list **#2 is reopened**. Fix this before
-> anything else in the "Next steps" list.
+> [!NOTE]
+> **The reconciliation found two live coordinate fabrications in `MapBoard.jsx`; both are
+> now fixed** (punch-list #2, reopened and closed the same day). A dispatch with null
+> coordinates was being rendered and routed as a valid incident at City Centre, and a road
+> closure with no coordinate was being drawn across City Centre although the municipal feed
+> never reported one. Null now propagates in both paths.
 
 Companion documents:
 * [`docs/decomposition_plan.md`](./decomposition_plan.md) — module-by-module plan, what is done, what remains
@@ -107,8 +107,15 @@ Recorded because they were stated in commit messages and are wrong:
   words, so only 317 rows matched at all. Scope of the false-intersection problem is
   **unknown**, recorded as such in punch-list #9/#13.
 * **"All hardcoded coordinate fallbacks have been removed frontend-wide."** False, and
-  the most consequential of these corrections. `MapBoard.jsx:471` was missed. Found by
-  re-grepping for the constant rather than trusting the punch-list's ✅.
+  the most consequential of these corrections. **Two** were missed, both in
+  `MapBoard.jsx` — the dispatch target at `:471` and the road closure marker at `:176`.
+  Found by re-grepping for the constant rather than trusting the punch-list's ✅.
+* **"Only line 471 needs to change."** Mine, from the reconciliation, and also wrong.
+  I classified `:176` as an initial map view from a grep line number without reading the
+  enclosing function; it was a second fabrication of the same class. **Identify the
+  function a hit sits in before judging it** — three of the five `COQUITLAM_CENTER` uses
+  in that file really are legitimate map-view defaults, which is exactly what makes the
+  other two easy to wave through.
 * **"`SatelliteMiniMap.jsx` deleted entirely."** It was removed from
   `VerificationSidebar.jsx` — the actual fix — but the component still exists under
   `components/hud/` and is used by `ActiveDispatchPanel.jsx`. The defect is genuinely
@@ -152,20 +159,13 @@ real test.
 | Hydrants → database + API | ✅ done |
 | Audio store consolidation | ✅ done |
 | **Remaining decomposition** | ⏳ `MapBoard.jsx`, `phase2.py`, review surfaces, `MapLayers.jsx` |
-| Punch-list reconciliation | ✅ done (2 closed, 1 reopened, 11 open) |
+| Punch-list reconciliation | ✅ done (3 closed, 11 open) |
+| `MapBoard.jsx` coordinate fabrications | ✅ fixed (both) |
 | **Final phase: hardening & review** | ⏳ not started |
 
 ---
 
 ## Next steps
-
-### Immediate
-
-0. **Remove the `MapBoard.jsx:471` coordinate fallback** (punch-list #2, reopened). Drop
-   the `|| COQUITLAM_CENTER[...]` defaults so null coordinates propagate and the §5 Tier 1
-   card fires. The other four `COQUITLAM_CENTER` uses in that file were checked and are
-   legitimate map-view defaults — **only line 471 changes.** Small, safety-relevant, and
-   on the live dispatch path.
 
 ### Low-risk
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { MapContainer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
+import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
-import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
+import MapSurface from '../map/MapSurface';
 import { BASE_LAYERS } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
@@ -347,28 +347,17 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         </button>
       )}
 
-      <MapContainer
+      <MapSurface
         center={hasValidCoords ? [destLat, destLng] : [origin.lat, origin.lng]}
         zoom={13}
         className="w-full h-full z-0"
-        zoomControl={false}
-        dragging={true}
-        scrollWheelZoom={true}
-        doubleClickZoom={true}
-        touchZoom={true}
-        ref={setMapInstance}
+        mapRef={setMapInstance}
+        zoomControl
+        baseStyle="VOYAGER"
+        showCadastral
+        showFireHalls
       >
         <MapInteractivity onPan={() => setUserPanned(true)} />
-        <ZoomControl position="bottomright" />
-
-        {/* Offline-First Navigation Basemap (Prioritizes local :8081 tile server with graceful online fallback) */}
-        <BaseMap style="VOYAGER" />
-
-        {/* Coquitlam Municipal Cadastral Layer */}
-        <CoquitlamOverlays visible={true} />
-
-        {/* Station Halls Layer */}
-        <StationsLayer visible={true} />
 
         {/* Live OSRM Emergency Response Routing Overlay */}
         {hasValidCoords && (
@@ -432,7 +421,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
             callKey={`${callKey}-${selectedCandidateIdx}`}
           />
         )}
-      </MapContainer>
+      </MapSurface>
     </div>
   );
 }

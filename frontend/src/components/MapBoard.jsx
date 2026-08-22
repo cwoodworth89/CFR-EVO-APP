@@ -1,13 +1,12 @@
 /* global __BUILD_DATE__ */
 // NOTE: For details on local GIS JSONs (hydrants.json, zones.json) and map layout config, see docs/gis_endpoints.md
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
-import { MapContainer, Polygon, CircleMarker, Polyline, Tooltip, Pane, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
-import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer, RailroadCrossingsLayer } from './MapLayers';
+import { RailroadCrossingsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
 import { Header } from './hud/Header';
 import { LeftSidebar } from './hud/LeftSidebar';
@@ -18,6 +17,7 @@ import RoadClosureMarker from './map/RoadClosureMarker';
 import ZonesLayer from './map/ZonesLayer';
 import MapViewControls from './map/MapViewControls';
 import TargetAddressCard from './hud/TargetAddressCard';
+import MapSurface from './map/MapSurface';
 import RoadClosuresLayer from './map/RoadClosuresLayer';
 import DispatchTargetLayer from './map/DispatchTargetLayer';
 import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
@@ -448,41 +448,21 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
 
         {/* Map Container Wrapper */}
         <div className="flex-grow h-full relative flex flex-col bg-slate-900 min-w-0">
-          <MapContainer 
-              center={COQUITLAM_CENTER} 
-              zoom={12} 
+          <MapSurface
+              center={COQUITLAM_CENTER}
+              zoom={12}
               minZoom={12}
               maxZoom={22}
               maxBounds={OPERATIONAL_BOUNDS}
               maxBoundsViscosity={1.0}
-              style={{ height: "100%", width: "100%" }} 
-              className="bg-slate-900" zoomControl={false} ref={setMap}
+              mapRef={setMap}
+              baseStyle={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels && currentZoom >= 16) ? "GREY" : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER" : "GREY"}
+              showCadastral={showLabels && !cadastralError}
+              onCadastralError={() => setCadastralError(true)}
+              showFireHalls={showFireHalls}
+              showHydrants={showHydrants}
           >
-            <BaseMap 
-              style={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels && currentZoom >= 16) ? "GREY" : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER" : "GREY"} 
-              useLabelsFallback={false} 
-            />
-            
-            <CoquitlamOverlays 
-                visible={showLabels && !cadastralError} 
-                onLoadError={() => setCadastralError(true)} 
-            />
-            
-            {/* Hydrants Visual GIS Overlay */}
-            <HydrantsLayer visible={showHydrants} />
-            
-            {/* Schools GIS Overlay */}
-            
-            {/* 2. DEFINE CUSTOM PANES */}
-            <Pane name="underlayPane" style={{ zIndex: 390 }} />
-            <Pane name="labelsPane" style={{ zIndex: 410 }} />
-            
-            {/* 3. LAYERS ASSIGNED TO PANES */}
-            
             <ZonesLayer zones={zones} visible={showZones} currentZoom={currentZoom} />
-
-            {/* HIDE STATIONS IN TRAINING MODE */}
-            {<StationsLayer visible={showFireHalls} />}
 
             {/* AT-GRADE RAILROAD CROSSINGS LAYER */}
             <RailroadCrossingsLayer visible={showRailroadCrossings} />
@@ -505,7 +485,7 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
                 onRouteCalculated={setRouteCoordinates}
               />
             )}
-          </MapContainer>
+          </MapSurface>
 
           <MapViewControls
             map={map}

@@ -4,7 +4,8 @@ import logging
 from cfr_dispatch.config.paths import VOCAB_DIR
 
 def load_vocabulary_file(filename: str) -> list[str]:
-    """Fallback: load from .txt file on disk."""
+    """Reads a seed .txt file. Used by import_gis_data.py step7 to populate
+    public.vocabulary on a fresh install -- NOT a runtime fallback."""
     filepath = VOCAB_DIR / filename
     items = []
     if os.path.exists(filepath):
@@ -28,7 +29,7 @@ def load_vocabulary_from_db(category: str) -> list[str]:
             ).fetchall()
             return [r[0] for r in rows]
     except Exception as e:
-        logging.warning(f"Failed to load vocabulary '{category}' from DB, falling back to file: {e}")
+        logging.error(f"Failed to load vocabulary '{category}' from public.vocabulary: {e}")
         return []
 
 def load_streets_from_db() -> list[str]:
@@ -43,20 +44,38 @@ def load_streets_from_db() -> list[str]:
             ).fetchall()
             return [r[0] for r in rows if r[0]]
     except Exception as e:
-        logging.warning(f"Failed to load streets from DB, falling back to file: {e}")
+        logging.error(f"Failed to load street names from public.road_names: {e}")
         return []
 
-# Load with DB-first, file fallback
-UNITS_VOCAB_RAW = load_vocabulary_from_db('unit') or load_vocabulary_file('units_vocabulary.txt')
-RESPONSE_TYPES = load_vocabulary_from_db('response_type') or load_vocabulary_file('response_types.txt')
-RADIO_CHANNELS = load_vocabulary_from_db('radio_channel') or load_vocabulary_file('radio_channels.txt')
-MAP_GRIDS = load_vocabulary_from_db('map_grid') or load_vocabulary_file('map_grid_numbers.txt')
-CALL_TYPES = sorted(load_vocabulary_from_db('call_type') or load_vocabulary_file('call_types.txt'), key=len, reverse=True)
-COQUITLAM_STREETS = (
-    load_streets_from_db()
-    or load_vocabulary_file('top_streets.txt')
-    or load_vocabulary_file('coquitlam_streets.txt')
-)
+# public.vocabulary and public.road_names are the single source of truth.
+#
+# There is deliberately NO runtime file fallback. The .txt files under
+# data/vocabulary/ are one-time SEED data for import_gis_data.py step7 on a fresh
+# install; they are not kept in sync afterwards. Falling back to them at runtime meant
+# a database that was merely slow to start would silently arm the parser with stale
+# vocabulary, and nothing would report it.
+#
+# If the vocabulary cannot be loaded, that is a hard failure. A parser running with an
+# empty call-type list labels every dispatch "Unknown Incident" -- a silent, plausible
+# wrong answer, which CLAUDE.md §6.1 exists to prevent.
+
+def _require(category: str, terms: list[str]) -> list[str]:
+    if not terms:
+        raise RuntimeError(
+            f"Vocabulary category '{category}' is empty or unreachable in public.vocabulary. "
+            f"Refusing to start with degraded vocabulary -- the parser would silently "
+            f"mislabel every dispatch. Check DATABASE_URL and that the cfr_postgres "
+            f"container is healthy, then re-run "
+            f"'python backend/scripts/import_gis_data.py' if the table needs seeding."
+        )
+    return terms
+
+UNITS_VOCAB_RAW = _require('unit', load_vocabulary_from_db('unit'))
+RESPONSE_TYPES = _require('response_type', load_vocabulary_from_db('response_type'))
+RADIO_CHANNELS = _require('radio_channel', load_vocabulary_from_db('radio_channel'))
+MAP_GRIDS = _require('map_grid', load_vocabulary_from_db('map_grid'))
+CALL_TYPES = sorted(_require('call_type', load_vocabulary_from_db('call_type')), key=len, reverse=True)
+COQUITLAM_STREETS = _require('road_names', load_streets_from_db())
 
 
 # Extract base unit types dynamically from units_vocabulary.txt (e.g. "Engine 1" -> "Engine")

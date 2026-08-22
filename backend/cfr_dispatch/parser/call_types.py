@@ -1,52 +1,24 @@
 # cfr_dispatch/parser/call_types.py
 # Incident/call type vocabulary loading and fuzzy matching.
 
-import os
 import logging
 import regex as re
 from typing import List
 from thefuzz import fuzz
 
-def load_call_types(filepath="call_types.txt") -> List[str]:
-    """Loads and returns sorted call types list from a text file, longest first."""
-    if filepath == "call_types.txt":
-        try:
-            from cfr_dispatch.config import CALL_TYPES as cfg_call_types
-            if cfg_call_types:
-                return cfg_call_types
-        except ImportError:
-            pass
+def load_call_types(filepath: str = None) -> List[str]:
+    """Returns the call-type vocabulary from public.vocabulary via the config layer.
 
-    call_types = []
-    
-    # Resolve default filepath relative to the parent directory of this module (agent/)
-    if filepath == "call_types.txt":
-        package_dir = os.path.dirname(os.path.abspath(__file__))
-        agent_dir = os.path.dirname(package_dir)
-        resolved_path = os.path.join(agent_dir, "data", "vocabulary", "call_types.txt")
-        if os.path.exists(resolved_path):
-            filepath = resolved_path
-        else:
-            resolved_path = os.path.join(agent_dir, "call_types.txt")
-            if os.path.exists(resolved_path):
-                filepath = resolved_path
+    `filepath` is accepted for backwards compatibility with existing callers and is
+    ignored; vocabulary has no runtime file fallback (see config/vocab.py).
+    """
+    from cfr_dispatch.config import CALL_TYPES as cfg_call_types
+    return cfg_call_types
 
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        call_types.append(line)
-            logging.info(f"Loaded {len(call_types)} call types from '{filepath}'")
-        except Exception as e:
-            logging.error(f"Error loading call types from '{filepath}': {e}")
-    else:
-        logging.warning(f"'{filepath}' not found. Fuzzy incident type matching will be limited.")
-    return sorted(call_types, key=len, reverse=True)
 
-# Global call types list initialized on module import
+# Module-level call-type vocabulary, resolved from public.vocabulary on import.
 CALL_TYPES = load_call_types()
+
 
 def match_incident_type(transcript: str, call_types: List[str]) -> str:
     """Matches transcript text to incident/call types using exact substring or fuzzy matching."""

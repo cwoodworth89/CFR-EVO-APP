@@ -25,68 +25,59 @@ def load_env():
                     env[parts[0].strip()] = parts[1].strip()
     return env
 
-def learn_new_incident_types(records, base_dir):
-    """
-    Scans retrieved verified records for 'verified_incident' values.
-    If any verified incident type is not in the local call_types.txt,
-    it automatically appends it to the file.
-    """
-    vocab_path = os.path.join(base_dir, "data", "vocabulary", "call_types.txt")
-    if not os.path.exists(vocab_path):
-        vocab_path = os.path.join(base_dir, "call_types.txt")
-        if not os.path.exists(vocab_path):
-            logging.warning(f"Could not find call_types.txt at {vocab_path}. Skipping dynamic vocabulary update.")
-            return
+def learn_new_incident_types(records, base_dir=None):
+    """Adds HITL-verified incident types not yet in public.vocabulary.
 
-    # 1. Read existing call types to avoid duplicates
-    existing_types = set()
-    try:
-        with open(vocab_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line_clean = f.name if hasattr(f, 'name') else '' # dummy line just to read
-                line_clean = line.strip()
-                if line_clean and not line_clean.startswith("#"):
-                    existing_types.add(line_clean.lower())
-    except Exception as e:
-        logging.error(f"Failed to read call_types.txt for duplicate check: {e}")
+    Previously this appended to data/vocabulary/call_types.txt. The parser reads
+    vocabulary from public.vocabulary, and nothing synced the file back into the
+    database, so every learned call type was stranded in a file the parser never read.
+    Writes now go to the database directly, where the parser and the Whisper bias
+    prompt both pick them up on next start.
+    """
+    import os
+    from sqlalchemy import create_engine, text
+
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        logging.error("DATABASE_URL is not set. Cannot record learned incident types.")
         return
 
-    # 2. Extract new types from records
-    new_types_to_append = []
-    for r in records:
-        v_inc = r.get("verified_incident")
-        if v_inc:
-            v_inc_clean = v_inc.strip()
-            if v_inc_clean and v_inc_clean.lower() not in existing_types:
-                new_types_to_append.append(v_inc_clean)
-                existing_types.add(v_inc_clean.lower())
+    try:
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            existing = {
+                r[0].strip().lower()
+                for r in conn.execute(text(
+                    "SELECT term FROM public.vocabulary WHERE category = 'call_type'"
+                )).fetchall() if r[0]
+            }
 
-    # 3. Append new types to the file
-    if new_types_to_append:
-        logging.info(f"Learned {len(new_types_to_append)} new incident types: {new_types_to_append}")
-        try:
-            # Check if we need to write a newline first
-            prepend_newline = False
-            if os.path.exists(vocab_path) and os.path.getsize(vocab_path) > 0:
-                with open(vocab_path, "r", encoding="utf-8") as f:
-                    f.seek(0, os.SEEK_END)
-                    # read last char
-                    try:
-                        f.seek(f.tell() - 1)
-                        if f.read(1) != "\n":
-                            prepend_newline = True
-                    except Exception:
-                        pass
-            
-            with open(vocab_path, "a", encoding="utf-8") as f:
-                if prepend_newline:
-                    f.write("\n")
-                f.write("\n# --- Dynamically Learned Call Types ---\n")
-                for nt in new_types_to_append:
-                    f.write(f"{nt}\n")
-            logging.info(f"Successfully appended learned call types to {vocab_path}.")
-        except Exception as e:
-            logging.error(f"Failed to append new call types to call_types.txt: {e}")
+            learned = []
+            for r in records:
+                v_inc = (r.get("verified_incident") or "").strip()
+                if v_inc and v_inc.lower() not in existing:
+                    learned.append(v_inc)
+                    existing.add(v_inc.lower())
+
+            if not learned:
+                logging.info("No new incident types to learn.")
+                return
+
+            for term in learned:
+                conn.execute(text("""
+                    INSERT INTO public.vocabulary
+                        (category, term, term_normalized, sort_order, source, is_active)
+                    VALUES ('call_type', :term, lower(:term), 999, 'hitl_learned', TRUE)
+                    ON CONFLICT DO NOTHING
+                """), {"term": term})
+
+            logging.info(
+                f"Learned {len(learned)} new incident types into public.vocabulary "
+                f"(source='hitl_learned'): {learned}"
+            )
+    except Exception as e:
+        logging.error(f"Failed to record learned incident types in public.vocabulary: {e}")
+
 
 def normalize_transcript_raw(verified_text: str) -> str:
     # 1. Convert everything to lowercase
@@ -130,7 +121,7 @@ def main():
 
     
     # 3b. Learn and append any new verified incident types
-    learn_new_incident_types(records, base_dir)
+    learn_new_incident_types(records)
     
     if not records:
         logging.info("No verified data to extract. Add some human-in-the-loop reviews in the UI first.")

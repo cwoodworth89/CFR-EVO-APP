@@ -65,9 +65,20 @@ export function useMqttListener({ onInsert, onUpdate, onDelete, enabled = true }
       client.on('message', (receivedTopic, message) => {
         if (receivedTopic !== topic) return;
         try {
-          const payload = JSON.parse(message.toString());
-          const eventType = payload.eventType || 'INSERT';
-          const record = payload.new || payload;
+          const envelope = JSON.parse(message.toString());
+
+          // The backend publishes { event, topic, timestamp, is_test, payload }
+          // (see notification_service/mqtt_broker.py). This previously read
+          // `payload.eventType` and `payload.new`, neither of which the backend sends,
+          // so `record` fell through to the envelope itself: record.target was
+          // undefined and every live dispatch reached the kiosk with lat/lng null.
+          // The Supabase-style `new`/`eventType` names are still accepted so older
+          // publishers keep working.
+          const eventType = envelope.event || envelope.eventType || 'INSERT';
+          const record = envelope.payload || envelope.new || envelope;
+          if (envelope.is_test !== undefined && record && record.is_test === undefined) {
+            record.is_test = envelope.is_test;
+          }
 
           console.log(`MQTT Received Event [${eventType}]:`, record);
           const { onInsert: handleInsert, onUpdate: handleUpdate, onDelete: handleDelete } = callbacksRef.current;

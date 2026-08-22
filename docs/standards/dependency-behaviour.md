@@ -86,6 +86,41 @@ this junction in" returns NULL for them.
 different containment queries across the codebase disagreed with each other. Now
 consolidated into `public.zone_for_point()`. Punch-list #13.
 
+### PostGIS 3.4 — `ST_ClusterDBSCAN` with `minpoints := 1` produces no noise
+
+```
+3 input points (2 close, 1 far), eps := 0.0002, minpoints := 1
+-> 3 rows, 3 non-null cluster ids, 0 NULL, 2 distinct clusters
+```
+
+With `minpoints := 1` every point is its own core point, so nothing is classified as noise
+and no row comes back with a NULL cluster id. `derive_intersections.py` relies on this: a
+junction represented by a single centreline node must still become a cluster of one rather
+than being dropped.
+
+Verified 2026-08-22. Had it returned NULL for isolated points, single-node junctions would
+have silently vanished from `public.intersections`.
+
+### PostGIS 3.4 — `ST_LineMerge` signals failure through geometry type
+
+```
+disjoint parts  -> ST_MultiLineString (2 parts)
+touching parts  -> ST_LineString      (1 part)
+```
+
+`ST_LineMerge` joins parts that share endpoints and leaves the rest alone, so a collection
+that cannot be merged into a single line comes back as a `MultiLineString`. The geometry
+type is therefore a reliable test for "did this merge".
+
+`derive_intersections.py` uses `ST_LineInterpolatePoint` (which requires a `LineString`)
+only when the merge yields `ST_LineString`, and falls back to `ST_PointOnSurface`
+otherwise. Verified 2026-08-22 — the discrimination is correct.
+
+This is also the shape of an earlier live defect: block interpolation had never worked
+because `public.roads.geom` is `MULTILINESTRING` and `ST_LineInterpolatePoint` requires
+`LINESTRING`, so step 3 of the geocoder cascade threw on every call and silently fell
+through to coarser steps.
+
 ## Unverified — assumptions still resting on names
 
 Recorded so they are visible (§7.5). None of these have been checked.
@@ -95,9 +130,3 @@ Recorded so they are visible (§7.5). None of these have been checked.
   has not been tuned.
 * **Silero VAD** (`vad_filter=True` in `transcriber.py`) — what it removes, and whether it
   can clip the leading tones or the first unit name of a dispatch.
-* **`ST_ClusterDBSCAN`** — behaviour with `minpoints := 1`, used in
-  `derive_intersections.py`. Assumed to mean "every point forms at least its own cluster";
-  not verified against PostGIS 3.4 source or docs.
-* **`ST_LineMerge`** on a `MultiLineString` with disjoint parts — used in the same script,
-  with a `ST_PointOnSurface` fallback that assumes merge failure is detectable by geometry
-  type.

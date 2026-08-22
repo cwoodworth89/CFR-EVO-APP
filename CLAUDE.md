@@ -155,4 +155,57 @@ plainly when something could not be verified and why.
 
 ---
 
-See also: [`PROJECT.md`](PROJECT.md) for architecture/feature/milestone tracking, [`README.md`](README.md) for setup instructions, and [`docs/agent_onboarding.md`](docs/agent_onboarding.md) for the full CLI command reference, SSH/audio (`XDG_RUNTIME_DIR`) heuristics, and the STT MLOps feedback pipeline.
+---
+
+## 7. Start From The Source Of Record
+
+§6.3 requires every operational constant to carry its provenance. This section is that
+rule moved upstream: **find the source before you write the value, not after.**
+
+Every serious defect found in the 2026-08-21/22 review was a missing or wrong source
+rather than a coding error — parcel proximity standing in for road topology, a fuzzy
+score standing in for a street vocabulary, an alphabetical list standing in for a token
+budget. None of them looked like bugs. They looked like working code.
+
+### 7.1 Before Implementing, Identify What Governs It
+Any change that produces an **operational value** or defines a **domain model** —
+routing, geocoding, spatial relationships, response-time figures, hydrant classification,
+dispatch parsing, STT tuning — starts by identifying the authority for it.
+
+The first stop is [`docs/standards/README.md`](docs/standards/README.md), the index of
+standards this project has obtained and what each one governs.
+
+This does **not** apply to ordinary engineering choices — file layout, naming, a helper
+extraction, a React hook. Those are judgement, not domain. The test is: *if this value or
+model is wrong, can crews tell?* If not, it needs a source.
+
+### 7.2 If Nothing Covers It, Stop And Say So
+If `docs/standards/` has no entry covering the decision, **raise it with the user before
+implementing.** State what you are about to decide, what would normally govern it, and
+that nothing in the project covers it.
+
+Do not improvise a model and carry on. Do not settle it with a "reasonable default". An
+invented domain model is the most expensive kind of defect here, because it is invisible:
+it produces plausible output indefinitely and nothing flags it.
+
+### 7.3 Recollection Is Not Provenance
+If you rely on a specification you know but that is **not** in `docs/standards/`, label it
+as recollection and verify it against something authoritative before it reaches code —
+the installed source of a pinned dependency counts, memory does not.
+
+This has already bitten: a "224 token" Whisper limit was asserted from memory during the
+review. It happened to be right, confirmed afterwards against the installed
+`faster_whisper/transcribe.py`, but it was stated as fact before it was checked.
+
+### 7.4 Cite The Clause, Not The Document
+"Per NFPA 1710" is not provenance; `NFPA 1710 s4.1.2.1` is. A citation that cannot be
+looked up is decoration. Where a standard has revisions, record which one.
+
+### 7.5 Absence Is Recorded, Not Silent
+When a standard *should* exist for something and the project does not have it, it belongs
+in `docs/standards/README.md` as an open gap. An unknown source is tracked the same way an
+unknown value is (§6.1): visibly.
+
+
+See also: [`docs/standards/README.md`](docs/standards/README.md) for the standards index (§7),
+[`PROJECT.md`](PROJECT.md) for architecture/feature/milestone tracking, [`README.md`](README.md) for setup instructions, and [`docs/agent_onboarding.md`](docs/agent_onboarding.md) for the full CLI command reference, SSH/audio (`XDG_RUNTIME_DIR`) heuristics, and the STT MLOps feedback pipeline.

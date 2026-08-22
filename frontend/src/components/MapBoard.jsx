@@ -13,9 +13,12 @@ import { Header } from './hud/Header';
 import { LeftSidebar } from './hud/LeftSidebar';
 import { RightSidebar } from './hud/RightSidebar';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
-import { targetIcon, createSoftZoneNumberIcon } from './map/mapIcons';
-import { getZoneCentroid, getAlphaSegment, enrichAddressWithBuilding } from './map/mapGeometry';
+import { getAlphaSegment, enrichAddressWithBuilding } from './map/mapGeometry';
 import RoadClosureMarker from './map/RoadClosureMarker';
+import ZonesLayer from './map/ZonesLayer';
+import MapViewControls from './map/MapViewControls';
+import RoadClosuresLayer from './map/RoadClosuresLayer';
+import DispatchTargetLayer from './map/DispatchTargetLayer';
 import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
 import { useRoadClosures } from '../hooks/useRoadClosures';
 
@@ -431,25 +434,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
       setRightSidebarOpen(false);
   }, [onLaunchKiosk, applyModeDefaults]);
 
-  const getZoneStyle = (zone) => {
-    // Color-code by fire hall for explore/live modes
-    const stationName = zone.station || "";
-    let color = "#475569"; // default slate gray
-    
-    if (stationName.includes("Hall 1") || zone.unit_id === "E1") color = "#f43f5e";      // Soft Crimson Red for Hall 1
-    else if (stationName.includes("Hall 2") || zone.unit_id === "E2") color = "#3b82f6"; // Soft Royal Blue for Hall 2
-    else if (stationName.includes("Hall 3") || zone.unit_id === "E3" || zone.unit_id === "Q5") color = "#10b981"; // Soft Emerald Green for Hall 3
-    else if (stationName.includes("Hall 4") || zone.unit_id === "E4") color = "#a855f7"; // Soft Purple for Hall 4
-    
-    return {
-      color: color,
-      fillColor: color,
-      fillOpacity: 0.10,
-      weight: 1.8,
-      dashArray: "4 4"
-    };
-  };
- 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
       
@@ -525,30 +509,7 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
             
             {/* 3. LAYERS ASSIGNED TO PANES */}
             
-            {/* Soft Multi-Color Vector Response Zones Layer (Color-coded by Fire Hall - OFF at zoom >= 16) */}
-            {(showZones) && currentZoom < 16 && zones.map((zone) => (
-              <Polygon 
-                  key={zone.zone_id} 
-                  positions={zone.geometry.coordinates[0].map(c => [c[1], c[0]])} 
-                  pathOptions={getZoneStyle(zone)} 
-                  pane="underlayPane" 
-              />
-            ))}
-
-            {/* Centered Soft Black Zone Number Labels (ON at zoom 13/14/15 when showZones is ON, OFF at zoom >= 16) */}
-            {(showZones) && currentZoom >= 13 && currentZoom < 16 && zones.map((zone) => {
-              const center = getZoneCentroid(zone);
-              if (!center) return null;
-              return (
-                <Marker 
-                  key={`zone-num-${zone.zone_id}`}
-                  position={center}
-                  icon={createSoftZoneNumberIcon(zone.zone_id)}
-                  interactive={false}
-                  pane="labelsPane"
-                />
-              );
-            })}
+            <ZonesLayer zones={zones} visible={showZones} currentZoom={currentZoom} />
 
             {/* HIDE STATIONS IN TRAINING MODE */}
             {<StationsLayer visible={showFireHalls} />}
@@ -556,164 +517,37 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
             {/* AT-GRADE RAILROAD CROSSINGS LAYER */}
             <RailroadCrossingsLayer visible={showRailroadCrossings} />
             
-            {/* ROAD CLOSURES LAYER */}
-            {showRoadClosures && activeClosures.map((closure, i) => (
-              <RoadClosureMarker 
-                key={closure.id || i}
-                closure={closure}
-                isSelected={selectedClosure !== null && selectedClosure.id === closure.id}
-                onSelect={setSelectedClosure}
+            <RoadClosuresLayer
+              closures={activeClosures}
+              visible={showRoadClosures}
+              selectedClosure={selectedClosure}
+              onSelect={setSelectedClosure}
+            />
+
+            {appMode === "EXPLORE" && (
+              <DispatchTargetLayer
+                targetAddress={targetAddress}
+                targetPolygon={targetPolygon}
+                targetCoords={targetCoords}
+                targetMarkerRef={targetMarkerRef}
+                nearestHydrants={nearestHydrants}
+                originStation={STATIONS[homeHall]}
+                onRouteCalculated={setRouteCoordinates}
               />
-            ))}
-
-            {/* Active Target Address Marker & Suggested Route Overlay */}
-            {appMode === "EXPLORE" && targetAddress && (
-              <>
-                {/* Street section: a "<street> and <street>" dispatch has no point
-                    location, so the stretch of road inside the announced map grid is
-                    highlighted instead. Amber, thick and dashed so it reads as an area
-                    of search rather than as a route line or a parcel outline. */}
-                {targetAddress.location_type === 'street_section'
-                  && Array.isArray(targetAddress.segment)
-                  && targetAddress.segment.map((line, i) => (
-                    <Polyline
-                      key={`street-section-${i}`}
-                      positions={line.map(([lng, lat]) => [lat, lng])}
-                      pathOptions={{
-                        color: '#f59e0b',
-                        weight: 10,
-                        opacity: 0.75,
-                        dashArray: '14,10',
-                        lineCap: 'round'
-                      }}
-                    />
-                  ))}
-                {targetPolygon && (
-                  <Polygon 
-                    positions={targetPolygon} 
-                    pathOptions={{ 
-                      color: targetAddress.buildingName ? '#f59e0b' : '#0284c7', 
-                      fillColor: targetAddress.buildingName ? '#f59e0b' : '#38bdf8', 
-                      fillOpacity: targetAddress.buildingName ? 0.08 : 0.15, 
-                      weight: 2,
-                      dashArray: '4,4'
-                    }}
-                  />
-                )}
-                {targetAddress.buildingName && (
-                  <CircleMarker
-                    center={[targetAddress.lat, targetAddress.lng]}
-                    radius={20}
-                    pathOptions={{
-                      color: '#f59e0b',
-                      fillColor: '#38bdf8',
-                      fillOpacity: 0.25,
-                      weight: 2.5,
-                      className: 'animate-pulse'
-                    }}
-                  />
-                )}
-                <Marker 
-                  ref={targetMarkerRef}
-                  position={[targetAddress.lat, targetAddress.lng]} 
-                  icon={targetIcon}
-                />
-
-                {/* Highlight Top 3 closest hydrants (No tracer line) */}
-                {nearestHydrants.map((hyd, idx) => {
-                  const isPrimary = idx === 0;
-                  return (
-                    <CircleMarker 
-                      key={`${hyd.gisId}-${idx}`}
-                      center={[hyd.lat, hyd.lng]} 
-                      radius={isPrimary ? 16 : 12} 
-                      pathOptions={{ 
-                        color: isPrimary ? '#06b6d4' : '#c084fc', // Cyan for closest, Lavender for others
-                        fillColor: isPrimary ? '#22d3ee' : '#e9d5ff', 
-                        fillOpacity: isPrimary ? 0.15 : 0.1, 
-                        weight: isPrimary ? 2 : 1.5,
-                        className: isPrimary ? 'animate-pulse' : '' 
-                      }} 
-                    >
-                      <Tooltip direction="top" className="font-bold text-xs bg-slate-950 text-white border border-slate-800 p-2 shadow-xl">
-                        <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
-                          <span className={`text-[9px] uppercase font-mono tracking-wider ${isPrimary ? 'text-cyan-400' : 'text-purple-400'}`}>
-                            {isPrimary ? 'NEAREST HYDRANT' : `HYDRANT OPTION #${idx + 1}`}
-                          </span>
-                          <span className="text-white text-sm font-bold">{hyd.gisId}</span>
-                          <span className="text-slate-400 text-[10px] mt-1 font-mono">Distance: {hyd.distance}m</span>
-                          {hyd.flowClass && (
-                            <span className="text-sky-400 text-xs font-semibold">Flow Class: {hyd.flowClass}</span>
-                          )}
-                        </div>
-                      </Tooltip>
-                    </CircleMarker>
-                  );
-                })}
-
-                {STATIONS[homeHall] && (
-                  <RoutingOverlay 
-                    from={STATIONS[homeHall]} 
-                    to={targetCoords} 
-                    onRouteCalculated={setRouteCoordinates}
-                  />
-                )}
-              </>
             )}
           </MapContainer>
 
-          {/* Top-Right Floating Controls: Zoom Level & Quick Reset View Button */}
-          <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-2">
-            <div className="pointer-events-none select-none px-2.5 py-1 rounded-lg bg-slate-950/90 border border-slate-800/80 text-[10px] font-mono text-slate-400 backdrop-blur-md shadow-lg flex items-center gap-2">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">ZOOM</span>
-              <span className="font-extrabold text-amber-400 font-mono text-xs">
-                {typeof currentZoom === 'number' ? currentZoom.toFixed(1) : currentZoom}
-              </span>
-            </div>
-
-            {isOffDefault && (
-              <button
-                onClick={() => {
-                  setUserPanned(false);
-                  if (map) {
-                    map.flyTo(COQUITLAM_CENTER, 12, { animate: true, duration: 0.8 });
-                  }
-                }}
-                title="Reset view to Coquitlam City Center (Zoom 12)"
-                className="px-3 py-1.5 rounded-lg bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 group animate-in fade-in slide-in-from-top-1 duration-200"
-              >
-                <svg className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span>Reset View</span>
-              </button>
-            )}
-          </div>
-
-          {/* Floating Re-Center Button when user pans or zooms */}
-          {userPanned && targetAddress && (
-            <button
-              onClick={() => {
-                setUserPanned(false);
-                if (map && targetCoords && STATIONS[homeHall]) {
-                  map.fitBounds([STATIONS[homeHall], targetCoords], {
-                    paddingTopLeft: [340, 80],
-                    paddingBottomRight: [400, 80],
-                    animate: true
-                  });
-                }
-              }}
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1100] bg-slate-900/95 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-4.5 py-2.5 rounded-full border border-sky-500/60 shadow-2xl flex items-center gap-2 transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-3 duration-200"
-            >
-              <span className="animate-pulse">🎯</span>
-              <span>RE-CENTER ON ROUTE</span>
-            </button>
-          )}
-
-          {/* APPLICATION VERSION & COMPILE TIMESTAMP WATERMARK */}
-          <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
-            CFR EVO APP | BUILD: {buildTime} | LICENSE: POLYFORM NONCOMMERCIAL 1.0.0
-          </div>
+          <MapViewControls
+            map={map}
+            currentZoom={currentZoom}
+            isOffDefault={isOffDefault}
+            userPanned={userPanned}
+            setUserPanned={setUserPanned}
+            targetAddress={targetAddress}
+            targetCoords={targetCoords}
+            homeStation={STATIONS[homeHall]}
+            buildTime={buildTime}
+          />
         </div>
 
         {/* Right 1/3 Spatial Inspection Stack Panel (Target Address, 3D Satellite, Street View) */}

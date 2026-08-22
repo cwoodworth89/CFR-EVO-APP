@@ -8,6 +8,11 @@ The system is offline-first, so obtained standards are **vendored into this dire
 with their revision recorded — not linked. A link is not available at 3am on a kiosk with
 no WAN.
 
+> **This file covers domain standards.** For what the libraries we depend on actually do —
+> as opposed to what their API names suggest — see
+> [`dependency-behaviour.md`](dependency-behaviour.md). That is where the majority of this
+> project's real defects have come from, and it is already populated.
+
 ## How to use this
 
 1. Find the row covering what you are about to change.

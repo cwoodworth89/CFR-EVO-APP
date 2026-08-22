@@ -197,6 +197,28 @@ This has already bitten: a "224 token" Whisper limit was asserted from memory du
 review. It happened to be right, confirmed afterwards against the installed
 `faster_whisper/transcribe.py`, but it was stated as fact before it was checked.
 
+### 7.3a The API Name Is Not The Contract
+Most of what governs this system is not a published standard at all — it is the behaviour
+of the libraries it runs on. Those defects are the more dangerous kind, because a missing
+standard *feels* like a gap while a library assumption feels like knowledge.
+
+Every library defect found so far had the same shape: **the name described the intent, not
+the behaviour.**
+
+| Called | The name implies | It actually does |
+|:--|:--|:--|
+| `hotwords=` | these words are boosted | keeps the first 223 tokens, discards the rest silently |
+| `token_set_ratio` | a similarity ratio | returns **100** when one token set is a subset of the other |
+| `ST_Contains` | the point is in the polygon | excludes the boundary, so a junction on a zone edge is not contained |
+
+Before an operational decision rests on a library function's behaviour, verify it against
+the installed source of the pinned version, and record it in
+[`docs/standards/dependency-behaviour.md`](docs/standards/dependency-behaviour.md).
+
+The check is cheap. `token_set_ratio('LOUGHEED HWY', 'ALDERSON AVE & LOUGHEED HWY')`
+returns `100`; running that took ten seconds and would have prevented a 4.3 km routing
+error.
+
 ### 7.4 Cite The Clause, Not The Document
 "Per NFPA 1710" is not provenance; `NFPA 1710 s4.1.2.1` is. A citation that cannot be
 looked up is decoration. Where a standard has revisions, record which one.
@@ -207,5 +229,6 @@ in `docs/standards/README.md` as an open gap. An unknown source is tracked the s
 unknown value is (§6.1): visibly.
 
 
-See also: [`docs/standards/README.md`](docs/standards/README.md) for the standards index (§7),
+See also: [`docs/standards/README.md`](docs/standards/README.md) for the standards index and
+[`docs/standards/dependency-behaviour.md`](docs/standards/dependency-behaviour.md) for verified library semantics (§7),
 [`PROJECT.md`](PROJECT.md) for architecture/feature/milestone tracking, [`README.md`](README.md) for setup instructions, and [`docs/agent_onboarding.md`](docs/agent_onboarding.md) for the full CLI command reference, SSH/audio (`XDG_RUNTIME_DIR`) heuristics, and the STT MLOps feedback pipeline.

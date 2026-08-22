@@ -61,13 +61,18 @@ class TestFaultInjection(unittest.TestCase):
         self.assertIsInstance(candidates, list)
 
     def test_04_unknown_address_fallback_safety(self):
-        """Verify unresolvable address falls through gracefully."""
-        from cfr_dispatch.config import ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH
-        if os.path.exists(ADDRESS_SHAPEFILE_PATH) and os.path.exists(ZONES_SHAPEFILE_PATH):
-            validator = CoquitlamDataValidator(ADDRESS_SHAPEFILE_PATH, ZONES_SHAPEFILE_PATH)
-            result = validator.local_geocode("9999 NonExistent Fake Street")
-            # Should return None coordinates or flag verification without crashing
-            self.assertTrue(result is None or result.get("lat") is None)
+        """Verify an unresolvable address returns nothing rather than a guess."""
+        # Was constructed from ADDRESS_SHAPEFILE_PATH / ZONES_SHAPEFILE_PATH, both
+        # removed in the Phase A PostGIS migration -- the import raised ImportError.
+        # The validator is database-backed now. The assertion matters more than it did
+        # when this was written: under CLAUDE.md 6.1 an unresolvable address MUST
+        # produce no coordinate, because a plausible wrong one routes apparatus to it.
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            self.skipTest('DATABASE_URL not set; this check needs the PostGIS database')
+        validator = CoquitlamDataValidator(database_url=database_url)
+        result = validator.local_geocode("9999 NonExistent Fake Street")
+        self.assertTrue(result is None or result.get("lat") is None)
 
     def test_05_network_disconnect_resilience(self):
         """Verify network connectivity checker flags WAN outage."""

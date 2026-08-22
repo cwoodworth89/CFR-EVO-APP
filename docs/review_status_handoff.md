@@ -161,6 +161,7 @@ real test.
 | **Remaining decomposition** | ⏳ `MapBoard.jsx`, `phase2.py`, review surfaces, `MapLayers.jsx` |
 | Punch-list reconciliation | ✅ done (3 closed, 11 open) |
 | `MapBoard.jsx` coordinate fabrications | ✅ fixed (both) |
+| Test suite repair (punch-list #8) | ✅ done — 82 passed, 1 xfailed, 0 failed |
 | **Final phase: hardening & review** | ⏳ not started |
 
 ---
@@ -172,10 +173,6 @@ real test.
 1. **Helper extraction for `react-refresh`** — move non-component exports out of
    `MapLayers.jsx`, `ActiveAlertBanner.jsx`, `ReviewTable.jsx`, `VerificationSidebar.jsx`.
    Mechanical; clears 14 of the 22 remaining lint issues.
-2. **Fix the stale tests** (punch-list #8). One test queries the dropped
-   `public.landmarks` and aborts the transaction, cascading into ~6 others. Fixing that
-   one likely clears most of the 11.
-
 ### Decomposition still open
 
 3. `MapBoard.jsx` — 1155 lines, 52 hooks, densest state container left.
@@ -224,7 +221,12 @@ real test.
 * Running the suite on the kiosk needs:
   `set -a && . ./backend/.env && set +a && export XDG_RUNTIME_DIR=/run/user/1000 && PYTHONPATH=services/gis/src:backend`
 * `DATABASE_URL` is not in `backend/.env`; take it from the `cfr_api` container and swap
-  `@postgres:` for `@localhost:` when running host-side scripts.
+  `@postgres:` for `@localhost:` when running host-side scripts. **The test suite needs it
+  too** — without it `test_fault_injection::test_04` silently *skips* instead of passing:
+  ```bash
+  export DATABASE_URL=$(docker exec cfr_api printenv DATABASE_URL | sed 's/@postgres:/@localhost:/')
+  ```
+* There is no `python` on the kiosk PATH — the venv interpreter is `.venv/bin/python`.
 * **A schema change needs `docker compose up -d --build api`, not `docker restart`.**
   A restart reuses the old image — that is how a dispatch was lost this session.
 * Do not run state-changing git commands on the kiosk.

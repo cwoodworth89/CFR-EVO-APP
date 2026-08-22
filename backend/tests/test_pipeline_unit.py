@@ -9,7 +9,13 @@ from cfr_dispatch.config.models import DispatchData
 
 class MockValidator:
     """Mock GIS validator for fast, offline unit testing."""
-    def local_geocode(self, address: str):
+    def local_geocode(self, parsed_address: str, target_map_grid=None,
+                      cross_street_1: str = None, cross_street_2: str = None):
+        # Signature must track gis_service.geocoder.CoquitlamDataValidator.local_geocode.
+        # It gained target_map_grid in the geocoder 2.0 work and the cross_street_*
+        # arguments with cross-road narrowing; this mock kept the old one-argument form
+        # and the real call site raised TypeError.
+        address = parsed_address
         if "Sandstone" in address:
             return {
                 "address": "2648 Sandstone Cres, Coquitlam, BC",

@@ -18,7 +18,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > same pass.
 >
 > Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**,
-> **#22**, **#27**, **#29**.
+> **#22**, **#29**.
 >
 > **Found from live operation 2026-08-22**, none of them reachable from the test corpus —
 > all three came from one operator screenshot of a real dispatch: **#24** (an invented
@@ -1149,7 +1149,31 @@ takes seconds and must not stall PortAudio capture, and a pipeline crash must no
 audio listener down with it. These items are about how that separation is *implemented*.
 
 ### 27. The worker process is unsupervised
-> **Status**: ⚠️ **Open — found 2026-08-22.**
+> **Status**: ✅ **Closed 2026-08-22.** `cfr_dispatch/worker_supervisor.py` polls
+> `is_alive()` every 15 s from a daemon thread and restarts the worker, logging every
+> restart at CRITICAL.
+>
+> **Crash loops are handled rather than ignored.** Restarting forever buries the cause and
+> looks like progress, so restarts are counted in a rolling window (5 in 600 s). Past the
+> ceiling the supervisor stops restarting and **keeps reporting on every check** — going
+> quiet after giving up would recreate the silent-dead-worker failure this exists to
+> prevent.
+>
+> Verified with a worker that exits immediately:
+>
+> ```
+> CRITICAL ProbeWorker died (exitcode 9). Restarting -- restart 1 of 3 ...
+> CRITICAL ProbeWorker died (exitcode 9). Restarting -- restart 2 of 3 ...
+> CRITICAL ProbeWorker died (exitcode 9). Restarting -- restart 3 of 3 ...
+> CRITICAL ... restarted 3 times in 60 seconds. Refusing to restart again ...
+> CRITICAL ProbeWorker is DEAD and the supervisor has stopped restarting it ...   (repeats)
+> ```
+>
+> and a healthy worker left untouched (same pid, 0 restarts).
+>
+> Original finding follows.
+>
+> ⚠️ **Open — found 2026-08-22.**
 
 `orchestration.py`:
 

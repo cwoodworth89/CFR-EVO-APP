@@ -8,6 +8,7 @@ import { useRoadClosures } from '../../hooks/useRoadClosures';
 import { BASE_LAYERS } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
+import ApproximateLocationBanner from './ApproximateLocationBanner';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 function AutoFitBounds({ origin, destination, userPanned, callKey }) {
@@ -256,6 +257,15 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       {activeCall?.location_type === 'street_section' && (
         <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
           <StreetSectionBanner activeCall={activeCall} />
+        </div>
+      )}
+
+      {/* Amber warning for a location the geocoder could only place approximately.
+          Distinct from the unresolved case below: coordinates exist and routing runs,
+          but the pin is a substitution and the crew must be told so. */}
+      {hasValidCoords && activeCall?.resolution_note && (
+        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
+          <ApproximateLocationBanner activeCall={activeCall} />
         </div>
       )}
 

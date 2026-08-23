@@ -69,8 +69,31 @@ export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
     length_m: target.length_m ?? null,
     street: target.street || null,
     resolution_note: target.resolution_note || null,
+    // The address as dispatched, when the resolver routed somewhere else. Paired with
+    // resolution_note by the substituting resolvers so the amber banner can show both
+    // what was called in and where the pin actually is.
+    requested_address: target.requested_address || null,
 
     priority_code: record.priority_code,
+    // Confidence cutoff of 90 — measured on this system 2026-08-23 (CLAUDE.md §6.3 tier 3),
+    // NOT a standard. It was inherited without provenance; this analysis was run to decide
+    // whether to keep it, and it is RETAINED PROVISIONALLY pending more HITL reviews.
+    //
+    // Against 202 reviewed calls, comparing the system address to the operator's
+    // verified_address after normalising suffixes, unit numbers and "(street centroid)"
+    // annotations — i.e. "would the crew have reached the right address":
+    //
+    //   score 0     10 reviewed   100% wrong      (hard resolution failures)
+    //   score 45-78 20 reviewed    60% wrong
+    //   score 81-89 15 reviewed     0% wrong
+    //   score 91-96  9 reviewed     0% wrong
+    //   score 100   148 reviewed    8% wrong
+    //
+    // The break is at 80, not 90 — 81-89 was flawless on address. A cut at 90 is therefore
+    // CONSERVATIVE (it flags a band that has not actually failed) rather than wrong, which is
+    // the safe direction for a warning. Not moved to 80 because 81-89 has only 15 reviewed
+    // calls, and because score 100 still misses 8%, so confidence is not a complete proxy for
+    // geocode correctness. Tracked for revision in punch-list #32.
     verify_location: record.verify_location
       ?? (record.confidence_score ? record.confidence_score >= 90 : true),
     map_grid: target.verified_map_grid || target.map_grid || '',

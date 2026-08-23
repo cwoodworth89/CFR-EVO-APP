@@ -125,7 +125,30 @@ def process_phase_1_check(
             metrics["gis_ms"] = t_gis.elapsed_ms
 
             if db_payload:
-                # 5. Broadcast to local FastAPI & Mosquitto MQTT & Ntfy
+                target = db_payload.get("target", {})
+                best_addr = db_payload.get("address") or target.get("address", "Unknown Location")
+
+                # 5. Record the session BEFORE broadcasting.
+                #
+                # These were the other way round. Any exception in the broadcast block left
+                # an INSERT published with no phase 1 session stored, and phase 2 then found
+                # nothing, took the "Phase 1 was skipped" branch and published a SECOND
+                # INSERT -- a duplicate dispatch on the kiosk (punch-list #25, #29).
+                #
+                # Recording first makes an untracked INSERT impossible: if this fails, the
+                # broadcast below still happens and phase 2 still runs, but the failure is
+                # logged loudly rather than surfacing later as a mystery duplicate.
+                session_manager.record_phase_1_success(
+                    dispatch_id=dispatch_id,
+                    buffer_len=len(buffer),
+                    raw_transcript=raw_transcript,
+                    transcript=transcript,
+                    candidates=all_candidates,
+                    units=responding_units,
+                    target=target or {"address": best_addr}
+                )
+
+                # 6. Broadcast to local FastAPI & Mosquitto MQTT & Ntfy
                 with PipelineTimer("broadcast") as t_bcast:
                     save_dispatch_record(db_payload)
                     if send_mqtt:
@@ -136,25 +159,12 @@ def process_phase_1_check(
 
                 total_tta_s = (metrics["dsp_ms"] + metrics["stt_ms"] + metrics["gis_ms"] + metrics["bcast_ms"]) / 1000.0
                 
-                target = db_payload.get("target", {})
-                best_addr = db_payload.get("address") or target.get("address", "Unknown Location")
                 conf = db_payload.get("confidence_score", 0.0)
 
                 logging.info(
                     f"[METRICS] [{dispatch_id}] Phase 1 TTA: {total_tta_s:.2f}s "
                     f"(DSP: {metrics['dsp_ms']:.0f}ms, STT: {metrics['stt_ms']:.0f}ms, GIS: {metrics['gis_ms']:.0f}ms, MQTT: {metrics['bcast_ms']:.0f}ms) | "
                     f"Units: {responding_units} | Addr: '{best_addr}' ({conf:.0f}% conf)"
-                )
-
-                # Save session state in worker manager
-                session_manager.record_phase_1_success(
-                    dispatch_id=dispatch_id,
-                    buffer_len=len(buffer),
-                    raw_transcript=raw_transcript,
-                    transcript=transcript,
-                    candidates=all_candidates,
-                    units=responding_units,
-                    target=target or {"address": best_addr}
                 )
 
                 return Phase1Result(

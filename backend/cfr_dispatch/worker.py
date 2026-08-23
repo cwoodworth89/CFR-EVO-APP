@@ -12,33 +12,34 @@ from cfr_dispatch.stt import get_whisper_model
 from cfr_dispatch.pipeline import process_phase_1_check, process_phase_2_finalize
 from gis_service import CoquitlamDataValidator
 from cfr_dispatch.logging_setup import setup_logging
+from cfr_dispatch.session_store import PostgresSessionStore
 
 class DispatchSessionManager:
+    """Two-phase dispatch session state.
+
+    Phase 1 state is persisted in PostgreSQL (`public.dispatch_sessions`) rather than held
+    in this process. It used to be a plain dict, so a worker crash lost every in-flight
+    dispatch's phase 1 context -- and phase 2, finding nothing, took the "Phase 1 was
+    skipped" branch and published a second INSERT instead of an UPDATE, putting a duplicate
+    on the kiosk (punch-list #25, #29).
+
+    The public interface is unchanged, so phase 1 and phase 2 call it exactly as before.
+
+    Execution profiles stay in memory deliberately: they are rolling metrics for this
+    process, not dispatch state, and nothing reads them after a restart.
     """
-    Thread-safe / process-local session state manager for two-phase dispatch processing.
-    Tracks preliminary Phase 1 trigger points and stores rolling execution profiles.
-    """
+
     def __init__(self, max_history: int = 50, session_ttl_seconds: int = 600):
-        self._triggered_phase_1_ids = set()
-        self._phase_1_trigger_lengths = {}
-        self._phase_1_candidates = {}
-        self._session_timestamps = {}
+        self._store = PostgresSessionStore(ttl_seconds=session_ttl_seconds)
         self._session_ttl_s = session_ttl_seconds
         self._recent_profiles = deque(maxlen=max_history)
 
     def _evict_stale_sessions(self):
-        """Removes session entries that have exceeded TTL without Phase 2 finalization."""
-        now = time.time()
-        stale_ids = [
-            sid for sid, ts in self._session_timestamps.items()
-            if now - ts > self._session_ttl_s
-        ]
-        for sid in stale_ids:
-            self.cleanup_session(sid)
+        self._store.evict_stale()
 
     def is_phase_1_triggered(self, dispatch_id: str) -> bool:
         self._evict_stale_sessions()
-        return dispatch_id in self._triggered_phase_1_ids
+        return self._store.is_triggered(dispatch_id)
 
     def record_phase_1_success(
         self,
@@ -51,25 +52,21 @@ class DispatchSessionManager:
         target: dict
     ):
         self._evict_stale_sessions()
-        self._triggered_phase_1_ids.add(dispatch_id)
-        self._phase_1_trigger_lengths[dispatch_id] = buffer_len
-        self._session_timestamps[dispatch_id] = time.time()
-        self._phase_1_candidates[dispatch_id] = {
-            "raw_transcript": raw_transcript,
-            "transcript": transcript,
-            "candidates": candidates,
-            "units": units,
-            "target": target
-        }
+        self._store.record_phase_1(
+            dispatch_id=dispatch_id,
+            buffer_len=buffer_len,
+            raw_transcript=raw_transcript,
+            transcript=transcript,
+            candidates=candidates,
+            units=units,
+            target=target,
+        )
 
     def get_phase_1_data(self, dispatch_id: str) -> dict | None:
-        return self._phase_1_candidates.get(dispatch_id)
+        return self._store.get_phase_1(dispatch_id)
 
     def cleanup_session(self, dispatch_id: str):
-        self._triggered_phase_1_ids.discard(dispatch_id)
-        self._phase_1_trigger_lengths.pop(dispatch_id, None)
-        self._phase_1_candidates.pop(dispatch_id, None)
-        self._session_timestamps.pop(dispatch_id, None)
+        self._store.cleanup(dispatch_id)
 
     def get_recent_profiles(self) -> list:
         return list(self._recent_profiles)

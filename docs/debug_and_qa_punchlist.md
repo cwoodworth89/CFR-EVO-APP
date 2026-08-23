@@ -1020,10 +1020,32 @@ Queued — Tap to View Next"* banner. Tapping it cleared the banner and appeared
 nothing else.
 
 `useKioskQueue.handleInsert` had **no de-duplication**: it queued any INSERT arriving while
-a call was active, without ever comparing `dispatch_id`. Phase 2 legitimately re-broadcasts
-a corrected payload once the full recording has been parsed, so that correction queued as
-though it were a second incident. Tapping "view next" activated a near-identical copy of
-the call already on screen, which reads as nothing happening.
+a call was active, without ever comparing `dispatch_id`. Tapping "view next" activated a
+near-identical copy of the call already on screen, which reads as nothing happening.
+
+> [!IMPORTANT]
+> **Root cause corrected 2026-08-22.** This item first attributed the duplicate to phase 2
+> re-broadcasting a corrected payload as an INSERT. **That was wrong**, and the broadcast
+> log — readable only after #26 restored the pipeline's logging — settles it. For
+> `DISP-2026-F33FA3` the backend published exactly one INSERT and one UPDATE:
+>
+> ```
+> 15:12:00  Published INSERT event to Mosquitto MQTT   (phase 1)
+> 15:12:20  Published UPDATE event to Mosquitto MQTT   (phase 2, Match=True, Corrected=False)
+> ```
+>
+> The operator still saw the queued-call banner, and the reporter confirmed it appears
+> **immediately**, not after a correction. The cause is **MQTT QoS 1 redelivery**: both
+> publish and subscribe use `qos=1`, which guarantees *at-least-once* delivery. Duplicates
+> are part of that contract — the protocol carries a DUP flag for exactly this — and the
+> subscriber is required to be idempotent. Exactly-once is QoS 2.
+>
+> The de-duplication below is therefore **not a workaround for a backend defect**. The
+> backend is correct; this is the idempotency QoS 1 requires of every subscriber. See
+> `docs/standards/dependency-behaviour.md`.
+>
+> A duplicate delivery and a phase 2 correction produce the *same visible symptom*, which
+> is why this could not be settled from the symptom alone.
 
 The two payloads genuinely differed. For `DISP-2026-282647` the screen showed **map grid
 61** while the stored record has **grid 68** — the operator was reading uncorrected phase 1

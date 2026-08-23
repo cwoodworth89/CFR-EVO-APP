@@ -6,6 +6,7 @@ import multiprocessing
 
 from cfr_dispatch.logging_setup import setup_logging
 from cfr_dispatch.worker import background_worker_loop, get_shared_validator
+from cfr_dispatch.worker_supervisor import WorkerSupervisor
 from cfr_dispatch.audio_listener import run_audio_listener_loop
 from cfr_dispatch.pipeline import (
     build_dispatch_payload,
@@ -27,14 +28,22 @@ def run_dispatch_system():
     
     dispatch_queue = multiprocessing.Queue(maxsize=10)
     logging.info("Starting background worker process...")
-    worker_process = multiprocessing.Process(target=background_worker_loop, args=(dispatch_queue,), daemon=True)
-    worker_process.start()
+
+    # Supervised, not fire-and-forget. The worker used to be started once and never looked
+    # at again, so a crash was permanent and silent: the listener kept capturing dispatches
+    # that nothing would process, persist or broadcast (punch-list #27).
+    supervisor = WorkerSupervisor(
+        target=background_worker_loop,
+        args=(dispatch_queue,),
+    )
+    supervisor.start()
 
     try:
         run_audio_listener_loop(dispatch_queue)
     except KeyboardInterrupt:
         logging.info("Listener stopped by user.")
     finally:
+        supervisor.stop()
         dispatch_queue.put(None)
         logging.info("CFR EVO Dispatch System shut down.")
 

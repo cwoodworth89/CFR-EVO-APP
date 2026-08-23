@@ -7,27 +7,30 @@ import { formatTimestampPT, getCallTones } from './reviewFormat';
 // "System" -- hiding the very disagreement this list is scanned to find. A call whose
 // system address was wrong looked identical to one that was right.
 //
-// Showing the system value alone would instead discard the correction, so a field that
-// was corrected renders both: the system value struck through, then the verified value.
-// Agreement renders as a single plain value, so a row that stands out is a row that
-// actually disagrees.
+// Rows here are narrow and dense, so the corrected value is NOT rendered inline -- two
+// values on one line clipped the address at this column width. A corrected field shows
+// the system value plus a marker carrying the verified value in its tooltip; the review
+// panel already displays both side by side once a row is selected.
+//
+// Nothing is lost by this: both the system fields and the verified_* columns persist in
+// public.dispatches, which is what backtesting reads.
 function SystemVsVerified({ system, verified, submitted, className = '' }) {
   const sysText = system ?? '';
   const verText = verified ?? '';
   const hasVerified = submitted && verText !== '';
   const differs = hasVerified && verText.trim().toLowerCase() !== sysText.trim().toLowerCase();
 
-  if (!differs) {
-    return <span className={className}>{sysText || '—'}</span>;
-  }
   return (
     <span className={className}>
-      <span className="text-rose-400/80 line-through" title="What the system produced">
-        {sysText || '—'}
-      </span>
-      <span className="text-emerald-400 font-bold ml-1" title="Operator-verified ground truth">
-        {verText}
-      </span>
+      {sysText || '—'}
+      {differs && (
+        <span
+          className="text-amber-400 font-bold ml-1 not-italic cursor-help"
+          title={`System produced "${sysText || '—'}" — operator corrected to "${verText}"`}
+        >
+          ✎
+        </span>
+      )}
     </span>
   );
 }
@@ -163,8 +166,8 @@ export default function ReviewTable({
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Training Status</th>
-                  <th className="py-2.5 px-3 w-[28%] bg-slate-900" title="What the system produced. A struck-through value means the operator corrected it; the verified value follows in green.">
-                    System Output <span className="text-slate-500 normal-case">(struck = corrected)</span>
+                  <th className="py-2.5 px-3 w-[28%] bg-slate-900" title="What the system produced. ✎ marks a field the operator corrected — hover it for the verified value.">
+                    System Output <span className="text-amber-400 normal-case">✎ = corrected</span>
                   </th>
                   <th className="py-2.5 px-3 text-right w-[11%] bg-slate-900">Actions</th>
                 </tr>

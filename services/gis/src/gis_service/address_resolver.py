@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional, Tuple, List, Any
 from sqlalchemy import text
-from .normalization import normalize_street_name
+from .normalization import normalize_street_name, get_suffix_mappings
 
 try:
     from thefuzz import fuzz
@@ -12,9 +12,82 @@ except ImportError:
     import difflib
     class _Fuzz:
         @staticmethod
+        def ratio(s1, s2):
+            return int(difflib.SequenceMatcher(None, str(s1).lower(), str(s2).lower()).ratio() * 100)
+
+        @staticmethod
         def token_set_ratio(s1, s2):
             return int(difflib.SequenceMatcher(None, str(s1).lower(), str(s2).lower()).ratio() * 100)
     fuzz = _Fuzz()
+
+
+def _suffix_tokens() -> set:
+    """Every token that is only a street-type word, both spellings.
+
+    Sourced from public.vocabulary category 'street_suffix' -- the same table the
+    normalizer uses, so the two cannot drift (CLAUDE.md §6.2).
+    """
+    mappings = get_suffix_mappings()
+    return {k.upper() for k in mappings.keys()} | {v.upper() for v in mappings.values()}
+
+
+def street_name_tokens(parsed_street: str) -> list:
+    """The tokens that actually name a street, with street-type words removed.
+
+    "WALTON AVE" -> ["WALTON"];  "AVENUE AVE" -> [];  "AVE" -> [].
+    """
+    if not parsed_street:
+        return []
+    suffixes = _suffix_tokens()
+    return [t for t in parsed_street.upper().split() if t not in suffixes]
+
+
+def query_street(street_raw: str, street_type: str) -> str:
+    """Normalized street for matching, from a caller's (raw, type) pair.
+
+    Geocoder step 1 passes ParsedAddress.raw -- which already ends in the street type --
+    together with the separately normalized type, so the naive join yields
+    "GORDON AVE AVE". token_set_ratio hid this because a token *set* discards the
+    duplicate; fuzz.ratio does not, and scored a perfect match as 83. Collapse repeated
+    adjacent tokens so the comparison sees the street as spoken.
+
+    Also drops a trailing unit designator ("PIPELINE RD 205", "DUFFERIN ST 204D").
+    The house number arrives separately, so any number left on the street is a unit,
+    and no street name in public.parcels contains a numeric token -- verified
+    2026-08-23: `SELECT count(*) FROM public.parcels WHERE street ~ '(^|\\s)[0-9]+(\\s|$)'`
+    returns 0. Left in place these cost real margin: "PIPELINE RD 205" scores 85
+    against "PIPELINE RD", and a longer unit would drop a correct address below the
+    threshold entirely.
+    """
+    joined = f"{street_raw} {street_type}".strip() if street_type else (street_raw or "")
+    normalized = normalize_street_name(joined)
+    tokens = normalized.split()
+    while tokens and re.fullmatch(r"\d+[A-Za-z]?", tokens[-1]):
+        tokens.pop()
+    out = []
+    for tok in tokens:
+        if not out or out[-1] != tok:
+            out.append(tok)
+    return " ".join(out)
+
+
+def score_street(parsed_street: str, db_norm: str) -> int:
+    """Similarity between a spoken street and a municipal one.
+
+    Deliberately fuzz.ratio, NOT fuzz.token_set_ratio. Verified against the installed
+    thefuzz 0.22.1 on 2026-08-23 (CLAUDE.md §7.3a):
+
+        token_set_ratio("AVE", "WALTON AVE")   = 100   <- subset scores a perfect match
+        token_set_ratio("AVE", "ANSON AVE")    = 100      against every avenue at once
+        ratio("AVE", "WALTON AVE")             =  46
+        ratio("GORDEN AVE", "GORDON AVE")      =  90   <- real STT noise still passes
+
+    token_set_ratio returns 100 whenever one token set is a subset of the other,
+    because the intersection then equals one side by construction. Any street fragment
+    therefore matched every street sharing its suffix, at maximum confidence. See
+    docs/standards/dependency-behaviour.md.
+    """
+    return fuzz.ratio(parsed_street, db_norm)
 
 
 class AddressResolver:
@@ -24,7 +97,19 @@ class AddressResolver:
 
     def resolve_exact(self, house: str, street_raw: str, street_type: str) -> dict | None:
         """Step 1: Exact parcel match — house number + fuzzy street name."""
-        parsed_street = normalize_street_name(f"{street_raw} {street_type}".strip() if street_type else street_raw)
+        parsed_street = query_street(street_raw, street_type)
+
+        # A street type with no street name identifies nothing. "3000 avenue" (STT
+        # dropped the name) must not resolve to whichever avenue happens to have a
+        # 3000 block -- there were three, and the old scoring rated all of them 100.
+        # Unresolved is the correct answer here and surfaces as the Tier 1 card (§6.1).
+        if not street_name_tokens(parsed_street):
+            logging.info(
+                "Address '%s %s' carries no street name after normalization "
+                "('%s'); refusing to guess which street.", house, street_raw, parsed_street
+            )
+            return None
+
         try:
             with self.engine.connect() as conn:
                 rows = conn.execute(text("""
@@ -33,18 +118,34 @@ class AddressResolver:
                            centroid_lat, centroid_lng, zone_id,
                            ST_AsGeoJSON(geom) as geom_geojson
                     FROM public.parcels
-                    WHERE house = :house;
+                    WHERE house = :house
+                    ORDER BY street, streettype, id;
                 """), {"house": str(house)}).mappings().fetchall()
 
                 best_score = 0
                 best_row = None
+                tied_streets = set()
                 for row in rows:
                     db_street = f"{row['street']} {row['streettype'] or ''}".strip().upper()
                     db_norm = normalize_street_name(db_street)
-                    score = fuzz.token_set_ratio(parsed_street, db_norm)
+                    score = score_street(parsed_street, db_norm)
                     if score > best_score:
                         best_score = score
                         best_row = row
+                        tied_streets = {db_norm}
+                    elif score == best_score and best_row is not None:
+                        tied_streets.add(db_norm)
+
+                # Two different streets scoring identically is a genuine ambiguity, not
+                # a winner. Previously the first row of an unordered query won silently.
+                if best_score >= self.confidence_threshold and len(tied_streets) > 1:
+                    logging.warning(
+                        "Address '%s %s' matches %d streets equally (%s) at score %s; "
+                        "returning ambiguous rather than picking one.",
+                        house, parsed_street, len(tied_streets),
+                        ", ".join(sorted(tied_streets)), best_score
+                    )
+                    return None
 
                 if best_score >= self.confidence_threshold and best_row is not None:
                     dest_lat = best_row['front_lat'] or best_row['entrance_lat'] or best_row['lat']
@@ -255,6 +356,36 @@ class AddressResolver:
                 requested = f"{house} {street} {street_type}".strip().title()
                 delta = int(row['house_delta'])
 
+                # The substitute must be in the same hundred-block as the dispatched
+                # number. Without this there was no bound at all: 3415 Harbour Dr
+                # (DISP-2026-1388CD) resolved to 1869 Harbour Dr, 1546 numbers away,
+                # and "6 Silver Springs Blvd" (DISP-2026-74813F, STT dropped the
+                # leading digits) resolved to 2951, 2945 away. Both were presented as
+                # locations with a reassuring note attached.
+                #
+                # PROVENANCE: the hundred-block is the addressing unit in this
+                # jurisdiction, not a tuned constant -- Coquitlam civic numbering
+                # allocates one hundred-block per block face, and Locution dispatch
+                # itself announces block-level locations that way ("1080 Block
+                # Ponderosa St", DISP-2026-266B57). Nothing in docs/standards/ governs
+                # substitution distance; this is a municipal-data-derived rule, not a
+                # published standard (CLAUDE.md §7.2).
+                #
+                # Known limitation: two adjacent numbers that straddle a block boundary
+                # (3099 -> 3101) are refused. Refusing a near miss costs an operator
+                # one Tier 1 card; accepting a far one sends apparatus to the wrong
+                # block, so the asymmetry is deliberate.
+                requested_block = int(house) // 100
+                nearest_block = int(row['house']) // 100
+                if requested_block != nearest_block:
+                    logging.info(
+                        "Nearest civic address to %s is %s, in the %d00 block rather "
+                        "than the %d00 block (%d off). Refusing the substitution; "
+                        "the address is unresolved.",
+                        requested, row['address'], nearest_block, requested_block, delta
+                    )
+                    return None
+
                 # Confidence degrades with how far the substituted number is from the
                 # one dispatched. Deliberately never approaches the 100.0 an exact
                 # parcel match earns.
@@ -330,23 +461,37 @@ class AddressResolver:
 
     def validate_address_exists(self, house: str, street_raw: str, street_type: str) -> Tuple[int, str | None]:
         """Checks if an address exists in the parcels database. Returns (score, matched_address)."""
-        parsed_street = normalize_street_name(f"{street_raw} {street_type}".strip() if street_type else street_raw)
+        parsed_street = query_street(street_raw, street_type)
+
+        # Same guard as resolve_exact. This is the *validator*, so the old behaviour was
+        # the worse half of the defect: given a bare suffix it returned a confident
+        # match and thereby confirmed an address that had never been spoken.
+        if not street_name_tokens(parsed_street):
+            return 0, None
+
         try:
             with self.engine.connect() as conn:
                 rows = conn.execute(text("""
                     SELECT house, street, streettype, address
-                    FROM public.parcels WHERE house = :house;
+                    FROM public.parcels WHERE house = :house
+                    ORDER BY street, streettype, address;
                 """), {"house": str(house)}).mappings().fetchall()
                 best_score = 0
                 best_addr = None
+                tied_streets = set()
                 for row in rows:
                     db_street = f"{row['street']} {row['streettype'] or ''}".strip().upper()
                     db_norm = normalize_street_name(db_street)
-                    score = fuzz.token_set_ratio(parsed_street, db_norm)
+                    score = score_street(parsed_street, db_norm)
                     if score > best_score:
                         best_score = score
                         st = row['streettype'] or ''
                         best_addr = f"{house} {row['street']} {st}".strip().title()
+                        tied_streets = {db_norm}
+                    elif score == best_score and best_addr is not None:
+                        tied_streets.add(db_norm)
+                if best_score >= self.confidence_threshold and len(tied_streets) > 1:
+                    return best_score, None
                 if best_score >= self.confidence_threshold:
                     return best_score, best_addr
                 return best_score, None

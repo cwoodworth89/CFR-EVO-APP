@@ -188,17 +188,35 @@ class CoquitlamDataValidator:
                 return result
 
         # === STEP 5: Street centroid fallback ===
+        # Deliberately does NOT overwrite result['address'] with the requested address.
+        # Doing so made an average of every parcel on the street display exactly like an
+        # exact parcel match -- "3415 Harbour Dr" was shown as though found, when the
+        # number does not exist on that street and the pin was the street's midpoint
+        # (punch-list #12). Step 4b already established the honest pattern: report the
+        # location actually used, and say why in resolution_note (§6.1).
         if parsed:
             result = self.address.resolve_street_centroid(parsed.street, parsed.street_type)
             if result:
-                result['address'] = f"{parsed.house} {parsed.raw}".strip().title() if parsed.house else result['address']
+                result['requested_address'] = f"{parsed.house} {parsed.raw}".strip().title() \
+                    if parsed.house else result['address']
+                result['resolution_note'] = (
+                    f"{result['requested_address']} could not be placed on this street. "
+                    f"Showing the midpoint of {result['address']}, not a specific address. "
+                    f"Verify on arrival."
+                )
                 return result
 
         # === STEP 6: Road centroid fallback ===
         if parsed:
             result = self.address.resolve_road_centroid(parsed.street, parsed.street_type)
             if result:
-                result['address'] = f"{parsed.house} {parsed.raw}".strip().title() if parsed.house else result['address']
+                result['requested_address'] = f"{parsed.house} {parsed.raw}".strip().title() \
+                    if parsed.house else result['address']
+                result['resolution_note'] = (
+                    f"{result['requested_address']} could not be placed on this street. "
+                    f"Showing the centreline midpoint of {result['address']}, not a "
+                    f"specific address. Verify on arrival."
+                )
                 return result
 
         # No further fallbacks. Two former steps were removed:

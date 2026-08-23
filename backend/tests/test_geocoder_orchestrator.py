@@ -113,7 +113,14 @@ class TestGeocoderOrchestrator:
         res = mock_validator.get_coordinates("9999 Gordon Ave")
         assert res is not None
         assert res["is_street_centroid"] is True
-        assert res["address"] == "9999 Gordon Ave"
+        # The street centroid must NOT claim to be the requested address. It is the
+        # average of every parcel on the street; reporting it as "9999 Gordon Ave"
+        # made a whole-street average display exactly like an exact parcel match
+        # (punch-list #12). The requested address is preserved separately and the
+        # reason is stated, matching the step 4b pattern.
+        assert res["address"] == "Gordon Ave"
+        assert res["requested_address"] == "9999 Gordon Ave"
+        assert "could not be placed on this street" in res["resolution_note"]
         mock_validator.address.resolve_street_centroid.assert_called_once()
 
     def test_step6_road_centroid(self, mock_validator):
@@ -129,6 +136,11 @@ class TestGeocoderOrchestrator:
         })
         res = mock_validator.get_coordinates("9999 Gordon Ave")
         assert res is not None
+        # Same contract as step 5 -- this assertion was absent, so the road centroid
+        # kept reporting the requested address unnoticed while step 5 was being fixed.
+        assert res["address"] == "Gordon Ave"
+        assert res["requested_address"] == "9999 Gordon Ave"
+        assert "could not be placed on this street" in res["resolution_note"]
         mock_validator.address.resolve_road_centroid.assert_called_once()
 
     def test_place_name_alone_does_not_geocode(self, mock_validator):

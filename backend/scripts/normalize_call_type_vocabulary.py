@@ -34,6 +34,15 @@ DEAD_TERMS = [
     "Alarms Activated",
     "Alarms Activated - High Risk",
     "Medical Aid - Cardiac Problems",
+    # Operator ruling 2026-08-23: not spoken call types.
+    #
+    # "Vehicle Rollover" -- "Motor Vehicle Incident - Rollover" IS spoken and stays; this
+    # bare form is not. Neither term has ever been used, and no transcript in the corpus
+    # contains "roll" at all, so this retires the duplicate before it can win a match.
+    "Vehicle Rollover",
+    # "Public Assist" -- zero occurrences in any raw_transcript, incident_type or
+    # verified_incident. "Assist" and "Lift Assist" are the spoken forms and remain.
+    "Public Assist",
 ]
 
 # (retired term, canonical term, keep_as_alias)

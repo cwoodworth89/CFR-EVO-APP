@@ -204,7 +204,9 @@ class CoquitlamDataValidator:
         # dispatches always include the near roads, so the vaguer branch was the one
         # actually running in production.
         if parsed and parsed.house:
-            result = self.address.resolve_nearest_civic(parsed.house, parsed.street, parsed.street_type)
+            result = self.address.resolve_nearest_civic(
+                parsed.house, parsed.street, parsed.street_type,
+                near_road_1=cross_street_1, near_road_2=cross_street_2)
             if result:
                 return result
 

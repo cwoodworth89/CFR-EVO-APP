@@ -463,7 +463,8 @@ class AddressResolver:
             logging.error(f"Error in cross-road narrowing: {e}", exc_info=True)
         return None
 
-    def resolve_nearest_civic(self, house: str, street: str, street_type: str) -> dict | None:
+    def resolve_nearest_civic(self, house: str, street: str, street_type: str,
+                              near_road_1: str = None, near_road_2: str = None) -> dict | None:
         """Step 4b: Nearest civic address on the street, by house number.
 
         Used when a dispatched address is not in the municipal records and its house
@@ -482,33 +483,69 @@ class AddressResolver:
         """
         if not house or not str(house).isdigit():
             return None
+
+        # The announced "near" roads position the call along the street. Without them
+        # this picks purely by house-number proximity, which on a long street can be
+        # the wrong end of the block: measured 2026-08-23, one house number spans
+        # 4.63 m on Glen Dr and 3.82 m on Barnet Hwy, so a same-block substitution can
+        # sit ~460 m from the real address. Where the roads are given they decide, and
+        # the number gap only breaks ties.
+        near_names = []
+        for road in (near_road_1, near_road_2):
+            tokens = street_name_tokens(normalize_street_name(road)) if road else []
+            if tokens:
+                near_names.append(" ".join(tokens))
+
+        # Two explicit query shapes rather than one with a conditional CTE: a bound
+        # boolean guarding `= ANY(:names)` leaves the driver unable to infer the array
+        # type and the statement fails at execution, which silently degraded this rung
+        # to None and pushed calls down to the centroid.
+        near_cte = ("""
+                    WITH near_roads AS (
+                        SELECT ST_Union(geom) AS geom
+                        FROM public.roads
+                        WHERE UPPER(roadname) = ANY(:names)
+                    )
+        """ if near_names else """
+                    WITH near_roads AS (SELECT NULL::geometry AS geom)
+        """)
+
         try:
             with self.engine.connect() as conn:
-                row = conn.execute(text("""
-                    SELECT address, house, lat, lng,
-                           ABS((house)::int - (:house)::int) AS house_delta
-                    FROM public.parcels
-                    WHERE UPPER(street) = UPPER(:street)
-                      AND (UPPER(streettype) = UPPER(:stype) OR :stype = '')
-                      AND house ~ '^[0-9]+$'
-                      AND (unit IS NULL OR unit = '')
-                      AND lat IS NOT NULL AND lng IS NOT NULL
-                    ORDER BY house_delta ASC, (house)::int ASC
+                row = conn.execute(text(near_cte + """
+                    SELECT p.address, p.house, p.lat, p.lng,
+                           ABS((p.house)::int - (:house)::int) AS house_delta,
+                           CASE WHEN nr.geom IS NULL THEN NULL
+                                ELSE ST_Distance(p.geom::geography, nr.geom::geography)
+                           END AS near_road_m
+                    FROM public.parcels p
+                    LEFT JOIN near_roads nr ON TRUE
+                    WHERE UPPER(p.street) = UPPER(:street)
+                      AND (UPPER(p.streettype) = UPPER(:stype) OR :stype = '')
+                      AND p.house ~ '^[0-9]+$'
+                      AND (p.unit IS NULL OR p.unit = '')
+                      AND p.lat IS NOT NULL AND p.lng IS NOT NULL
+                      -- The hundred-block bound is applied HERE, before ranking. If the
+                      -- near roads ranked across the whole street first, they could
+                      -- select a parcel outside the dispatched block, which the bound
+                      -- would then reject -- discarding a perfectly good same-block
+                      -- answer. Bound first, then choose within it.
+                      AND (p.house)::int / 100 = (:house)::int / 100
+                    -- Bare alias, not an expression on it: Postgres accepts
+                    -- "ORDER BY near_road_m" but rejects "ORDER BY (near_road_m IS NULL)".
+                    -- NULLS LAST gives the same precedence when no near roads were given.
+                    ORDER BY near_road_m ASC NULLS LAST,
+                             house_delta ASC, (p.house)::int ASC
                     LIMIT 1;
-                """), {"house": str(house), "street": street, "stype": street_type or ''}).mappings().fetchone()
+                """), {"house": str(house), "street": street, "stype": street_type or '',
+                       "names": near_names}
+                ).mappings().fetchone()
 
-                if not row:
-                    return None
-
-                requested = f"{house} {street} {street_type}".strip().title()
-                delta = int(row['house_delta'])
-
-                # The substitute must be in the same hundred-block as the dispatched
-                # number. Without this there was no bound at all: 3415 Harbour Dr
-                # (DISP-2026-1388CD) resolved to 1869 Harbour Dr, 1546 numbers away,
-                # and "6 Silver Springs Blvd" (DISP-2026-74813F, STT dropped the
-                # leading digits) resolved to 2951, 2945 away. Both were presented as
-                # locations with a reassuring note attached.
+                # No parcel in the dispatched hundred-block. Before this bound existed
+                # there was none at all: 3415 Harbour Dr (DISP-2026-1388CD) resolved to
+                # 1869 Harbour Dr, 1546 numbers away, and "6 Silver Springs Blvd"
+                # (DISP-2026-74813F, STT dropped the leading digits) resolved to 2951,
+                # 2945 away. Both were presented as locations with a reassuring note.
                 #
                 # PROVENANCE: the hundred-block is the addressing unit in this
                 # jurisdiction, not a tuned constant -- Coquitlam civic numbering
@@ -518,20 +555,20 @@ class AddressResolver:
                 # substitution distance; this is a municipal-data-derived rule, not a
                 # published standard (CLAUDE.md §7.2).
                 #
-                # Known limitation: two adjacent numbers that straddle a block boundary
-                # (3099 -> 3101) are refused. Refusing a near miss costs an operator
-                # one Tier 1 card; accepting a far one sends apparatus to the wrong
-                # block, so the asymmetry is deliberate.
-                requested_block = int(house) // 100
-                nearest_block = int(row['house']) // 100
-                if requested_block != nearest_block:
+                # Known limitation: two adjacent numbers straddling a block boundary
+                # (3099 -> 3101) are refused. Refusing a near miss costs one Tier 1
+                # card; accepting a far one sends apparatus to the wrong block, so the
+                # asymmetry is deliberate.
+                if not row:
                     logging.info(
-                        "Nearest civic address to %s is %s, in the %d00 block rather "
-                        "than the %d00 block (%d off). Refusing the substitution; "
-                        "the address is unresolved.",
-                        requested, row['address'], nearest_block, requested_block, delta
+                        "No civic address on %s %s in the %d00 block; refusing to "
+                        "substitute from another block. Falling through.",
+                        street, street_type or '', int(house) // 100
                     )
                     return None
+
+                requested = f"{house} {street} {street_type}".strip().title()
+                delta = int(row['house_delta'])
 
                 # Confidence degrades with how far the substituted number is from the
                 # one dispatched. Deliberately never approaches the 100.0 an exact
@@ -547,6 +584,11 @@ class AddressResolver:
                     "is_nearest_civic": True,
                     "requested_address": requested,
                     "resolution_note": (
+                        f"{requested} is not in City of Coquitlam address records. "
+                        f"Routed to {row['address']}, the closest address in the "
+                        f"{int(house) // 100}00 block to {' and '.join(near_names).title()} "
+                        f"({delta} off the dispatched number). Verify on arrival."
+                        if row['near_road_m'] is not None else
                         f"{requested} is not in City of Coquitlam address records. "
                         f"Routed to {row['address']}, the nearest civic address on this "
                         f"street ({delta} off the dispatched number). Verify on arrival."

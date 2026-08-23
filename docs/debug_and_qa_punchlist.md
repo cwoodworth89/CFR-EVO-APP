@@ -18,7 +18,7 @@ This document tracks identified bugs, routing anomalies, edge cases, and feature
 > same pass.
 >
 > Still open: **#1**, **#10**, **#12**, **#14**, **#17**, **#19**, **#20**, **#21**,
-> **#22**, **#29**.
+> **#22**.
 >
 > **Found from live operation 2026-08-22**, none of them reachable from the test corpus —
 > all three came from one operator screenshot of a real dispatch: **#24** (an invented
@@ -1236,7 +1236,38 @@ survivors: ['OLD-1', 'OLD-2', 'NEW-P2']
 The newest call gets through and neither call blocks.
 
 ### 29. Phase 1 session state lives only in worker memory
-> **Status**: ⚠️ **Open — found 2026-08-22.**
+> **Status**: ✅ **Closed 2026-08-22.** Phase 1 state is now persisted in
+> **`public.dispatch_sessions`** (`cfr_dispatch/session_store.py`), so it survives a worker
+> restart. `DispatchSessionManager` keeps the same interface, so phase 1 and phase 2 call
+> it unchanged.
+>
+> `candidates` are `DispatchData` dataclasses stored as JSON and rebuilt on read, because
+> phase 2 reads `.address` and `.intersection` off them as attributes. Unknown keys are
+> dropped and missing ones default, so a session written before a deploy does not crash the
+> worker reading it after one — these rows outlive a restart by design.
+>
+> **The ordering defect is fixed too.** `phase1.py` now records the session *before*
+> broadcasting. It was the other way round, so any exception in the broadcast block left an
+> INSERT published with no session stored — and phase 2, finding nothing, took the
+> "Phase 1 was skipped" branch and published a second INSERT. Recording first makes an
+> untracked INSERT impossible.
+>
+> Verified across a real process boundary — written by one process, read by another:
+>
+> ```
+> read back: transcript='CLEAN' units=['E1'] target.lat=49.27533
+> count=2  types=['DispatchData', 'DispatchData']
+> phase2-style pick -> address='3025 Lougheed Hwy'
+>                      intersection='Lougheed Hwy & Westwood St'  map_grid='82'
+> is_triggered before cleanup: True / after: False
+> ```
+>
+> Execution profiles stay in memory deliberately: rolling metrics for one process, not
+> dispatch state.
+>
+> Original finding follows.
+>
+> ⚠️ **Open — found 2026-08-22.**
 
 `DispatchSessionManager` holds phase 1 candidates in a plain dict inside the worker
 process (`worker.py`, `_phase_1_candidates`). Nothing persists it.

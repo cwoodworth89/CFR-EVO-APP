@@ -140,6 +140,42 @@ score transcription. Use `raw_transcript` for anything STT-related.
 This is also why fabricated values are so hard to spot in the review panel: they appear
 inside a field that reads as a record of the audio.
 
+### 4.1a `verified_transcript` is ONE round, not the whole audio
+
+**Operator confirmation 2026-08-23.** The reviewer verifies a **single round**. The stored
+`verified_transcript` therefore covers roughly **half** the audio, because nearly every
+dispatch is announced twice (§4.3).
+
+Confirmed by query: `respond` appears **once** in 197 of 202 verified transcripts, while the
+matching `raw_transcript` carries two or more rounds.
+
+The duplication happens **downstream, at STT training extraction only** --
+[`extract_training_data.py:182`](../backend/scripts/extract_training_data.py):
+
+```python
+if duration > 25.0 and normalized_text:
+    rounds = split_rounds(normalized_text, UNITS_VOCABULARY)
+    if len(rounds) < 2:
+        normalized_text = f"{normalized_text} {normalized_text}"
+```
+
+That exists so the Whisper training label matches the two-round audio. It is **not** applied
+to the database column.
+
+Consequences, both easy to hit:
+
+* **Never diff `verified_transcript` against `raw_transcript` directly.** One is a single
+  round, the other is two. A naive WER or string comparison reports roughly 50% error on a
+  perfect transcription. Compare round-for-round, or duplicate the verified text first the
+  same way the extractor does.
+* **It is human-idealised.** Reviewers write correct spelling and punctuation, so it is the
+  right source for deriving the *announcement grammar* but the wrong source for judging what
+  STT actually produces. Anchor-reliability figures must be measured on `raw_transcript` --
+  they differ sharply (§4.3a).
+
+Same defect class as §4.1: a field whose name promises a record of the audio, which is
+something else.
+
 ### 4.2 The corpus is historical — a stored defect may already be fixed
 
 Each record reflects the code as of its date, and the geocoder was substantially rewritten
@@ -160,6 +196,55 @@ throws away a correct round-2 reading in favour of a garbled round 1 (§5). What
 all 201 rather than reasoning about.
 
 ---
+
+### 4.3a Anchor reliability differs sharply between verified and raw text
+
+The announcement is a **strictly ordered template**. Across 202 verified transcripts the
+marker order **never varies** -- only optional slots are omitted:
+
+```
+coquitlam [UNITS] respond [MODE] [CALL TYPE] [ADDRESS] near [CROSS STREETS] use talk group [N] map grid [N]
+```
+
+But a parser sees `raw_transcript`, not the reviewer's clean text, and the anchors survive
+STT very differently. Measured over the 202 calls holding both:
+
+| Anchor | in verified | in raw | lost |
+|:--|--:|--:|--:|
+| `coquitlam` (wake) | 202 | **202** | 0 |
+| `talk group` | 199 | 194 | 5 |
+| `respond` (exact) | 202 | 193 | 9 |
+| `routine` / `emergency` | 201 | 193 | 8 |
+| **`map grid`** | 202 | **165** | **37** |
+| `near` | 170 | 172 | **-2** |
+
+* **`coquitlam` is the only perfect anchor**, and it is also the least useful alone -- it
+  recurs inside the talk group name (`Talk Group 5 Coquitlam`,
+  `Talk Group 10 Combined Response Coquitlam`), so it anchors the *start* only.
+* **`near` appears MORE often in raw than in verified text.** STT invents it. It cannot be
+  used as a structural anchor, only as a hint.
+* **`map grid` is lost in 18% of raw transcripts** -- and *not* because the dispatcher
+  omitted it. Those calls have **longer** median audio (50.6s vs 47.5s) but far **fewer**
+  words (37 vs 51). The audio contains the tail; the transcription stops early. **This is an
+  STT defect being counted against the parser.**
+
+### 4.3b The two rounds are redundancy, and it is not being used
+
+The dispatcher announces the call twice, and the rounds are meant to be **identical**. Where
+`split_rounds` separates them cleanly they are near-identical (median `fuzz.ratio` 82; 86 of
+186 score 90+).
+
+That redundancy is error correction that nothing currently exploits:
+
+> **57 of 186 double-round calls carry the map grid in only ONE of the two rounds.**
+
+Merging per field across rounds recovers those. Two cautions, both measured:
+
+* `split_rounds` is itself weak -- **15** double-round calls do not split at all, and **34**
+  split into segments scoring under 10% similarity (typically a bare unit tail, which is what
+  produced punch-list #34).
+* Merging must take the **most specific** answer per field, never the first. Taking the first
+  reintroduces the round-1-wins bias of §5.
 
 ## 5. The worked example: `DISP-2026-156DCF`
 

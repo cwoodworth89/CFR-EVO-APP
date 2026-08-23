@@ -19,6 +19,7 @@ not the behaviour**, and the code was written against the name.
 | `token_set_ratio` | a similarity ratio | returns **100** when one token set is a subset of the other |
 | `ST_Contains` | the point is in the polygon | excludes the boundary, so a point on a zone edge is *not* contained |
 | `multiprocessing.Process` | the child continues where the parent left off | on Python 3.14 it does not inherit logging config -- the default start method became `forkserver` |
+| MQTT `qos=1` | delivered once, reliably | delivered **at least** once -- duplicates are guaranteed possible and the receiver must be idempotent |
 
 None of these are bugs in the libraries. All are documented or evident in source. The
 defect was on our side: **we trusted the name.**
@@ -157,6 +158,42 @@ Two further forkserver consequences worth knowing:
 
 Configure logging *inside* each process rather than relying on inheritance; that is correct
 under every start method.
+
+### MQTT QoS 1 — "at least once" means duplicates are part of the contract
+
+```
+publish:   client.publish(MQTT_TOPIC, msg, qos=1)      mqtt_broker.py
+subscribe: client.subscribe(topic, { qos: 1 }, ...)    useMqttListener.js
+```
+
+QoS 1 reads as a reliability *upgrade* from QoS 0, and it is — but the guarantee is
+**at-least-once**, not exactly-once. Redelivery is expected behaviour: if the broker does
+not receive a PUBACK it sends the message again, which is why the protocol carries a DUP
+flag. **The receiver is required to be idempotent.** Exactly-once is QoS 2, which costs a
+four-part handshake.
+
+**Consequence when unverified**: the kiosk queued a duplicate delivery as a second
+incident. Verified from the journal for `DISP-2026-F33FA3` — the backend published exactly
+one INSERT and one UPDATE:
+
+```
+15:12:00  Published INSERT event to Mosquitto MQTT   (phase 1)
+15:12:20  Published UPDATE event to Mosquitto MQTT   (phase 2, Match=True, Corrected=False)
+```
+
+The backend was correct. The duplicate was a redelivery of the INSERT, and
+`useKioskQueue.handleInsert` had no de-duplication, so it appended the same dispatch to the
+queue and raised the amber "1 New Call Queued" banner for the call already on screen.
+Punch-list #25.
+
+The fix — keying on `dispatch_id` and merging rather than queueing — is not a workaround.
+It is the idempotency QoS 1 requires of every subscriber.
+
+**Note the ordering trap this creates for diagnosis.** A duplicate INSERT and a phase 2
+correction produce the *same visible symptom*. Only the broadcast log distinguishes them,
+which is why punch-list #26 (the pipeline's discarded logging) had to be fixed first —
+the first attempt at this investigation concluded "phase 2 re-broadcast" from the symptom
+alone, and the logs later showed phase 2 published UPDATE exactly as designed.
 
 ## Unverified — assumptions still resting on names
 

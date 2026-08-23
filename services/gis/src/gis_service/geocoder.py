@@ -3,8 +3,10 @@ services/gis/src/gis_service/geocoder.py
 PostGIS-backed Geocoder Orchestrator for CFR EVO.
 
 Thin orchestrator that delegates to specialized resolver modules.
-Resolution chain: exact address → intersection → block interpolation →
-cross-road narrowing → street centroid → road centroid → custom places → manual overrides.
+Resolution chain, most specific first: exact parcel → intersection → block
+interpolation → nearest civic address → near-road narrowing → street centroid →
+road centroid. Every rung below the first two is an approximation and says so via
+resolution_note; exhausting the chain returns None rather than a guess.
 """
 import os
 import re
@@ -107,15 +109,21 @@ class CoquitlamDataValidator:
         """
         Primary geocoding entry point — cascading resolution chain.
         
-        Resolution order:
-        1. Exact address (parcel house+street)
-        2. Intersection (cross streets as destination)
-        3. Block interpolation (road segment address ranges)
-        4. Cross-road narrowing (use nearby cross streets)
-        5. Street centroid (average parcel positions)
-        6. Road centroid (centerline geometry centroid)
-        7. Custom places (manually curated locations)
-        8. Manual overrides (hardcoded special cases)
+        Resolution order, most specific first. Each rung returns immediately, so the
+        order encodes which answer is better, not merely which is cheaper:
+
+        1. Exact parcel        — a real property at the dispatched number
+        2. Intersection        — the announced junction
+        3. Block interpolation — position from the road segment's address range
+        4. Nearest civic       — the closest real parcel on the street, same block
+        5. Near-road narrowing — positioned by the announced "near" roads
+        6. Street centroid     — average of every parcel on the street
+        7. Road centroid       — centreline midpoint
+
+        Rungs 3-7 are all approximations and every one of them sets resolution_note,
+        which raises the kiosk's amber "APPROXIMATE LOCATION" banner. Anything past
+        rung 7 is unresolved and returns None, surfacing as the Tier 1 card rather
+        than a guessed location (§6.1).
         """
         if not parsed_address:
             return None
@@ -177,7 +185,33 @@ class CoquitlamDataValidator:
             if result:
                 return result
 
-        # === STEP 4: Cross-road narrowing ===
+        # === STEP 4: Nearest civic address on the street ===
+        # For a numbered address that exists in neither the parcel table nor any road
+        # segment's address range, the nearest real civic number beats a whole-street
+        # average. Deliberately does NOT overwrite result['address'] with the requested
+        # address: the operator must see which parcel was actually used, and
+        # resolution_note says why.
+        #
+        # ORDER: this runs BEFORE near-road narrowing (step 5). It used to run after,
+        # which meant supplying MORE information produced a WORSE answer -- measured
+        # 2026-08-23 on "3080 Gordon Ave":
+        #
+        #   without near roads -> "3060 Gordon Ave"                        conf 70
+        #   with near roads    -> "Gordon Ave (Between Christmas Way & ...)" conf 75
+        #
+        # A real civic address on the correct street is a better destination than a
+        # midpoint between two junctions, which carries no address at all. Real
+        # dispatches always include the near roads, so the vaguer branch was the one
+        # actually running in production.
+        if parsed and parsed.house:
+            result = self.address.resolve_nearest_civic(parsed.house, parsed.street, parsed.street_type)
+            if result:
+                return result
+
+        # === STEP 5: Near-road narrowing ===
+        # Only once no real parcel can be offered. Positions the call along the street
+        # using the announced "near" roads -- better than a whole-street average, but
+        # still not an address.
         if parsed and (cross_street_1 or cross_street_2):
             result = self.address.resolve_crossroad_narrow(
                 parsed.street, parsed.street_type,
@@ -187,23 +221,12 @@ class CoquitlamDataValidator:
             if result:
                 return result
 
-        # === STEP 4b: Nearest civic address on the street ===
-        # For a numbered address that exists in neither the parcel table nor any road
-        # segment's address range, the nearest real civic number beats a whole-street
-        # average. Deliberately does NOT overwrite result['address'] with the requested
-        # address: the operator must see which parcel was actually used, and
-        # resolution_note says why.
-        if parsed and parsed.house:
-            result = self.address.resolve_nearest_civic(parsed.house, parsed.street, parsed.street_type)
-            if result:
-                return result
-
-        # === STEP 5: Street centroid fallback ===
+        # === STEP 6: Street centroid fallback ===
         # Deliberately does NOT overwrite result['address'] with the requested address.
         # Doing so made an average of every parcel on the street display exactly like an
         # exact parcel match -- "3415 Harbour Dr" was shown as though found, when the
         # number does not exist on that street and the pin was the street's midpoint
-        # (punch-list #12). Step 4b already established the honest pattern: report the
+        # (punch-list #12). Nearest civic established the honest pattern: report the
         # location actually used, and say why in resolution_note (§6.1).
         if parsed:
             result = self.address.resolve_street_centroid(parsed.street, parsed.street_type)
@@ -217,7 +240,7 @@ class CoquitlamDataValidator:
                 )
                 return result
 
-        # === STEP 6: Road centroid fallback ===
+        # === STEP 7: Road centroid fallback ===
         if parsed:
             result = self.address.resolve_road_centroid(parsed.street, parsed.street_type)
             if result:

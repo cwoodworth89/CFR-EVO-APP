@@ -85,9 +85,50 @@ class TestGeocoderOrchestrator:
         assert res["is_block_interpolated"] is True
         mock_validator.address.resolve_block.assert_called_once()
 
-    def test_step4_crossroad_narrowing(self, mock_validator):
+    def test_nearest_civic_outranks_near_road_narrowing(self, mock_validator):
+        """A real civic address beats a midpoint between two roads.
+
+        These two rungs used to sit the other way round, which meant supplying the
+        announced "near" roads produced a WORSE answer than omitting them -- measured
+        2026-08-23 on "3080 Gordon Ave":
+
+            without near roads -> "3060 Gordon Ave"                          conf 70
+            with near roads    -> "Gordon Ave (Between Christmas Way & ...)"  conf 75
+
+        Real dispatches always carry the near roads, so the vaguer branch was the one
+        running in production. Both resolvers are mocked to succeed here; only the
+        order decides, and near-road narrowing must not be reached.
+        """
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value=None)
+        mock_validator.address.resolve_nearest_civic = MagicMock(return_value={
+            "address": "3060 Gordon Ave", "lat": 49.271, "lng": -122.792,
+            "rings": [], "confidence": 70.0, "is_nearest_civic": True,
+            "requested_address": "3080 Gordon Ave",
+            "resolution_note": "3080 Gordon Ave is not in City of Coquitlam address records.",
+            "is_ambiguous": False,
+        })
+        mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value={
+            "address": "Gordon Ave (between Christmas Way & Westwood St)",
+            "lat": 49.278, "lng": -122.791, "rings": [], "confidence": 75.0,
+            "is_crossroad_narrowed": True, "is_ambiguous": False,
+        })
+
+        res = mock_validator.get_coordinates(
+            "3080 Gordon Ave", cross_street_1="Christmas Way", cross_street_2="Westwood St")
+
+        assert res is not None
+        assert res["address"] == "3060 Gordon Ave"
+        assert res.get("is_nearest_civic") is True
+        mock_validator.address.resolve_nearest_civic.assert_called_once()
+        mock_validator.address.resolve_crossroad_narrow.assert_not_called()
+
+    def test_step5_near_road_narrowing(self, mock_validator):
+        # Reached only when no real parcel can be offered; nearest civic is mocked
+        # to fail explicitly rather than relying on it erroring against the mock engine.
+        mock_validator.address.resolve_exact = MagicMock(return_value=None)
+        mock_validator.address.resolve_block = MagicMock(return_value=None)
+        mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
         mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value={
             "address": "Gordon Ave (between Pinetree Way & Westwood St)", "lat": 49.278, "lng": -122.791,
             "rings": [], "confidence": 75.0, "is_crossroad_narrowed": True, "is_ambiguous": False

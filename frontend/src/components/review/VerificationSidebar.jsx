@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { TALK_GROUPS, toTitleCase } from './verificationConstants';
+import { API_BASE_URL } from '../../apiClient';
 
 export default function VerificationSidebar({
   selectedCall,
@@ -61,6 +62,38 @@ export default function VerificationSidebar({
     }, 50);
     return () => clearTimeout(timer);
   }, [verifiedTranscript, selectedCall]);
+
+  // Call types offered to the reviewer come from public.vocabulary -- the same list the
+  // parser matches against. Previously this field was free text, so ground truth drifted
+  // from the vocabulary: locale variants ("Smouldering"/"Smoldering") and pluralisations
+  // were typed as rival terms, and seven verified values had no vocabulary row at all and
+  // so could never be produced by the parser no matter how good the parse (punch-list #33).
+  const [callTypes, setCallTypes] = useState([]);
+  const [callTypesFailed, setCallTypesFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE_URL}/api/vocabulary?category=call_type`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setCallTypes(Array.isArray(data) ? data : []);
+        setCallTypesFailed(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // Do NOT fall back to a hardcoded list. A stale local vocabulary is what this
+        // change exists to remove; an empty picker that says so is the honest failure
+        // (CLAUDE.md §6.1). The input stays usable as free text either way.
+        console.error('Failed to load call_type vocabulary:', err);
+        setCallTypes([]);
+        setCallTypesFailed(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   if (!selectedCall) {
     return (
@@ -428,6 +461,7 @@ export default function VerificationSidebar({
             </div>
             <input
               type="text"
+              list="cfr-call-types"
               value={verifiedIncident}
               onChange={(e) => setVerifiedIncident(e.target.value)}
               onKeyDown={(e) => {
@@ -438,6 +472,16 @@ export default function VerificationSidebar({
               className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
               placeholder={selectedCall.incident_type || "e.g. Structure Fire"}
             />
+            <datalist id="cfr-call-types">
+              {callTypes.map((ct) => (
+                <option key={ct} value={ct} />
+              ))}
+            </datalist>
+            {callTypesFailed && (
+              <span className="text-[10px] text-amber-400">
+                ⚠️ Call-type list unavailable — typed text is not validated
+              </span>
+            )}
           </div>
 
           {/* Location Input */}

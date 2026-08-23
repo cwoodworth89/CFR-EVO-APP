@@ -104,6 +104,111 @@ class TestQueryStreet:
         assert ar.query_street("Silver Springs Blvd", "BLVD") == "SILVER SPRINGS BLVD"
 
 
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def mappings(self):
+        return self
+
+    def fetchall(self):
+        return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+
+class _FakeConn:
+    """Serves the parcel query, then answers intersection lookups from a fixed set."""
+
+    def __init__(self, parcel_rows, meeting_streets=()):
+        self.parcel_rows = parcel_rows
+        self.meeting_streets = {s.upper() for s in meeting_streets}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, statement, params=None):
+        sql = str(statement)
+        if "public.intersections" in sql:
+            street = (params or {}).get("s1", "").upper()
+            return _FakeResult([(1,)] if street in self.meeting_streets else [])
+        return _FakeResult(self.parcel_rows)
+
+
+class _FakeEngine:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def connect(self):
+        return self._conn
+
+
+def _parcel(street, stype, zone, house="3000"):
+    return {
+        "id": 1, "address": f"{house} {street} {stype}", "house": house,
+        "street": street, "streettype": stype, "zone_id": zone,
+        "lat": 49.28, "lng": -122.79, "front_lat": None, "front_lng": None,
+        "entrance_lat": None, "entrance_lng": None,
+        "centroid_lat": None, "centroid_lng": None, "geom_geojson": None,
+    }
+
+
+class TestAmbiguityWaterfall:
+    """Equally-matching streets are resolved by what dispatch announced.
+
+    Order: map grid, then cross streets, then refuse. Both signals are stated by the
+    dispatcher for the incident, so they outrank a similarity score -- and before this
+    the tie was settled by whichever row the database happened to return first.
+    """
+
+    # A real Coquitlam collision: "wood st" is equidistant from both of these at 78
+    # (measured on thefuzz 0.22.1), so neither wins on similarity alone. The resolver
+    # threshold is lowered to 70 for these tests so the tie is reachable -- at the
+    # production threshold of 80 this pair is refused earlier, which is also correct.
+    ROWS = [_parcel("Westwood", "St", "85"), _parcel("Eastwood", "St", "82")]
+
+    def _resolver(self, meeting_streets=()):
+        return ar.AddressResolver(
+            _FakeEngine(_FakeConn(self.ROWS, meeting_streets)), confidence_threshold=70)
+
+    def test_the_pair_really_does_tie(self):
+        # Guards the premise: if these stop tying, the tests below stop testing
+        # anything and would pass for the wrong reason.
+        assert ar.score_street("WOOD ST", "WESTWOOD ST") == \
+            ar.score_street("WOOD ST", "EASTWOOD ST")
+
+    def test_map_grid_breaks_the_tie(self):
+        res = self._resolver().resolve_exact(
+            "3000", "Wood St", "ST", target_map_grid="82")
+        assert res is not None
+        assert res["address"] == "3000 Eastwood St"
+
+    def test_cross_streets_break_the_tie_when_grid_is_absent(self):
+        res = self._resolver(meeting_streets={"WESTWOOD ST"}).resolve_exact(
+            "3000", "Wood St", "ST", cross_street_1="Pinetree Way")
+        assert res is not None
+        assert res["address"] == "3000 Westwood St"
+
+    def test_refuses_when_nothing_narrows_it(self):
+        # No grid, no cross streets: unresolved is correct. Picking one would be the
+        # original defect, which produced a confident wrong street.
+        res = self._resolver().resolve_exact("3000", "Wood St", "ST")
+        assert res is None
+
+    def test_grid_that_matches_nothing_falls_through_to_cross_streets(self):
+        # A grid naming a zone none of the candidates sit in must not empty the set;
+        # it falls through to the next signal rather than resolving to nothing.
+        res = self._resolver(meeting_streets={"EASTWOOD ST"}).resolve_exact(
+            "3000", "Wood St", "ST",
+            target_map_grid="999", cross_street_1="Pinetree Way")
+        assert res is not None
+        assert res["address"] == "3000 Eastwood St"
+
+
 class TestNoStreetNameIsRefused:
     """resolve_exact and validate_address_exists must both refuse a bare suffix.
 

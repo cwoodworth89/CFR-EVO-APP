@@ -95,8 +95,57 @@ class AddressResolver:
         self.engine = engine
         self.confidence_threshold = confidence_threshold
 
-    def resolve_exact(self, house: str, street_raw: str, street_type: str) -> dict | None:
-        """Step 1: Exact parcel match — house number + fuzzy street name."""
+    def _narrow_by_map_grid(self, rows: list, target_map_grid) -> list:
+        """Keep only candidates in the announced map grid.
+
+        public.parcels.zone_id IS the emergency response zone the dispatcher announces
+        as "map grid" -- verified 2026-08-23: the three 3000-block avenues carry
+        zone_id 85 (Walton), 82 (Lincoln) and 85 (Pinewood), matching the grid numbers
+        Locution speaks. This is the first and strongest narrowing signal because the
+        dispatcher states it explicitly for the incident.
+        """
+        if not target_map_grid:
+            return rows
+        grid = str(target_map_grid).strip()
+        narrowed = [r for r in rows if str(r['zone_id'] or '').strip() == grid]
+        return narrowed or rows
+
+    def _narrow_by_cross_streets(self, conn, rows: list,
+                                 cross_street_1: str, cross_street_2: str) -> list:
+        """Keep candidates whose street actually meets one of the announced cross streets.
+
+        Uses public.intersections, which is derived from public.roads geometry, so
+        "these streets meet" is a real topological fact rather than a proximity guess.
+        """
+        crosses = [normalize_street_name(c) for c in (cross_street_1, cross_street_2) if c]
+        if not crosses:
+            return rows
+
+        keep = []
+        for row in rows:
+            street_full = normalize_street_name(
+                f"{row['street']} {row['streettype'] or ''}".strip()
+            )
+            hit = conn.execute(text("""
+                SELECT 1 FROM public.intersections
+                WHERE ((UPPER(street_a) = UPPER(:s1) AND UPPER(street_b) = ANY(:crosses))
+                    OR (UPPER(street_b) = UPPER(:s1) AND UPPER(street_a) = ANY(:crosses)))
+                LIMIT 1;
+            """), {"s1": street_full, "crosses": [c.upper() for c in crosses]}).fetchone()
+            if hit:
+                keep.append(row)
+        return keep or rows
+
+    def resolve_exact(self, house: str, street_raw: str, street_type: str,
+                      target_map_grid=None,
+                      cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+        """Step 1: Exact parcel match — house number + fuzzy street name.
+
+        When several streets match the spoken name equally well, the announced map
+        grid and cross streets disambiguate before anything is returned, in that
+        order: grid, then cross streets, then refuse. Both are stated by the
+        dispatcher for this incident, so they outrank any similarity score.
+        """
         parsed_street = query_street(street_raw, street_type)
 
         # A street type with no street name identifies nothing. "3000 avenue" (STT
@@ -123,31 +172,54 @@ class AddressResolver:
                 """), {"house": str(house)}).mappings().fetchall()
 
                 best_score = 0
-                best_row = None
-                tied_streets = set()
+                scored = []
                 for row in rows:
                     db_street = f"{row['street']} {row['streettype'] or ''}".strip().upper()
                     db_norm = normalize_street_name(db_street)
                     score = score_street(parsed_street, db_norm)
                     if score > best_score:
                         best_score = score
-                        best_row = row
-                        tied_streets = {db_norm}
-                    elif score == best_score and best_row is not None:
-                        tied_streets.add(db_norm)
+                        scored = [(row, db_norm)]
+                    elif score == best_score:
+                        scored.append((row, db_norm))
 
-                # Two different streets scoring identically is a genuine ambiguity, not
-                # a winner. Previously the first row of an unordered query won silently.
-                if best_score >= self.confidence_threshold and len(tied_streets) > 1:
-                    logging.warning(
-                        "Address '%s %s' matches %d streets equally (%s) at score %s; "
-                        "returning ambiguous rather than picking one.",
-                        house, parsed_street, len(tied_streets),
-                        ", ".join(sorted(tied_streets)), best_score
-                    )
+                if best_score < self.confidence_threshold or not scored:
                     return None
 
-                if best_score >= self.confidence_threshold and best_row is not None:
+                best_row = scored[0][0]
+                if len({norm for _, norm in scored}) > 1:
+                    # Several streets match the spoken name equally well. Resolve with
+                    # what the dispatcher actually announced, strongest signal first,
+                    # rather than taking whichever row the database returned.
+                    candidates = [row for row, _ in scored]
+
+                    narrowed = self._narrow_by_map_grid(candidates, target_map_grid)
+                    stage = "map grid"
+                    if len({(r['street'], r['streettype']) for r in narrowed}) > 1:
+                        narrowed = self._narrow_by_cross_streets(
+                            conn, narrowed, cross_street_1, cross_street_2)
+                        stage = "cross streets"
+
+                    remaining = {(r['street'], r['streettype']) for r in narrowed}
+                    if len(remaining) > 1:
+                        logging.warning(
+                            "Address '%s %s' matches %d streets equally (%s) and neither "
+                            "the map grid (%s) nor the cross streets (%s / %s) narrow it "
+                            "to one. Returning unresolved rather than picking one.",
+                            house, parsed_street, len({n for _, n in scored}),
+                            ", ".join(sorted(n for _, n in scored)),
+                            target_map_grid, cross_street_1, cross_street_2
+                        )
+                        return None
+
+                    best_row = narrowed[0]
+                    logging.info(
+                        "Address '%s %s' was ambiguous across %d streets; %s narrowed it "
+                        "to %s.", house, parsed_street, len({n for _, n in scored}),
+                        stage, best_row['address']
+                    )
+
+                if best_row is not None:
                     dest_lat = best_row['front_lat'] or best_row['entrance_lat'] or best_row['lat']
                     dest_lng = best_row['front_lng'] or best_row['entrance_lng'] or best_row['lng']
                     rings = self._extract_rings(best_row['geom_geojson'])

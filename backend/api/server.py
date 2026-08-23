@@ -38,6 +38,7 @@ try:
         audio_router,
         tiles_router,
         hydrants_router,
+        vocabulary_router,
     )
     # Backward compatibility re-exports
     from backend.api.schemas import (
@@ -83,6 +84,7 @@ except ModuleNotFoundError:
         audio_router,
         tiles_router,
         hydrants_router,
+        vocabulary_router,
     )
     # Backward compatibility re-exports
     from api.schemas import (
@@ -155,6 +157,7 @@ app.include_router(evaluations_router)
 app.include_router(audio_router)
 app.include_router(tiles_router)
 app.include_router(hydrants_router)
+app.include_router(vocabulary_router)
 
 
 @app.get("/")

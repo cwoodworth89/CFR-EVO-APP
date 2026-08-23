@@ -11,6 +11,7 @@ from .evaluations import router as evaluations_router
 from .audio import router as audio_router
 from .tiles import router as tiles_router
 from .hydrants import router as hydrants_router
+from .vocabulary import router as vocabulary_router
 
 __all__ = [
     "auth_router",
@@ -23,4 +24,5 @@ __all__ = [
     "audio_router",
     "tiles_router",
     "hydrants_router",
+    "vocabulary_router",
 ]

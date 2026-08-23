@@ -1289,3 +1289,476 @@ which process — or which *instance* of the worker — handled phase 1.
 `record_phase_1_success`. Any exception in that broadcast block leaves an INSERT emitted
 with no session recorded, producing the same "phase 1 was skipped" outcome. Recording the
 session first would make an untracked INSERT impossible.
+
+---
+
+## 🏷️ Response Terminology & Status Colour
+
+### 30. "Code 1 / Code 3" is not Coquitlam terminology, and the border has no warning or review state
+> **Status**: ⚠️ **Open — found 2026-08-23.** Reported by the operator from a live kiosk
+> screenshot (`1347 KENNEY ST`, GRID 88, routine call). The rendering sites below were
+> **confirmed** by reading the working tree; the terminology correction itself is the
+> operator's, and Coquitlam usage is not currently backed by a document in
+> `docs/standards/` (see the gap note at the end).
+
+**Two separate defects in one item, because they share the same `isEmergency` input.**
+
+#### 30a. The code numbers are wrong, and should be removed entirely
+
+The kiosk badge reads **`🟢 ROUTINE (CODE 1)`**. Coquitlam Fire/Rescue does not use Code 1;
+the numeric scale in use is **Code 2 and Code 3**, so the label is doubly wrong — the wrong
+number *and* a scale the department does not speak.
+
+The operator's direction: **drop the numeric codes from the interface entirely.** The
+authoritative terms are **`ROUTINE`** and **`EMERGENCY`**, which is also how the dispatch
+itself is transmitted over the radio — so the display would match what crews actually hear.
+
+Confirmed rendering and label sites:
+
+| File | Line | Current |
+|:--|:--|:--|
+| [`frontend/src/components/hud/ActiveAlertBanner.jsx`](../frontend/src/components/hud/ActiveAlertBanner.jsx) | `36` | `isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'` |
+| [`services/gis/src/gis_service/routing_engine.py`](../services/gis/src/gis_service/routing_engine.py) | `309`, `433` | `"response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)"` |
+| [`backend/tests/test_routing_engine.py`](../backend/tests/test_routing_engine.py) | `338`, `341` | asserts both strings — **will fail** when the labels change, and must be updated with them |
+
+`response_mode` has **no frontend consumer** — the grep above finds it only in the routing
+engine that emits it and the test that asserts it. So the backend and frontend strings are
+independently wrong rather than one feeding the other, and both need changing.
+
+**Related, and the reason this is not purely cosmetic** —
+[`frontend/src/components/kiosk/KioskView.jsx:93`](../frontend/src/components/kiosk/KioskView.jsx#L93):
+
+```js
+const isEmergency =
+  activeCall.priority_code <= 2 ||
+  String(activeCall.priority_code).toLowerCase() === 'emergency' ||
+  String(activeCall.response_type).toLowerCase() === 'emergency';
+```
+
+The numeric branch encodes a **`<= 2` means emergency** rule. If the department's scale is
+Code 2/Code 3 rather than 1/2/3, then `priority_code == 2` classifying as *emergency* needs
+confirming against what the dispatch feed actually sends — under a 2/3 scale, 2 may well be
+the *routine* value, which would invert the classification and the border colour with it.
+**This branch must be resolved before the labels are cosmetically renamed**, or the display
+will read correctly while classifying incorrectly.
+
+> **Resolved by #31**: `priority_code` is not a column in `public.dispatches` and appears
+> nowhere in the backend. Every branch of this expression reads an undefined field, so
+> `isEmergency` is **always false** and *every* call — including all 343 emergency ones —
+> renders green. The branch is to be deleted, not renumbered. **Fix #31 first; #30 is the
+> wording on top of it.**
+
+#### 30b. The border colour has only two of the four required states
+
+Confirmed at [`KioskView.jsx:175`](../frontend/src/components/kiosk/KioskView.jsx#L175):
+
+```js
+const borderColor = isEmergency ? 'border-red-600' : 'border-emerald-500';
+```
+
+Applied as a `border-[6px]` ring on the fixed full-screen container (`:180`). The operator
+confirms **green for routine is correct and worth keeping**. The required state set is:
+
+| State | Border | Present today |
+|:--|:--|:--|
+| Routine | **Green** | ✅ `border-emerald-500` |
+| Emergency | **Red** | ✅ `border-red-600` |
+| Warning | **Amber** | ❌ no amber border state exists |
+| Review mode | **Blue** | ❌ review keeps the red/green border; it is signalled only by a *purple* `🧪 REVIEW REPLAY` badge in `ActiveAlertBanner.jsx:39` |
+
+Two follow-on notes for whoever implements this:
+
+* **Review mode is currently purple, not blue** — the badge at `ActiveAlertBanner.jsx:39`
+  uses `purple-950/purple-500/purple-200`. If blue becomes the review colour, the badge
+  should move with the border or the two will disagree.
+* **What drives the amber warning state is undefined.** The §5 Tier 1 unresolved-location
+  card and the queued-call banner (`KioskView.jsx:185`) are both already amber, so they are
+  the natural candidates — but which conditions raise the *border* to amber, and what
+  happens when a warning coincides with an emergency (does amber override red, or red win?),
+  is a precedence decision that has not been made. **Ask before implementing.**
+
+#### Answered by the operator, 2026-08-23
+
+1. **Numeric codes are removed from the system entirely.** Use the bare terms **`routine`** /
+   **`emergency`** everywhere — that is how the dispatch is transmitted and how the parser and
+   `public.vocabulary` already represent it, so there is nothing to translate. Code 2 / Code 3
+   are **deleted, not renamed**, and no numeric mapping is retained as a fallback; if one is
+   ever needed the operator will add it themselves. The `priority_code <= 2` branch is to be
+   **deleted**, not corrected; see **#31**, which found it tests a column that does not exist.
+2. **Amber is orthogonal to response type.** Green/red are *"stylistic, and a minor reminder
+   to drivers"*. **Amber flags the call for additional attention regardless of response
+   type**, so it **overrides** both green and red. Current triggers:
+   * the system applied a **correction**,
+   * **low confidence**,
+   * a **call is queued**,
+   * *(added 2026-08-23)* the **response type is `NULL`** — shown as `UNKNOWN`; see #31.
+3. **Review stays purple.** No change; the existing `🧪 REVIEW REPLAY` badge colour is
+   correct and the border should match it rather than going blue.
+
+Revised target state for the border:
+
+| State | Border | Precedence | Present today |
+|:--|:--|:--|:--|
+| Review mode | **Purple** | highest | badge only, border unchanged |
+| Warning | **Amber** | overrides green/red | ❌ does not exist |
+| Response type `NULL` | **Amber**, labelled `UNKNOWN` | as warning | ❌ cannot occur yet — see #31 |
+| Emergency | **Red** | — | ✅ but never fires — see #31 |
+| Routine | **Green** | — | ✅ fires on *every* call — see #31 |
+
+**The "low confidence" threshold, measured 2026-08-23.** The operator asked for a new number
+on the grounds that the existing `confidence_score >= 90` in `dispatchModel.js:74` is
+unsourced. It is unsourced — but **the corpus supports it**, so the defect is the missing
+provenance, not the value.
+
+`confidence_score` is heavily quantised (435 rows, none NULL):
+
+| Score | Rows |
+|:--|--:|
+| `0` | 30 |
+| 45–78 | 25 |
+| 81–89 | 27 |
+| 91–96 | 19 |
+| `100` | 334 |
+
+Cross-referenced against HITL `quality_rating`, counting only **rated** calls:
+
+| Band | Rated | Perfect | Failed |
+|:--|--:|--:|--:|
+| `0` | 5 | **0%** | **100%** |
+| 45–78 | 14 | 14% | 21% |
+| 81–89 | 13 | 15% | 8% |
+| 91–96 | 8 | **63%** | **0%** |
+| `100` | 116 | 59% | 3% |
+
+**The behavioural break is between 89 and 91.** 91–96 behaves like 100 (≈60% perfect, no
+failures); 81–89 behaves like 45–78 (≈15% perfect, failures present). A cut at 90 lands
+exactly on that boundary. Moving it to 80 would sweep the 81–89 band — the band that
+actually behaves badly — into the "confident" side.
+
+At `< 90`, **82 of 435 calls (19%)** would raise amber.
+
+⚠️ **Caveats, stated rather than buried**: the 91–96 and 81–89 bands have only 8 and 13
+*rated* calls, so the boundary is suggestive, not established. 77% of the `100` band is
+unrated. And `quality_rating` is the operator's own judgement, so this measures agreement
+between the parser's self-assessment and the reviewer, not ground truth.
+
+**Recommendation**: keep **90**, and convert it from an unsourced constant into a §6.3 tier-3
+*measured* one by citing this analysis inline. Revisit once the rated sample in the 81–96
+range grows. **Operator decision still required** — see the question below.
+
+`confidence_score = 0` is a distinct case, not merely "low": all 30 such rows are hard
+resolution failures (13 have no address at all, 19 are already flagged `verify_location`),
+and every rated one was graded FAILED. Worth treating as its own amber reason rather than
+folding into the threshold.
+
+Still to pin down: the predicate for "applied a correction". `isRecentlyUpdated` (already
+plumbed into `ActiveAlertBanner`) is the likely signal, and `queuedCalls.length > 0` the
+queued one.
+
+**Operator decision 2026-08-23**: **keep 90 for now**, commented with its measurement, and
+tag it for future QA review once more dispatches have been rated. Tracked as **#32**, which
+also records what the operator wants the flag to *mean* — "would the crew have reached the
+right address", i.e. below OPERATIONAL or a poor geocode score — and a re-measurement against
+`verified_address` that partly contradicts the `quality_rating` analysis above.
+
+> **Standards gap** — Coquitlam Fire/Rescue response-mode terminology is not held in
+> `docs/standards/`. Recorded there per CLAUDE.md §7.5; until it exists, the operator is the
+> authority, and the authority's ruling is: **`routine` / `emergency`, no numeric code.**
+
+---
+
+### 31. `response_type` never reaches the kiosk — every call renders as ROUTINE
+> **Status**: ⚠️ **Open — found 2026-08-23 while investigating #30.** **Confirmed** against
+> the running kiosk database and the working tree. This is the defect #30 was sitting on
+> top of; #30 is the wording, this is the data.
+
+**The kiosk cannot tell an emergency call from a routine one. It never receives the field.**
+
+#### Confirmed by query, not by reading
+
+`public.dispatches` has **22 columns and none of them carry a response type**:
+
+```
+id, dispatch_id, timestamp, incident_type, responding_units, target,
+raw_transcript, sanitized_transcript, confidence_score, verify_location,
+origins, audio_url, audio_duration, verified_transcript, verified_address,
+verified_incident, verified_units, feedback_submitted, quality_rating,
+model_updated, review_notes, routing_metrics
+```
+
+There is **no `priority_code` column, and no `response_type` column.** Neither key appears
+anywhere in the `target` JSONB either — a scan of every `target` key across all 435 rows
+matching `%resp%`, `%prior%` or `%code%` returns **zero**.
+
+Yet the information is plainly present in the audio:
+
+| | rows |
+|:--|--:|
+| Total dispatches | 435 |
+| Transcript contains `respond emergency` | **343** |
+| Transcript contains `respond routine` | 66 |
+
+#### Consequence
+
+[`KioskView.jsx:93`](../frontend/src/components/kiosk/KioskView.jsx#L93):
+
+```js
+const isEmergency =
+  activeCall.priority_code <= 2 ||                                  // undefined <= 2      -> false
+  String(activeCall.priority_code).toLowerCase() === 'emergency' || // "undefined"          -> false
+  String(activeCall.response_type).toLowerCase() === 'emergency';   // "undefined"          -> false
+```
+
+All three branches read fields that do not exist, so `isEmergency` is **always `false`**.
+Every dispatch renders with the green routine border and the `🟢 ROUTINE` badge — including
+all **343 emergency calls**. The screenshot in #30 happens to be a genuine routine call,
+which is why the error is invisible there.
+
+The operator states the border is *"stylistic, and a minor reminder to drivers"*, so this is
+not a life-safety failure — but it is a signal that has never once been correct for an
+emergency call, and drivers have been receiving a green cue on every call regardless.
+
+`dispatchModel.js:73` faithfully maps `priority_code: record.priority_code` — it is
+propagating a field the backend has never produced.
+
+#### Root cause: the value is computed, used, and then discarded
+
+[`payload_builder.py:186`](../backend/cfr_dispatch/pipeline/payload_builder.py#L186):
+
+```python
+detected_resp = next((d.response_type for d in all_candidates if d.response_type), "emergency")
+routing_metrics = router.calculate_units_routing(
+    responding_units, lat, lng, response_type=detected_resp, ...)
+```
+
+`detected_resp` is parsed correctly from the transcript, passed to the routing engine, logged
+— and then **never added to `target_payload`** (`:195–202`). It dies in the local scope. The
+parser side is fine: `destructive_parser.py:74` and `announcement.py:171` both extract it,
+and `public.vocabulary` already stores `response_type` as the two strings **`routine`** and
+**`emergency`** (`2026-08-21_vocabulary_seed.sql:232-233`).
+
+The only place it survives to the database is incidentally, inside per-unit routing metrics —
+and almost never:
+
+| `target.routing_metrics[].response_mode` | unit rows |
+|:--|--:|
+| `null` | **405** |
+| `Emergency (Code 3)` | 8 |
+| `Routine (Code 1)` | 2 |
+
+#### Two smaller defects found alongside
+
+1. **The defaults disagree — resolved to `NULL`.** When no candidate carries a response type,
+   `payload_builder.py:186` defaults to **`"emergency"`**, while `payload_builder.py:228`
+   (template reconstruction), `phase2.py:177`/`:260` and `destructive_parser.py:39` all default
+   to **`"routine"`**. The same unparsed call is therefore routed as emergency but
+   reconstructed as routine. **Operator ruling 2026-08-23: all four fallbacks are removed and
+   an unparsed response type propagates as `None`** (§6.1), displaying as unknown. The visible
+   consequence — some calls showing neither the green nor the red border — is accepted.
+
+   **Where `NULL` surfaces — both settled by the operator 2026-08-23:**
+   * **Border**: a `NULL` response type is an **amber** condition with the response type shown
+     as `UNKNOWN`. It joins the amber trigger set in #30 rather than producing a borderless
+     call, so the gap is loud rather than quiet.
+   * **ETA**: `routing_engine.py:279` and `:407` derive
+     `is_routine = str(response_type).lower().strip() == "routine"`; a boolean cannot represent
+     unknown, so `None` already falls through to the **emergency** branch. The operator has
+     ruled this **correct** — most calls are emergency and time-critical, and ETAs are not
+     currently relied upon operationally. It must stop being *accidental*: both sites need a
+     §6.3 tier-4 provenance comment naming the decision. The **stored** value stays `NULL`;
+     only the routing calculation assumes emergency. That distinction is the whole point —
+     inventing a stored response type is banned, computing under a declared and displayed
+     assumption is not.
+2. **`public.dispatches.routing_metrics`** (the top-level column, distinct from
+   `target.routing_metrics`) is an empty object on every row scanned. Possibly dead; worth
+   confirming before anything new is written to it.
+
+#### Direction agreed with the operator (2026-08-23)
+
+**Use the strings; do not introduce a numeric code.** The dispatch is transmitted as
+"respond routine" / "respond emergency", the parser already produces exactly those two
+lowercase strings, and `public.vocabulary` already stores them — so a numeric code would be a
+translation layer with no source and two more places to get inverted.
+
+Accordingly:
+
+* Persist `response_type` (`'routine'` | `'emergency'` | `NULL` when unparsed) through
+  `target_payload` so it reaches the kiosk.
+* Replace the three-branch `isEmergency` in `KioskView.jsx:93` with a single string test.
+  **Delete the `priority_code <= 2` branch outright** — it tests a field that has never
+  existed, and under the department's Code 2/Code 3 scale its arithmetic would be inverted
+  anyway. This resolves open question 1 of #30.
+* **Remove Code 2 / Code 3 from the system entirely** (operator, 2026-08-23) — deleted, not
+  renamed and not retained as a mapping. No numeric response code should survive anywhere in
+  the codebase. If a numeric scale is ever genuinely needed, the operator will make that
+  change themselves; no translation layer is to be left in place in anticipation.
+* **An unparsed response type is `NULL`, never a guess** (operator, 2026-08-23). This closes
+  the conflicting-defaults question below: all four fallbacks come out.
+* Add a **reviewer verification control** for response type in the HITL panel, modelled on
+  the tone selectors — see the briefing below.
+
+> **Handed to the parser agent 2026-08-23**:
+> [`docs/briefings/response_type_persistence.md`](./briefings/response_type_persistence.md)
+> covers both the persistence fix and the review-panel control, with the operator ruling and
+> the conflicting-defaults question that must be raised before implementing.
+
+---
+
+### 32. QA review: re-derive the amber "needs attention" threshold once more calls are rated
+> **Status**: 🕓 **Deferred by the operator 2026-08-23 — revisit after more HITL reviews.**
+> The threshold stays at **90**, now carrying its measurement inline
+> (`frontend/src/utils/dispatchModel.js`). This item exists so the provisional decision is not
+> mistaken later for a settled one.
+
+#### What the operator actually wants the flag to mean
+
+Not "low transcript confidence" — **"would the crew have reached the right address."** In the
+operator's words, *operational* means the crew would at least get to the right address even if
+other data was poor, and that is the factor that matters. So the amber trigger should fire on
+**anything below OPERATIONAL, or a poor geocode score**, rather than on overall parser
+confidence.
+
+That is a different signal from `confidence_score`, and the two do not agree.
+
+#### Measurement run 2026-08-23 — and a correction to an earlier figure
+
+202 reviewed calls (`feedback_submitted` with a non-empty `verified_address`), comparing the
+system address to the operator's correction.
+
+**A first pass compared the strings raw and reported 25% of the `score 100` band as
+"corrected". That figure was wrong and is withdrawn.** Most of those diffs were cosmetic —
+suffix expansion (`HWY`→`HIGHWAY`, `AVE`→`AVENUE`, `CRES`→`CRESCENT`), unit-number stripping
+(`1142 DUFFERIN ST 152` → `1142 DUFFERIN ST`), and removal of the `(street centroid)`
+annotation. None of those would send a crew anywhere different.
+
+After normalising suffixes, trailing unit numbers and annotations:
+
+| Confidence | Reviewed | Substantively wrong address |
+|:--|--:|--:|
+| `0` | 10 | **100%** |
+| 45–78 | 20 | **60%** |
+| 81–89 | 15 | **0%** |
+| 91–96 | 9 | **0%** |
+| `100` | 148 | **8%** |
+
+**The break is at 80, not 90.** The 81–89 band — which looked mediocre against
+`quality_rating` — is *flawless* on address. So a cutoff at 90 is **conservative rather than
+wrong**: it flags a band that has not actually failed. For a warning colour that is the safe
+direction to err, which is why 90 is retained rather than moved.
+
+#### Why it is not moved to 80 today
+
+* 81–89 has only **15** reviewed calls. Zero failures in 15 is not yet zero failure rate.
+* **`score 100` still gets 8% wrong** (12 of 148). Confidence is not a complete proxy for
+  geocode correctness, so *no* threshold on this field alone catches everything the operator
+  cares about. A geocode-specific quality signal would serve better than a parser-confidence
+  one — see below.
+* `confidence_score = 0` is a **distinct failure mode**, not merely "low": all 30 such rows
+  are hard resolution failures (13 have no address, 19 already flagged `verify_location`) and
+  10 of 10 reviewed had the address corrected. Worth its own amber reason.
+
+#### Data-quality problem this exposed, worth fixing before the next measurement
+
+**`verified_address` is being used for cosmetic edits, which contaminates it as ground truth.**
+Reviewers expand suffixes and strip unit numbers, so a naive comparison overstates the geocode
+error rate by roughly 3× (37 raw diffs vs 12 real ones in the `100` band). Any future accuracy
+metric built on `verified_address` must normalise first, or the numbers will be wrong in the
+alarming direction.
+
+Two related observations from the same sample:
+
+* Genuine failures are visible and do look like real defects — `1` → `657 Whiting Way`,
+  `1550` → `1550 United Blvd`, `3000 Walton Ave` → `3007 Anson Ave`, and STT damage such as
+  `3025 Low Heat Hwy` → `3025 Lougheed Highway` (*"Low Heat"* for *Lougheed*).
+* At least one rating looks inconsistent: `3030 Gordon Avenue Rain City Housing` verified to
+  `2648 Sandstone Cres` — a completely different address — yet rated **PERFECT**. If
+  `quality_rating` is to drive the flag, its own consistency needs a pass first.
+
+#### To do when revisiting
+
+1. Re-run the banded comparison once the rated sample in 81–96 is materially larger.
+2. Decide whether the trigger should key off **`quality_rating < OPERATIONAL`** (the
+   operator's stated preference) rather than `confidence_score` — noting ratings are applied
+   *retroactively*, so they cannot flag a live call. A live proxy is still needed; the
+   question is which one best predicts the retroactive rating.
+3. Consider a dedicated **geocode confidence** distinct from parser confidence. The geocoder
+   already knows whether it returned an exact parcel match, a street centroid, or a fuzzy
+   suggestion — that is a far more direct answer to "will the crew reach the right address"
+   than a transcript score. Related to #12.
+
+---
+
+### 33. Call-type vocabulary carries locale variants as duplicate rows; HITL captures incident as free text
+> **Status**: 🔧 **In progress — found 2026-08-23 during the parser audit.** All counts below
+> are **confirmed** by query against the kiosk database (`100.95.146.94:5432`), not read from
+> code. Two records are **flagged for operator re-review** (see the last section) and are not
+> being guessed at.
+
+**Root cause is the input, not the data.**
+[`VerificationSidebar.jsx:429`](../frontend/src/components/review/VerificationSidebar.jsx)
+captures `verified_incident` as a bare `<input type="text">` — no datalist, no select, no
+validation against `public.vocabulary`. Reviewers hand-type the incident type, so ground truth
+drifts from the vocabulary the parser is matching against. Every item below is downstream of
+that one control.
+
+#### The vocabulary is doing two jobs at once
+
+`public.vocabulary` (`category='call_type'`, 66 rows, all `source='cfr_curated'`) is
+simultaneously **what the parser listens for** and **what the kiosk displays**. Where those
+two disagree, the table has grown a second row instead of a second field.
+
+Measured, `raw_transcript` vs vocabulary:
+
+| Pair | STT writes | Reviewers confirm | Verdict |
+|:--|:--|:--|:--|
+| `Wildland Fire - Smoldering` / `- Smouldering` | `smoldering` **5/5**, `smouldering` **0/5** | `Smouldering` **2/2** | **not a duplicate — a recognition alias** |
+| `Medical Aid - Breathing Problem` / `- Problems` | `breathing problem` **24/24** singular | split 5 / 4 | plural row is dead weight |
+
+Whisper writes American English consistently; the department writes Canadian. The
+`- Smoldering` row is the only reason those five calls classify at all — **retiring it as a
+duplicate would introduce the qualifier-drop defect this audit set out to measure.**
+
+Genuinely dead rows (zero usage on either side, safe to retire):
+`Alarms Activated`, `Alarms Activated - High Risk`, `Medical Aid - Cardiac Problems`.
+
+#### Ground truth contains terms the parser structurally cannot emit
+
+Seven `verified_incident` values have no matching vocabulary row. `match_incident_type` returns
+a vocabulary term or `Unknown Incident`, so these can never be produced no matter how good the
+parse. They are vocabulary gaps, **not** parser defects:
+
+`Structure Fire - Detached Structure`, `Tent Fire - High Risk`,
+`Medical Aid - Airway Obstruction`, `Odor - Unknown Source` — legitimate, being added.
+
+#### Correction to an earlier claim in this audit
+
+An earlier pass in this session reported `Tent Fire - High Risk` and
+`Structure Fire - Detached Structure` as **2 live parser defects**. That was wrong — both are
+missing vocabulary rows. Recorded here so the claim is not repeated (CLAUDE.md §6.6).
+
+Also corrected: the qualifier-drop class is **not** 22 live defects.
+Re-running current code over the class gives **16 already correct, 6 remaining**, of which 4
+were these locale variants. The stored-vs-verified figure was measuring history, exactly the
+ghost-defect trap `docs/parser_audit_handoff.md` §4.2 warns about.
+
+#### ⚠️ Flagged for operator re-review — do not guess
+
+Two records have `verified_incident` values that are data-entry errors. The correct incident
+type cannot be recovered from the vocabulary and **must not be inferred** (CLAUDE.md §6.1):
+
+| Dispatch | `verified_incident` | Needs |
+|:--|:--|:--|
+| (1 record) | `''` — empty string | operator to re-review and set the real type |
+| (1 record) | `Assist` — not a vocabulary term; ambiguous between `Public Assist`, `Lift Assist`, `Medical Aid - Assist` | operator to disambiguate |
+
+Until resolved, both are counted as **unknown**, not as parser misses. The empty-string record
+was being scored as a wrong answer by naive mismatch counts, inflating the incident-type error
+rate by one.
+
+#### Gap (CLAUDE.md §7.2)
+
+Nothing in [`docs/standards/`](standards/README.md) governs the call-type vocabulary, and
+`source='cfr_curated'` records no external authority. Canonical spellings here were set by
+operator decision on 2026-08-23 (`Breathing Problem` singular, `Smouldering` Canadian), not by
+a document. If E-Comm / Coquitlam Fire dispatch publishes an official call-type list, it
+supersedes this and belongs in `docs/standards/`.

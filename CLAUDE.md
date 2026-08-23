@@ -229,6 +229,10 @@ in `docs/standards/README.md` as an open gap. An unknown source is tracked the s
 unknown value is (§6.1): visibly.
 
 
+**Picking up debugging work?** Start at
+[`docs/review_status_handoff.md`](docs/review_status_handoff.md) — system state, what
+changed, open items in priority order, and the environment gotchas that cost the most time.
+
 See also: [`docs/standards/README.md`](docs/standards/README.md) for the standards index and
 [`docs/standards/dependency-behaviour.md`](docs/standards/dependency-behaviour.md) for verified library semantics (§7),
 [`PROJECT.md`](PROJECT.md) for architecture/feature/milestone tracking, [`README.md`](README.md) for setup instructions, and [`docs/agent_onboarding.md`](docs/agent_onboarding.md) for the full CLI command reference, SSH/audio (`XDG_RUNTIME_DIR`) heuristics, and the STT MLOps feedback pipeline.

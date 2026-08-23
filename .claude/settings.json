@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Browser__preview_start",
+      "mcp__Claude_Browser__navigate",
+      "mcp__Claude_Browser__read_page",
+      "mcp__Claude_Browser__get_page_text",
+      "mcp__Claude_Browser__find",
+      "mcp__Claude_Browser__computer",
+      "mcp__Claude_Browser__form_input",
+      "mcp__Claude_Browser__read_console_messages",
+      "mcp__Claude_Browser__read_network_requests",
+      "mcp__Claude_Browser__resize_window",
+      "mcp__Claude_Browser__tabs_context",
+      "mcp__Claude_Browser__tabs_create",
+      "mcp__Claude_Browser__tabs_select",
+      "mcp__Claude_Browser__tabs_close",
+      "mcp__Claude_Browser__preview_list",
+      "mcp__Claude_Browser__preview_logs",
+      "mcp__Claude_Browser__preview_stop",
+
+      "mcp__cfr-postgres__query",
+
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git fetch *)",
+      "Bash(git merge-base *)",
+      "Bash(git rev-list *)",
+
+      "Bash(npm run build*)",
+      "Bash(npm run lint*)",
+      "Bash(npx eslint *)",
+
+      "Bash(ssh -o BatchMode=yes *)",
+      "Bash(scp -o BatchMode=yes *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force origin main*)",
+      "Bash(git push -f origin main*)"
+    ],
+    "ask": [
+      "Bash(sudo *)"
+    ]
+  }
+}

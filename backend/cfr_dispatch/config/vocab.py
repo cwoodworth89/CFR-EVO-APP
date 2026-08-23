@@ -94,6 +94,26 @@ UNITS_VOCAB_RAW = _require('unit', load_vocabulary_from_db('unit'))
 RESPONSE_TYPES = _require('response_type', load_vocabulary_from_db('response_type'))
 RADIO_CHANNELS = _require('radio_channel', load_vocabulary_from_db('radio_channel'))
 MAP_GRIDS = _require('map_grid', load_vocabulary_from_db('map_grid'))
+# CALL-TYPE STRUCTURE (operator ruling 2026-08-23, docs/standards/README.md)
+#
+# A call type is a MAIN type optionally followed by a SUB type, joined by " - ":
+#
+#     Medical Aid                     <- main alone, valid
+#     Medical Aid - Overdose          <- main + sub
+#     Structure Fire - Detached Structure
+#
+# A main type can stand on its own; 25 of the 27 current mains do. Most calls, though,
+# arrive with the expanded form, and the sub type is the operationally significant half --
+# it changes what crews bring and how they stage.
+#
+# The two levels are deliberately NOT modelled separately. There is one flat running list
+# of complete terms in public.vocabulary, and " - " is the only structure. Do not split
+# this into main/sub categories, columns, or tables, and do not offer or store a sub type
+# on its own -- "Overdose" is not a call type, "Medical Aid - Overdose" is.
+#
+# Sorted longest-first so a qualified type is tested before the base type it contains.
+# Without this, "Medical Aid" matches first and the sub type is silently dropped -- the
+# exact defect measured at 22 calls before the 2026-08-23 vocabulary work (punch-list #33).
 CALL_TYPES = sorted(_require('call_type', load_vocabulary_from_db('call_type')), key=len, reverse=True)
 # Recognition-only spellings. Deliberately NOT added to CALL_TYPES: an alias must never
 # be offered to a reviewer or rendered on the kiosk, only matched against (punch-list #33).

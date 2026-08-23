@@ -110,41 +110,95 @@ class AddressResolver:
         narrowed = [r for r in rows if str(r['zone_id'] or '').strip() == grid]
         return narrowed or rows
 
-    def _narrow_by_cross_streets(self, conn, rows: list,
-                                 cross_street_1: str, cross_street_2: str) -> list:
-        """Keep candidates whose street actually meets one of the announced cross streets.
+    def _narrow_by_near_roads(self, conn, rows: list,
+                              near_road_1: str, near_road_2: str) -> list:
+        """Keep the candidate closest, on average, to the announced "near" roads.
 
-        Uses public.intersections, which is derived from public.roads geometry, so
-        "these streets meet" is a real topological fact rather than a proximity guess.
+        Locution announces "near <road> and <road>". Those roads are NOT necessarily
+        cross streets -- they frequently run parallel to the incident street and never
+        meet it. The only reliable claim is that they are *nearby*, so this ranks
+        candidates by distance rather than by whether an intersection exists.
+
+        Averaging both roads matters, and a single road is not enough. On
+        DISP-2026-156DCF ("near pinetree way and ponderosa street"), measured
+        2026-08-23 against the candidates for "3000 <avenue>":
+
+            3000 Lincoln Ave    Pinetree   11 m   Ponderosa     8 m   avg   10 m
+            3000 Pinewood Ave   Pinetree    9 m   Ponderosa  1061 m   avg  535 m
+            3000 Walton Ave     Pinetree  297 m   Ponderosa  1254 m   avg  776 m
+
+        Pinewood is the closest candidate to Pinetree Way and would win a
+        nearest-single-road test; the average is what rejects it. Walton -- the street
+        this call actually shipped -- ranks last.
+
+        Matching is on public.roads.roadname (the base name), because roads store the
+        suffix unabbreviated ("PONDEROSA STREET") while parcels abbreviate it
+        ("Ponderosa St"). Comparing full names silently matches nothing.
         """
-        crosses = [normalize_street_name(c) for c in (cross_street_1, cross_street_2) if c]
-        if not crosses:
+        names = []
+        for road in (near_road_1, near_road_2):
+            tokens = street_name_tokens(normalize_street_name(road)) if road else []
+            if tokens:
+                names.append(" ".join(tokens))
+        if not names or not rows:
             return rows
 
-        keep = []
-        for row in rows:
-            street_full = normalize_street_name(
-                f"{row['street']} {row['streettype'] or ''}".strip()
-            )
-            hit = conn.execute(text("""
-                SELECT 1 FROM public.intersections
-                WHERE ((UPPER(street_a) = UPPER(:s1) AND UPPER(street_b) = ANY(:crosses))
-                    OR (UPPER(street_b) = UPPER(:s1) AND UPPER(street_a) = ANY(:crosses)))
-                LIMIT 1;
-            """), {"s1": street_full, "crosses": [c.upper() for c in crosses]}).fetchone()
-            if hit:
-                keep.append(row)
-        return keep or rows
+        ids = [r['id'] for r in rows if r.get('id') is not None]
+        if not ids:
+            return rows
+
+        try:
+            ranked = conn.execute(text("""
+                WITH near_roads AS (
+                    SELECT UPPER(roadname) AS nm, ST_Union(geom) AS geom
+                    FROM public.roads
+                    WHERE UPPER(roadname) = ANY(:names)
+                    GROUP BY UPPER(roadname)
+                )
+                SELECT p.id,
+                       AVG(ST_Distance(p.geom::geography, n.geom::geography)) AS avg_m,
+                       COUNT(n.nm) AS roads_matched
+                FROM public.parcels p CROSS JOIN near_roads n
+                WHERE p.id = ANY(:ids)
+                GROUP BY p.id
+                ORDER BY avg_m ASC;
+            """), {"names": names, "ids": ids}).mappings().fetchall()
+        except Exception as e:
+            logging.error("Near-road narrowing failed: %s", e, exc_info=True)
+            return rows
+
+        if not ranked:
+            return rows
+
+        best = ranked[0]
+        # An exact tie is a genuine ambiguity; leave the set as it was so the caller
+        # refuses rather than picking arbitrarily.
+        if len(ranked) > 1 and float(ranked[1]['avg_m']) == float(best['avg_m']):
+            return rows
+
+        by_id = {r['id']: r for r in rows}
+        winner = by_id.get(best['id'])
+        if winner is None:
+            return rows
+        logging.info(
+            "Near roads (%s) narrowed %d candidates to %s, %.0f m away on average.",
+            ", ".join(names), len(rows), winner['address'], float(best['avg_m'])
+        )
+        return [winner]
 
     def resolve_exact(self, house: str, street_raw: str, street_type: str,
                       target_map_grid=None,
-                      cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+                      near_road_1: str = None, near_road_2: str = None) -> dict | None:
         """Step 1: Exact parcel match — house number + fuzzy street name.
 
         When several streets match the spoken name equally well, the announced map
-        grid and cross streets disambiguate before anything is returned, in that
-        order: grid, then cross streets, then refuse. Both are stated by the
-        dispatcher for this incident, so they outrank any similarity score.
+        grid and "near" roads disambiguate before anything is returned, in that order:
+        grid, then near roads, then unresolved. Both are stated by the dispatcher for
+        this incident, so they outrank any similarity score.
+
+        NOTE ON TERMINOLOGY: Locution says "near <road> and <road>". These are *near*
+        roads, not cross streets -- they often parallel the incident street and never
+        intersect it. Treating them as intersections discards the parallel case.
         """
         parsed_street = query_street(street_raw, street_type)
 
@@ -196,19 +250,19 @@ class AddressResolver:
                     narrowed = self._narrow_by_map_grid(candidates, target_map_grid)
                     stage = "map grid"
                     if len({(r['street'], r['streettype']) for r in narrowed}) > 1:
-                        narrowed = self._narrow_by_cross_streets(
-                            conn, narrowed, cross_street_1, cross_street_2)
-                        stage = "cross streets"
+                        narrowed = self._narrow_by_near_roads(
+                            conn, narrowed, near_road_1, near_road_2)
+                        stage = "near roads"
 
                     remaining = {(r['street'], r['streettype']) for r in narrowed}
                     if len(remaining) > 1:
                         logging.warning(
                             "Address '%s %s' matches %d streets equally (%s) and neither "
-                            "the map grid (%s) nor the cross streets (%s / %s) narrow it "
+                            "the map grid (%s) nor the near roads (%s / %s) narrow it "
                             "to one. Returning unresolved rather than picking one.",
                             house, parsed_street, len({n for _, n in scored}),
                             ", ".join(sorted(n for _, n in scored)),
-                            target_map_grid, cross_street_1, cross_street_2
+                            target_map_grid, near_road_1, near_road_2
                         )
                         return None
 

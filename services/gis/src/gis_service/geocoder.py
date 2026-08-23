@@ -128,14 +128,17 @@ class CoquitlamDataValidator:
 
         # === STEP 1: Exact address (requires house number) ===
         if parsed:
-            # The map grid and cross streets are announced for this incident, so they
-            # are passed in to break ties between equally-matching streets rather than
-            # letting a similarity score decide alone.
+            # The map grid and the "near" roads are announced for this incident, so
+            # they break ties between equally-matching streets rather than letting a
+            # similarity score decide alone. The cross_street_* parameter names are the
+            # existing plumbing; the values are Locution's "near <road> and <road>",
+            # which are not necessarily cross streets at all -- see
+            # AddressResolver._narrow_by_near_roads.
             result = self.address.resolve_exact(
                 parsed.house, parsed.raw, parsed.street_type,
                 target_map_grid=target_map_grid,
-                cross_street_1=cross_street_1,
-                cross_street_2=cross_street_2,
+                near_road_1=cross_street_1,
+                near_road_2=cross_street_2,
             )
             if result:
                 return result

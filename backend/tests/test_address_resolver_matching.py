@@ -119,11 +119,15 @@ class _FakeResult:
 
 
 class _FakeConn:
-    """Serves the parcel query, then answers intersection lookups from a fixed set."""
+    """Serves the parcel query, then the near-road distance ranking.
 
-    def __init__(self, parcel_rows, meeting_streets=()):
+    `near_road_ranking` is an ordered list of parcel ids, closest first, standing in
+    for the PostGIS ST_Distance query.
+    """
+
+    def __init__(self, parcel_rows, near_road_ranking=None):
         self.parcel_rows = parcel_rows
-        self.meeting_streets = {s.upper() for s in meeting_streets}
+        self.near_road_ranking = near_road_ranking
 
     def __enter__(self):
         return self
@@ -133,9 +137,13 @@ class _FakeConn:
 
     def execute(self, statement, params=None):
         sql = str(statement)
-        if "public.intersections" in sql:
-            street = (params or {}).get("s1", "").upper()
-            return _FakeResult([(1,)] if street in self.meeting_streets else [])
+        if "near_roads" in sql:
+            if not self.near_road_ranking:
+                return _FakeResult([])
+            return _FakeResult([
+                {"id": pid, "avg_m": float(10 * (i + 1)), "roads_matched": 2}
+                for i, pid in enumerate(self.near_road_ranking)
+            ])
         return _FakeResult(self.parcel_rows)
 
 
@@ -147,9 +155,9 @@ class _FakeEngine:
         return self._conn
 
 
-def _parcel(street, stype, zone, house="3000"):
+def _parcel(street, stype, zone, house="3000", pid=1):
     return {
-        "id": 1, "address": f"{house} {street} {stype}", "house": house,
+        "id": pid, "address": f"{house} {street} {stype}", "house": house,
         "street": street, "streettype": stype, "zone_id": zone,
         "lat": 49.28, "lng": -122.79, "front_lat": None, "front_lng": None,
         "entrance_lat": None, "entrance_lng": None,
@@ -160,7 +168,7 @@ def _parcel(street, stype, zone, house="3000"):
 class TestAmbiguityWaterfall:
     """Equally-matching streets are resolved by what dispatch announced.
 
-    Order: map grid, then cross streets, then refuse. Both signals are stated by the
+    Order: map grid, then near roads, then unresolved. Both are stated by the
     dispatcher for the incident, so they outrank a similarity score -- and before this
     the tie was settled by whichever row the database happened to return first.
     """
@@ -169,11 +177,12 @@ class TestAmbiguityWaterfall:
     # (measured on thefuzz 0.22.1), so neither wins on similarity alone. The resolver
     # threshold is lowered to 70 for these tests so the tie is reachable -- at the
     # production threshold of 80 this pair is refused earlier, which is also correct.
-    ROWS = [_parcel("Westwood", "St", "85"), _parcel("Eastwood", "St", "82")]
+    ROWS = [_parcel("Westwood", "St", "85", pid=1),
+            _parcel("Eastwood", "St", "82", pid=2)]
 
-    def _resolver(self, meeting_streets=()):
+    def _resolver(self, near_road_ranking=None):
         return ar.AddressResolver(
-            _FakeEngine(_FakeConn(self.ROWS, meeting_streets)), confidence_threshold=70)
+            _FakeEngine(_FakeConn(self.ROWS, near_road_ranking)), confidence_threshold=70)
 
     def test_the_pair_really_does_tie(self):
         # Guards the premise: if these stop tying, the tests below stop testing
@@ -187,9 +196,12 @@ class TestAmbiguityWaterfall:
         assert res is not None
         assert res["address"] == "3000 Eastwood St"
 
-    def test_cross_streets_break_the_tie_when_grid_is_absent(self):
-        res = self._resolver(meeting_streets={"WESTWOOD ST"}).resolve_exact(
-            "3000", "Wood St", "ST", cross_street_1="Pinetree Way")
+    def test_near_roads_break_the_tie_when_grid_is_absent(self):
+        # Westwood ranks closest to the announced near roads, so it wins -- even
+        # though nothing here requires it to intersect them.
+        res = self._resolver(near_road_ranking=[1, 2]).resolve_exact(
+            "3000", "Wood St", "ST",
+            near_road_1="Pinetree Way", near_road_2="Ponderosa St")
         assert res is not None
         assert res["address"] == "3000 Westwood St"
 
@@ -199,14 +211,23 @@ class TestAmbiguityWaterfall:
         res = self._resolver().resolve_exact("3000", "Wood St", "ST")
         assert res is None
 
-    def test_grid_that_matches_nothing_falls_through_to_cross_streets(self):
+    def test_grid_that_matches_nothing_falls_through_to_near_roads(self):
         # A grid naming a zone none of the candidates sit in must not empty the set;
         # it falls through to the next signal rather than resolving to nothing.
-        res = self._resolver(meeting_streets={"EASTWOOD ST"}).resolve_exact(
-            "3000", "Wood St", "ST",
-            target_map_grid="999", cross_street_1="Pinetree Way")
+        res = self._resolver(near_road_ranking=[2, 1]).resolve_exact(
+            "3000", "Wood St", "ST", target_map_grid="999",
+            near_road_1="Pinetree Way", near_road_2="Ponderosa St")
         assert res is not None
         assert res["address"] == "3000 Eastwood St"
+
+    def test_near_roads_that_tie_exactly_leave_it_unresolved(self):
+        # Equidistant candidates carry no information; refusing is correct.
+        conn = _FakeConn(self.ROWS, near_road_ranking=[1, 2])
+        conn.near_road_ranking = None  # no ranking rows -> nothing narrowed
+        resolver = ar.AddressResolver(_FakeEngine(conn), confidence_threshold=70)
+        res = resolver.resolve_exact("3000", "Wood St", "ST",
+                                     near_road_1="Pinetree Way")
+        assert res is None
 
 
 class TestNoStreetNameIsRefused:

@@ -102,9 +102,14 @@ MAP_GRIDS = _require('map_grid', load_vocabulary_from_db('map_grid'))
 #     Medical Aid - Overdose          <- main + sub
 #     Structure Fire - Detached Structure
 #
-# A main type can stand on its own; 25 of the 27 current mains do. Most calls, though,
-# arrive with the expanded form, and the sub type is the operationally significant half --
-# it changes what crews bring and how they stage.
+# A main type can stand on its own ("Assist", "Rescue", "Alarm Activated"), but MOST calls
+# carry a sub type: measured 2026-08-23 over 202 verified calls, 77% overall and 93% of
+# "Medical Aid". The sub type is the operationally significant half -- it changes what
+# crews bring and how they stage -- so dropping it is a real defect, not a cosmetic one.
+#
+# Standing alone is genuine, not a gap: "Alarm Activated" is bare in 14 of 26 calls and
+# "Alarm Activated - High Risk" in the other 12, and dispatch says nothing else after
+# "alarm activated". Do not invent sub types to "complete" a main type.
 #
 # The two levels are deliberately NOT modelled separately. There is one flat running list
 # of complete terms in public.vocabulary, and " - " is the only structure. Do not split

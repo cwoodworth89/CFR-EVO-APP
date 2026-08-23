@@ -56,6 +56,12 @@ MISSING_TERMS = [
     "Tent Fire - High Risk",
     "Medical Aid - Airway Obstruction",
     "Odor - Unknown Source",
+    # Operator ruling 2026-08-23: "Assist", "Lift Assist" and "Medical Aid - Assist" are
+    # three DISTINCT call types, not variants of one. Bare "Assist" was the only one with
+    # no vocabulary row, so dispatch saying "respond routine, assist, 1331 Green Bank
+    # Court" classified as "Unknown Incident" -- confirmed on 3 calls. Spoken 22 times in
+    # the corpus (16 of them "lift assist").
+    "Assist",
 ]
 
 

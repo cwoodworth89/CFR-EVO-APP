@@ -372,13 +372,24 @@ class AddressResolver:
                     """), {"fraction": fraction, "road_id": row['id']}).mappings().fetchone()
 
                     if point and point['lat'] is not None:
+                        # No parcel carries this number. The point is interpolated along
+                        # the road segment's address range, so it is a position on the
+                        # street rather than a property -- say so, or it displays
+                        # identically to an exact parcel match (CLAUDE.md §6.1).
+                        requested = f"{house} {fullname}".strip().title()
                         return {
-                            "address": f"{house} {fullname}".strip().title(),
+                            "address": requested,
                             "lat": float(point['lat']),
                             "lng": float(point['lng']),
                             "rings": [],
                             "confidence": 70.0,
                             "is_block_interpolated": True,
+                            "requested_address": requested,
+                            "resolution_note": (
+                                f"{requested} has no parcel in City of Coquitlam records. "
+                                f"Position estimated along the road segment from its "
+                                f"address range. Verify on arrival."
+                            ),
                             "is_ambiguous": False
                         }
         except Exception as e:
@@ -426,6 +437,11 @@ class AddressResolver:
                         "rings": [],
                         "confidence": 75.0,
                         "is_crossroad_narrowed": True,
+                        "resolution_note": (
+                            f"No parcel matched on {street} {street_type}. Showing the "
+                            f"midpoint between {cross_street_1} and {cross_street_2}, "
+                            f"not a specific address. Verify on arrival."
+                        ),
                         "is_ambiguous": False
                     }
                 elif len(points) == 1:
@@ -436,6 +452,11 @@ class AddressResolver:
                         "rings": [],
                         "confidence": 72.0,
                         "is_crossroad_narrowed": True,
+                        "resolution_note": (
+                            f"No parcel matched on {street} {street_type}. Showing where "
+                            f"it meets {cross_street_1}, not a specific address. "
+                            f"Verify on arrival."
+                        ),
                         "is_ambiguous": False
                     }
         except Exception as e:

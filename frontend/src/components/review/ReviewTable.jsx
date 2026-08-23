@@ -1,6 +1,37 @@
 import React from 'react';
 import { formatTimestampPT, getCallTones } from './reviewFormat';
 
+// The "System Prefills" column must show what the SYSTEM produced. It previously
+// replaced each field with the operator's verified value once feedback_submitted was
+// set, so a corrected call displayed the human's answer under a heading that says
+// "System" -- hiding the very disagreement this list is scanned to find. A call whose
+// system address was wrong looked identical to one that was right.
+//
+// Showing the system value alone would instead discard the correction, so a field that
+// was corrected renders both: the system value struck through, then the verified value.
+// Agreement renders as a single plain value, so a row that stands out is a row that
+// actually disagrees.
+function SystemVsVerified({ system, verified, submitted, className = '' }) {
+  const sysText = system ?? '';
+  const verText = verified ?? '';
+  const hasVerified = submitted && verText !== '';
+  const differs = hasVerified && verText.trim().toLowerCase() !== sysText.trim().toLowerCase();
+
+  if (!differs) {
+    return <span className={className}>{sysText || '—'}</span>;
+  }
+  return (
+    <span className={className}>
+      <span className="text-rose-400/80 line-through" title="What the system produced">
+        {sysText || '—'}
+      </span>
+      <span className="text-emerald-400 font-bold ml-1" title="Operator-verified ground truth">
+        {verText}
+      </span>
+    </span>
+  );
+}
+
 export default function ReviewTable({
   filteredCalls = [],
   selectedCall,
@@ -132,7 +163,9 @@ export default function ReviewTable({
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Training Status</th>
-                  <th className="py-2.5 px-3 w-[28%] bg-slate-900">System Prefills</th>
+                  <th className="py-2.5 px-3 w-[28%] bg-slate-900" title="What the system produced. A struck-through value means the operator corrected it; the verified value follows in green.">
+                    System Output <span className="text-slate-500 normal-case">(struck = corrected)</span>
+                  </th>
                   <th className="py-2.5 px-3 text-right w-[11%] bg-slate-900">Actions</th>
                 </tr>
               </thead>
@@ -223,13 +256,11 @@ export default function ReviewTable({
                       </td>
                       <td className="py-3 px-3 max-w-[15rem] truncate text-slate-300">
                         <div className="font-extrabold text-white text-[11px] truncate">
-                          {call.feedback_submitted && call.verified_incident ? (
-                            <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
-                              {call.verified_incident}
-                            </span>
-                          ) : (
-                            call.incident_type
-                          )}
+                          <SystemVsVerified
+                            system={call.incident_type}
+                            verified={call.verified_incident}
+                            submitted={call.feedback_submitted}
+                          />
                         </div>
                         <div className="text-[10px] truncate mt-0.5 flex items-center gap-0.5">
                           {call.target?.map_coords_accurate === true ? (
@@ -239,22 +270,18 @@ export default function ReviewTable({
                           ) : (
                             <span className="text-slate-500" title="Map Coordinates Unverified">📍 </span>
                           )}
-                          {call.feedback_submitted && call.verified_address ? (
-                            <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
-                              {call.verified_address}
-                            </span>
-                          ) : (
-                            call.target?.address || call.address || 'Unknown Address'
-                          )}
+                          <SystemVsVerified
+                            system={call.target?.address || call.address || 'Unknown Address'}
+                            verified={call.verified_address}
+                            submitted={call.feedback_submitted}
+                          />
                         </div>
                         <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-                          Units: {call.feedback_submitted && call.verified_units && call.verified_units.length > 0 ? (
-                            <span className="text-emerald-400 font-bold" title="Verified Ground Truth">
-                              {call.verified_units.join(', ')}
-                            </span>
-                          ) : (
-                            call.responding_units?.join(', ') || 'None'
-                          )}
+                          Units: <SystemVsVerified
+                            system={call.responding_units?.join(', ') || 'None'}
+                            verified={call.verified_units?.length ? call.verified_units.join(', ') : ''}
+                            submitted={call.feedback_submitted}
+                          />
                         </div>
                       </td>
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>

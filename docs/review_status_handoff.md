@@ -6,6 +6,8 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — **29 numbered items**, the live work queue
+* [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
+  corpus baselines, the ground-truth corpus, and three traps. Start there if that is the task.
 * [`docs/standards/README.md`](./standards/README.md) — domain standards index (currently all gaps)
 * [`docs/standards/dependency-behaviour.md`](./standards/dependency-behaviour.md) — **verified library semantics; read this before trusting any API name**
 * [`docs/architecture/unified_map_surface.md`](./architecture/unified_map_surface.md) — frontend architecture, implemented

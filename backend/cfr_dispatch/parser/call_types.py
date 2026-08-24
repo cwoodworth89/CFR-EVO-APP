@@ -33,7 +33,7 @@ def match_incident_type(transcript: str, call_types: List[str], aliases: dict = 
     Returns a CANONICAL term always. `aliases` maps a recognition-only spelling to the
     canonical term it stands for: faster-whisper writes American English while the
     department writes Canadian, so the string matched is not always the string shown
-    (punch-list #33). Defaults to the vocabulary-backed map when not supplied.
+    (punch-list #43). Defaults to the vocabulary-backed map when not supplied.
     """
     if aliases is None:
         aliases = CALL_TYPE_ALIASES

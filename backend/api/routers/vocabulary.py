@@ -8,7 +8,7 @@ Only ACTIVE, CANONICAL terms are returned. Recognition aliases live in
 vocabulary.metadata->'aliases' and are deliberately withheld: an alias exists so the parser
 can match a spelling faster-whisper produces (American "smoldering" for the department's
 "smouldering"), and offering it to a reviewer would reintroduce the split ground truth this
-endpoint exists to prevent. See punch-list #33.
+endpoint exists to prevent. See punch-list #43.
 """
 import logging
 from typing import Optional

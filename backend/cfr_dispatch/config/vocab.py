@@ -44,7 +44,7 @@ def load_call_type_aliases() -> dict[str, str]:
     consistently ("smoldering" 5/5, "smouldering" 0/5) while the department writes
     Canadian. Carrying the American spelling as a separate active row made it a rival
     canonical term; carrying it here keeps recognition working while a single term
-    reaches the operator. See punch-list #33.
+    reaches the operator. See punch-list #43.
     """
     try:
         from sqlalchemy import create_engine, text
@@ -118,10 +118,10 @@ MAP_GRIDS = _require('map_grid', load_vocabulary_from_db('map_grid'))
 #
 # Sorted longest-first so a qualified type is tested before the base type it contains.
 # Without this, "Medical Aid" matches first and the sub type is silently dropped -- the
-# exact defect measured at 22 calls before the 2026-08-23 vocabulary work (punch-list #33).
+# exact defect measured at 22 calls before the 2026-08-23 vocabulary work (punch-list #43).
 CALL_TYPES = sorted(_require('call_type', load_vocabulary_from_db('call_type')), key=len, reverse=True)
 # Recognition-only spellings. Deliberately NOT added to CALL_TYPES: an alias must never
-# be offered to a reviewer or rendered on the kiosk, only matched against (punch-list #33).
+# be offered to a reviewer or rendered on the kiosk, only matched against (punch-list #43).
 CALL_TYPE_ALIASES = load_call_type_aliases()
 COQUITLAM_STREETS = _require('road_names', load_streets_from_db())
 

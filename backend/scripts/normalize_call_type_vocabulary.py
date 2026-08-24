@@ -1,5 +1,5 @@
 # backend/scripts/normalize_call_type_vocabulary.py
-"""One-time canonicalization of public.vocabulary category='call_type'. See punch-list #33.
+"""One-time canonicalization of public.vocabulary category='call_type'. See punch-list #43.
 
 The call-type vocabulary had grown a second ROW wherever the string the parser must
 recognise differed from the string the department displays. That made locale variants into

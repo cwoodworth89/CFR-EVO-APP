@@ -77,7 +77,7 @@ export default function VerificationSidebar({
   // parser matches against. Previously this field was free text, so ground truth drifted
   // from the vocabulary: locale variants ("Smouldering"/"Smoldering") and pluralisations
   // were typed as rival terms, and seven verified values had no vocabulary row at all and
-  // so could never be produced by the parser no matter how good the parse (punch-list #33).
+  // so could never be produced by the parser no matter how good the parse (punch-list #43).
   const [callTypes, setCallTypes] = useState([]);
   const [callTypesFailed, setCallTypesFailed] = useState(false);
 

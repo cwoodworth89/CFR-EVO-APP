@@ -1689,7 +1689,7 @@ Two related observations from the same sample:
 
 ---
 
-### 33. Call-type vocabulary carries locale variants as duplicate rows; HITL captures incident as free text
+### 43. Call-type vocabulary carries locale variants as duplicate rows; HITL captures incident as free text
 > **Status**: 🔧 **In progress — found 2026-08-23 during the parser audit.** All counts below
 > are **confirmed** by query against the kiosk database (`100.95.146.94:5432`), not read from
 > code. Two records are **flagged for operator re-review** (see the last section) and are not
@@ -2028,7 +2028,7 @@ round 2: 'coquitlam engine 1 engine 2 rescue 2'
          -> no respond marker: a unit tail -> skipped  (currently the source of 'Rescue')
 ```
 
-#### Step 3 is not optional — it is punch-list #33's round-1 bias in miniature
+#### Step 3 is not optional — it is punch-list #42's round-1 bias in miniature
 
 Selecting the **first** non-Unknown round instead of the most specific one **breaks**
 `DISP-2026-E792B0`:
@@ -2049,13 +2049,14 @@ addresses (`next(...)`, first candidate wins, unconditionally, across 201 double
 Related: the subset trap inventory in #19, and `Rescue`'s `token_set_ratio` of 100 above is
 a fifth instance of it.
 
-#### ⚠️ Numbering collision
+#### Numbering note — resolved
 
-**There are two items numbered 33 in this file** — "Call-type vocabulary…" (this session's
-vocabulary work) and "Legacy worked-example placeholders…" (concurrent session). Both are
-cited as "punch-list #33" from code comments, in `config/vocab.py` and
-`review/VerificationSidebar.jsx` respectively. Left as-is rather than renumbering another
-session's in-flight item; needs an operator decision on which keeps the number.
+Two items were briefly numbered 33, written concurrently by two sessions. Operator ruling
+2026-08-23: the **call-type vocabulary** item was renumbered to **#43**; "Legacy worked-example
+placeholders…" keeps **#33**. Code comments citing "punch-list #33" in `config/vocab.py`,
+`parser/call_types.py`, `api/routers/vocabulary.py`, the two vocabulary scripts and
+`docs/standards/README.md` were updated to #43 in the same commit. The `#33` citation in
+`review/VerificationSidebar.jsx` for the placeholder defect is correct and was left alone.
 
 ---
 

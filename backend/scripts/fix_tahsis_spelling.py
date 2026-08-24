@@ -17,7 +17,7 @@ the model a street name that does not exist.
 
 Note for the STT side, NOT addressed here: faster-whisper wrote "Tassus" for Tahsis in 2 of
 3 corpus occurrences. That is a consistent mis-recognition and belongs as a street-vocabulary
-alias, the same pattern as "Smoldering" for "Smouldering" (punch-list #33), rather than being
+alias, the same pattern as "Smoldering" for "Smouldering" (punch-list #43), rather than being
 left to fuzzy matching.
 
 Dry-run by default. Pass --apply to write.

@@ -125,9 +125,12 @@ class _FakeConn:
     for the PostGIS ST_Distance query.
     """
 
-    def __init__(self, parcel_rows, near_road_ranking=None):
+    def __init__(self, parcel_rows, near_road_ranking=None, known_roads=None):
         self.parcel_rows = parcel_rows
         self.near_road_ranking = near_road_ranking
+        # Names _verify_near_roads will consider real. Defaults to "every name asked
+        # about is real", so tests opt in to the descriptor case explicitly.
+        self.known_roads = known_roads
 
     def __enter__(self):
         return self
@@ -137,6 +140,10 @@ class _FakeConn:
 
     def execute(self, statement, params=None):
         sql = str(statement)
+        if "DISTINCT UPPER(roadname)" in sql:
+            asked = list((params or {}).get("names", []))
+            known = self.known_roads if self.known_roads is not None else asked
+            return _FakeResult([(n,) for n in asked if n in known])
         if "near_roads" in sql:
             if not self.near_road_ranking:
                 return _FakeResult([])
@@ -180,9 +187,10 @@ class TestAmbiguityWaterfall:
     ROWS = [_parcel("Westwood", "St", "85", pid=1),
             _parcel("Eastwood", "St", "82", pid=2)]
 
-    def _resolver(self, near_road_ranking=None):
+    def _resolver(self, near_road_ranking=None, known_roads=None):
         return ar.AddressResolver(
-            _FakeEngine(_FakeConn(self.ROWS, near_road_ranking)), confidence_threshold=70)
+            _FakeEngine(_FakeConn(self.ROWS, near_road_ranking, known_roads)),
+            confidence_threshold=70)
 
     def test_the_pair_really_does_tie(self):
         # Guards the premise: if these stop tying, the tests below stop testing
@@ -228,6 +236,50 @@ class TestAmbiguityWaterfall:
         res = resolver.resolve_exact("3000", "Wood St", "ST",
                                      near_road_1="Pinetree Way")
         assert res is None
+
+
+class TestNearRoadsAreNotAlwaysRoads:
+    """Locution's "near <x> and <y>" does not promise x and y are streets.
+
+    Measured over 283 dispatches carrying near roads: 129 matched both names, 44
+    matched only one, 23 matched neither, and 87 named a single road. The unmatched
+    names are descriptors ("Turning Lane", "Access Road", "Private Driveway", "Walton
+    Elementary School Access") and mis-transcriptions ("Tanger Crt" for Tanager,
+    "Crab Avenue" for Craig).
+
+    A partial match must be discarded, not used: ranking on one road is what would
+    select 3000 Pinewood Ave, which sits 9 m from Pinetree Way and 1061 m from
+    Ponderosa St.
+    """
+
+    def _resolver(self, known_roads):
+        conn = _FakeConn([], known_roads=known_roads)
+        return ar.AddressResolver(_FakeEngine(conn), confidence_threshold=80), conn
+
+    def test_both_names_real_are_kept(self):
+        resolver, conn = self._resolver({"PINETREE", "PONDEROSA"})
+        assert resolver._verify_near_roads(conn, ["PINETREE", "PONDEROSA"]) == \
+            ["PINETREE", "PONDEROSA"]
+
+    def test_a_descriptor_discards_the_whole_signal(self):
+        # "Turning Lane" is not a road. Falling back to ranking on Christmas Way alone
+        # would be worse than ignoring the near roads entirely.
+        resolver, conn = self._resolver({"CHRISTMAS"})
+        assert resolver._verify_near_roads(conn, ["CHRISTMAS", "TURNING"]) == []
+
+    def test_neither_name_real_discards_the_signal(self):
+        resolver, conn = self._resolver(set())
+        assert resolver._verify_near_roads(conn, ["ACCESS", "PRIVATE DRIVEWAY"]) == []
+
+    def test_a_single_announced_road_is_not_enough(self):
+        # One road says "somewhere near this line" and cannot position a call along a
+        # street; 87 of 283 dispatches announce only one.
+        resolver, conn = self._resolver({"CHRISTMAS"})
+        assert resolver._verify_near_roads(conn, ["CHRISTMAS"]) == []
+
+    def test_no_near_roads_is_not_an_error(self):
+        resolver, conn = self._resolver(set())
+        assert resolver._verify_near_roads(conn, []) == []
 
 
 class TestNoStreetNameIsRefused:

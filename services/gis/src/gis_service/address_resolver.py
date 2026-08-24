@@ -110,6 +110,47 @@ class AddressResolver:
         narrowed = [r for r in rows if str(r['zone_id'] or '').strip() == grid]
         return narrowed or rows
 
+    def _verify_near_roads(self, conn, near_names: list) -> list:
+        """Return the announced near roads only if EVERY one is a real named road.
+
+        Locution's "near <x> and <y>" does not promise that x and y are streets. Across
+        283 dispatches carrying near roads, 44 named one road plus something that is not
+        a road: "Turning Lane", "Access Road", "Private Driveway", "Walton Elementary
+        School Access", alongside mis-transcriptions like "Tanger Crt" for Tanager and
+        "Crab Avenue" for Craig. A further 23 matched neither name.
+
+        Partial matches are discarded rather than used, because a single road cannot
+        position a call along a street -- it can only say "somewhere near this line",
+        and the nearest candidate to one road is frequently the wrong one (see
+        _narrow_by_near_roads for the measured Pinewood/Pinetree case).
+
+        Returns [] when the set is unusable, which callers treat as "no near roads
+        announced" and fall back to house-number proximity.
+        """
+        if not near_names:
+            return []
+        found = {r[0] for r in conn.execute(text("""
+            SELECT DISTINCT UPPER(roadname) FROM public.roads
+            WHERE UPPER(roadname) = ANY(:names);
+        """), {"names": near_names}).fetchall()}
+
+        missing = [n for n in near_names if n not in found]
+        if missing:
+            logging.info(
+                "Announced near road(s) %s are not named roads in public.roads "
+                "(descriptor, mis-transcription, or absent from the municipal layer). "
+                "Ignoring the near-road signal rather than ranking on %d of %d.",
+                ", ".join(missing), len(found), len(near_names)
+            )
+            return []
+        if len(near_names) < 2:
+            logging.info(
+                "Only one near road announced (%s); a single road cannot position a "
+                "call along a street. Ignoring the near-road signal.", near_names[0]
+            )
+            return []
+        return near_names
+
     def _narrow_by_near_roads(self, conn, rows: list,
                               near_road_1: str, near_road_2: str) -> list:
         """Keep the candidate closest, on average, to the announced "near" roads.
@@ -140,6 +181,7 @@ class AddressResolver:
             tokens = street_name_tokens(normalize_street_name(road)) if road else []
             if tokens:
                 names.append(" ".join(tokens))
+        names = self._verify_near_roads(conn, names)
         if not names or not rows:
             return rows
 
@@ -496,30 +538,38 @@ class AddressResolver:
             if tokens:
                 near_names.append(" ".join(tokens))
 
-        # Two explicit query shapes rather than one with a conditional CTE: a bound
-        # boolean guarding `= ANY(:names)` leaves the driver unable to infer the array
-        # type and the statement fails at execution, which silently degraded this rung
-        # to None and pushed calls down to the centroid.
-        near_cte = ("""
-                    WITH near_roads AS (
-                        SELECT ST_Union(geom) AS geom
-                        FROM public.roads
-                        WHERE UPPER(roadname) = ANY(:names)
-                    )
-        """ if near_names else """
-                    WITH near_roads AS (SELECT NULL::geometry AS geom)
-        """)
-
         try:
             with self.engine.connect() as conn:
-                row = conn.execute(text(near_cte + """
+                # Only trust the near roads when EVERY announced name resolves to a real
+                # named road. Measured over 283 dispatches carrying near roads: 129 had
+                # both names match, 44 had only one, 23 had neither, and 87 announced a
+                # single road. So 46% would be ranked on one road alone -- and one road
+                # is actively misleading: on DISP-2026-156DCF, 3000 Pinewood Ave sits 9 m
+                # from Pinetree Way and 1061 m from Ponderosa St. Ranking on Pinetree
+                # alone picks it; averaging both rejects it.
+                #
+                # Announcements frequently name things that are not roads at all --
+                # "Turning Lane", "Access Road", "Private Driveway", "Walton Elementary
+                # School Access" -- alongside plain mis-transcriptions. Both arrive here
+                # as a name that matches nothing, and neither is a reason to fall back to
+                # a single-road ranking that has no way to be right.
+                near_names = self._verify_near_roads(conn, near_names)
+
+                row = conn.execute(text("""
+                    WITH near_roads AS (
+                        SELECT UPPER(roadname) AS nm, ST_Union(geom) AS geom
+                        FROM public.roads
+                        WHERE UPPER(roadname) = ANY(:names)
+                        GROUP BY UPPER(roadname)
+                    )
                     SELECT p.address, p.house, p.lat, p.lng,
                            ABS((p.house)::int - (:house)::int) AS house_delta,
-                           CASE WHEN nr.geom IS NULL THEN NULL
-                                ELSE ST_Distance(p.geom::geography, nr.geom::geography)
-                           END AS near_road_m
+                           -- AVG over a CROSS JOIN, never ST_Distance to an ST_Union of
+                           -- both roads: the union measures distance to the NEAREST of
+                           -- them, which is the single-road ranking this exists to avoid.
+                           (SELECT AVG(ST_Distance(p.geom::geography, n.geom::geography))
+                              FROM near_roads n) AS near_road_m
                     FROM public.parcels p
-                    LEFT JOIN near_roads nr ON TRUE
                     WHERE UPPER(p.street) = UPPER(:street)
                       AND (UPPER(p.streettype) = UPPER(:stype) OR :stype = '')
                       AND p.house ~ '^[0-9]+$'

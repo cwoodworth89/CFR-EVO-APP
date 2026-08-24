@@ -2839,3 +2839,105 @@ so the DBF was parsed directly with a ~40-line reader rather than geopandas — 
 before anyone plans shapefile work here. Tailscale SSH lapsed mid-session and needs browser
 re-auth, so kiosk-side checks in this batch were done over HTTP to the tile server and via the
 `cfr-postgres` MCP connection instead.
+
+---
+
+### 40 (root cause). The tile compiler narrows its bounding box above z16, and then declares the wide one anyway
+> **Status**: ⚠️ **Open — ROOT CAUSE FOUND 2026-08-23. Confirmed: the measured cut matches
+> the constant to four decimal places.**
+
+`backend/scripts/compile_mbtiles.py:397-406` downloads a **different bounding box per zoom
+tier**:
+
+```python
+for z in range(min_z, max_z + 1):
+    if z <= 16:
+        # Full regional bounds for Zooms 12-16
+        z_tiles = calculate_tiles(REGIONAL_MIN_LAT, REGIONAL_MIN_LON, ...)      # west -123.04
+    elif z <= 18:
+        # Coquitlam operational corridor for Zooms 17-18
+        z_tiles = calculate_tiles(COQUITLAM_MIN_LAT, COQUITLAM_MIN_LON, ...)    # west -122.865
+    else:
+        # Urban Core & Apparatus Bay Stations 1-4 Corridor for Zooms 19-20
+        z_tiles = calculate_tiles(URBAN_CORE_MIN_LAT, URBAN_CORE_MIN_LON, ...)  # west -122.870
+```
+
+| Constant | West | East | South | North | Applies to |
+|:--|--:|--:|--:|--:|:--|
+| `REGIONAL_*` | **−123.04** | −122.60 | 49.15 | 49.48 | z12–16 |
+| `COQUITLAM_*` | **−122.865** | −122.685 | 49.208 | 49.385 | z17–18 |
+| `URBAN_CORE_*` | **−122.870** | −122.730 | 49.240 | 49.340 | z19–20 |
+
+**`COQUITLAM_MIN_LON = -122.865` (`:59`) is the defect.** The measured boundary was
+**−122.8656** (tile x=20801 empty, x=20802 content at z17). That is the same line to four
+decimal places — it is this constant, not a crawl failure, not a corrupted archive.
+
+Every observation now follows from it:
+
+* z16 renders at Cottonwood Ave (−122.884) — inside `REGIONAL`. **Measured 16,644 b.** ✅
+* z17 is empty there — outside `COQUITLAM`. **Measured 116 b.** ✅
+* `street` and `satellite` share the **identical** boundary because they share this function,
+  differing only in `max_zoom`. ✅
+* `cadastral` is unaffected — it is built by a *different* script,
+  `crawl_cadastral_tiles.py`, whose `DEFAULT_MIN_LON = -122.92`. That is why the operator's
+  screenshot shows parcels and labels on black: the only layer with western high-zoom
+  coverage is the overlay. ✅
+
+#### The constant contradicts the project's own definition of the city
+
+The comment at `:57` calls it *"Coquitlam Municipal Core Bounds"*, but Coquitlam extends west
+to roughly **−122.93**. Two other places in this codebase already say so:
+
+* `crawl_cadastral_tiles.py` uses **−122.92**.
+* **CLAUDE.md §5** defines out-of-bounds as `lng < -122.92`, via `isWithinCoquitlam()`.
+
+So the kiosk considers −122.90 to be **inside** the city and will happily route there and
+suppress the out-of-bounds card — while having no basemap above z16 for it. The bounds check
+and the tile build disagree about where Coquitlam is.
+
+#### The declared metadata hides it
+
+`compile_mbtiles.py:142` writes the metadata `bounds` for **every** layer as the *regional*
+box:
+
+```python
+"bounds": f"{REGIONAL_MIN_LON},{REGIONAL_MIN_LAT},{REGIONAL_MAX_LON},{REGIONAL_MAX_LAT}",
+```
+
+The archive therefore advertises coverage from −123.04 while only holding −122.865 above z16.
+This is the reason nothing detected the gap: the frontend's `maxNativeZoom` is correct and has
+no way to know, `mbtileserver` serves a 116-byte empty tile rather than a 404, and the
+metadata says everything is fine. **A layer that reports coverage it does not have is the same
+defect class as §6.1** — a confident wrong answer beats a visible unknown.
+
+#### Scope, measured against `public.parcels`
+
+| Missing above | Parcels affected | Share of city |
+|:--|--:|--:|
+| **z16** (outside `COQUITLAM` box) | **18,735** | **28.6%** |
+| **z18** (outside `URBAN_CORE` box) | **21,023** | **32.1%** |
+
+So roughly **a third of the city has no basemap at the zoom used to pick out a driveway,
+roofline or hydrant** — Austin Heights, Maillardville, Burquitlam, plus the northern and
+eastern edges. 20 emergency response zones are affected.
+
+#### Fix
+
+1. **Correct the constants.** `COQUITLAM_MIN_LON` should be ≈ **−122.93** to match
+   `isWithinCoquitlam()` and the cadastral crawl, and the other three `COQUITLAM_*` bounds
+   should be reviewed against the real municipal boundary at the same time. Give them a
+   provenance comment naming the source (§6.3) — the current values have none.
+2. **Reconsider the `URBAN_CORE` tier for z19–20.** A 0.14° × 0.10° box is a small fraction of
+   the city, and it excludes 32% of parcels from the highest-detail imagery. If it exists to
+   bound archive size, that trade-off should be stated and sized, not implied.
+3. **Write honest metadata.** The `bounds` value must describe what the archive actually
+   contains. If coverage differs per zoom, the declared bounds should be the *narrowest*
+   tier, not the widest — under-promising is safe, over-promising is what produced this.
+4. **Re-crawl** the western extent at z17–20 for `satellite`, `street` and `street_nolabels`,
+   then checkpoint to `journal_mode = DELETE` per CLAUDE.md §1 before the read-only mount.
+
+**Worth doing regardless of the re-crawl**: give the kiosk a visible signal when a base layer
+has no tile, rather than rendering black. The operator diagnosed this as "blank" and could not
+tell it apart from a failed tile server.
+
+See the `mbtiles-tile-server` skill for the compile and checkpoint procedure.

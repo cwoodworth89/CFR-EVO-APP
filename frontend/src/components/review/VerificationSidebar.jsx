@@ -1,5 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { TALK_GROUPS, toTitleCase } from './verificationConstants';
+
+// Shown only when the parser produced nothing for a field. These placeholders used to carry
+// worked examples ("e.g. 2648 Sandstone Cres", "e.g. Structure Fire", "e.g. E1, L1"), which
+// predate the Ctrl+Space prefill of the system hypothesis and are obsolete now that the real
+// system value is the placeholder. They were also a live hazard: DISP-2026-D106EB was saved
+// with all three example values as its verified address, incident and units, then exported
+// into the training set (model_updated = true) before the operator corrected it. Plausible
+// example data in a field that writes to the ground-truth corpus reads as real (CLAUDE.md
+// §6.1 / §6.5), and 2648 Sandstone Cres is a real Coquitlam parcel. Punch-list #33.
+const NO_SYSTEM_VALUE = '-- nothing parsed --';
 import { API_BASE_URL } from '../../apiClient';
 
 export default function VerificationSidebar({
@@ -370,7 +380,6 @@ export default function VerificationSidebar({
                 }
                 handleInputKeyDown(e, 'transcript');
               }}
-              onDoubleClick={() => onPrefillField('transcript')}
               className="w-full min-h-[140px] max-h-[320px] bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono leading-relaxed overflow-y-auto"
             />
           </div>
@@ -426,7 +435,7 @@ export default function VerificationSidebar({
               <span 
                 onClick={() => onPrefillField('units')}
                 className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[150px] cursor-pointer transition-colors" 
-                title="Click, double-click input, or press Ctrl+Space to import"
+                title="Click, or press Ctrl+Space, to import the system value"
               >
                 Sys: {selectedCall.responding_units?.join(', ') || 'None'} 📥
               </span>
@@ -439,9 +448,8 @@ export default function VerificationSidebar({
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { onSubmitReview(e); return; }
                 handleInputKeyDown(e, 'units');
               }}
-              onDoubleClick={() => onPrefillField('units')}
               className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-              placeholder={(selectedCall.responding_units || []).join(', ') || "e.g. E1, L1"}
+              placeholder={(selectedCall.responding_units || []).join(', ') || NO_SYSTEM_VALUE}
             />
           </div>
 
@@ -454,7 +462,7 @@ export default function VerificationSidebar({
               <span 
                 onClick={() => onPrefillField('incident')}
                 className="text-[8px] text-slate-500 hover:text-sky-400 font-bold cursor-pointer transition-colors" 
-                title="Click, double-click input, or press Ctrl+Space to import"
+                title="Click, or press Ctrl+Space, to import the system value"
               >
                 System: {selectedCall.incident_type || 'Unknown'} 📥
               </span>
@@ -468,9 +476,8 @@ export default function VerificationSidebar({
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { onSubmitReview(e); return; }
                 handleInputKeyDown(e, 'incident');
               }}
-              onDoubleClick={() => onPrefillField('incident')}
               className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-              placeholder={selectedCall.incident_type || "e.g. Structure Fire"}
+              placeholder={selectedCall.incident_type || NO_SYSTEM_VALUE}
             />
             <datalist id="cfr-call-types">
               {callTypes.map((ct) => (
@@ -493,7 +500,7 @@ export default function VerificationSidebar({
               <span 
                 onClick={() => onPrefillField('address')}
                 className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
-                title="Click, double-click input, or press Ctrl+Space to import"
+                title="Click, or press Ctrl+Space, to import the system value"
               >
                 System: {selectedCall.target?.address || selectedCall.address || 'Unknown'} 📥
               </span>
@@ -506,9 +513,8 @@ export default function VerificationSidebar({
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { onSubmitReview(e); return; }
                 handleInputKeyDown(e, 'address');
               }}
-              onDoubleClick={() => onPrefillField('address')}
               className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
-              placeholder={selectedCall.target?.address || selectedCall.address || "e.g. 2648 Sandstone Cres"}
+              placeholder={selectedCall.target?.address || selectedCall.address || NO_SYSTEM_VALUE}
             />
           </div>
 
@@ -521,7 +527,7 @@ export default function VerificationSidebar({
               <span 
                 onClick={() => onPrefillField('subaddress')}
                 className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[180px] truncate cursor-pointer transition-colors" 
-                title="Click, double-click input, or press Ctrl+Space to import"
+                title="Click, or press Ctrl+Space, to import the system value"
               >
                 System: {toTitleCase(selectedCall.target?.subaddress) || 'None'} 📥
               </span>
@@ -534,7 +540,6 @@ export default function VerificationSidebar({
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { onSubmitReview(e); return; }
                 handleInputKeyDown(e, 'subaddress');
               }}
-              onDoubleClick={() => onPrefillField('subaddress')}
               className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
               placeholder={toTitleCase(selectedCall.target?.subaddress) || "None"}
             />
@@ -579,7 +584,7 @@ export default function VerificationSidebar({
                 <span 
                   onClick={() => onPrefillField('map_grid')}
                   className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[70px] cursor-pointer transition-colors" 
-                  title="Click, double-click input, or press Ctrl+Space to import"
+                  title="Click, or press Ctrl+Space, to import the system value"
                 >
                   Sys: {selectedCall.target?.map_grid || 'Unknown'} 📥
                 </span>
@@ -592,9 +597,8 @@ export default function VerificationSidebar({
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { onSubmitReview(e); return; }
                   handleInputKeyDown(e, 'map_grid');
                 }}
-                onDoubleClick={() => onPrefillField('map_grid')}
                 className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none font-mono"
-                placeholder={selectedCall.target?.map_grid || "e.g. 92"}
+                placeholder={selectedCall.target?.map_grid || NO_SYSTEM_VALUE}
               />
             </div>
           </div>

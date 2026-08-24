@@ -1,36 +1,41 @@
 import React from 'react';
 import { formatTimestampPT, getCallTones } from './reviewFormat';
 
-// The "System Prefills" column must show what the SYSTEM produced. It previously
-// replaced each field with the operator's verified value once feedback_submitted was
-// set, so a corrected call displayed the human's answer under a heading that says
-// "System" -- hiding the very disagreement this list is scanned to find. A call whose
-// system address was wrong looked identical to one that was right.
+// This column shows the CALL DATA as it now stands: the operator's verified value where one
+// exists, otherwise what the system produced. Operator decision 2026-08-23 (punch-list #39) —
+// "I just want to see the accurate information in the row if it's been verified, and if
+// something was updated by a reviewer, make that obvious."
 //
-// Rows here are narrow and dense, so the corrected value is NOT rendered inline -- two
-// values on one line clipped the address at this column width. A corrected field shows
-// the system value plus a marker carrying the verified value in its tooltip; the review
-// panel already displays both side by side once a row is selected.
+// A corrected field is rendered in amber and bold, with the SYSTEM's original hypothesis in
+// the tooltip. That is deliberately both things at once, and the history is worth keeping:
 //
-// Nothing is lost by this: both the system fields and the verified_* columns persist in
-// public.dispatches, which is what backtesting reads.
+//   * It originally showed the verified value with no marking at all. That hid the
+//     disagreement this list is scanned to find -- a call whose system address was wrong
+//     looked identical to one that was right.
+//   * It was then changed to show the SYSTEM value with a small pencil marker, which
+//     preserved the signal but buried the accurate address behind a hover, and needed a
+//     legend to decode.
+//
+// Showing the verified value *styled as corrected* satisfies both: the row reads true at a
+// glance, and a correction is still visible without decoding anything. Only the direction of
+// the tooltip changed -- the system hypothesis is never lost, and both the system fields and
+// the verified_* columns persist in public.dispatches, which is what backtesting reads.
 function SystemVsVerified({ system, verified, submitted, className = '' }) {
   const sysText = system ?? '';
   const verText = verified ?? '';
   const hasVerified = submitted && verText !== '';
   const differs = hasVerified && verText.trim().toLowerCase() !== sysText.trim().toLowerCase();
 
+  if (!differs) {
+    return <span className={className}>{sysText || '—'}</span>;
+  }
+
   return (
-    <span className={className}>
-      {sysText || '—'}
-      {differs && (
-        <span
-          className="text-amber-400 font-bold ml-1 not-italic cursor-help"
-          title={`System produced "${sysText || '—'}" — operator corrected to "${verText}"`}
-        >
-          ✎
-        </span>
-      )}
+    <span
+      className={`${className} text-amber-300 font-bold cursor-help`}
+      title={`Corrected by reviewer. System originally produced: "${sysText || '—'}"`}
+    >
+      {verText}
     </span>
   );
 }
@@ -166,8 +171,8 @@ export default function ReviewTable({
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Training Status</th>
-                  <th className="py-2.5 px-3 w-[28%] bg-slate-900" title="What the system produced. ✎ marks a field the operator corrected — hover it for the verified value.">
-                    System Output <span className="text-amber-400 normal-case">✎ = corrected</span>
+                  <th className="py-2.5 px-3 w-[28%] bg-slate-900" title="Verified values where the operator corrected them, otherwise system output. Amber bold = corrected by a reviewer; hover it for the system's original hypothesis.">
+                    Call Data <span className="text-amber-300 normal-case">amber = reviewer corrected</span>
                   </th>
                   <th className="py-2.5 px-3 text-right w-[11%] bg-slate-900">Actions</th>
                 </tr>

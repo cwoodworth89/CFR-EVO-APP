@@ -1670,9 +1670,10 @@ Two related observations from the same sample:
 * Genuine failures are visible and do look like real defects — `1` → `657 Whiting Way`,
   `1550` → `1550 United Blvd`, `3000 Walton Ave` → `3007 Anson Ave`, and STT damage such as
   `3025 Low Heat Hwy` → `3025 Lougheed Highway` (*"Low Heat"* for *Lougheed*).
-* At least one rating looks inconsistent: `3030 Gordon Avenue Rain City Housing` verified to
-  `2648 Sandstone Cres` — a completely different address — yet rated **PERFECT**. If
-  `quality_rating` is to drive the flag, its own consistency needs a pass first.
+* One record looked like a rating inconsistency and turned out to be something else:
+  `3030 Gordon Avenue Rain City Housing` verified to `2648 Sandstone Cres`, rated **PERFECT**.
+  It was the review form's own placeholder examples saved as data — see **#33**, now closed.
+  The operator has corrected the record. It was the only genuine case in the 202 reviewed.
 
 #### To do when revisiting
 
@@ -1746,19 +1747,728 @@ ghost-defect trap `docs/parser_audit_handoff.md` §4.2 warns about.
 Two records have `verified_incident` values that are data-entry errors. The correct incident
 type cannot be recovered from the vocabulary and **must not be inferred** (CLAUDE.md §6.1):
 
-| Dispatch | `verified_incident` | Needs |
+**Both records have since been cleared. Neither was an operator error.**
+
+| Dispatch | `verified_incident` | Outcome |
 |:--|:--|:--|
-| (1 record) | `''` — empty string | operator to re-review and set the real type |
-| (1 record) | `Assist` — not a vocabulary term; ambiguous between `Public Assist`, `Lift Assist`, `Medical Aid - Assist` | operator to disambiguate |
+| ~~`DISP-2026-E05DBD`~~ | ~~`''`~~ | **CLEARED** — not a dispatch. See below. |
+| ~~`DISP-2026-266B57`~~ | ~~`Assist`~~ | **CLEARED** — `Assist` was a missing vocabulary term, since added. |
 
-Until resolved, both are counted as **unknown**, not as parser misses. The empty-string record
-was being scored as a wrong answer by naive mismatch counts, inflating the incident-type error
-rate by one.
+`DISP-2026-E05DBD` is a **station PA page**, not a call:
 
-#### Gap (CLAUDE.md §7.2)
+```
+raw_transcript      : 'Lunch, lunch is up, lunch is up.'
+verified_transcript : ''      verified_units: []      verified_incident: ''
+audio_duration      : 10.24s  confidence_score: 0.00  address: 'Unknown Location'
+```
 
-Nothing in [`docs/standards/`](standards/README.md) governs the call-type vocabulary, and
-`source='cfr_curated'` records no external authority. Canonical spellings here were set by
-operator decision on 2026-08-23 (`Breathing Problem` singular, `Smouldering` Canadian), not by
-a document. If E-Comm / Coquitlam Fire dispatch publishes an official call-type list, it
-supersedes this and belongs in `docs/standards/`.
+The reviewer emptied *every* verified field — a deliberate, internally consistent way of
+marking "this is not a dispatch". Reading the empty string as a data-entry slip was wrong;
+it is the correct answer to a record that should never have been created.
+
+**This is punch-list #14 (PA page leakage) with concrete IDs.** The corpus holds at least
+four non-dispatches captured as calls:
+
+| Dispatch | Duration | Transcript |
+|:--|--:|:--|
+| `DISP-2026-E05DBD` | 10.2s | `Lunch, lunch is up, lunch is up.` |
+| `DISP-2026-415E9F` | 8.2s | `Lunch is ready. Lunch is ready.` |
+| `DISP-2026-E82B53` | 9.9s | `Medic 1, Medic 1, we're heading out.` |
+| `DISP-2026-FEB541` | 10.0s | `Wilson, Wilson, you're good to go.` |
+
+All are well under the ~25s double-round dispatch length. They contaminate any
+incident-type or WER metric computed over the corpus unless excluded, and the only current
+signal that they are not calls is that a human emptied their verified fields.
+
+#### The domain model, recorded (CLAUDE.md §7.2)
+
+No external standard governs the call-type vocabulary (`source='cfr_curated'`). The operator
+supplied the model on 2026-08-23, and it is now a row in
+[`docs/standards/README.md`](standards/README.md) and a comment block above `CALL_TYPES` in
+[`config/vocab.py`](../backend/cfr_dispatch/config/vocab.py):
+
+> A call type is a **main type** optionally followed by a **sub type**, joined by ` - `.
+> A main type can stand on its own — 25 of 27 currently do — but most calls arrive with the
+> expanded form, and the sub type is the operationally significant half.
+
+**The two levels are deliberately not modelled separately.** One flat running list of complete
+terms; ` - ` is the only structure. Do not split into main/sub categories, columns, or tables,
+and do not offer or store a sub type alone — `Overdose` is not a call type,
+`Medical Aid - Overdose` is.
+
+Canonical spellings are operator decisions (`Breathing Problem` singular, `Smouldering`
+Canadian). If E-Comm / Coquitlam Fire dispatch publishes an official list, it supersedes this.
+
+#### The assist family: three distinct call types, one missing row — RESOLVED
+
+**Correction to an earlier claim in this item.** `Public Assist`, `Lift Assist`,
+`Medical Aid - Assist` and `Assist` were written up here as a naming inconsistency to be
+rationalised. That was wrong. Operator ruling 2026-08-23: **they are separate call types,
+not variants of one**, and the model does not require `Lift Assist` to be re-spelled
+`Assist - Lift`. Nothing needed rationalising.
+
+The actual defect was narrower and measurable: **bare `Assist` had no vocabulary row.**
+`match_incident_type` can only return a vocabulary term, so dispatch saying
+*"respond routine, assist, 1331 Green Bank Court"* fell through to `Unknown Incident`.
+
+Added 2026-08-23. **Six calls recovered** from `Unknown Incident` to `Assist`:
+`DISP-2026-587456`, `DISP-2026-266B57`, `DISP-2026-F1F328`, `DISP-2026-6547A7`,
+`DISP-2026-511E01`, `DISP-2026-BF90E3`.
+
+**This also clears one of the two records flagged above.** `DISP-2026-266B57` carried
+`verified_incident = 'Assist'` and was flagged as an ambiguous data-entry error needing
+operator disambiguation. It was neither — it was a **correct human answer to a vocabulary
+gap**, and it now matches the parser exactly. Only the empty-string record remains flagged.
+
+Worth generalising: a `verified_incident` with no vocabulary row is evidence of a **missing
+term** first, and a reviewer mistake only second. The reviewer heard the call; the
+vocabulary is the thing that was incomplete.
+
+#### Two non-spoken terms retired — RESOLVED
+
+Operator ruling 2026-08-23, after the corpus showed both had never been used:
+
+* **`Vehicle Rollover` — retired.** `Motor Vehicle Incident - Rollover` **is** a spoken call
+  type and stays; the bare form is not. Neither had ever been used and no transcript in the
+  corpus contains "roll" at all, so the duplicate is gone before it could ever win a match.
+* **`Public Assist` — retired.** Zero occurrences in any `raw_transcript`, `incident_type` or
+  `verified_incident`. `Assist` and `Lift Assist` are the spoken forms and remain.
+
+Both were retired via `is_active = FALSE`, not deleted, so the rows survive if either turns
+out to be a real spoken form later. The script guards on live usage before retiring any term,
+so re-running it is safe.
+
+**64 active call types.** No regression: incident-type disagreement stayed at 4.5% (9/202).
+
+#### A note for whoever extends this vocabulary next
+
+Every change in this item was settled by **measuring the corpus, then asking the operator** —
+never by reasoning from the term names. Three of this session's own conclusions were wrong and
+were corrected the same way:
+
+| Claim | Reality |
+|:--|:--|
+| `Smoldering` is a duplicate spelling to retire | It is the **only** form STT produces; retiring it would have broken 5 calls |
+| `Assist` is an ambiguous data-entry error | A **correct** human answer to a missing vocabulary row; 6 calls recovered by adding it |
+| Sub types are rare ("25 of 27 mains stand alone") | **77%** of calls carry one; 93% of `Medical Aid` |
+
+A term's name tells you nothing about whether dispatch says it. The corpus does. Query
+`raw_transcript` before adding, retiring, or merging anything here.
+
+---
+
+### 33. Legacy worked-example placeholders in the review form — one reached the training set
+> **Status**: ✅ **Closed 2026-08-23.** Removed from
+> `frontend/src/components/review/VerificationSidebar.jsx`; `lint:crash` and `npm run build`
+> both pass. Not yet deployed to the kiosk.
+
+Four fields in the HITL verification sidebar fell back to hand-written worked examples when
+the parser produced no value:
+
+| Field | Line | Legacy fallback |
+|:--|:--|:--|
+| Responding units | `:444` | `"e.g. E1, L1"` |
+| Incident type | `:473` | `"e.g. Structure Fire"` |
+| Address | `:511` | `"e.g. 2648 Sandstone Cres"` |
+| Map grid | `:597` | `"e.g. 92"` |
+
+**These are obsolete.** They predate the current design, in which the **system hypothesis is
+itself the placeholder** and the reviewer presses **Ctrl+Space** to accept it — which is what
+saves typing and prevents spelling drift. Once the real value sits in the background, a worked
+example is dead weight.
+
+#### How it was found — one of them reached the corpus
+
+`DISP-2026-D106EB` (2026-07-13) was saved with **all three text examples as its verified
+data**, an exact three-for-three match:
+
+| Field | System output (matches the audio) | What was saved |
+|:--|:--|:--|
+| Address | `3030 Gordon Avenue Rain City Housing` | `2648 Sandstone Cres` |
+| Incident | `Medical Aid - Overdose` | `Structure Fire` |
+| Units | `M1` | `E1, L1` |
+
+Its own `verified_transcript` says *"medic 1 respond emergency medical aid overdose 3030
+gordon avenue rain city housing"* — so the system was right on every field and the
+corrections were the form's examples. The record was rated **PERFECT**, carried
+`include_in_training = true` and `model_updated = true`, and had therefore **already been
+exported as ground truth** — teaching Whisper that audio describing an overdose on Gordon
+Avenue transcribes to a structure fire on Sandstone Cres.
+
+Attributed by the operator to an early-system reviewer mistake, from before the prefill
+design; the record has since been corrected by hand. A scan of all 202 reviewed calls for
+verified addresses whose street never appears in the transcript found **no other genuine
+case** — the other three hits were `Crt`→`Court` suffix expansions.
+
+The **mechanism was not reproduced**. The placeholders are conditional
+(`selectedCall.incident_type || "e.g. …"`), and that call had a real incident type, so the
+examples should not have been visible on that record at all.
+
+#### Why it was worth removing rather than tolerating
+
+* `2648 Sandstone Cres` matches exactly **one real parcel** in `public.parcels` — a real
+  Coquitlam property, used as decorative example text in a form that writes to the
+  ground-truth corpus.
+* All four examples are *plausible dispatch values*. §6.1 and §6.5 exist because a
+  plausible-looking wrong answer cannot be distinguished from a real one; this is that rule
+  applied to a UI affordance rather than to a computed value.
+
+#### Fix
+
+A single `NO_SYSTEM_VALUE = '-- nothing parsed --'` constant replaces all four, carrying the
+history above as an inline comment. When the parser produced nothing, the field now says so
+instead of showing something that reads like data. The system-hypothesis placeholder and the
+Ctrl+Space prefill are untouched — they were always the point.
+
+---
+
+### 34. Apparatus names collide with call-type names, turning STT damage into a confident wrong answer
+> **Status**: ⚠️ **Open — found 2026-08-23 investigating `DISP-2026-A19179`.** **Confirmed**
+> by re-running current code against the kiosk database. Characterised only; no fix applied.
+
+**`Rescue` is both an apparatus type and a call type.** When STT garbles the incident
+phrase, the apparatus name supplies a false call type — and does so at maximum score.
+
+#### The worked case
+
+`DISP-2026-A19179` (2026-07-29, 54.9s, rated FAILED). Ground truth
+`Alarm Activated - High Risk`.
+
+```
+verified_transcript : ...respond emergency alarm activated high risk 1188 pinetree way near...
+raw_transcript      : ...respondents way near glen drive and atlantic avenue...
+```
+
+STT collapsed *"respond emergency alarm activated high risk 1188 pinetree"* into
+*"respondents"* — **the incident phrase is simply not in the transcript.** What remains is
+the unit list, `engine 1 engine 2 rescue 2`, and `Rescue` is an active call type:
+
+```
+step-1 exact substring hits : ['Rescue']          <- "rescue 2" contains "rescue"
+token_set_ratio('rescue', transcript) = 100       <- subset trap, would also fire
+ratio('rescue', transcript)           =   7       <- what the name implies
+```
+
+Both matching stages independently produce `Rescue`. There is no path to `Unknown Incident`.
+
+#### This is not a regression, and not the alias work
+
+* Verified by re-running with `aliases={}`: still `Rescue`. The 2026-08-23 alias change is
+  not the cause.
+* The **stored** value is `Unknown Incident` (confidence 0.00) — correct at the time. The
+  `Rescue` call-type row was created **2026-08-21**, three weeks *after* this call ran. The
+  2026-08-21 vocabulary seeding introduced a term that collides with an apparatus name.
+
+This is the §4.2 ghost-defect check run in the opposite direction, and worth noting as a
+pattern: *older calls usually show already-fixed defects, but a vocabulary addition can make
+a historical call newly wrong.* Re-running current code is what distinguishes the two.
+
+#### Why it matters more than one call
+
+Collisions between `UNITS_VOCABULARY` and `call_type`: **`Rescue`, `Hazmat 1`, `Hazmat 2`,
+`Hazmat 3`.**
+
+| Measure | n |
+|:--|--:|
+| Calls mentioning rescue apparatus (`rescue` + digit) | 64 |
+| …verified as an incident **other** than `Rescue` (latent exposure) | 24 |
+| …currently misclassified because of the collision | **1** |
+| Calls whose true incident genuinely **is** `Rescue` | 7 |
+
+Exposure is 1 of 24 because longest-first ordering saves it: when the real incident phrase
+survives STT, the longer term (`Alarm Activated - High Risk`, 27 chars) is tested before
+`Rescue` (6 chars) and wins. **The collision only bites when STT has already damaged the
+incident phrase** — precisely when the system should be reporting `Unknown Incident`.
+
+So the defect does not create wrong answers on its own. It **converts honest failures into
+confident ones**, which is the more dangerous direction (CLAUDE.md §6.1). `Rescue` is a
+legitimate call type on 7 verified calls, so it cannot simply be removed.
+
+#### Fix, validated against the corpus but NOT applied
+
+**Operator ruling 2026-08-23 supplied the rule**: the apparatus is always `Rescue 1`,
+`Rescue 2` — never bare — and the call type is announced **after** the units. The
+announcement template is:
+
+```
+[units] respond [routine|emergency] [CALL TYPE] [address] near [cross streets] ...
+```
+
+So the call type occupies the slot *after* `respond [mode]`, and everything before it is the
+unit list.
+
+**A first attempt keyed on "followed by a digit" and was wrong** — worth recording so it is
+not retried. The call type is *also* followed by digits, because the address number comes
+next: `"respond routine, rescue, 2968 glen drive"` reaches STT as `"Rescue 2, 968 Glen
+Drive"`. Six of the seven true-`Rescue` calls have no bare `rescue` at all.
+
+The rule that does work, tested over all 202 verified calls:
+
+1. Match the call type only in the text **after** the `respond [mode]` marker.
+2. A round with **no** `respond` marker is a **unit tail, not an announcement** — it has no
+   call-type slot and is skipped entirely.
+3. Across rounds, the **most specific** match wins (see below).
+
+| | correct | wrong |
+|:--|--:|--:|
+| current (whole transcript) | 193/202 | 4.5% |
+| proposed | 193/202 | 4.5% |
+
+**One call changes**: `DISP-2026-A19179` goes from `Rescue` — confident and wrong — to
+`Unknown Incident`, which is the honest answer for a transcript that never contained the
+incident phrase. No regressions. Same accuracy, strictly better on the axis that matters
+(CLAUDE.md §6.1: an unknown reported as unknown is a correct answer).
+
+`split_rounds` already isolates the problem cleanly:
+
+```
+round 1: 'coquitlam engine 1 engine 2 rescue 2 respond way near glen drive ... map grid 82'
+         -> has respond, nothing in the call-type slot -> Unknown  (correct)
+round 2: 'coquitlam engine 1 engine 2 rescue 2'
+         -> no respond marker: a unit tail -> skipped  (currently the source of 'Rescue')
+```
+
+#### Step 3 is not optional — it is punch-list #33's round-1 bias in miniature
+
+Selecting the **first** non-Unknown round instead of the most specific one **breaks**
+`DISP-2026-E792B0`:
+
+```
+round 1: 'medical aid epidominal pain'   <- STT garbled -> matches only 'Medical Aid'
+round 2: 'medical aid abdominal pain'    <- correct     -> 'Medical Aid - Abdominal Pain'
+```
+
+Current code gets this right **by accident**: it matches against both rounds concatenated, so
+round 2's correct wording is in the string and longest-first finds the qualified type. Any
+move to per-round parsing must therefore choose the most specific answer across rounds, or it
+reintroduces the round-1-wins defect described in
+[`parser_audit_handoff.md`](parser_audit_handoff.md) §5 — which
+[`pipeline/phase2.py:146`](../backend/cfr_dispatch/pipeline/phase2.py) still has for
+addresses (`next(...)`, first candidate wins, unconditionally, across 201 double-round calls).
+
+Related: the subset trap inventory in #19, and `Rescue`'s `token_set_ratio` of 100 above is
+a fifth instance of it.
+
+#### ⚠️ Numbering collision
+
+**There are two items numbered 33 in this file** — "Call-type vocabulary…" (this session's
+vocabulary work) and "Legacy worked-example placeholders…" (concurrent session). Both are
+cited as "punch-list #33" from code comments, in `config/vocab.py` and
+`review/VerificationSidebar.jsx` respectively. Left as-is rather than renumbering another
+session's in-flight item; needs an operator decision on which keeps the number.
+
+---
+
+## 🖥️ Live Operation Batch, 2026-08-23
+
+Eight items reported by the operator from one review session. Each was characterized
+read-only against the working tree and the running kiosk; what was measured is stated.
+
+### 34. Live overdose call still showed the green ROUTINE (Code 1) badge
+> **Status**: ⚠️ **Open — duplicate symptom of #31, now confirmed in live operation.**
+
+An overdose dispatch (an *emergency* response) rendered with the green border and the
+`ROUTINE (CODE 1)` badge. This is exactly the failure #31 predicts: `response_type` never
+reaches the kiosk, `isEmergency` is always false, so every call renders routine. **No separate
+fix — #31 and #30 cover it.** Logged because it is the first live confirmation rather than a
+database inference.
+
+**Second, separate defect in the same sighting**: the kiosk announced an update that did not
+exist. `triggerUpdateFlash` (`frontend/src/hooks/useKioskQueue.js:41-48`) sets
+`isRecentlyUpdated` for 4 s, which renders the `⚡ UPDATED` badge
+(`ActiveAlertBanner.jsx:46`). Nothing in that path compares the new payload to the old one, so
+the badge fires on **any** re-delivery — and MQTT QoS 1 is at-least-once, so duplicate
+delivery of an unchanged call is the contract, not an anomaly (see the kiosk idempotency note
+in the handoff). The operator is told data changed when it did not.
+
+**Fix direction**: fire the flash only when a field the operator can see actually differs —
+address, incident, units, grid, talkgroup, coordinates — rather than on receipt. Worth
+deciding *what counts as a change* before implementing, since "updated" is an operational
+claim (§6.1: a badge asserting something that did not happen is fabricated state).
+
+---
+
+### 35. Google Street View panel still not working
+> **Status**: ⚠️ **Open — cause identified, not yet confirmed on the kiosk.**
+
+`frontend/src/components/kiosk/StreetViewPanel.jsx:8`:
+
+```js
+const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+```
+
+Two hard requirements, either of which produces the blank panel seen in the screenshot:
+
+1. **The key must be present at BUILD time.** Vite inlines `import.meta.env.*` when
+   `npm run build` runs — it is not read at runtime. The key lives in `frontend/.env.local`,
+   which is **git-ignored** (CLAUDE.md §3.6) and therefore *not* synced by `git pull`. If the
+   kiosk's `.env.local` lacks the key, every build there produces `apiKey = ''` and the panel
+   renders empty no matter how many times the code is corrected locally.
+2. **It needs WAN.** `:135` gates on `isOnline`, and `:301` loads
+   `https://maps.googleapis.com/maps/api/js`. Street View cannot work offline, which is a
+   standing exception to the §1 offline-first rule and is worth stating explicitly somewhere
+   the next reader will find it.
+
+**Next step is a two-minute check on the kiosk**, not a code change:
+`grep -c VITE_GOOGLE_MAPS_API_KEY /home/tcfire/CFR-EVO-APP/frontend/.env.local`, then confirm
+the built bundle actually contains the key. If it is missing, `scp` the file and rebuild.
+**Not verified from here** — the check needs the kiosk.
+
+---
+
+### 36. Double-click-to-autofill removed from the review form
+> **Status**: ✅ **Closed 2026-08-23.** Operator request: Ctrl+Space alone is working well.
+
+Six `onDoubleClick={() => onPrefillField(...)}` handlers removed from
+`VerificationSidebar.jsx` (transcript, units, incident, address, subaddress, map grid), and
+the five tooltips advertising the gesture updated to
+`"Click, or press Ctrl+Space, to import the system value"`.
+
+The `Sys:` click affordance and the Ctrl+Space handler are untouched. `lint:crash` and
+`npm run build` both pass. **Not yet deployed to the kiosk.**
+
+---
+
+### 37. Close button and timer timeout should not dismiss to the same place
+> **Status**: ⚠️ **Open — noted for change by the operator 2026-08-23.**
+
+Required behaviour:
+
+| Dismissal | Should go to |
+|:--|:--|
+| **Call timer times out** | main map (EXPLORE) |
+| **Operator presses Close** | back to whatever screen they were on |
+
+Today both do the same thing, and the "drop to map" is *forced*. `App.jsx:52-54`:
+
+```js
+const activeIsLive = !!kioskState.activeCall && !kioskState.activeCall.isReview;
+if (activeIsLive && returnMode !== 'EXPLORE') setReturnMode('EXPLORE');
+```
+
+That is a deliberate decision recorded on 2026-08-22 — a live call interrupting a review was
+meant to return the crew to the map, not to an admin table. The reasoning is sound for a real
+response; it is simply wrong for the operator doing review work, which is what this item
+changes.
+
+`useKioskQueue.js:177` `dismissActiveCall` is shared by **both** paths — the Close button
+(`KioskView.jsx:226`) and the countdown (`:199`) call the identical function, so nothing
+downstream can distinguish them.
+
+**Fix direction**: give `dismissActiveCall` a reason (`'timeout' | 'manual'`); stop clobbering
+`returnMode` on activation and instead capture the pre-call mode; on `'timeout'` set EXPLORE,
+on `'manual'` restore what was captured. **Note this touches the live dispatch path**, so the
+2026-08-22 intent must survive: a live call that interrupts a review and then *times out*
+still lands on the map.
+
+---
+
+### 38. `DISP-2026-ACCF6D` routed to the wrong street — the parcel front point is on Pinetree Way
+> **Status**: ⚠️ **Open — confirmed by spatial query. Likely systemic; see the estimate.**
+
+Dispatch (2026-08-23 09:29) for **`1178 Heffley Cres`**, transcript
+*"medical aid - chest pain, 1178 heffley crescent Number 1202"*, confidence 100. The operator
+reports the route ends one street over.
+
+**It does.** The dispatch used `lat/lng = 49.2807084, -122.7932581`, taken from the parcel
+`front_lat` / `front_lng`. Measured against `public.roads`:
+
+| Point | Nearest road | Distance |
+|:--|:--|--:|
+| **Stored front point** | **Pinetree Way** | **0.0 m** |
+| Stored front point | Heffley Crescent | **109.2 m** |
+| Parcel centroid | Pinetree Way | 56.8 m |
+| Parcel centroid | Heffley Crescent | 59.4 m |
+
+The stored "front" of a Heffley Crescent address sits **exactly on Pinetree Way**, 109 m from
+the street it is addressed on. Heffley Crescent is not even among the three nearest roads.
+OSRM is behaving correctly — it is being handed the wrong destination.
+
+Note the centroid is not obviously better here (roughly equidistant), so this is not a
+"use the centroid instead" fix; the front point is simply wrong.
+
+**Scope estimate — read the caveats.** Over a random 1,500-parcel sample with a front point,
+comparing the first token of the address street to the nearest road `roadname`:
+
+| Result | Parcels |
+|:--|--:|
+| Front point within 30 m of its own named street | 1,058 |
+| Marginal, 30–60 m | 139 |
+| **Over 60 m from its own street** (the Heffley signature) | **173 (11.5%)** |
+| Own street name not matched in `public.roads` | 130 |
+
+⚠️ **This is an estimate, not a count.** The comparison uses only the *first word* of the
+street name, so multi-word streets fall into the "not matched" bucket rather than being
+judged; large institutional parcels may legitimately sit far from their named street; and no
+sampled case other than Heffley was inspected individually. Extrapolating ~11.5% across 65,400
+parcels would be roughly 7,500 affected — **do not quote that figure as fact** until a proper
+audit runs.
+
+**Next step**: a real audit of `parcels.front_lat/front_lng` provenance — how the front point
+was derived, and whether it can be re-derived by projecting the parcel centroid onto the
+nearest segment *of the road it is addressed on* rather than the nearest road of any name.
+That is the same class of defect as the intersections rebuild: a plausible geometric shortcut
+standing in for the real relationship (§6.2).
+
+---
+
+### 39. Review table: restore the verified value in the row, drop the pencil-and-legend
+> **Status**: ⚠️ **Open — operator wants the earlier behaviour back, with a caveat below.**
+
+The operator ask: *"I just want to see the accurate information in the row if it has been
+verified, and if something was updated by a reviewer, make that obvious."*
+
+**What it is now**: `SystemVsVerified` in `frontend/src/components/review/ReviewTable.jsx:17`
+renders the **system** value plus a `✎` marker, with the verified value only in a `title`
+tooltip, and a `✎ = corrected` legend in the column header (`:169-170`).
+
+**What it was**: the column showed the **verified** value once `feedback_submitted` was set,
+replacing the system value outright.
+
+**Why it was changed — this matters, and it is documented at `ReviewTable.jsx:4-16`.** The
+column is headed *"System Output"*, and swapping in the human answer meant a call whose
+system address was **wrong** looked identical to one that was **right** — hiding the exact
+disagreement the list is scanned to find. The stated reason for the tooltip rather than an
+inline pair was column width: two values on one line clipped the address.
+
+**So neither design is what the operator actually asked for.** The ask is *both*: show the
+accurate (verified) value **and** make the correction obvious. That is achievable and is a
+third design, not a revert:
+
+* Render the **verified** value as the primary text when one exists.
+* Style it distinctly — colour or weight — so a corrected row is obvious at a glance without
+  a legend to decode.
+* Keep the **system** value reachable (tooltip, or the review panel, which already shows both
+  side by side when a row is selected).
+* Consider renaming the column, since it would no longer be "System Output".
+
+**Recommendation**: do not simply revert. Reverting reintroduces the defect the comment
+describes — a wrong system answer becoming invisible — which is a §6.6-style honesty problem
+in the one view used to audit accuracy. **Confirm the design with the operator before
+building it**, in particular whether the column should remain system-first or become
+verified-first with the system value on hover.
+
+---
+
+### 40. Street basemap has no tiles above zoom 18 — but the reported symptom did not reproduce
+> **Status**: ⚠️ **Open — partially characterized; needs the exact location from the operator.**
+
+Reported: *"Zoom 17 and greater, on map mode in Austin's north area is showing blank."*
+
+**Measured** against the live tile server (`http://100.95.146.94:8081`), tileset metadata:
+
+| Layer | minzoom | maxzoom | Format |
+|:--|--:|--:|:--|
+| `street` | 12 | **18** | png |
+| `street_nolabels` | 12 | **18** | png |
+| `satellite` | 12 | 20 | jpg |
+| `cadastral` | 14 | 20 | png |
+
+Above z18 the street layers return a **116-byte empty PNG**, not a 404. Probed around Austin
+Heights (49.2505, −122.86) and north of it (49.262, −122.86):
+
+```
+z17  satellite=14858b  street=7406b     <- both have content
+z18  satellite=17760b  street=1744b     <- both have content
+z19  satellite=14806b  street=116b      <- street empty
+z20  satellite=12602b  street=116b      <- street empty
+```
+
+**I could not reproduce blank at z17.** Both layers return real tiles at z17 and z18 at the
+coordinates probed. The street layers do die at **z19+**, which is a real limitation but does
+not match the reported zoom.
+
+Further, the frontend is configured correctly for it: `MapConstants.js` sets
+`maxNativeZoom: 18` on `GREY`/`DARK`/`OSM`/`VOYAGER` and `20` on `SATELLITE`, and
+`MapLayers.jsx:100` passes it through to the Leaflet layer — so Leaflet should **upscale** the
+z18 tile past 18 rather than request an empty z19. On that configuration the symptom should be
+*blurry*, not *blank*.
+
+**Open questions for the operator**: which base layer was selected (satellite, street, grey,
+dark), and roughly which coordinates? "Austin's north area" is ambiguous, and the answer
+determines whether this is a tile-coverage gap in a specific spot, an overzoom bug, or the
+116-byte blank tile defeating the Leaflet upscale in a way the config implies it should not.
+A screenshot with the zoom indicator visible would settle it.
+
+---
+
+### 41. `629 Cottonwood Ave` is absent from `public.parcels`
+> **Status**: ⚠️ **Open — confirmed. A data gap, not a search bug.**
+
+The operator could not find `629 Cottonwood Ave` in the search bar. It is not there to find:
+723 parcels match `%Cottonwood%`, and **zero** match `629 Cottonwood%`.
+
+The neighbours exist, and the gap is a run of consecutive odd numbers:
+
+```
+... 620, 622, 625, 628, [627, 629, 631 MISSING], 633, 635, 637, 639 ...
+```
+
+So the search bar is reporting the database honestly. Either the addresses are genuinely
+absent from the City of Coquitlam `Addresses.shp` import, or they were dropped during
+`backend/scripts/import_parcels.py`. A run of three consecutive missing odd numbers on one
+side of the street suggests a real-world cause (a consolidated lot, a redevelopment, a
+renumbering) at least as strongly as an import defect — **do not assume the importer is
+broken without checking the source shapefile.**
+
+Per §6.2 this belongs in the data, not in application code: if the addresses are real, the fix
+is a parcel import correction, never a string-match special case in the geocoder.
+
+**Next step**: check whether 627/629/631 Cottonwood Ave exist in the source `Addresses.shp`,
+and whether the operator can confirm from local knowledge that 629 is a real, currently
+addressable property.
+
+---
+
+## 🔁 Batch follow-up, 2026-08-23 (operator screenshots + kiosk probes)
+
+### 40 (revised). Street AND satellite basemaps stop at zoom 17 across western Coquitlam
+> **Status**: ⚠️ **Open — REPRODUCED and localised. Wider than first characterized.**
+> This supersedes the "could not reproduce" note in #40 above, which was **wrong**: the first
+> probe ran against coordinates ~1.5 km east of the affected area and a `while`-loop curl
+> failure printed `0b` for every layer, which masked the result. Both errors are recorded
+> rather than overwritten.
+
+The operator's screenshot shows Explore mode, **Street Map** basemap, **zoom 17.0**, around
+Cottonwood Ave / Regan Ave / Marshall St (Austin Heights). Parcel outlines and address labels
+render on pure black — that is the **cadastral overlay alone**, with no basemap underneath.
+
+**Measured** at 49.2588, −122.8843 (a real parcel front point from `public.parcels`):
+
+| Zoom | `street` | `satellite` | `cadastral` |
+|--:|--:|--:|--:|
+| 15 | 24,805 b | — | — |
+| 16 | 16,644 b | 24,452 b | — |
+| **17** | **116 b (empty)** | **116 b (empty)** | 25,761 b |
+| **18** | **116 b (empty)** | — | — |
+
+A 116-byte PNG is the tile server's empty tile. **Both the street and satellite archives stop
+at z16 here, while cadastral continues** — exactly the black-with-parcels rendering reported.
+
+**The gap is a clean vertical cut, identical in both archives.** Scanning west→east along
+z17 y=44869:
+
+```
+x=20780..20801  116 b   (empty)
+x=20802         8,419 b (content)   <- boundary, lng ≈ -122.8656
+x=20804..20830  content
+```
+
+Identical boundary for satellite (`x≤20801` empty, `x=20802` = 20,331 b), and the same cut at
+z18. A north–south scan at x=20795 is empty at every latitude tested (y = 44820…44920), so
+this is a longitude clip, not a patchy hole.
+
+**Everything west of roughly −122.866 has no basemap above zoom 16** — Austin Heights,
+Maillardville and Burquitlam, i.e. a populated strip roughly 4 km wide running the full height
+of the city. Crews zooming in on any west-side address see parcel outlines on black.
+
+**The declared metadata is wrong, which is why nothing detected this.** Both archives report:
+
+```
+street     minzoom 12  maxzoom 18  bounds [-123.04, 49.15, -122.6, 49.48]
+satellite  minzoom 12  maxzoom 20  bounds [-123.04, 49.15, -122.6, 49.48]
+```
+
+The declared western bound of −123.04 overstates actual z17+ coverage by ~0.17° of longitude.
+Because the metadata claims the coverage exists, the frontend has no way to know it does not,
+and `maxNativeZoom` cannot help — the tiles are *within* the declared range and simply empty.
+
+**This is not a frontend defect.** `MapConstants.js` (`maxNativeZoom: 18` street / `20`
+satellite) and `MapLayers.jsx:100` are correct. The fix is in the MBTiles build: re-crawl the
+western extent at z17–z20 for both archives, and correct the declared bounds so the two agree.
+See the `mbtiles-tile-server` skill.
+
+**Recommend raising the priority.** Austin Heights is a dense residential area, and losing the
+basemap at exactly the zoom used to identify a specific property is an operational gap, not a
+cosmetic one. Cadastral coverage masks it just enough to look intentional.
+
+---
+
+### 41 (revised). `629 Cottonwood Ave` exists on the map but not in `public.parcels`
+> **Status**: ⚠️ **Open — confirmed as an import gap, not a real-world absence.**
+
+The operator points out that 629 **is** labelled as a parcel on the cadastral layer, and the
+screenshot confirms it: one parcel carries **two** labels, `625` and `629`.
+
+That resolves the question left open above. The parcel is an **address range, 625–629**, and:
+
+* the **cadastral MBTiles** (built from the City data) renders both numbers;
+* **`public.parcels` holds only `625 Cottonwood Ave`** (49.2595007, −122.8843437). There is no
+  `629` row, so the search bar cannot find it.
+
+So the earlier suggestion that a consolidated lot or renumbering explained it was **wrong** —
+the address is real and the City data has it. Two derivations of the same municipal source
+disagree, and the one the search reads is the lossy one.
+
+**This is very likely not a single missing address.** Any parcel carrying an address *range*
+would lose every number except the one imported. `public.roads` already stores
+`left_begin/left_end/right_begin/right_end`, so range semantics exist elsewhere in the schema
+— worth checking whether `Addresses.shp` carries a range per parcel that
+`backend/scripts/import_parcels.py` collapses to a single value.
+
+**Next step**: inspect the source `Addresses.shp` attributes for 625 Cottonwood Ave, determine
+whether ranges are represented, and count how many parcels are affected before deciding on a
+fix. Per §6.2 the correction belongs in the import, never as a geocoder special case.
+
+---
+
+### 39 (revised). Review table now shows verified data, marked
+> **Status**: ✅ **Closed 2026-08-23** to the operator's specification. Not yet deployed.
+
+Operator direction: *"If verified data is different from system data, I want it marked (by
+bolding, or a slight color change), and have a hover over show system original hypothesis."*
+
+`SystemVsVerified` in `frontend/src/components/review/ReviewTable.jsx` now:
+
+* renders the **verified** value when it differs from the system value, in **amber and bold**,
+  with `title` = *"Corrected by reviewer. System originally produced: …"*;
+* renders the system value plainly when there is no correction, or the correction is only
+  whitespace/case.
+
+The column header changed from **"System Output — ✎ = corrected"** to **"Call Data — amber =
+reviewer corrected"**, since it no longer shows system output unconditionally.
+
+This is the third design, not a revert, and the full history is preserved in the code comment:
+the original showed verified values *unmarked* (hiding disagreement), the second showed system
+values with a pencil (burying the accurate address behind a hover and needing a legend). The
+current one makes the row read true at a glance while keeping the correction visible and the
+system hypothesis one hover away. `lint:crash` and `npm run build` pass.
+
+---
+
+### 35 (revised). Street View: the API-key hypothesis was wrong
+> **Status**: ⚠️ **Open — cause NOT yet identified. Needs the kiosk browser console.**
+
+Checked directly on the kiosk. **All three prerequisites are satisfied**, so the theory
+recorded in #35 above is withdrawn:
+
+| Check | Result |
+|:--|:--|
+| `frontend/.env.local` present | yes — 285 bytes, dated Aug 9 |
+| `VITE_GOOGLE_MAPS_API_KEY` set in it | yes |
+| Key baked into the built bundle | yes — found in `dist/assets/MapBoard-*.js` |
+| `maps.googleapis.com` reachable from the kiosk | yes — HTTP 200 in 0.17 s |
+| Build freshness | `dist/index.html` 2026-08-23 12:26 (today) |
+
+So the key is present at build time, the SDK host is reachable, and the bundle is current.
+The blank panel is something else.
+
+**What the code does when the key IS present** (`StreetViewPanel.jsx:466-487`): it renders an
+*empty* `div` and relies on the Google SDK to inject the panorama into `containerRef`. The
+`<iframe>` fallback is only rendered when `!apiKey` or `sdkError`. So any silent failure of
+`new google.maps.StreetViewPanorama(...)` leaves a genuinely empty container — and the
+skeleton loader is cleared unconditionally by a 3.5 s timer (`:283-285`) whether or not the
+panorama ever mounted. **A failed load and a successful one look identical to the operator.**
+
+Plausible causes, none verified: the Maps JS API key lacking Street View / billing
+entitlement (Google returns an error to the console, not to the callback), the newer SDK
+loader requirements, or `hasCoords` false for the call in question.
+
+**Next step needs the operator**: open the kiosk browser console (F12) with a call active and
+capture any `maps.googleapis.com` errors. That is the fastest path — the in-app browser cannot
+drive an MQTT-driven kiosk view.
+
+**Worth fixing regardless of cause**: the 3.5 s timer that clears the loading state without
+checking whether the panorama mounted. An unmounted panorama should surface an explicit
+"Street View unavailable" state rather than an indistinguishable black rectangle (§6.1 — the
+failure is currently invisible).

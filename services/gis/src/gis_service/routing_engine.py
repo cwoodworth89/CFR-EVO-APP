@@ -276,6 +276,15 @@ class EVORoutingEngine:
         hall = self.get_hall_location(station_id)
 
         crow_km = self.calculate_distance_km(hall["lat"], hall["lng"], dest_lat, dest_lng)
+        # Anything that is not the literal "routine" — including an unparsed None — routes at
+        # emergency speed. Operator decision 2026-08-23 (CLAUDE.md §6.3 tier 4, department
+        # operational policy): most calls are emergency and time-critical, so emergency speed
+        # is the conservative assumption when the response type is unknown.
+        #
+        # This is a stated assumption in the *calculation*, not a stored value. The parsed
+        # response type stays NULL in `target` and the kiosk shows it as UNKNOWN on an amber
+        # border — do not write "emergency" back to the record to make this simpler.
+        # See punch-list #31.
         is_routine = str(response_type).lower().strip() == "routine"
 
         if road_distance_km is not None and road_distance_km > 0:
@@ -404,6 +413,15 @@ class EVORoutingEngine:
             start_lat = hall["lat"]
             start_lng = hall["lng"]
 
+        # Anything that is not the literal "routine" — including an unparsed None — routes at
+        # emergency speed. Operator decision 2026-08-23 (CLAUDE.md §6.3 tier 4, department
+        # operational policy): most calls are emergency and time-critical, so emergency speed
+        # is the conservative assumption when the response type is unknown.
+        #
+        # This is a stated assumption in the *calculation*, not a stored value. The parsed
+        # response type stays NULL in `target` and the kiosk shows it as UNKNOWN on an amber
+        # border — do not write "emergency" back to the record to make this simpler.
+        # See punch-list #31.
         is_routine = str(response_type).lower().strip() == "routine"
 
         # Departure is always the hall's verified front-apron GPS coordinate.

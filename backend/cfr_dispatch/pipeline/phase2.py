@@ -187,7 +187,22 @@ def process_phase_2_finalize(
                         logging.warning(f"[{dispatch_id}] Template reconstruction warning: {r_err}")
 
                 p1_address = p1_target.get("address") or (p1_candidate.address or p1_candidate.intersection if p1_candidate else "")
+                # MERGE onto the Phase 1 target, never rebuild it. This PATCH replaces the
+                # whole `target` object, so any key not carried forward is destroyed.
+                # Rebuilding from a hand-picked allowlist silently dropped `cross_streets`
+                # from every dispatch -- the announced "near" roads, which crews use to
+                # confirm they are on the right block (punch-list #35). It went unnoticed
+                # for months because the near roads were also being written to
+                # `intersection`, which WAS on the list; when the 2026-08-21 geocoder work
+                # correctly stopped overloading that field, the data vanished outright.
+                # `routing_metrics`, `location_type`, `resolution_note` and
+                # `requested_address` were being lost the same way.
+                #
+                # An allowlist has to be edited every time a field is added, and nothing
+                # fails when it is not. Spreading means a new Phase 1 field survives by
+                # default and only Phase 2's own results override.
                 target_payload = {
+                    **p1_target,
                     "address": p1_address,
                     "lat": p1_target.get("lat"),
                     "lng": p1_target.get("lng"),
@@ -195,12 +210,6 @@ def process_phase_2_finalize(
                     "map_grid": p2_grid,
                     "radio_channel": p2_channel
                 }
-                if p1_target.get("subaddress"):
-                    target_payload["subaddress"] = p1_target.get("subaddress")
-                if p1_target.get("tone_name"):
-                    target_payload["tone_name"] = p1_target.get("tone_name")
-                if p1_target.get("intersection"):
-                    target_payload["intersection"] = p1_target.get("intersection")
 
                 update_payload = {
                     "verify_location": False,
@@ -269,7 +278,15 @@ def process_phase_2_finalize(
                             except Exception as r_err:
                                 logging.warning(f"[{dispatch_id}] Template reconstruction warning: {r_err}")
 
+                        # Merge, don't rebuild -- see the note on the Phase 1 agreement path
+                        # above (punch-list #35). Phase 2 re-geocoded, so the location fields
+                        # below override; everything else Phase 1 recorded survives.
+                        #
+                        # `cross_streets` is parser-derived, not geocoder-derived: both phases
+                        # read the same announcement, so it carries forward unchanged even
+                        # though the address was corrected.
                         target_payload = {
+                            **p1_target,
                             "address": res["address"],
                             "lat": res["lat"],
                             "lng": res["lng"],
@@ -279,8 +296,6 @@ def process_phase_2_finalize(
                         }
                         if p1_target.get("subaddress") or (best_p2_candidate and best_p2_candidate.subaddress):
                             target_payload["subaddress"] = p1_target.get("subaddress") or best_p2_candidate.subaddress
-                        if p1_target.get("tone_name"):
-                            target_payload["tone_name"] = p1_target.get("tone_name")
                         if best_p2_candidate and best_p2_candidate.intersection:
                             target_payload["intersection"] = best_p2_candidate.intersection
 

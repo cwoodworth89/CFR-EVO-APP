@@ -40,6 +40,11 @@ export default function MapSurface({
   zoomControl = false,
   zoomControlPosition = 'bottomright',
 
+  // Legend for the "no map data" hatch painted by .leaflet-container (#40).
+  // Off by default: only the full map surfaces have room for it, and a caption
+  // on a small inset panel is noise.
+  showNoTileLegend = false,
+
   // always-on layers
   baseStyle = 'VOYAGER',
   showCadastral = false,
@@ -71,6 +76,15 @@ export default function MapSurface({
       <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />
       <StationsLayer visible={showFireHalls} />
       <HydrantsLayer visible={showHydrants} />
+
+      {showNoTileLegend && (
+        <div
+          className="cfr-no-tile-legend"
+          title="Hatched areas hold no cached tile for this layer at this zoom. This is missing offline map data, not a tile server failure. See punch-list #40."
+        >
+          No map data at this zoom
+        </div>
+      )}
 
       {children}
     </MapContainer>

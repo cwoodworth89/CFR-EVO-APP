@@ -46,24 +46,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger("mbtiles_builder")
 
-# Bounding Boxes
-# Regional Operational Bounds (Zooms 12-16)
+# ---------------------------------------------------------------------------
+# Coverage policy (operator decision 2026-08-23, punch-list #40)
+#
+# There are exactly TWO areas: inside Coquitlam, and outside it. The former
+# "URBAN_CORE" third tier was removed -- it was an unconsulted narrowing that
+# excluded 32% of the city's parcels from z19-20 imagery.
+#
+#   REGION  - context only. The LABELLED street map, so an operator panning
+#             outside the city still sees named roads.
+#   CITY    - the real municipal boundary plus a buffer. Everything, to the
+#             highest zoom each source offers: both street styles, satellite,
+#             and the 7.5cm orthophotos. The unlabelled style exists to sit
+#             under the cadastral overlay, so it is pointless outside the
+#             cadastral extent -- i.e. outside the city.
+#
+# CITY bounds are the extent of public.city_boundary (City of Coquitlam Open
+# Data, queried 2026-08-23: -122.89343, 49.21987 -> -122.62109, 49.35117) plus
+# a ~1 km buffer for border and mutual-aid response.
+#
+# They are NOT hand-picked. The previous COQUITLAM_MIN_LON = -122.865 was, and
+# it was wrong on both sides: 0.028 deg short in the west (cutting Austin
+# Heights, Maillardville and Burquitlam -- 18,713 parcels) and 0.064 deg short
+# in the east. Re-derive these from public.city_boundary rather than editing
+# them by hand if the municipal boundary ever changes.
+# ---------------------------------------------------------------------------
+
+# Regional context bounds -- labelled street map only.
 REGIONAL_MIN_LAT = 49.15
 REGIONAL_MAX_LAT = 49.48
 REGIONAL_MIN_LON = -123.04
 REGIONAL_MAX_LON = -122.60
 
-# Coquitlam Core & Emergency Response Corridor (Zooms 17-18)
-COQUITLAM_MIN_LAT = 49.208
-COQUITLAM_MAX_LAT = 49.385
-COQUITLAM_MIN_LON = -122.865
-COQUITLAM_MAX_LON = -122.685
+# ~1 km at Coquitlam's latitude (49.28 deg N).
+CITY_BUFFER_DEG_LAT = 0.009
+CITY_BUFFER_DEG_LON = 0.0138
 
-# Urban Core & Apparatus Bay Stations 1-4 Corridor (Zooms 19-20)
-URBAN_CORE_MIN_LAT = 49.240
-URBAN_CORE_MAX_LAT = 49.340
-URBAN_CORE_MIN_LON = -122.870
-URBAN_CORE_MAX_LON = -122.730
+# public.city_boundary extent + buffer.
+CITY_MIN_LAT = 49.21987 - CITY_BUFFER_DEG_LAT
+CITY_MAX_LAT = 49.35117 + CITY_BUFFER_DEG_LAT
+CITY_MIN_LON = -122.89343 - CITY_BUFFER_DEG_LON
+CITY_MAX_LON = -122.62109 + CITY_BUFFER_DEG_LON
+
+# Highest zoom fetched for REGIONAL context. Street detail outside the response
+# area has little operational value and the tile count explodes: z12-16 over the
+# region is 10,149 tiles (~0.04 GB), while z12-20 is 2,523,994 (~8.8 GB at the
+# measured 3.5 KB/tile) plus roughly a day and a half of crawling. Raise this
+# deliberately, not by accident.
+REGIONAL_MAX_ZOOM = 16
 
 USER_AGENT = "CFR-EVO/1.0 (Coquitlam Fire Rescue Emergency Offline Cache)"
 
@@ -74,7 +104,10 @@ LAYER_CONFIGS = {
         "url_template": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
         "subdomains": ["a", "b", "c", "d"],
         "min_zoom": 12,
-        "max_zoom": 18,
+        "max_zoom": 20,
+        # The only layer that extends past the city: an operator panning out
+        # still needs named roads for context. See the coverage policy above.
+        "regional_context": True,
     },
     "street_nolabels": {
         "format": "png",
@@ -82,7 +115,10 @@ LAYER_CONFIGS = {
         "url_template": "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
         "subdomains": ["a", "b", "c", "d"],
         "min_zoom": 12,
-        "max_zoom": 18,
+        "max_zoom": 20,
+        # City only: this style exists to sit under the cadastral overlay, which
+        # does not extend past the municipal boundary.
+        "regional_context": False,
     },
     "satellite": {
         "format": "jpg",
@@ -139,7 +175,20 @@ def init_mbtiles_db(db_path: str, layer_name: str, config: Dict[str, Any]) -> sq
         "version": "1.0",
         "description": config.get("description", f"{layer_name} offline tile cache"),
         "format": config["format"],
-        "bounds": f"{REGIONAL_MIN_LON},{REGIONAL_MIN_LAT},{REGIONAL_MAX_LON},{REGIONAL_MAX_LAT}",
+        # Declare what the archive ACTUALLY holds, not the widest box considered.
+        # This previously always reported the REGIONAL bounds regardless of what
+        # was downloaded, so an archive covering only -122.865 westward advertised
+        # -123.04 -- which is why nothing detected the gap in punch-list #40. A
+        # layer that reports coverage it does not have is CLAUDE.md 6.1 applied to
+        # a tileset: a confident wrong answer beats a visible unknown.
+        "bounds": (
+            f"{REGIONAL_MIN_LON},{REGIONAL_MIN_LAT},{REGIONAL_MAX_LON},{REGIONAL_MAX_LAT}"
+            if config.get("regional_context", False)
+            else f"{CITY_MIN_LON},{CITY_MIN_LAT},{CITY_MAX_LON},{CITY_MAX_LAT}"
+        ),
+        # Zoom depth is uniform inside the city; regional context stops earlier.
+        "coquitlam_bounds": f"{CITY_MIN_LON},{CITY_MIN_LAT},{CITY_MAX_LON},{CITY_MAX_LAT}",
+        "regional_maxzoom": str(REGIONAL_MAX_ZOOM) if config.get("regional_context", False) else "",
         "minzoom": str(config["min_zoom"]),
         "maxzoom": str(config["max_zoom"]),
         "center": "-122.7907,49.2911,15",
@@ -394,16 +443,17 @@ def compile_layer(
     tiles_to_download = []
     min_z, max_z = config["min_zoom"], config["max_zoom"]
     
+    regional_ok = config.get("regional_context", False)
+
     for z in range(min_z, max_z + 1):
-        if z <= 16:
-            # Full regional bounds for Zooms 12-16
-            z_tiles = calculate_tiles(REGIONAL_MIN_LAT, REGIONAL_MIN_LON, REGIONAL_MAX_LAT, REGIONAL_MAX_LON, z)
-        elif z <= 18:
-            # Coquitlam operational corridor for Zooms 17-18
-            z_tiles = calculate_tiles(COQUITLAM_MIN_LAT, COQUITLAM_MIN_LON, COQUITLAM_MAX_LAT, COQUITLAM_MAX_LON, z)
-        else:
-            # Urban Core & Apparatus Bay Stations 1-4 Corridor for Zooms 19-20
-            z_tiles = calculate_tiles(URBAN_CORE_MIN_LAT, URBAN_CORE_MIN_LON, URBAN_CORE_MAX_LAT, URBAN_CORE_MAX_LON, z)
+        # Inside the city, every layer is fetched to its full zoom depth. The
+        # labelled street map additionally covers the wider region, but only up
+        # to REGIONAL_MAX_ZOOM -- see the coverage policy at the top of this file.
+        z_tiles = calculate_tiles(CITY_MIN_LAT, CITY_MIN_LON, CITY_MAX_LAT, CITY_MAX_LON, z)
+        if regional_ok and z <= REGIONAL_MAX_ZOOM:
+            z_tiles = calculate_tiles(
+                REGIONAL_MIN_LAT, REGIONAL_MIN_LON, REGIONAL_MAX_LAT, REGIONAL_MAX_LON, z
+            )
             
         for t in z_tiles:
             tz, tx, ty = t

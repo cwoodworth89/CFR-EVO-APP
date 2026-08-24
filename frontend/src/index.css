@@ -45,3 +45,71 @@
   opacity: 1 !important;
   transform: scale(1.08);
 }
+/* 🚫 "NO MAP DATA" backdrop — punch-list #40.
+ *
+ * mbtileserver answers a request outside an archive's crawled extent with a
+ * 116-byte TRANSPARENT png and HTTP 200, not a 404. Against the dark map
+ * container that rendered as plain black, which is indistinguishable from a
+ * dead tile server — the operator reported the western third of the city as
+ * "blank" and neither they nor I could tell the two apart on sight.
+ *
+ * This paints the container itself with a hatch and makes the gap self-
+ * describing. Opaque tiles (satellite jpg, the light street styles) cover it
+ * completely, so it is visible ONLY where tile data genuinely does not exist.
+ * No emptiness detection is needed, which means it cannot disagree with the
+ * archives the way a hardcoded bounds check would.
+ */
+.leaflet-container {
+  background-color: #0b1220;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(148, 163, 184, 0.10) 0px,
+      rgba(148, 163, 184, 0.10) 2px,
+      transparent 2px,
+      transparent 14px
+    );
+}
+
+/* Standing legend for the hatch. Rendered by MapSurface only when a base layer
+ * is active, so it never captions an intentionally empty pane. */
+.cfr-no-tile-legend {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(4px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.cfr-no-tile-legend::before {
+  content: '';
+  width: 16px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background-color: #0b1220;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(148, 163, 184, 0.30) 0px,
+      rgba(148, 163, 184, 0.30) 2px,
+      transparent 2px,
+      transparent 7px
+    );
+}

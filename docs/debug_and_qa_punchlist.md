@@ -2662,3 +2662,180 @@ harness as a regression gate first — `trace_geocode_corpus.py` already replays
 the missing half is the parser-side equivalent (`parser_audit_handoff.md` §3). Any candidate
 rule must be scored over the full corpus **split by month**, because a pooled figure here
 would be dominated by 2026-07 STT damage that no longer occurs.
+
+---
+
+## 🧾 Import Completeness Audit, 2026-08-23
+
+Run because the operator was worried that **imports are silently dropping data** — #41
+(a missing address) and a parallel report of missing `public.roads` entries.
+
+**Headline: both importers are faithful to their sources. The losses are real, but they are
+deliberate filters and stale source data, not import bugs.** One filter is a genuine
+operational problem and is the largest finding in this batch.
+
+---
+
+### 42. The roads import silently discards 242 road segments, including 45 streets that 1,918 parcels are addressed on
+> **Status**: ⚠️ **Open — confirmed against source and database. This is the answer to the
+> "missing `public.roads` entries" report.**
+
+`backend/scripts/import_gis_data.py`, `step2_import_roads` (~`:228`):
+
+```python
+status = props.get("STATUS")
+if status and str(status).strip().upper() != "OPERATING":
+    continue
+```
+
+**The arithmetic reconciles exactly, so nothing is lost accidentally:**
+
+| | |
+|:--|--:|
+| `road_centre_lines.geojson` features | 3,456 |
+| Dropped — `STATUS != 'OPERATING'` | **242** |
+| Dropped — missing `FULLNAME` | 0 |
+| Expected in `public.roads` | 3,214 |
+| **Actual `public.roads` rows** | **3,214** ✅ |
+
+The 242 break down as **170 PRIVATE, 71 MOT, 1 METRO**, and `public.roads` contains exactly
+one distinct status: `OPERATING`.
+
+#### Why this matters operationally
+
+**68 named roads exist *only* as non-OPERATING segments and are therefore entirely absent
+from `public.roads`** — not thinned, absent. Among them:
+
+* **`Highway #1`** (Trans-Canada) — 7 MOT segments, 0 OPERATING. Confirmed: `SELECT count(*)
+  FROM public.roads WHERE fullname ILIKE '%Highway #1%'` returns **0**.
+* **`Mary Hill By-Pass Road`** — 4 MOT segments, 0 OPERATING. Also **0** rows.
+* ~60 strata/private residential streets.
+
+Partial losses too, where a road survives but loses segments: `Lougheed Highway` 8 of 45,
+`United Boulevard` 6 of 22, and **`Highway Ramp` 41 of 44**.
+
+**The residential side is the serious part.** Cross-referencing `public.parcels.street`
+against `public.roads.roadname`:
+
+| | |
+|:--|--:|
+| Distinct streets in `public.parcels` | 997 |
+| **Streets with no matching road** | **45** |
+| **Parcels addressed on those streets** | **1,918** |
+
+Largest affected streets:
+
+| Street | Parcels |
+|:--|--:|
+| Princess | **568** |
+| Silver Springs | **359** |
+| Riverbend | 227 |
+| Whisper | 193 |
+| Bluff | 63 |
+| River | 60 |
+| Bow | 55 |
+| Flynn | 50 |
+
+Verified in the source: `Princess Crescent (PRIV)`, `Silver Springs Boulevard`,
+`Riverbend Drive`, `Whisper Way`, `Oxbow Way (PRIV)`, `Parkland Drive (Private)` are all
+present in `road_centre_lines.geojson` and all carry `STATUS = PRIVATE`. They are strata
+roads — **but people live on them and crews respond to them.** A dispatch to
+`2980 Princess Cres` is in the corpus already.
+
+**What still works**: direct address geocoding, because `public.parcels` holds these
+addresses with coordinates. **What does not**: anything road-derived — `public.intersections`
+(derived from `public.roads`, so no junction on these streets can exist), "near \<road\> and
+\<road\>" matching, cross-street validation, and street-name vocabulary.
+
+#### Recommendation
+
+Do not simply delete the filter — `STATUS` is meaningful municipal data and MOT/PRIVATE
+segments may need different routing treatment. Instead **import all statuses and keep the
+`status` column populated**, letting consumers decide. `public.roads.status` already exists
+and currently holds one value for every row, which is the tell that a distinction was
+flattened at import rather than preserved.
+
+Requires a re-import and an `public.intersections` re-derivation. **Confirm with the operator
+before running** — it changes the geocoder's street vocabulary.
+
+---
+
+### 41 (closed). `629 Cottonwood Ave` — the parcel import is correct; the shapefile does not have it
+> **Status**: ✅ **Closed 2026-08-23 as "not an import defect."** The underlying discrepancy is
+> real and is recorded below, but nothing in this project is losing it.
+
+**The parcel import reconciles exactly**, read straight from `Addresses.dbf` (no GDAL locally,
+so via a minimal DBF reader):
+
+| | |
+|:--|--:|
+| Records in `Addresses.shp` | 69,708 |
+| Blank `ADDRESS` | 167 |
+| Exact duplicate `ADDRESS` strings | 4,141 |
+| **Unique = expected import** | **65,400** |
+| **Actual `public.parcels` rows** | **65,401** |
+
+That is a clean reconciliation. (The extra row is 1 above the source; worth a glance but it is
+a single record, not a pattern.)
+
+**`629 Cottonwood Ave` is not in `Addresses.shp` at all.** Searching the source for
+Cottonwood house numbers 625–633 returns exactly two records: `625 Cottonwood Ave` and
+`633 Cottonwood Ave`, both `STATUS = Active`. So the earlier suggestion that the importer
+collapses address *ranges* was **wrong** — there is no range to collapse.
+
+**Where the map label comes from.** The cadastral layer is not rendered from a shapefile —
+`backend/scripts/crawl_cadastral_tiles.py` pre-caches tiles from the **City of Coquitlam
+ArcGIS Cadastral MapServer**, layers `[0: Road Labels, 1: Address Labels, 16: Parcels]`. So
+`629` is drawn by the City's own live map service.
+
+**The two municipal sources disagree**, and this project faithfully reflects both:
+
+| Source | Has 629? |
+|:--|:--|
+| `Addresses.shp`, extract dated **2025-06-22** | **No** |
+| ArcGIS Cadastral MapServer address labels (crawled later) | **Yes** |
+
+The most likely explanation is simply that the shapefile extract is **over a year old** and
+the address was created after it. That is worth acting on independently of 629: the whole
+parcel layer is running on a 2025-06-22 snapshot.
+
+**Next step**: re-pull `Addresses.shp` from the Open Data portal and re-run the import — it is
+a non-destructive `ON CONFLICT (address) DO UPDATE` upsert that preserves operational data
+(pre-plans, lockbox notes, Street View headings), so it is low risk. See the
+`gis-pipeline-sync` skill. Then confirm 629 appears.
+
+---
+
+### 40 (quantified). The basemap gap covers 28% of the city's parcels
+> **Status**: ⚠️ **Open — extent now measured. Recommend raising priority.**
+
+Adding numbers to the coverage cut at longitude ≈ **−122.8656** established earlier (street
+*and* satellite both empty above z16 west of it, cadastral unaffected):
+
+| | |
+|:--|--:|
+| Parcels with coordinates | 65,401 |
+| **Parcels west of the cut** | **18,568** |
+| **Share of the city** | **28.4%** |
+| Distinct emergency response zones affected | **20** |
+
+So **more than a quarter of Coquitlam's addressed properties have no basemap above zoom 16**,
+spanning 20 response zones — Austin Heights, Maillardville, Burquitlam. At the zoom used to
+identify a specific driveway or roofline, crews see parcel outlines on black.
+
+This is a tile-build defect, not a frontend one: `MapConstants.js` and `MapLayers.jsx` are
+configured correctly, and the archives' own declared bounds (`-123.04 … -122.6`) overstate
+their real coverage, so nothing in the system can detect the gap. Fix is a re-crawl of the
+western extent at z17–z20 for `satellite` and `street`/`street_nolabels`, plus corrected
+metadata bounds. See the `mbtiles-tile-server` skill.
+
+---
+
+### Method note
+
+`Addresses.shp` and `road_centre_lines.geojson` are git-ignored and were read **locally**, as
+standalone scratch checks (CLAUDE.md §3.2). GDAL/fiona are not installed on the dev machine,
+so the DBF was parsed directly with a ~40-line reader rather than geopandas — worth knowing
+before anyone plans shapefile work here. Tailscale SSH lapsed mid-session and needs browser
+re-auth, so kiosk-side checks in this batch were done over HTTP to the tile server and via the
+`cfr-postgres` MCP connection instead.

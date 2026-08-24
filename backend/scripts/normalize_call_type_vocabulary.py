@@ -71,6 +71,14 @@ MISSING_TERMS = [
     # Court" classified as "Unknown Incident" -- confirmed on 3 calls. Spoken 22 times in
     # the corpus (16 of them "lift assist").
     "Assist",
+    # Operator ruling 2026-08-23 from HITL notes ("Add Stove Fire to the list", "Missed new
+    # medical aid type. - Psychiatric add to the list"). Both confirmed spoken verbatim:
+    #   DISP-2026-C23196  "Respond, Emergency, Stove Fire, 2921 Kalamalka Drive..."
+    #   DISP-2026-97FF69  "Respond Emergency, Medical Aid, Psychiatric, 1240 Lansdowne..."
+    # C23196 also shows the apparatus collision of punch-list #34: with no "Stove Fire" row
+    # the only call type left to match was "Rescue", from the unit "Rescue 2" in the list.
+    "Stove Fire",
+    "Medical Aid - Psychiatric",
 ]
 
 

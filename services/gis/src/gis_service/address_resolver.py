@@ -581,11 +581,27 @@ class AddressResolver:
                       -- would then reject -- discarding a perfectly good same-block
                       -- answer. Bound first, then choose within it.
                       AND (p.house)::int / 100 = (:house)::int / 100
+                    -- House number FIRST, near roads only to break ties.
+                    --
+                    -- The dispatched number is itself positional: numbering runs along
+                    -- the street, so the nearest number is usually the nearest place.
+                    -- The near roads are a weaker signal and can point the wrong way.
+                    -- Measured on Gordon Ave 2026-08-23: 3060 is the highest number on
+                    -- the street (3080 does not exist -- the street ends), so a call to
+                    -- 3080 lies past 3060. Christmas Way and Westwood St sit at the
+                    -- OPPOSITE end, and ranking by them selects 3001 -- 156 m the wrong
+                    -- way from the nearest-number answer.
+                    --
+                    -- Ranking by near roads first was measured to change no historical
+                    -- call (202-record corpus replay), so it bought nothing and risked
+                    -- this. As a tie-break it can only help: it decides between parcels
+                    -- the house number cannot separate.
+                    --
                     -- Bare alias, not an expression on it: Postgres accepts
                     -- "ORDER BY near_road_m" but rejects "ORDER BY (near_road_m IS NULL)".
-                    -- NULLS LAST gives the same precedence when no near roads were given.
-                    ORDER BY near_road_m ASC NULLS LAST,
-                             house_delta ASC, (p.house)::int ASC
+                    ORDER BY house_delta ASC,
+                             near_road_m ASC NULLS LAST,
+                             (p.house)::int ASC
                     LIMIT 1;
                 """), {"house": str(house), "street": street, "stype": street_type or '',
                        "names": near_names}
@@ -635,9 +651,9 @@ class AddressResolver:
                     "requested_address": requested,
                     "resolution_note": (
                         f"{requested} is not in City of Coquitlam address records. "
-                        f"Routed to {row['address']}, the closest address in the "
-                        f"{int(house) // 100}00 block to {' and '.join(near_names).title()} "
-                        f"({delta} off the dispatched number). Verify on arrival."
+                        f"Routed to {row['address']}, the nearest civic address in the "
+                        f"{int(house) // 100}00 block ({delta} off the dispatched number, "
+                        f"nearest {' and '.join(near_names).title()}). Verify on arrival."
                         if row['near_road_m'] is not None else
                         f"{requested} is not in City of Coquitlam address records. "
                         f"Routed to {row['address']}, the nearest civic address on this "

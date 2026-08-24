@@ -223,10 +223,30 @@ STT very differently. Measured over the 202 calls holding both:
   `Talk Group 10 Combined Response Coquitlam`), so it anchors the *start* only.
 * **`near` appears MORE often in raw than in verified text.** STT invents it. It cannot be
   used as a structural anchor, only as a hint.
-* **`map grid` is lost in 18% of raw transcripts** -- and *not* because the dispatcher
-  omitted it. Those calls have **longer** median audio (50.6s vs 47.5s) but far **fewer**
-  words (37 vs 51). The audio contains the tail; the transcription stops early. **This is an
-  STT defect being counted against the parser.**
+* **`map grid` is missing from 37 raw transcripts -- but the defect is ALREADY FIXED.**
+  Pooled over the whole corpus this reads as 18%, which is wrong and was reported that way
+  first. Split by date it is unambiguous:
+
+  | Month | missing grid | double-round calls | rate |
+  |:--|--:|--:|--:|
+  | 2026-07 | 37 | 205 | **18%** |
+  | 2026-08 | 1 | 218 | **0%** |
+
+  All 37 fall between **2026-07-19 and 2026-07-29**. Call volume continued normally through
+  the changeover (12/day on 07-30, 14 on 07-31), so the drop to zero is real, not a gap in
+  the data. The operator's audio-listener work to capture both rounds is the cause; the exact
+  commit is not pinned (the 75s recording increase, `b78dbe6`, lands 08-03 -- *after* the
+  defect stops -- so an earlier kiosk-side change is the more likely trigger). Max audio
+  duration does rise from 59s in July to 75s in August.
+
+  The single 2026-08 case, `DISP-2026-9B4E70`, is **not** a grid failure: 75s of audio and an
+  11-character transcript reading `"Ice Coffee."` -- a PA announcement, the leakage class of
+  punch-list #14.
+
+  > **Read this as a method warning.** The 18% figure was produced by pooling a historical
+  > defect across all time and reporting it as live -- the exact trap §4.2 describes, walked
+  > into while citing §4.2. Any rate computed over this corpus must be split by date before it
+  > is believed. The operator caught this one from intuition about the fix history.
 
 ### 4.3b The two rounds are redundancy, and it is not being used
 
@@ -234,17 +254,25 @@ The dispatcher announces the call twice, and the rounds are meant to be **identi
 `split_rounds` separates them cleanly they are near-identical (median `fuzz.ratio` 82; 86 of
 186 score 90+).
 
-That redundancy is error correction that nothing currently exploits:
+That redundancy is error correction that nothing currently exploits. **Split by date**, per
+the warning in §4.3a:
 
-> **57 of 186 double-round calls carry the map grid in only ONE of the two rounds.**
+| Month | rounds split | no split | grid in BOTH | **grid in ONE only** | grid in neither |
+|:--|--:|--:|--:|--:|--:|
+| 2026-07 | 190 | 15 | 111 | **57** | 22 |
+| 2026-08 | 217 | **1** | 204 | **13** | **0** |
 
-Merging per field across rounds recovers those. Two cautions, both measured:
+The July column is the pre-fix audio capture (§4.3a) and should not be used to size the work.
+**On current data the cross-round merge is worth 13 calls (6%), not 57 (30%)** -- still real,
+much smaller than first reported.
 
-* `split_rounds` is itself weak -- **15** double-round calls do not split at all, and **34**
-  split into segments scoring under 10% similarity (typically a bare unit tail, which is what
-  produced punch-list #34).
-* Merging must take the **most specific** answer per field, never the first. Taking the first
-  reintroduces the round-1-wins bias of §5.
+`split_rounds` is likewise far healthier than the pooled figure suggested: **1** failure to
+split in August versus 15 in July.
+
+The one caution that is *not* a historical artifact: merging must take the **most specific**
+answer per field, never the first. Taking the first reintroduces the round-1-wins bias of §5,
+which is a live defect in [`pipeline/phase2.py:146`](../backend/cfr_dispatch/pipeline/phase2.py)
+for addresses today.
 
 ## 5. The worked example: `DISP-2026-156DCF`
 

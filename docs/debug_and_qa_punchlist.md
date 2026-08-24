@@ -2472,3 +2472,99 @@ drive an MQTT-driven kiosk view.
 checking whether the panorama mounted. An unmounted panorama should surface an explicit
 "Street View unavailable" state rather than an indistinguishable black rectangle (§6.1 — the
 failure is currently invisible).
+
+---
+
+### 35. "Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`
+> **Status**: 🔴 **Open — live regression, found 2026-08-23.** Reported by the operator
+> ("we've seemed to have dropped recording near roads completely") and **confirmed** against
+> the kiosk database and the working tree. Root cause identified; no fix applied.
+
+#### The regression is real and dated
+
+| Date | Calls | Said "near" | `intersection` recorded |
+|:--|--:|--:|--:|
+| 2026-08-18 | 9 | 9 | 9 |
+| 2026-08-19 | 8 | 7 | 7 |
+| 2026-08-20 | 10 | 9 | **9** |
+| **2026-08-21** | 10 | 6 | **1** |
+| 2026-08-22 | 19 | 16 | **3** |
+| 2026-08-23 | 13 | 12 | **1** |
+
+The operator's own HITL notes track the changeover precisely: 2026-08-20 reads
+*"Spelling mistakes for near roads"* and *"Misspelled one of the near roads"* — captured, just
+misspelled. From 2026-08-21 the notes read *"Missed near roads"*.
+
+#### It is NOT a parser failure
+
+The parser still extracts the near roads correctly. Replaying `DISP-2026-ABD874` (2026-08-23)
+through current code:
+
+```
+addr='3098 Guildford Quay'  cross_street_1='Eastwood Street'  cross_street_2='Pipeline Road Rd'
+```
+
+`build_dispatch_payload` also does the right thing, writing them at
+[`payload_builder.py:203`](../backend/cfr_dispatch/pipeline/payload_builder.py):
+
+```python
+target_cross_streets = [s for s in [cross_street_1, cross_street_2] if s]
+...
+"cross_streets": target_cross_streets
+```
+
+#### Root cause: Phase 2 rebuilds `target` from a hand-picked subset
+
+[`phase2.py:190`](../backend/cfr_dispatch/pipeline/phase2.py) and again at `:272` construct a
+**new** `target_payload` rather than updating the existing one, then PATCH it over the record:
+
+```python
+target_payload = {
+    "address": p1_address, "lat": ..., "lng": ..., "rings": ...,
+    "map_grid": p2_grid, "radio_channel": p2_channel,
+}
+if p1_target.get("subaddress"):   target_payload["subaddress"] = ...
+if p1_target.get("tone_name"):    target_payload["tone_name"] = ...
+if p1_target.get("intersection"): target_payload["intersection"] = ...
+```
+
+`cross_streets` is not on the carry-forward list, so the PATCH **destroys** whatever Phase 1
+wrote. Confirmed against stored records — the surviving key set matches this dict exactly:
+
+```
+address, lat, lng, map_grid, radio_channel, rings, subaddress, tone_name
+```
+
+`routing_metrics`, `location_type`, `resolution_note` and `requested_address` are lost the same
+way. Only **4** dispatches in the entire corpus have ever carried a `cross_streets` key, and
+only **1** has a non-empty one.
+
+#### Why it surfaced on 2026-08-21 and not earlier
+
+Two changes had to line up:
+
+1. **Before 2026-08-21** the near roads rode in the `intersection` field, which *is* on the
+   carry-forward list, so they survived — semantically wrong but functional:
+   ```
+   addr='1535 Parkway Blvd'  intersection='Salal Cresson and Sunridge'
+   addr='2968 Glen Dr'       intersection='Pacific Street and The High St'
+   ```
+2. **On 2026-08-21** the geocoder work correctly stopped overloading `intersection` for civic
+   addresses. `intersection` now means what it says — set only when the location genuinely
+   *is* a junction (`'Barnet Hwy & Lougheed Hwy'`).
+
+That fix was right. It exposed a latent defect: the field that *should* carry near roads was
+already being thrown away, and nothing noticed because the wrong field was masking it.
+
+**This is the shape worth remembering.** A correct fix in one module surfaced silent data loss
+in another. The regression is not in the 08-21 change; it is in the Phase 2 rebuild, which has
+been lossy since `cross_streets` was introduced (`0ec3061`, 2026-08-20).
+
+#### Suggested fix, not applied
+
+Merge into the existing target rather than replacing it — `{**p1_target, **updates}` — so a
+field added to Phase 1 is not silently dropped by Phase 2. An explicit allowlist that must be
+edited every time a field is added is the mechanism that produced this defect.
+
+Operationally, near roads are how crews confirm they are on the right block, and the two-tier
+warning of CLAUDE.md §5 does not cover a *silently missing* corroboration field.

@@ -110,8 +110,8 @@ class AddressResolver:
         narrowed = [r for r in rows if str(r['zone_id'] or '').strip() == grid]
         return narrowed or rows
 
-    def _verify_near_roads(self, conn, near_names: list) -> list:
-        """Return the announced near roads only if EVERY one is a real named road.
+    def _verify_cross_streets(self, conn, xstreet_names: list) -> list:
+        """Return the announced cross streets only if EVERY one is a real named road.
 
         Locution's "near <x> and <y>" does not promise that x and y are streets. Across
         283 dispatches carrying near roads, 44 named one road plus something that is not
@@ -122,37 +122,37 @@ class AddressResolver:
         Partial matches are discarded rather than used, because a single road cannot
         position a call along a street -- it can only say "somewhere near this line",
         and the nearest candidate to one road is frequently the wrong one (see
-        _narrow_by_near_roads for the measured Pinewood/Pinetree case).
+        _narrow_by_cross_streets for the measured Pinewood/Pinetree case).
 
-        Returns [] when the set is unusable, which callers treat as "no near roads
+        Returns [] when the set is unusable, which callers treat as "no XStreets
         announced" and fall back to house-number proximity.
         """
-        if not near_names:
+        if not xstreet_names:
             return []
         found = {r[0] for r in conn.execute(text("""
             SELECT DISTINCT UPPER(roadname) FROM public.roads
             WHERE UPPER(roadname) = ANY(:names);
-        """), {"names": near_names}).fetchall()}
+        """), {"names": xstreet_names}).fetchall()}
 
-        missing = [n for n in near_names if n not in found]
+        missing = [n for n in xstreet_names if n not in found]
         if missing:
             logging.info(
                 "Announced near road(s) %s are not named roads in public.roads "
                 "(descriptor, mis-transcription, or absent from the municipal layer). "
-                "Ignoring the near-road signal rather than ranking on %d of %d.",
-                ", ".join(missing), len(found), len(near_names)
+                "Ignoring the XStreets signal rather than ranking on %d of %d.",
+                ", ".join(missing), len(found), len(xstreet_names)
             )
             return []
-        if len(near_names) < 2:
+        if len(xstreet_names) < 2:
             logging.info(
-                "Only one near road announced (%s); a single road cannot position a "
-                "call along a street. Ignoring the near-road signal.", near_names[0]
+                "Only one cross street announced (%s); a single road cannot position a "
+                "call along a street. Ignoring the XStreets signal.", xstreet_names[0]
             )
             return []
-        return near_names
+        return xstreet_names
 
-    def _narrow_by_near_roads(self, conn, rows: list,
-                              near_road_1: str, near_road_2: str) -> list:
+    def _narrow_by_cross_streets(self, conn, rows: list,
+                                 cross_street_1: str, cross_street_2: str) -> list:
         """Keep the candidate closest, on average, to the announced "near" roads.
 
         Locution announces "near <road> and <road>". Those roads are NOT necessarily
@@ -177,11 +177,11 @@ class AddressResolver:
         ("Ponderosa St"). Comparing full names silently matches nothing.
         """
         names = []
-        for road in (near_road_1, near_road_2):
+        for road in (cross_street_1, cross_street_2):
             tokens = street_name_tokens(normalize_street_name(road)) if road else []
             if tokens:
                 names.append(" ".join(tokens))
-        names = self._verify_near_roads(conn, names)
+        names = self._verify_cross_streets(conn, names)
         if not names or not rows:
             return rows
 
@@ -191,7 +191,7 @@ class AddressResolver:
 
         try:
             ranked = conn.execute(text("""
-                WITH near_roads AS (
+                WITH xstreets AS (
                     SELECT UPPER(roadname) AS nm, ST_Union(geom) AS geom
                     FROM public.roads
                     WHERE UPPER(roadname) = ANY(:names)
@@ -200,7 +200,7 @@ class AddressResolver:
                 SELECT p.id,
                        AVG(ST_Distance(p.geom::geography, n.geom::geography)) AS avg_m,
                        COUNT(n.nm) AS roads_matched
-                FROM public.parcels p CROSS JOIN near_roads n
+                FROM public.parcels p CROSS JOIN xstreets n
                 WHERE p.id = ANY(:ids)
                 GROUP BY p.id
                 ORDER BY avg_m ASC;
@@ -230,7 +230,7 @@ class AddressResolver:
 
     def resolve_exact(self, house: str, street_raw: str, street_type: str,
                       target_map_grid=None,
-                      near_road_1: str = None, near_road_2: str = None) -> dict | None:
+                      cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
         """Step 1: Exact parcel match — house number + fuzzy street name.
 
         When several streets match the spoken name equally well, the announced map
@@ -292,8 +292,8 @@ class AddressResolver:
                     narrowed = self._narrow_by_map_grid(candidates, target_map_grid)
                     stage = "map grid"
                     if len({(r['street'], r['streettype']) for r in narrowed}) > 1:
-                        narrowed = self._narrow_by_near_roads(
-                            conn, narrowed, near_road_1, near_road_2)
+                        narrowed = self._narrow_by_cross_streets(
+                            conn, narrowed, cross_street_1, cross_street_2)
                         stage = "near roads"
 
                     remaining = {(r['street'], r['streettype']) for r in narrowed}
@@ -304,7 +304,7 @@ class AddressResolver:
                             "to one. Returning unresolved rather than picking one.",
                             house, parsed_street, len({n for _, n in scored}),
                             ", ".join(sorted(n for _, n in scored)),
-                            target_map_grid, near_road_1, near_road_2
+                            target_map_grid, cross_street_1, cross_street_2
                         )
                         return None
 
@@ -506,7 +506,7 @@ class AddressResolver:
         return None
 
     def resolve_nearest_civic(self, house: str, street: str, street_type: str,
-                              near_road_1: str = None, near_road_2: str = None) -> dict | None:
+                              cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
         """Step 4b: Nearest civic address on the street, by house number.
 
         Used when a dispatched address is not in the municipal records and its house
@@ -532,11 +532,11 @@ class AddressResolver:
         # 4.63 m on Glen Dr and 3.82 m on Barnet Hwy, so a same-block substitution can
         # sit ~460 m from the real address. Where the roads are given they decide, and
         # the number gap only breaks ties.
-        near_names = []
-        for road in (near_road_1, near_road_2):
+        xstreet_names = []
+        for road in (cross_street_1, cross_street_2):
             tokens = street_name_tokens(normalize_street_name(road)) if road else []
             if tokens:
-                near_names.append(" ".join(tokens))
+                xstreet_names.append(" ".join(tokens))
 
         try:
             with self.engine.connect() as conn:
@@ -553,10 +553,10 @@ class AddressResolver:
                 # School Access" -- alongside plain mis-transcriptions. Both arrive here
                 # as a name that matches nothing, and neither is a reason to fall back to
                 # a single-road ranking that has no way to be right.
-                near_names = self._verify_near_roads(conn, near_names)
+                xstreet_names = self._verify_cross_streets(conn, xstreet_names)
 
                 row = conn.execute(text("""
-                    WITH near_roads AS (
+                    WITH xstreets AS (
                         SELECT UPPER(roadname) AS nm, ST_Union(geom) AS geom
                         FROM public.roads
                         WHERE UPPER(roadname) = ANY(:names)
@@ -568,7 +568,7 @@ class AddressResolver:
                            -- both roads: the union measures distance to the NEAREST of
                            -- them, which is the single-road ranking this exists to avoid.
                            (SELECT AVG(ST_Distance(p.geom::geography, n.geom::geography))
-                              FROM near_roads n) AS near_road_m
+                              FROM xstreets n) AS cross_street_m
                     FROM public.parcels p
                     WHERE UPPER(p.street) = UPPER(:street)
                       AND (UPPER(p.streettype) = UPPER(:stype) OR :stype = '')
@@ -598,13 +598,13 @@ class AddressResolver:
                     -- the house number cannot separate.
                     --
                     -- Bare alias, not an expression on it: Postgres accepts
-                    -- "ORDER BY near_road_m" but rejects "ORDER BY (near_road_m IS NULL)".
+                    -- "ORDER BY cross_street_m" but rejects "ORDER BY (cross_street_m IS NULL)".
                     ORDER BY house_delta ASC,
-                             near_road_m ASC NULLS LAST,
+                             cross_street_m ASC NULLS LAST,
                              (p.house)::int ASC
                     LIMIT 1;
                 """), {"house": str(house), "street": street, "stype": street_type or '',
-                       "names": near_names}
+                       "names": xstreet_names}
                 ).mappings().fetchone()
 
                 # No parcel in the dispatched hundred-block. Before this bound existed
@@ -653,8 +653,8 @@ class AddressResolver:
                         f"{requested} is not in City of Coquitlam address records. "
                         f"Routed to {row['address']}, the nearest civic address in the "
                         f"{int(house) // 100}00 block ({delta} off the dispatched number, "
-                        f"nearest {' and '.join(near_names).title()}). Verify on arrival."
-                        if row['near_road_m'] is not None else
+                        f"nearest {' and '.join(xstreet_names).title()}). Verify on arrival."
+                        if row['cross_street_m'] is not None else
                         f"{requested} is not in City of Coquitlam address records. "
                         f"Routed to {row['address']}, the nearest civic address on this "
                         f"street ({delta} off the dispatched number). Verify on arrival."

@@ -136,17 +136,25 @@ class CoquitlamDataValidator:
 
         # === STEP 1: Exact address (requires house number) ===
         if parsed:
-            # The map grid and the "near" roads are announced for this incident, so
-            # they break ties between equally-matching streets rather than letting a
-            # similarity score decide alone. The cross_street_* parameter names are the
-            # existing plumbing; the values are Locution's "near <road> and <road>",
-            # which are not necessarily cross streets at all -- see
-            # AddressResolver._narrow_by_near_roads.
+            # TERMINOLOGY -- XStreets. The printed run sheet labels this field
+            # "XStreets:", so that is the canonical name across this codebase, and
+            # cross_street_1/2 are its parameters. Locution speaks them as
+            # "near <road> and <road>".
+            #
+            # Despite "cross", they are NOT guaranteed to intersect the incident
+            # street: they frequently run parallel to it. They may also name things
+            # that are not streets at all ("Turning Lane", "Mall Access", "Private
+            # Driveway"), and may reference streets absent from public.roads. The name
+            # is not the contract (CLAUDE.md §7.3a) -- treat them as proximity
+            # references only. See AddressResolver._verify_cross_streets.
+            #
+            # Here they break ties between equally-matching streets, alongside the
+            # announced map grid, rather than letting a similarity score decide alone.
             result = self.address.resolve_exact(
                 parsed.house, parsed.raw, parsed.street_type,
                 target_map_grid=target_map_grid,
-                near_road_1=cross_street_1,
-                near_road_2=cross_street_2,
+                cross_street_1=cross_street_1,
+                cross_street_2=cross_street_2,
             )
             if result:
                 return result
@@ -206,7 +214,7 @@ class CoquitlamDataValidator:
         if parsed and parsed.house:
             result = self.address.resolve_nearest_civic(
                 parsed.house, parsed.street, parsed.street_type,
-                near_road_1=cross_street_1, near_road_2=cross_street_2)
+                cross_street_1=cross_street_1, cross_street_2=cross_street_2)
             if result:
                 return result
 

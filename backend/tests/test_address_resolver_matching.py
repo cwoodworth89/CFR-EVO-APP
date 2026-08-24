@@ -121,14 +121,14 @@ class _FakeResult:
 class _FakeConn:
     """Serves the parcel query, then the near-road distance ranking.
 
-    `near_road_ranking` is an ordered list of parcel ids, closest first, standing in
+    `cross_street_ranking` is an ordered list of parcel ids, closest first, standing in
     for the PostGIS ST_Distance query.
     """
 
-    def __init__(self, parcel_rows, near_road_ranking=None, known_roads=None):
+    def __init__(self, parcel_rows, cross_street_ranking=None, known_roads=None):
         self.parcel_rows = parcel_rows
-        self.near_road_ranking = near_road_ranking
-        # Names _verify_near_roads will consider real. Defaults to "every name asked
+        self.cross_street_ranking = cross_street_ranking
+        # Names _verify_cross_streets will consider real. Defaults to "every name asked
         # about is real", so tests opt in to the descriptor case explicitly.
         self.known_roads = known_roads
 
@@ -144,12 +144,12 @@ class _FakeConn:
             asked = list((params or {}).get("names", []))
             known = self.known_roads if self.known_roads is not None else asked
             return _FakeResult([(n,) for n in asked if n in known])
-        if "near_roads" in sql:
-            if not self.near_road_ranking:
+        if "xstreets" in sql:
+            if not self.cross_street_ranking:
                 return _FakeResult([])
             return _FakeResult([
                 {"id": pid, "avg_m": float(10 * (i + 1)), "roads_matched": 2}
-                for i, pid in enumerate(self.near_road_ranking)
+                for i, pid in enumerate(self.cross_street_ranking)
             ])
         return _FakeResult(self.parcel_rows)
 
@@ -187,9 +187,9 @@ class TestAmbiguityWaterfall:
     ROWS = [_parcel("Westwood", "St", "85", pid=1),
             _parcel("Eastwood", "St", "82", pid=2)]
 
-    def _resolver(self, near_road_ranking=None, known_roads=None):
+    def _resolver(self, cross_street_ranking=None, known_roads=None):
         return ar.AddressResolver(
-            _FakeEngine(_FakeConn(self.ROWS, near_road_ranking, known_roads)),
+            _FakeEngine(_FakeConn(self.ROWS, cross_street_ranking, known_roads)),
             confidence_threshold=70)
 
     def test_the_pair_really_does_tie(self):
@@ -204,12 +204,12 @@ class TestAmbiguityWaterfall:
         assert res is not None
         assert res["address"] == "3000 Eastwood St"
 
-    def test_near_roads_break_the_tie_when_grid_is_absent(self):
+    def test_cross_streets_break_the_tie_when_grid_is_absent(self):
         # Westwood ranks closest to the announced near roads, so it wins -- even
         # though nothing here requires it to intersect them.
-        res = self._resolver(near_road_ranking=[1, 2]).resolve_exact(
+        res = self._resolver(cross_street_ranking=[1, 2]).resolve_exact(
             "3000", "Wood St", "ST",
-            near_road_1="Pinetree Way", near_road_2="Ponderosa St")
+            cross_street_1="Pinetree Way", cross_street_2="Ponderosa St")
         assert res is not None
         assert res["address"] == "3000 Westwood St"
 
@@ -219,26 +219,26 @@ class TestAmbiguityWaterfall:
         res = self._resolver().resolve_exact("3000", "Wood St", "ST")
         assert res is None
 
-    def test_grid_that_matches_nothing_falls_through_to_near_roads(self):
+    def test_grid_that_matches_nothing_falls_through_to_cross_streets(self):
         # A grid naming a zone none of the candidates sit in must not empty the set;
         # it falls through to the next signal rather than resolving to nothing.
-        res = self._resolver(near_road_ranking=[2, 1]).resolve_exact(
+        res = self._resolver(cross_street_ranking=[2, 1]).resolve_exact(
             "3000", "Wood St", "ST", target_map_grid="999",
-            near_road_1="Pinetree Way", near_road_2="Ponderosa St")
+            cross_street_1="Pinetree Way", cross_street_2="Ponderosa St")
         assert res is not None
         assert res["address"] == "3000 Eastwood St"
 
-    def test_near_roads_that_tie_exactly_leave_it_unresolved(self):
+    def test_cross_streets_that_tie_exactly_leave_it_unresolved(self):
         # Equidistant candidates carry no information; refusing is correct.
-        conn = _FakeConn(self.ROWS, near_road_ranking=[1, 2])
-        conn.near_road_ranking = None  # no ranking rows -> nothing narrowed
+        conn = _FakeConn(self.ROWS, cross_street_ranking=[1, 2])
+        conn.cross_street_ranking = None  # no ranking rows -> nothing narrowed
         resolver = ar.AddressResolver(_FakeEngine(conn), confidence_threshold=70)
         res = resolver.resolve_exact("3000", "Wood St", "ST",
-                                     near_road_1="Pinetree Way")
+                                     cross_street_1="Pinetree Way")
         assert res is None
 
 
-class TestNearRoadsAreNotAlwaysRoads:
+class TestCrossStreetsAreNotAlwaysRoads:
     """Locution's "near <x> and <y>" does not promise x and y are streets.
 
     Measured over 283 dispatches carrying near roads: 129 matched both names, 44
@@ -258,28 +258,28 @@ class TestNearRoadsAreNotAlwaysRoads:
 
     def test_both_names_real_are_kept(self):
         resolver, conn = self._resolver({"PINETREE", "PONDEROSA"})
-        assert resolver._verify_near_roads(conn, ["PINETREE", "PONDEROSA"]) == \
+        assert resolver._verify_cross_streets(conn, ["PINETREE", "PONDEROSA"]) == \
             ["PINETREE", "PONDEROSA"]
 
     def test_a_descriptor_discards_the_whole_signal(self):
         # "Turning Lane" is not a road. Falling back to ranking on Christmas Way alone
         # would be worse than ignoring the near roads entirely.
         resolver, conn = self._resolver({"CHRISTMAS"})
-        assert resolver._verify_near_roads(conn, ["CHRISTMAS", "TURNING"]) == []
+        assert resolver._verify_cross_streets(conn, ["CHRISTMAS", "TURNING"]) == []
 
     def test_neither_name_real_discards_the_signal(self):
         resolver, conn = self._resolver(set())
-        assert resolver._verify_near_roads(conn, ["ACCESS", "PRIVATE DRIVEWAY"]) == []
+        assert resolver._verify_cross_streets(conn, ["ACCESS", "PRIVATE DRIVEWAY"]) == []
 
     def test_a_single_announced_road_is_not_enough(self):
         # One road says "somewhere near this line" and cannot position a call along a
         # street; 87 of 283 dispatches announce only one.
         resolver, conn = self._resolver({"CHRISTMAS"})
-        assert resolver._verify_near_roads(conn, ["CHRISTMAS"]) == []
+        assert resolver._verify_cross_streets(conn, ["CHRISTMAS"]) == []
 
-    def test_no_near_roads_is_not_an_error(self):
+    def test_no_cross_streets_is_not_an_error(self):
         resolver, conn = self._resolver(set())
-        assert resolver._verify_near_roads(conn, []) == []
+        assert resolver._verify_cross_streets(conn, []) == []
 
 
 class TestNoStreetNameIsRefused:

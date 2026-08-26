@@ -60,12 +60,31 @@ Baseline as of 2026-08-26 (see §5 on why the split matters):
 | units | 98.5% | 98.0% |
 | map_grid | 64.7% | **99.0%** |
 | talkgroup | 89.0% | **100%** |
-| address | 64.9% | 69.0% |
+| address | 64.9% | 71.0% |
 
 **Known limitation, stated plainly:** `parse_like_production()` **mirrors** the selection
 logic in `pipeline/phase2.py` rather than calling it, because the real path needs a geocoder,
 a validator and database writes. If phase2's selection changes and the mirror does not, the
 harness scores something production no longer does. Change both in the same commit.
+
+### The `address` column is the parser's string, NOT the geocoded result
+
+This column is systematically pessimistic and must not be read as end-to-end accuracy. It
+compares what the **parser** extracted from the transcript against `verified_address`, with no
+geocoder in between. Two consequences:
+
+* **STT damage lands here.** Roughly half of the 2026-08 misses are street names the parser
+  faithfully carried through from a mis-transcription — `Loheed`/`Lowheed`/`Lockheed` for
+  Lougheed, `Landsdown` for Lansdowne, `Kenny` for Kenney. The parser is not wrong; the audio
+  never contained the right word. Snapping the parsed street to `public.road_names` is the
+  open fix.
+* **The geocoder often repairs it afterwards.** `DISP-2026-EC4501` scores `WRONG` here with
+  `3305 Chartwell Grove`, yet the pipeline stored `3305 Chartwell Green` at the correct parcel
+  — the right place. A handful of "failures" are ground-truth-versus-cadastre conflicts of
+  this kind (#47), not defects at all.
+
+The other four columns have no such gap: `incident`, `units`, `map_grid` and `talkgroup` are
+parser output compared to ground truth directly, and can be read at face value.
 
 ---
 

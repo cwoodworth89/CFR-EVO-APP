@@ -169,33 +169,49 @@ _COVERAGE_PATH = os.path.join(
 _coverage_cache: Optional[Any] = None
 
 
-def load_city_coverage() -> Optional[Any]:
-    """Prepared polygon of the municipal boundary + buffer, or None if unavailable.
+class CoverageUnavailable(RuntimeError):
+    """The municipal coverage polygon could not be loaded.
 
-    Returning None falls back to the bounding box, which over-fetches but never
-    under-fetches -- the safe direction for a coverage decision.
+    Deliberately fatal. An earlier draft fell back to the bounding box here, and
+    the operator rejected that: a fallback would silently crawl 55% more tiles
+    over Belcarra, Anmore and Pitt Meadows while reporting success, and the
+    resulting archive would be wrong in a way nothing downstream could detect.
+    That is precisely the failure this whole item exists to fix -- a plausible
+    wrong answer in place of a visible error (CLAUDE.md 6.1).
+    """
+
+
+def load_city_coverage() -> Any:
+    """Prepared polygon of the municipal boundary + buffer.
+
+    Raises CoverageUnavailable rather than degrading to a bounding box.
     """
     global _coverage_cache
     if _coverage_cache is not None:
-        return _coverage_cache or None
+        return _coverage_cache
     try:
         from shapely.geometry import shape
         from shapely.prepared import prep
-    except ImportError:
-        logger.warning("shapely not installed - falling back to bounding-box tile selection.")
-        _coverage_cache = False
-        return None
+    except ImportError as exc:
+        raise CoverageUnavailable(
+            "shapely is required to select tiles by the municipal boundary."
+            "\n  Install it:  .venv/bin/pip install shapely"
+            "\n  Refusing to fall back to a bounding box -- see punch-list #40."
+        ) from exc
     try:
         with open(_COVERAGE_PATH, "r", encoding="utf-8") as fh:
             doc = json.load(fh)
         geom = shape(doc["features"][0]["geometry"])
-        _coverage_cache = prep(geom)
-        logger.info(f"Loaded municipal tile-coverage polygon from {_COVERAGE_PATH}")
-        return _coverage_cache
     except (OSError, KeyError, IndexError, ValueError) as exc:
-        logger.warning(f"Could not load {_COVERAGE_PATH} ({exc}) - falling back to bounding box.")
-        _coverage_cache = False
-        return None
+        raise CoverageUnavailable(
+            f"Could not read the coverage polygon at {_COVERAGE_PATH}: {exc}"
+            "\n  Regenerate it:  python backend/scripts/export_tile_coverage.py"
+            "\n  Refusing to fall back to a bounding box -- see punch-list #40."
+        ) from exc
+
+    _coverage_cache = prep(geom)
+    logger.info(f"Loaded municipal tile-coverage polygon from {_COVERAGE_PATH}")
+    return _coverage_cache
 
 
 def tile_bounds(x: int, y: int, z: int) -> Tuple[float, float, float, float]:
@@ -214,10 +230,11 @@ def filter_tiles_to_city(tiles: List[Tuple[int, int, int]]) -> List[Tuple[int, i
     Intersects rather than contains: a tile straddling the boundary holds real
     city ground and must be kept. ST_Contains-style strictness here would carve
     a ragged hole around the entire perimeter -- the same trap as punch-list #13.
+
+    Raises CoverageUnavailable if the polygon cannot be loaded. There is no
+    bounding-box fallback by design.
     """
     poly = load_city_coverage()
-    if poly is None:
-        return tiles
     from shapely.geometry import box
     kept = []
     for z, x, y in tiles:

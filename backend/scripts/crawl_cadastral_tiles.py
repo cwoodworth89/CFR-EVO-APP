@@ -59,25 +59,40 @@ COVERAGE_GEOJSON = os.path.join(
 )
 
 
-def load_coverage_filter():
-    """Return a predicate(z, x, y) -> bool, or None to accept the whole box.
+class CoverageUnavailable(RuntimeError):
+    """The municipal coverage polygon could not be loaded. Deliberately fatal.
 
-    None means every tile in the bounding box is crawled: over-fetching, which
-    is the safe direction when coverage is uncertain.
+    There is no bounding-box fallback: it would silently crawl 55% more tiles
+    over neighbouring municipalities while reporting success, producing an
+    archive wrong in a way nothing downstream could detect. Operator decision
+    2026-08-26 -- show an error instead (CLAUDE.md 6.1, punch-list #40).
+    """
+
+
+def load_coverage_filter():
+    """Return a predicate(z, x, y) -> bool restricting the crawl to the city.
+
+    Raises CoverageUnavailable rather than degrading to the bounding box.
     """
     try:
         import json as _json
         from shapely.geometry import shape, box as _box
         from shapely.prepared import prep
-    except ImportError:
-        logger.warning("shapely not installed - crawling the full bounding box.")
-        return None
+    except ImportError as exc:
+        raise CoverageUnavailable(
+            "shapely is required to select tiles by the municipal boundary."
+            "\n  Install it:  .venv/bin/pip install shapely"
+            "\n  Refusing to fall back to a bounding box -- see punch-list #40."
+        ) from exc
     try:
         with open(COVERAGE_GEOJSON, "r", encoding="utf-8") as fh:
             poly = prep(shape(_json.load(fh)["features"][0]["geometry"]))
     except (OSError, KeyError, IndexError, ValueError) as exc:
-        logger.warning(f"Could not load {COVERAGE_GEOJSON} ({exc}) - crawling the full bounding box.")
-        return None
+        raise CoverageUnavailable(
+            f"Could not read the coverage polygon at {COVERAGE_GEOJSON}: {exc}"
+            "\n  Regenerate it:  python backend/scripts/export_tile_coverage.py"
+            "\n  Refusing to fall back to a bounding box -- see punch-list #40."
+        ) from exc
 
     def keep(z: int, x: int, y: int) -> bool:
         n = 1 << z
@@ -91,6 +106,7 @@ def load_coverage_filter():
 
     logger.info(f"Loaded municipal coverage polygon from {COVERAGE_GEOJSON}")
     return keep
+
 
 MAPSERVER_EXPORT_URL = (
     "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/export"
@@ -320,9 +336,8 @@ def crawl_cadastral(
     coverage = load_coverage_filter()
 
     for z in range(min_zoom, max_zoom + 1):
-        z_tiles = calculate_tiles(min_lat, min_lon, max_lat, max_lon, z)
-        if coverage is not None:
-            z_tiles = [t for t in z_tiles if coverage(*t)]
+        z_tiles = [t for t in calculate_tiles(min_lat, min_lon, max_lat, max_lon, z)
+                   if coverage(*t)]
         zoom_tile_map[z] = z_tiles
         total_grid_tiles += len(z_tiles)
         logger.info(f"  * Zoom {z:>2}: {len(z_tiles):>7,} tiles")

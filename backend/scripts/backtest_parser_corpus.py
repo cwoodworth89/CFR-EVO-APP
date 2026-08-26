@@ -153,8 +153,13 @@ def norm_address_loose(a):
     """Collapse the differences that are presentation, not location.
 
     Suffix spelling, unit/apartment designators, and intersection leg order.
+
+    `&` is expanded to " and " BEFORE `_words` strips punctuation. Reviewers write
+    "Westwood St & Lincoln Ave" where the parser produces "Westwood Street And Lincoln Ave";
+    stripping the ampersand first destroyed the separator, left one unsplittable run, and
+    scored an identical intersection as WRONG.
     """
-    s = _words(a)
+    s = _words(re.sub(r"\s*&\s*", " and ", str(a or "")))
     s = re.sub(r"\b(number|unit|suite|apt|apartment|basement|block)\b.*$", "", s).strip()
     parts = re.split(r"\s+and\s+|\s*&\s*", s)
     norm_parts = []

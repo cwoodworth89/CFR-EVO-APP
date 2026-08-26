@@ -220,14 +220,33 @@ def test_zone_for_point_resolves_points_on_zone_boundaries(conn):
         'SELECT count(*), count(public.zone_for_point(geom)) FROM public.intersections'
     )).fetchone()
     assert total > 0
-    inside_without_grid = conn.execute(text("""
+
+    # The condition is "touches a zone", not "lies inside the city".
+    #
+    # This previously asserted that NO intersection inside the city boundary lacked a
+    # grid. That held for the old road set by luck rather than by construction, and
+    # broke when the roads import stopped dropping private/MOT segments (2026-08-26,
+    # 1,785 -> 1,995 intersections): two new junctions on Lincoln Ave, at Oxford St and
+    # Shaughnessy St, resolved to no zone.
+    #
+    # Measured rather than assumed: those points are 9.1 m and 19.8 m from the NEAREST
+    # zone polygon, so they are not boundary points being rejected -- they are in a
+    # real hole in the municipal zone layer. ST_Difference of the city boundary against
+    # the union of all zones is 0.29 km^2, 0.22% of the city's 129.71 km^2. The zones
+    # genuinely do not tile the city.
+    #
+    # Testing "touches a zone" states the actual contract -- a point ON a zone edge must
+    # resolve -- without also asserting complete municipal coverage, which is not this
+    # function's promise to keep and not true.
+    touching_without_grid = conn.execute(text("""
         SELECT count(*) FROM public.intersections i
         WHERE public.zone_for_point(i.geom) IS NULL
-          AND ST_Contains((SELECT ST_Union(geom) FROM public.city_boundary), i.geom)
+          AND EXISTS (SELECT 1 FROM public.zones z WHERE ST_Intersects(z.geom, i.geom))
     """)).scalar()
-    assert inside_without_grid == 0, (
-        f'{inside_without_grid} intersections inside the city have no map grid; '
-        f'zone_for_point is rejecting boundary points again ({with_grid}/{total} resolved)')
+    assert touching_without_grid == 0, (
+        f'{touching_without_grid} intersections touch a zone polygon yet have no map '
+        f'grid; zone_for_point is rejecting boundary points again '
+        f'({with_grid}/{total} resolved)')
 
 
 def test_zone_for_point_returns_null_outside_the_city(conn):

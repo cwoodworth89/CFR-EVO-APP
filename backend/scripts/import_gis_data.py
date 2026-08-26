@@ -135,14 +135,20 @@ def ensure_tables(engine):
         intersection_key VARCHAR(511) NOT NULL,
         lat DOUBLE PRECISION NOT NULL,
         lng DOUBLE PRECISION NOT NULL,
-        zone_id VARCHAR(16),
+        -- NO zone_id. The map grid is DERIVED via public.zone_for_point(geom); a stored
+        -- column was a denormalized copy of that same function's result, free to drift
+        -- from the geometry it came from, and was dropped during the intersection
+        -- rebuild. The DDL below kept declaring it, which was harmless on its own --
+        -- CREATE TABLE IF NOT EXISTS no-ops against the existing table -- but the
+        -- accompanying CREATE INDEX on that column then failed with
+        -- 'column "zone_id" does not exist', aborting the whole import before any
+        -- write. This script could not run at all until 2026-08-26.
         geom GEOMETRY(Point, 4326),
         candidate_index INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_intersections_key ON public.intersections (intersection_key);
     CREATE INDEX IF NOT EXISTS idx_intersections_streets ON public.intersections (street_a, street_b);
-    CREATE INDEX IF NOT EXISTS idx_intersections_zone ON public.intersections (zone_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_intersections_unique ON public.intersections (intersection_key, candidate_index);
     CREATE INDEX IF NOT EXISTS idx_intersections_geom ON public.intersections USING GIST (geom);
 
@@ -222,12 +228,41 @@ def step2_import_roads(engine, roads_geojson_path: str, batch_size: int = 500) -
 
         records_to_insert = []
         operating_features = []
+        status_counts = {}
 
         for feature in features:
             props = feature.get("properties", {})
             status = props.get("STATUS")
-            if status and str(status).strip().upper() != "OPERATING":
-                continue
+
+            # EVERY road is imported, whatever its STATUS, and the value is preserved
+            # in public.roads.status for consumers to act on.
+            #
+            # This previously skipped anything not 'OPERATING', which dropped 242 of
+            # 3,456 features. The filter read as "skip roads that are not in service",
+            # but STATUS does not describe service state at all -- the complete domain
+            # is OPERATING / PRIVATE / MOT / METRO, which is OWNERSHIP AND JURISDICTION.
+            # There is no CLOSED value. A PRIVATE strata road is open and driven daily;
+            # an MOT road is a provincial highway, very much operating. The name said
+            # status, the values said who owns it (CLAUDE.md §7.3a).
+            #
+            # What that cost, measured 2026-08-23 against the source file and database:
+            #   * 45 streets carrying 1,918 addressed parcels had no road geometry at
+            #     all -- Princess Cres (568 parcels), Silver Springs Blvd (359),
+            #     Riverbend Dr (227), Whisper Way (193). Crews respond to these;
+            #     2980 Princess Cres is already in the dispatch corpus.
+            #   * Highway #1 and Mary Hill By-Pass Road were absent entirely.
+            #   * 41 of 44 Highway Ramp segments were missing -- the on-ramps.
+            #   * public.intersections derives from public.roads, so no junction on any
+            #     of those streets could exist to be matched.
+            #
+            # Real closures are not this field: they live in public.road_closures, fed
+            # dynamically, and are handled there.
+            #
+            # Department decision 2026-08-23: private and MOT roads are routable and
+            # matchable. Any routing distinction is applied downstream from status, not
+            # by making the road invisible here.
+            status_key = (str(status).strip().upper() if status else "OPERATING")
+            status_counts[status_key] = status_counts.get(status_key, 0) + 1
 
             fullname = props.get("FULLNAME") or props.get("fullname")
             if not fullname or not str(fullname).strip():
@@ -280,7 +315,11 @@ def step2_import_roads(engine, roads_geojson_path: str, batch_size: int = 500) -
         with engine.connect() as conn:
             count = conn.execute(text("SELECT COUNT(*) FROM public.roads;")).scalar()
 
-        logging.info(f"  ✓ Successfully imported {count} operating roads into public.roads.")
+        # Report the STATUS breakdown rather than a bare total. A silent count is what
+        # let 242 dropped features go unnoticed for months; a per-status line makes an
+        # unexpectedly absent class visible on every run.
+        breakdown = ", ".join(f"{k}={v}" for k, v in sorted(status_counts.items()))
+        logging.info(f"  ✓ Successfully imported {count} roads into public.roads ({breakdown}).")
         return count, operating_features
     except Exception as e:
         logging.error(f"  ✗ Step 2 error importing roads: {e}")

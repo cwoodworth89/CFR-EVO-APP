@@ -29,6 +29,7 @@ import io
 import math
 import time
 import random
+import json
 import sqlite3
 import argparse
 import logging
@@ -152,6 +153,78 @@ def calculate_tiles(min_lat: float, min_lon: float, max_lat: float, max_lon: flo
         for y in range(y_min, y_max + 1):
             tiles.append((z, x, y))
     return tiles
+
+
+# --- Municipal polygon tile selection -------------------------------------
+# Coquitlam is an L shape wrapped around Port Moody and Port Coquitlam. Its
+# bounding box is 289.3 km2 against a real area of 129.7 km2, so a box-based
+# crawl spends 55% of its requests on Belcarra, Anmore, Pitt Meadows and the
+# northern watershed. Measured over z12-20: 778,515 box tiles vs 430,845 that
+# actually touch the city -- 44.7% saved, and the saving grows with zoom.
+
+_COVERAGE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "gis", "coquitlam_tile_coverage.geojson"
+)
+_coverage_cache: Optional[Any] = None
+
+
+def load_city_coverage() -> Optional[Any]:
+    """Prepared polygon of the municipal boundary + buffer, or None if unavailable.
+
+    Returning None falls back to the bounding box, which over-fetches but never
+    under-fetches -- the safe direction for a coverage decision.
+    """
+    global _coverage_cache
+    if _coverage_cache is not None:
+        return _coverage_cache or None
+    try:
+        from shapely.geometry import shape
+        from shapely.prepared import prep
+    except ImportError:
+        logger.warning("shapely not installed - falling back to bounding-box tile selection.")
+        _coverage_cache = False
+        return None
+    try:
+        with open(_COVERAGE_PATH, "r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+        geom = shape(doc["features"][0]["geometry"])
+        _coverage_cache = prep(geom)
+        logger.info(f"Loaded municipal tile-coverage polygon from {_COVERAGE_PATH}")
+        return _coverage_cache
+    except (OSError, KeyError, IndexError, ValueError) as exc:
+        logger.warning(f"Could not load {_COVERAGE_PATH} ({exc}) - falling back to bounding box.")
+        _coverage_cache = False
+        return None
+
+
+def tile_bounds(x: int, y: int, z: int) -> Tuple[float, float, float, float]:
+    """(west, south, east, north) of a Slippy tile in WGS84."""
+    n = 1 << z
+    west = x / n * 360.0 - 180.0
+    east = (x + 1) / n * 360.0 - 180.0
+    north = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / n))))
+    south = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / n))))
+    return west, south, east, north
+
+
+def filter_tiles_to_city(tiles: List[Tuple[int, int, int]]) -> List[Tuple[int, int, int]]:
+    """Drop tiles that do not touch the municipal coverage polygon.
+
+    Intersects rather than contains: a tile straddling the boundary holds real
+    city ground and must be kept. ST_Contains-style strictness here would carve
+    a ragged hole around the entire perimeter -- the same trap as punch-list #13.
+    """
+    poly = load_city_coverage()
+    if poly is None:
+        return tiles
+    from shapely.geometry import box
+    kept = []
+    for z, x, y in tiles:
+        w, s_, e, n_ = tile_bounds(x, y, z)
+        if poly.intersects(box(w, s_, e, n_)):
+            kept.append((z, x, y))
+    return kept
 
 
 def init_mbtiles_db(db_path: str, layer_name: str, config: Dict[str, Any]) -> sqlite3.Connection:
@@ -449,8 +522,12 @@ def compile_layer(
         # Inside the city, every layer is fetched to its full zoom depth. The
         # labelled street map additionally covers the wider region, but only up
         # to REGIONAL_MAX_ZOOM -- see the coverage policy at the top of this file.
-        z_tiles = calculate_tiles(CITY_MIN_LAT, CITY_MIN_LON, CITY_MAX_LAT, CITY_MAX_LON, z)
+        z_tiles = filter_tiles_to_city(
+            calculate_tiles(CITY_MIN_LAT, CITY_MIN_LON, CITY_MAX_LAT, CITY_MAX_LON, z)
+        )
         if regional_ok and z <= REGIONAL_MAX_ZOOM:
+            # Regional context stays a plain box: it is deliberately NOT the city,
+            # and at z12-16 the whole region is only 10,149 tiles.
             z_tiles = calculate_tiles(
                 REGIONAL_MIN_LAT, REGIONAL_MIN_LON, REGIONAL_MAX_LAT, REGIONAL_MAX_LON, z
             )

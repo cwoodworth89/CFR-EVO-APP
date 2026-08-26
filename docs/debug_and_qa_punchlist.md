@@ -2028,7 +2028,7 @@ round 2: 'coquitlam engine 1 engine 2 rescue 2'
          -> no respond marker: a unit tail -> skipped  (currently the source of 'Rescue')
 ```
 
-#### Step 3 is not optional — it is punch-list #42's round-1 bias in miniature
+#### Step 3 is not optional — it is punch-list #44's round-1 bias in miniature
 
 Selecting the **first** non-Unknown round instead of the most specific one **breaks**
 `DISP-2026-E792B0`:
@@ -2572,7 +2572,7 @@ warning of CLAUDE.md §5 does not cover a *silently missing* corroboration field
 
 ---
 
-### 42. Round 1 wins the address unconditionally — Phase 2 never compares the two rounds
+### 44. Round 1 wins the address unconditionally — Phase 2 never compares the two rounds
 > **Status**: ⚠️ **Open — measured 2026-08-23.** **Confirmed live**, not historical: split by
 > month, it still costs ~5% of double-round calls in 2026-08. Characterised only; no fix
 > applied. Related to `parser_audit_handoff.md` §5, which flagged this as a lead but never
@@ -2941,3 +2941,126 @@ has no tile, rather than rendering black. The operator diagnosed this as "blank"
 tell it apart from a failed tile server.
 
 See the `mbtiles-tile-server` skill for the compile and checkpoint procedure.
+
+---
+
+### 45. Geocoder harness needs a review pass before its numbers are trusted again
+> **Status**: ⚠️ **Open — raised 2026-08-26** while building the parser harness. Not a defect
+> in the geocoder; a staleness risk in the tool used to measure it. See
+> [`docs/qa_harnesses.md`](qa_harnesses.md) §3.
+
+`backend/scripts/trace_geocode_corpus.py` (committed `8d00ea3`) replays verified dispatches
+through the live geocoder and records which of seven resolver steps answered. Four reasons its
+output should not be quoted until it is re-checked:
+
+1. **It predates the 2026-08-21/23 geocoder rewrite.** Nine commits landed on `services/gis/`
+   in that window — map-grid tie-breaking, near-road ranking, bounded civic substitution,
+   honest centroid labelling. Whether the seven-step ladder it wraps is still the seven steps
+   that run has not been verified.
+2. **No date split.** Its headline "30 of 34 stored defects already remediated" is a historical
+   statement. Every pooled rate over this corpus is suspect (#5 below, and `qa_harnesses.md` §5).
+3. **No cosmetic bucketing.** Reviewers use `verified_address` for suffix expansion and unit
+   stripping, which inflates a naive error rate roughly 3×. `backtest_parser_corpus.py` buckets
+   EXACT / COSMETIC / WRONG; this should adopt the same.
+4. **It measures the geocoder's own output** (`target->>'address'`), so it can never see how the
+   parser arrived at that string. The parser harness now fills that gap — read them together.
+
+**Work:** re-run against current `services/gis/`, confirm the resolver list, add `--by-month`
+and cosmetic bucketing, record a fresh baseline in `qa_harnesses.md` §3.
+
+---
+
+### 46. No STT harness exists — WER is computed for training, never for regression
+> **Status**: ⚠️ **Open — raised 2026-08-26.** See [`docs/qa_harnesses.md`](qa_harnesses.md) §4.
+
+`extract_training_data.py` and `backtest_regression.py` compute Word Error Rate to feed Whisper
+training. Neither answers **"did this STT change make the system better or worse against
+historical audio?"** — so STT configuration changes currently ship unmeasured.
+
+Audio is available on essentially every dispatch (`audio_url`), so the corpus supports this.
+
+**What it needs:**
+
+* Replay stored audio through the current faster-whisper configuration.
+* Score against `verified_transcript` — **after** handling the round trap below.
+* Report **by month**, and report *both* WER and downstream field accuracy. A WER improvement
+  that loses the map grid off the tail is not an improvement, and WER alone cannot see that.
+
+#### ⚠️ The trap that will corrupt any STT measurement
+
+**`verified_transcript` holds ONE round; `raw_transcript` holds two.** The reviewer verifies a
+single round; the duplication that matches it to the two-round audio happens only at training
+extraction ([`extract_training_data.py:182`](../backend/scripts/extract_training_data.py)),
+never in the database column. Confirmed by query: `respond` appears once in 197 of 202 verified
+transcripts.
+
+**Diffing the two columns directly reports ~50% error on a perfect transcription.** Duplicate
+the verified text first the way the extractor does, or compare round-for-round.
+
+#### Two findings already waiting for it
+
+* **Tail truncation** — 2026-07 lost `map grid` from 37 transcripts (18%) while those calls had
+  *longer* median audio (50.6s vs 47.5s) and *fewer* words (37 vs 51). Fixed by the operator's
+  audio-listener work around 2026-07-29; zero since. A harness would have flagged it the week
+  it started.
+* **Stable mis-recognitions** — faster-whisper writes `smoldering` 5/5 (never `smouldering`)
+  and `Tassus` for Tahsis in 2 of 3 occurrences. These belong as recognition aliases in the
+  street vocabulary, the same pattern already applied to call types in #43.
+
+---
+
+### 40 (plan). Coverage decided by the municipal polygon, not a box
+> **Status**: 🔧 **Scripts updated 2026-08-26; crawl NOT yet run.**
+
+The operator rejected a bounding box: *"pulling a square city boundary doesn't really work
+either. The city is an odd shape."* Correct — Coquitlam is an L wrapped around Port Moody and
+Port Coquitlam, and **fills only 44.8% of its own bounding box** (129.7 km² of 289.3 km²).
+
+Tiles are now tested against the real boundary + 1 km buffer:
+
+| z12–20 tiles | |
+|:--|--:|
+| Bounding box | 778,515 |
+| **Polygon** | **430,845** |
+| Saved | **44.7%** — and the saving grows with zoom (44.7% at z20) |
+
+**Agreed coverage, 2026-08-26:**
+
+| Layer | Area | Zooms | Tiles | Size |
+|:--|:--|:--|--:|--:|
+| `street` (labelled) | city polygon **+ region for context** | 12–20 city, 12–**16** region | 439,157 | 1.54 GB |
+| `street_nolabels` | city polygon | 12–20 | 430,845 | 1.21 GB |
+| `satellite` (+7.5 cm ortho) | city polygon | 12–20 | 430,845 | 6.29 GB |
+| `cadastral` | city polygon | 14–20 | ~430k | ~0.69 GB |
+| | | | **~1.73 M** | **~9.7 GB** |
+
+Sizes use bytes/tile **measured from the existing kiosk archives** (street 3.5 KB, nolabels
+2.8 KB, satellite 14.6 KB, cadastral 1.6 KB), not estimates. Kiosk has 226 GB free, so disk
+is not the constraint — crawl time and CDN load are.
+
+Regional context is deliberately a plain **box**, not the polygon: it is explicitly *not* the
+city, and at z12–16 the whole region is only 10,149 tiles / 36 MB. `REGIONAL_MAX_ZOOM = 16`
+because z12–20 region-wide would be 2,523,994 tiles (~8.8 GB, over a day of crawling) for
+street detail in municipalities CFR does not respond to.
+
+**Changes made:**
+
+* `compile_mbtiles.py` — `filter_tiles_to_city()` tests each tile against the polygon.
+  Uses **intersects, not contains**: a tile straddling the boundary holds real city ground,
+  and contains-style strictness would carve a ragged hole around the whole perimeter (the
+  same trap as #13). Falls back to the bounding box if shapely or the GeoJSON is missing —
+  **over**-fetching, the safe direction.
+* `backend/data/gis/coquitlam_tile_coverage.geojson` — 55-point polygon, generated.
+* `backend/scripts/export_tile_coverage.py` — regenerates it from `public.city_boundary`.
+  Hand-editing is what caused this defect; the script exists so nobody has to.
+* `crawl_cadastral_tiles.py` — same polygon filter, and its bounds corrected from the
+  hand-picked `-122.92 … -122.72` to the real extent. The old east limit stopped 0.1° short
+  of the city at `-122.621`, leaving **Pinecone Burke and Minnekhada with no parcel or
+  address labels at any zoom** — the wildland end of the response area.
+* All layers now reach **z20 inside the city** rather than z18.
+
+**Before crawling — unverified:** whether Carto Voyager and ArcGIS World Imagery actually
+serve real z19/z20 raster tiles here, or upscale. The dev machine is sandboxed from both CDNs
+(HTTP 000), so this must be checked **on the kiosk** first. If either upscales, ~322k tiles
+per layer at z20 would be fetched for no added detail. Check before committing to the crawl,
+not after (§7.3a).

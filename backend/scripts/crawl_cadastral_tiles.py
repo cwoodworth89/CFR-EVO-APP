@@ -37,11 +37,60 @@ logging.basicConfig(
 )
 logger = logging.getLogger("cadastral_crawler")
 
-# Default Municipal Operational Bounds (City of Coquitlam)
-DEFAULT_MIN_LAT = 49.22
-DEFAULT_MAX_LAT = 49.35
-DEFAULT_MIN_LON = -122.92
-DEFAULT_MAX_LON = -122.72
+# Municipal coverage: the extent of public.city_boundary plus a ~1 km buffer,
+# matching backend/data/gis/coquitlam_tile_coverage.geojson and compile_mbtiles.py.
+#
+# The previous values (-122.92 .. -122.72) were hand-picked and stopped 0.1 deg
+# short of the eastern city limit at -122.621, so Pinecone Burke and Minnekhada
+# had no parcel or address labels at any zoom -- the wildland end of the
+# response area. Punch-list #40. Re-derive from the boundary table with
+# backend/scripts/export_tile_coverage.py; do not hand-edit.
+DEFAULT_MIN_LAT = 49.21087
+DEFAULT_MAX_LAT = 49.36017
+DEFAULT_MIN_LON = -122.90723
+DEFAULT_MAX_LON = -122.60732
+
+# Tiles are additionally tested against the real boundary polygon, because
+# Coquitlam is an L wrapped around Port Moody and Port Coquitlam and fills only
+# 44.8% of its own bounding box.
+COVERAGE_GEOJSON = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "gis", "coquitlam_tile_coverage.geojson"
+)
+
+
+def load_coverage_filter():
+    """Return a predicate(z, x, y) -> bool, or None to accept the whole box.
+
+    None means every tile in the bounding box is crawled: over-fetching, which
+    is the safe direction when coverage is uncertain.
+    """
+    try:
+        import json as _json
+        from shapely.geometry import shape, box as _box
+        from shapely.prepared import prep
+    except ImportError:
+        logger.warning("shapely not installed - crawling the full bounding box.")
+        return None
+    try:
+        with open(COVERAGE_GEOJSON, "r", encoding="utf-8") as fh:
+            poly = prep(shape(_json.load(fh)["features"][0]["geometry"]))
+    except (OSError, KeyError, IndexError, ValueError) as exc:
+        logger.warning(f"Could not load {COVERAGE_GEOJSON} ({exc}) - crawling the full bounding box.")
+        return None
+
+    def keep(z: int, x: int, y: int) -> bool:
+        n = 1 << z
+        w = x / n * 360.0 - 180.0
+        e = (x + 1) / n * 360.0 - 180.0
+        north = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / n))))
+        south = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / n))))
+        # Intersects, not contains: a tile straddling the line holds real city
+        # ground and must be kept.
+        return poly.intersects(_box(w, south, e, north))
+
+    logger.info(f"Loaded municipal coverage polygon from {COVERAGE_GEOJSON}")
+    return keep
 
 MAPSERVER_EXPORT_URL = (
     "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Cadastral/MapServer/export"
@@ -268,8 +317,12 @@ def crawl_cadastral(
     zoom_tile_map: Dict[int, List[Tuple[int, int, int]]] = {}
     total_grid_tiles = 0
 
+    coverage = load_coverage_filter()
+
     for z in range(min_zoom, max_zoom + 1):
         z_tiles = calculate_tiles(min_lat, min_lon, max_lat, max_lon, z)
+        if coverage is not None:
+            z_tiles = [t for t in z_tiles if coverage(*t)]
         zoom_tile_map[z] = z_tiles
         total_grid_tiles += len(z_tiles)
         logger.info(f"  * Zoom {z:>2}: {len(z_tiles):>7,} tiles")

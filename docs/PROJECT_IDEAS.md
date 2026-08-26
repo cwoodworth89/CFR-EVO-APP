@@ -166,3 +166,170 @@ Also expected, and **not yet sourced**:
 * **Do not build this before multi-hall (#5)**: with one hall and one kiosk, a single
   topic is simpler and demonstrably sufficient.
 
+
+---
+
+### 8. 🔑 Keyed Gate Access Overlay (`public.gate_keys`)
+
+* **Status**: Design only — deferred by the v1.0.0 feature freeze
+  (see [`development_freeze_summary.md`](./development_freeze_summary.md)).
+* **Description**: A toggleable map layer marking gates across the Coquitlam response
+  area that require a key carried by first-due apparatus, with the key ID and a
+  descriptor surfaced on hover and click. Distinct from road closures: a gate is a
+  permanent access constraint, not a temporal event, and it has no Open511 feed or
+  municipal source behind it.
+* **Scope**: Physical gates on roads controlling access to **rural and backcountry
+  areas** — provincial parks, Forest Service Roads, BC Hydro roads, Metro Vancouver
+  parks and watershed, and City of Coquitlam parks and utility areas. Not Knox boxes,
+  not building access, not gate codes.
+* **Why it matters**: These gates are used rarely — a crew may encounter one once in
+  several years — which is precisely when institutional memory fails. Low usage
+  frequency is the argument *for* the feature, not against it.
+
+#### Data Source — no external authority exists
+Every other GIS layer in CFR EVO derives from the City of Coquitlam Open Data Portal
+and can be rebuilt by re-running an import script. This one cannot. There is no
+municipal, provincial, or regional dataset that publishes which key CFR carries for a
+given gate. The data is **hand-curated in conjunction with Coquitlam SAR**.
+
+This makes `public.gate_keys` the **first irreplaceable table in the system**, which is
+the direct motivation for backlog item #9. Do not build this before a backup routine
+exists — losing hand-curated SAR fieldwork to an SSD failure is not recoverable.
+
+OpenStreetMap tags gates as `barrier=gate` (with `locked`, `access`, `operator`), and
+the regional `vancouver.osm.pbf` already on the kiosk for OSRM covers well beyond the
+city limits. That is a viable *geometry* seed at $0 with no new dependency, but it can
+never supply `key_id`. Investigated and set aside in favour of hand curation; recorded
+here so the option is not re-derived from scratch later. Backcountry OSM gate coverage
+is patchy, so an absent marker must never be read as "no gate here" (CLAUDE.md §6.1).
+
+#### Schema
+```sql
+CREATE TABLE IF NOT EXISTS public.gate_keys (
+    id          BIGSERIAL PRIMARY KEY,
+    -- Ordinal from the curated CFR/SAR list. Display only -- renumbering the
+    -- source list must never repoint a record. gate_id carries identity.
+    list_index  INTEGER,
+    gate_id     VARCHAR(32) UNIQUE NOT NULL,
+    gate_desc   TEXT,
+    -- NULL means no CFR key is held for this gate. Do not default, and do not
+    -- render blank: "NO KEY ON RECORD" is the operationally useful answer and
+    -- saves a crew driving to a gate they cannot open (CLAUDE.md 6.1).
+    key_id      VARCHAR(32),
+    key_desc    TEXT,
+    lat         DOUBLE PRECISION NOT NULL,
+    lng         DOUBLE PRECISION NOT NULL,
+    geom        geometry(Point, 4326),
+    source      VARCHAR(64),   -- 'coquitlam_sar', 'cfr', ...
+    -- Last date the gate/lock was physically confirmed. NULL = never confirmed.
+    verified_at DATE,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+* `geom` and `updated_at` should be maintained by triggers. With hand edits, updating
+  `lat`/`lng` without `geom` silently diverges the popup coordinates from the marker
+  position, and `updated_at` will simply be forgotten.
+* `verified_at` earns its place here more than on any other table: a stale `key_id` is
+  the dominant failure mode, and unlike a hydrant flow class, no external sync will
+  ever correct it. Entries past an age threshold must render as visibly unconfirmed.
+
+#### Maintenance Model
+Database-only, manually updated. Change cadence is **every few years** — comparable to
+cadastral or hydrant data — and a typical edit is a single value:
+```sql
+UPDATE public.gate_keys SET key_id = 'K-7', verified_at = CURRENT_DATE
+ WHERE gate_id = 'G-014';
+```
+A CSV-plus-reload pipeline was considered and rejected: at this cadence it buys nothing
+and introduces a second source of truth. The `cfr-postgres` MCP server reaches the kiosk
+database directly over Tailscale, so an edit needs no script, file, or rebuild.
+
+#### Layer
+Direct copy of the hydrant pattern in [`MapLayers.jsx`](../frontend/src/components/MapLayers.jsx)
+(`HydrantDetailCard`, ~L164): one detail component rendered into both a `<Tooltip>`
+(hover) and a `<Popup>` (click) so the two cannot drift. Add `showGateKeys` to
+[`useMapLayerPreferences.js`](../frontend/src/hooks/useMapLayerPreferences.js) and a 🔑
+icon to [`layerIcons.js`](../frontend/src/components/map/layerIcons.js).
+
+Every difference from `HydrantsLayer` is a simplification: no bbox query, no cache TTL,
+no nearest-neighbour computation, no `minZoom` gate, and **no bounds check of any kind**.
+At a few dozen rows the layer fetches all of them once and renders. Default toggle off.
+
+* **No boundary filtering**: many gates sit outside the City of Coquitlam. Note that
+  `isWithinCoquitlam()` ([`addressUtils.js:38`](../frontend/src/utils/addressUtils.js))
+  means *"orthophoto and cadastral coverage exists here"* — it is not a validity test
+  for curated data, and must not be applied to this layer. The §5 Tier 2 banner firing
+  on an out-of-city **incident** remains correct and should be left alone.
+* **Tile coverage**: gates outside the municipal tile-coverage polygon will render over
+  the "no map data" hatch. Tracked separately with the map/imagery work — the layer
+  does not block on it.
+
+#### Explicitly Not In Scope
+* **No routing alert.** The original concept included warning crews of keyed gates near
+  an incident. Deferred deliberately: an alert built on an unpopulated dataset either
+  fires wrong or never fires, and a wrong key alert is worse than none. The schema
+  above supports adding a coordinate-radius alert later without modification.
+* **No OSRM integration.** Gates are advisory, matching how `public.road_closures` is
+  display-only today (see [`routing.py:37`](../backend/api/routers/routing.py)).
+* **No kiosk authoring UI, no auth model, no multi-lock schema.** One lock, one key,
+  developer-maintained.
+
+---
+
+### 9. 💾 Backup & Disaster Recovery for Irreplaceable Assets
+
+* **Status**: ⚠️ **Open gap — no backup routine exists anywhere in the project.**
+  A repository-wide search for `pg_dump` / `pg_restore` / `backup` returns hits only
+  inside `.venv`.
+* **Why now**: Every table in PostgreSQL today derives from an external authoritative
+  source and can be rebuilt by re-running an import script — which is why no backup has
+  been needed so far. Backlog item #8 (`gate_keys`) breaks that assumption, and the HITL
+  ground-truth corpus already has. This is worth resolving *before* #8 is built.
+
+#### Current Coverage
+GitHub (`cwoodworth89/CFR-EVO-APP`) covers **the code completely and the data not at
+all**. Everything that cannot be regenerated lives on a single SSD in the fire hall.
+
+| Asset | In Git? | Recoverable? | Notes |
+| :--- | :--- | :--- | :--- |
+| Source, docs, migrations, compose, `data/gis/*.geojson` | ✅ | — | Fully covered |
+| **PostgreSQL database** | ❌ | ❌ **No** | Docker named volume `postgres_data`. Holds dispatches, `verified_*` HITL corrections, `custom_places`, and (future) `gate_keys` |
+| **Dispatch audio recordings** | ❌ | ❌ **No** | `backend/audio_files/`, `frontend/public/recordings/`; `*.wav` blocked globally |
+| **Fine-tuned Whisper model** | ❌ | ⚠️ Costly | `backend/models/whisper-base-cfr-ct2/`, `*.safetensors`/`*.bin`/`*.pt`. Retrainable only if the training audio survives |
+| `backend/.env` secrets | ❌ | ⚠️ Manual | Intentionally ignored; needs a documented recovery path, not a repo copy |
+| MBTiles archives | ❌ | ⚠️ Hours | `backend/data/tiles/`. Re-crawlable (~430k tiles z12–20) but slow and CDN-dependent |
+| Raw ESRI shapefiles | ❌ | ✅ Cheap | Re-downloadable from the Coquitlam Open Data Portal |
+
+#### The Compounding Risk
+The audio recordings and the `verified_*` database columns are **one dataset in two
+places** — the paired system-vs-actual corpus the STT backtest and parser regression
+suites are built on. Losing either half destroys the pair, and no amount of re-importing
+municipal data reconstructs it. This is the single highest-value irreplaceable asset in
+the system, ahead of even the fine-tuned model, which is derived from it.
+
+Note also that `docker compose down -v` destroys `postgres_data` in one command. There
+is currently nothing between that keystroke and total loss of the HITL corpus.
+
+#### Proposed Scope
+1. **Scheduled `pg_dump`** of the full database on the kiosk, retained locally with
+   rotation. Compressed, this is small; it is the highest value-per-effort step by a
+   wide margin and should land first.
+2. **Off-kiosk copy.** A backup on the same SSD as the thing it backs up protects
+   against `down -v` and bad migrations, not hardware failure. Constrained by the $0 /
+   no-cloud rule (CLAUDE.md §1) — candidates are the Nextcloud store already in use for
+   this repository, or an external drive at the hall. **Needs a decision.**
+3. **Per-table export for curated data.** For `gate_keys` specifically, a one-way
+   `pg_dump -t public.gate_keys` into the repo gives git history, authorship, and diffs
+   for hand-curated rows. Direction is strictly DB → file: the dump is a backup
+   artifact, never an input, so no second source of truth is created.
+4. **Audio corpus archival** — the largest asset by volume and the one with no
+   regeneration path at all.
+5. **Documented restore drill.** An untested backup is a hypothesis. The restore path
+   must be written down and actually exercised once.
+
+#### Open Questions
+* Where does the off-kiosk copy go, given no cloud dependencies? (Blocks step 2.)
+* Retention policy for dispatch audio — is there a privacy or records-retention
+  constraint from the department? See [`privacy.md`](./privacy.md).
+* Does `backend/.env` recovery belong in a sealed document rather than any repository?

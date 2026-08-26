@@ -9,6 +9,8 @@ parser audit needs, and exists so that audit starts from evidence rather than fr
 geocoder context it grew out of.
 
 Companion documents:
+* [`docs/qa_harnesses.md`](./qa_harnesses.md) — **the QA toolset: how to measure any change against
+  historical records, and the traps that make a rate wrong.** Read it before quoting a number.
 * [`docs/review_status_handoff.md`](./review_status_handoff.md) — system state and the live work queue
 * [`docs/standards/dependency-behaviour.md`](./standards/dependency-behaviour.md) — verified library semantics
 * [`CLAUDE.md`](../CLAUDE.md) — §6 (no fabricated data) and §7 (start from the source of record)

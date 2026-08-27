@@ -312,19 +312,30 @@ Note also that `docker compose down -v` destroys `postgres_data` in one command.
 is currently nothing between that keystroke and total loss of the HITL corpus.
 
 #### Proposed Scope
-1. **Scheduled `pg_dump`** of the full database on the kiosk, retained locally with
-   rotation. Compressed, this is small; it is the highest value-per-effort step by a
-   wide margin and should land first.
-2. **Off-kiosk copy.** A backup on the same SSD as the thing it backs up protects
-   against `down -v` and bad migrations, not hardware failure. Constrained by the $0 /
-   no-cloud rule (CLAUDE.md §1) — candidates are the Nextcloud store already in use for
-   this repository, or an external drive at the hall. **Needs a decision.**
+1. ✅ **Scheduled `pg_dump`** — implemented as
+   [`backend/scripts/backup_db.sh`](../backend/scripts/backup_db.sh); see
+   [`database_backup_runbook.md`](./briefings/database_backup_runbook.md). Two tiers:
+   critical tables at 90-deep retention, full database at 7. Approved as a
+   freeze-compatible fix on 2026-08-27 — it changes no application behaviour.
+2. ⚠️ **Off-kiosk copy — partially addressed.**
+   [`pull_backups.ps1`](../backend/scripts/pull_backups.ps1) pulls archives to the
+   developer laptop (and onward via Nextcloud sync). This is an **interim** measure: it
+   only runs when the laptop is opened, so the off-kiosk copy is as stale as the last
+   time someone ran it.
+   **Still needs a decision for unattended off-site storage.** The strongest candidate
+   is the `nas` node already on the tailnet (`100.127.210.128`, Linux, always on) —
+   a scheduled `scp`/`rsync` push from the kiosk to it would close this properly at $0
+   with no cloud dependency and no reliance on the laptop.
 3. **Per-table export for curated data.** For `gate_keys` specifically, a one-way
    `pg_dump -t public.gate_keys` into the repo gives git history, authorship, and diffs
    for hand-curated rows. Direction is strictly DB → file: the dump is a backup
    artifact, never an input, so no second source of truth is created.
-4. **Audio corpus archival** — the largest asset by volume and the one with no
-   regeneration path at all.
+4. ⏳ **Audio corpus archival** — the largest asset by volume and the one with no
+   regeneration path at all. **Acknowledged and deliberately deferred (Curtis,
+   2026-08-27)** — the pull needs to happen, but not now. Note that the database
+   backup in step 1 protects only *half* of the ground-truth corpus: the `verified_*`
+   columns are useless without the `*.wav` files they were transcribed from. Until this
+   lands, the pairing is one disk failure away from being lost.
 5. **Documented restore drill.** An untested backup is a hypothesis. The restore path
    must be written down and actually exercised once.
 

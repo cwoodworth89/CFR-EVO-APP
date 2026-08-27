@@ -322,10 +322,13 @@ is currently nothing between that keystroke and total loss of the HITL corpus.
    developer laptop (and onward via Nextcloud sync). This is an **interim** measure: it
    only runs when the laptop is opened, so the off-kiosk copy is as stale as the last
    time someone ran it.
-   **Still needs a decision for unattended off-site storage.** The strongest candidate
-   is the `nas` node already on the tailnet (`100.127.210.128`, Linux, always on) —
-   a scheduled `scp`/`rsync` push from the kiosk to it would close this properly at $0
-   with no cloud dependency and no reliance on the laptop.
+   **Interim scope is deliberately kiosk → laptop only** (Curtis, 2026-08-27).
+   The long-term destination will be **City-owned infrastructure**, possibly with one
+   additional offsite copy.
+   The `nas` node on the tailnet (`100.127.210.128`) was considered and **ruled out**:
+   it is personal equipment, and dispatch records — including call audio and addresses —
+   are municipal data that should not rest on personally-owned storage. Recorded here so
+   the option is not revisited on convenience grounds. See [`privacy.md`](./privacy.md).
 3. **Per-table export for curated data.** For `gate_keys` specifically, a one-way
    `pg_dump -t public.gate_keys` into the repo gives git history, authorship, and diffs
    for hand-curated rows. Direction is strictly DB → file: the dump is a backup

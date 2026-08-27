@@ -8,6 +8,10 @@ The system is offline-first, so obtained standards are **vendored into this dire
 with their revision recorded — not linked. A link is not available at 3am on a kiosk with
 no WAN.
 
+> **Municipal data gaps are tracked separately.** Where the City of Coquitlam's own data is
+> missing, inconsistent, or disagrees with dispatch, the question belongs in
+> [`../city_gis_data_register.md`](../city_gis_data_register.md) — not here, and never in code.
+
 > **This file covers domain standards.** For what the libraries we depend on actually do —
 > as opposed to what their API names suggest — see
 > [`dependency-behaviour.md`](dependency-behaviour.md). That is where the majority of this

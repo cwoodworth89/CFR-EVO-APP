@@ -339,7 +339,8 @@ is currently nothing between that keystroke and total loss of the HITL corpus.
    backup in step 1 protects only *half* of the ground-truth corpus: the `verified_*`
    columns are useless without the `*.wav` files they were transcribed from. Until this
    lands, the pairing is one disk failure away from being lost.
-5. **Documented restore drill.** An untested backup is a hypothesis. The restore path
+5. ✅ **Documented restore drill** — run and passed 2026-08-27; see the runbook header.
+   Previously: an untested backup is a hypothesis. The restore path
    must be written down and actually exercised once.
 
 #### Open Questions

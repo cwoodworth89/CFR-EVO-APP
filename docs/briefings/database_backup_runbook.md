@@ -7,6 +7,13 @@ Covers [`backend/scripts/backup_db.sh`](../../backend/scripts/backup_db.sh) on t
 > **An untested backup is a hypothesis.** Run the restore drill in §4 at least once, and
 > again after any change to the schema or the container setup.
 
+**Drill status: ✅ PASSED 2026-08-27.** `cfr-critical-20260827-120023.sql.gz` was restored
+into a scratch database with `psql -v ON_ERROR_STOP=1` (exit 0, no errors). All six
+critical tables matched live row counts except `dispatches`, which was one row short —
+confirmed as expected point-in-time drift, not data loss: restored `max(id)` was 528
+against a live 529, i.e. one dispatch arrived after the 12:00:23 snapshot. Scratch
+database dropped afterwards.
+
 ---
 
 ## 1. What is protected, and what is not

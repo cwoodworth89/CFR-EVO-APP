@@ -4,14 +4,23 @@ compile_mbtiles.py
 ==================
 Builds and compiles centralized MBTiles archives for CFR EVO:
 1. satellite.mbtiles:
-   - Combines City of Coquitlam 2025 7.5cm Orthophoto + surrounding regional base imagery (Zooms 12 through 20).
-   - Standard format: JPEG (Quality 85).
+   - City of Coquitlam 2025 7.5cm Orthophoto + regional base imagery. Zooms 12-20
+     (z20-native orthos; roofline and driveway detail is why this layer exists).
+   - Standard format: JPEG (Quality 85). City coverage only.
 2. street.mbtiles:
-   - Carto Voyager / OpenStreetMap street basemap with full labels (Zooms 12 through 18).
+   - Carto Voyager / OpenStreetMap street basemap with full labels. Zooms 12-19.
+   - The ONLY layer extending past the city: regional context to z16 so an
+     operator panning out still sees named roads.
    - Standard format: PNG.
 3. street_nolabels.mbtiles:
-   - Tactical light/grey basemap without text labels (Zooms 12 through 18).
+   - Tactical light/grey basemap without text labels. Zooms 12-19.
+   - City coverage only -- it exists to underlay the cadastral overlay, which
+     stops at the municipal boundary.
    - Standard format: PNG.
+
+Tiles are selected by INTERSECTION WITH THE MUNICIPAL POLYGON, not a bounding box
+(see the coverage policy below). If the polygon cannot be loaded the run STOPS --
+there is deliberately no bounding-box fallback.
 
 Features:
 - Fast multi-threaded concurrent downloading (32 workers) with retry backoff
@@ -105,7 +114,12 @@ LAYER_CONFIGS = {
         "url_template": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
         "subdomains": ["a", "b", "c", "d"],
         "min_zoom": 12,
-        "max_zoom": 20,
+        # z19, not z20. Operator decision 2026-08-26: start at 19 and raise it
+        # later if the detail is wanted. Carto's raster basemaps are vector-derived
+        # and gain little between 19 and 20, while z20 alone is ~4x the tiles of
+        # every other zoom combined. Leaflet upscales past maxNativeZoom, so the
+        # map still zooms further -- it just stops fetching new detail.
+        "max_zoom": 19,
         # The only layer that extends past the city: an operator panning out
         # still needs named roads for context. See the coverage policy above.
         "regional_context": True,
@@ -116,7 +130,12 @@ LAYER_CONFIGS = {
         "url_template": "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
         "subdomains": ["a", "b", "c", "d"],
         "min_zoom": 12,
-        "max_zoom": 20,
+        # z19, not z20. Operator decision 2026-08-26: start at 19 and raise it
+        # later if the detail is wanted. Carto's raster basemaps are vector-derived
+        # and gain little between 19 and 20, while z20 alone is ~4x the tiles of
+        # every other zoom combined. Leaflet upscales past maxNativeZoom, so the
+        # map still zooms further -- it just stops fetching new detail.
+        "max_zoom": 19,
         # City only: this style exists to sit under the cadastral overlay, which
         # does not extend past the municipal boundary.
         "regional_context": False,
@@ -127,6 +146,8 @@ LAYER_CONFIGS = {
         "url_template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         "subdomains": [""],
         "min_zoom": 12,
+        # Stays at 20: the City's 7.5cm orthophotos are genuinely z20-native, and
+        # roofline/driveway detail is the operational reason this layer exists.
         "max_zoom": 20,
     }
 }

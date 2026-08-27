@@ -1,2 +1,7 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Shell scripts run on the Linux kiosk. CRLF endings make them fail with
+# "bad interpreter: /usr/bin/env bash^M", so pin them to LF regardless of
+# the checkout platform or core.autocrlf.
+*.sh text eol=lf
+
+# PowerShell runs on the Windows developer laptop.
+*.ps1 text eol=crlf

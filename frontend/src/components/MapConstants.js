@@ -18,7 +18,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 18,
+    // z19: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
+    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
+    maxNativeZoom: 19,
     maxZoom: 22,
   },
   DARK: {
@@ -27,7 +31,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 18,
+    // z19: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
+    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
+    maxNativeZoom: 19,
     maxZoom: 22,
   },
   SATELLITE: {
@@ -45,7 +53,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 18,
+    // z19: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
+    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
+    maxNativeZoom: 19,
     maxZoom: 22
   },
   VOYAGER: {
@@ -54,7 +66,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    maxNativeZoom: 18,
+    // z19: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
+    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
+    maxNativeZoom: 19,
     maxZoom: 22
   },
   CADASTRAL: {

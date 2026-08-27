@@ -50,7 +50,12 @@ export const getTileUrl = (style = 'SATELLITE', z = 12, x = 0, y = 0) => {
 export const getTileLayerConfig = (style = 'SATELLITE') => {
   const s = (style || 'SATELLITE').toUpperCase();
   let url = `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`;
-  let maxNativeZoom = 18;
+  // Deepest zoom actually crawled per layer -- must match "max_zoom" in
+  // compile_mbtiles.py LAYER_CONFIGS. Street styles stop at 19 (operator
+  // decision 2026-08-26, punch-list #40); satellite goes to 20 because the
+  // City's 7.5cm orthos are z20-native. Leaflet upscales beyond this, so the
+  // map still zooms to maxZoom -- it just stops requesting new tiles.
+  let maxNativeZoom = 19;
   let attribution = '© OpenStreetMap contributors (100% Offline Local Cache)';
   
   if (s === 'SATELLITE') {
@@ -59,7 +64,7 @@ export const getTileLayerConfig = (style = 'SATELLITE') => {
     attribution = 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)';
   } else if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
     url = `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`;
-    maxNativeZoom = 18;
+    maxNativeZoom = 19;
     attribution = '© OpenStreetMap contributors & Carto (100% Offline Local Cache)';
   }
 

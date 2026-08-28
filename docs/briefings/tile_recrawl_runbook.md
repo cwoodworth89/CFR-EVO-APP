@@ -24,11 +24,18 @@ Settled 2026-08-26. **Street styles stop at z19**, satellite goes to z20.
 
 Against 226 GB free, so disk is not a constraint — crawl time is.
 
-> **Measured 2026-08-27.** The three CDN-backed layers ran at ~110 tiles/s (13 min, 13 min and
-> 29 min). **`cadastral` took 8 h 35 min at ~10 tiles/s** — the City's ArcGIS MapServer is
-> roughly 11× slower than the Carto and Esri CDNs and dominates the whole run. Budget about
-> **9.5 hours**, essentially all of it cadastral. Assuming a uniform rate across sources gave
-> a "2.5–3 hour" estimate that was badly wrong.
+> **Measured 2026-08-27, and the first explanation was wrong.** The three CDN-backed layers ran
+> at ~110 tiles/s (13 min, 13 min, 29 min). `cadastral` took **8 h 35 min** — but *not* because
+> the City's server is slow. `crawl_cadastral_tiles.py` had a global `RateLimiter` with a 0.2 s
+> minimum interval: a hard **5 req/s** ceiling, serialized behind one lock, which the worker
+> count does not multiply. The run finished at exactly `5.0 tiles/s`, pinned to that ceiling
+> for its entire duration.
+>
+> **The default is now 0.05 s (~20 req/s)** — operator decision 2026-08-27 — which should put a
+> full cadastral re-crawl near **2 hours** and the whole chain near **3**. It is deliberately
+> *not* unlimited: `compile_mbtiles.py` runs 32 workers with no limiter at commercial CDNs,
+> while this one hits municipal infrastructure belonging to the department's own data partner.
+> Override per-run with `--delay`.
 
 **Why the street styles stop at 19.** Carto's raster basemaps are vector-derived and gain
 little between z19 and z20, while z20 alone is roughly 4× every other zoom combined. Stopping

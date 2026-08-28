@@ -117,6 +117,27 @@ USER_AGENT = "CFR-EVO/1.0 (Coquitlam Fire Rescue Offline Cadastral Tile Crawler)
 # EPSG:3857 Web Mercator constants
 ORIGIN_SHIFT = 20037508.342789244  # Earth circumference / 2 in Web Mercator meters
 
+# Minimum interval between requests to the City's ArcGIS MapServer, enforced
+# globally by RateLimiter below (one lock, so this is a hard ceiling on total
+# throughput -- the worker count does NOT multiply it).
+#
+# 0.05s = ~20 req/s. Operator decision 2026-08-27, chosen deliberately as a
+# middle ground rather than removing the limiter:
+#
+#   * The previous 0.2s (5 req/s) was measured, not guessed, as the cause of an
+#     8h35m cadastral crawl -- 153,094 tiles at exactly 5.0 tiles/s, pinned to
+#     the ceiling for the entire run. At 0.05s the same crawl is roughly 2h.
+#   * It is NOT raised to match compile_mbtiles.py, which runs 32 workers with no
+#     limiter at all (~110 tiles/s). That is aimed at Carto and Esri -- commercial
+#     CDNs built for request volume. This one hits municipal infrastructure that
+#     is likely modest and may be shared with public-facing services, and the City
+#     is both the department's data partner and the licensor of this data under
+#     the Open Government Licence. Being a bad neighbour here costs more than time.
+#
+# Raise or lower with --delay for a one-off run; prefer off-hours for a full
+# re-crawl. See punch-list #40 and docs/briefings/tile_recrawl_runbook.md.
+DEFAULT_DELAY_SEC = 0.05
+
 
 class RateLimiter:
     """Thread-safe pacing limiter to prevent overwhelming municipal servers."""
@@ -310,7 +331,7 @@ def crawl_cadastral(
     max_lat: float = DEFAULT_MAX_LAT,
     min_lon: float = DEFAULT_MIN_LON,
     max_lon: float = DEFAULT_MAX_LON,
-    delay_sec: float = 0.2,
+    delay_sec: float = DEFAULT_DELAY_SEC,
     workers: int = 8,
     layers: str = "show:0,1,16",
     tile_size: str = "256,256",
@@ -486,8 +507,10 @@ def main():
     parser.add_argument(
         "--delay",
         type=float,
-        default=0.2,
-        help="Minimum delay between requests in seconds (default: 0.2s = 200ms)"
+        default=DEFAULT_DELAY_SEC,
+        help=f"Minimum delay between requests in seconds "
+             f"(default: {DEFAULT_DELAY_SEC}s = {DEFAULT_DELAY_SEC * 1000:.0f}ms "
+             f"= ~{1.0 / DEFAULT_DELAY_SEC:.0f} req/s)"
     )
     parser.add_argument(
         "--workers",

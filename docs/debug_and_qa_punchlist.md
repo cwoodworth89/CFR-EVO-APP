@@ -3222,3 +3222,34 @@ runbook only mentioned `shapely`.
 and dominated the run — 8.5 of the 9.5 hours. Budget for that before scheduling any future
 cadastral re-crawl; the estimate of "~2.5–3 hours total" was wrong because it assumed a
 uniform rate across all four sources.
+
+#### Correction: the slow cadastral crawl was self-inflicted
+
+The claim above that "the City's ArcGIS MapServer is ~11× slower" is **wrong and withdrawn.**
+The operator questioned it, and the config says otherwise:
+
+```
+Workers / Delay: 8 concurrent workers | 200ms delay (~5.0 req/s)
+Crawl phase completed in 08:35:12 (153,094 ok, 8 failed, 5.0 tiles/s).
+```
+
+`crawl_cadastral_tiles.py` carried a global `RateLimiter` with `min_interval = 0.2s`. It
+serializes every request behind a single lock, so it is a hard **5 req/s** ceiling that the
+worker count does **not** multiply. The crawl finished at exactly 5.0 tiles/s — pinned to the
+limiter for the whole 8½ hours. `compile_mbtiles.py` has no limiter at all (32 workers,
+~110 tiles/s), which is the entire 22× difference.
+
+**How the wrong conclusion was reached**: the "~10 tiles/s" figure was derived by dividing the
+*total archive* (606,938 tiles) by elapsed time instead of the *newly downloaded* 153,094. The
+real rate was 4.95/s, which would have pointed straight at the 0.2 s constant. A cause was
+inferred from a mis-computed number rather than read from the config — the exact failure mode
+CLAUDE.md §7 exists to prevent, and worth recording as such.
+
+**Resolution**: `DEFAULT_DELAY_SEC = 0.05` (~20 req/s), operator decision 2026-08-27, with
+provenance inline. Deliberately not unlimited — the City's MapServer is municipal
+infrastructure belonging to the department's data partner and the licensor of this data, not a
+commercial CDN. Expect a full cadastral re-crawl near 2 h rather than 8.5 h.
+
+**Still open**: **8 tiles failed** in that run and have not been investigated. The crawler is
+resumable and would retry them, so a short re-run would show whether they are transient or a
+genuine gap.

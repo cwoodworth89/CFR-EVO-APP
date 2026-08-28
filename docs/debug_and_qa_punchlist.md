@@ -3143,3 +3143,82 @@ No string-match special case, and no alias row, until the source of the discrepa
 in application code). If GIS confirms `Chartwell Rd` is a legitimate legacy name, it belongs in
 the street vocabulary as a recognition alias, the same mechanism as the call-type aliases
 in #43.
+
+---
+
+### 40 (resolved). Re-crawl complete — the gap is closed and verified
+> **Status**: ✅ **Closed 2026-08-27.** Verified against the running tile server, not inferred.
+
+The re-crawl ran unattended on the kiosk via a sequential chain (`/tmp/run_all_crawls.sh`).
+All four layers completed `rc=0`.
+
+**The tile that started this** — Cottonwood Ave z17, `17/20795/44869`, the exact one blank in
+the operator's screenshot. It served a **116-byte empty PNG** before:
+
+| Layer | Before | After |
+|:--|--:|--:|
+| `street` | **116 b** | **8,884 b** |
+| `street_nolabels` | **116 b** | **7,613 b** |
+| `satellite` | **116 b** | **20,745 b** |
+| `cadastral` | 25,761 b | 25,761 b (was never affected) |
+
+Deep zoom on the west side also confirmed: `street` z19 → 3,130 b, `satellite` z20 → 12,284 b.
+Austin Heights, Maillardville and Burquitlam now have basemap coverage at every zoom.
+
+**Final archives:**
+
+| Layer | Tiles | Size | Zooms |
+|:--|--:|--:|:--|
+| `street` | 130,387 | 469.5 MB | 12→19 |
+| `street_nolabels` | 130,387 | 428.6 MB | 12→19 |
+| `satellite` | 511,118 | 7,695.2 MB | 12→20 |
+| `cadastral` | 606,938 | 990.6 MB | 14→20 |
+
+All four report `Integrity: ok` and `Journal Mode: delete`. Disk went 218 GB → 223 GB used,
+222 GB free.
+
+**The metadata now tells the truth** — the specific lie that hid this defect:
+
+```
+street           12 -> 19  bounds [-123.04,   49.15,    -122.6,     49.48]     <- regional, correct
+street_nolabels  12 -> 19  bounds [-122.90723, 49.21087, -122.60729, 49.36017] <- city
+satellite        12 -> 20  bounds [-122.90723, 49.21087, -122.60729, 49.36017] <- city
+cadastral        14 -> 20  bounds [-122.90723, 49.21087, -122.60732, 49.36017] <- city
+```
+
+Only `street` declares the regional box, because it is the only layer that actually holds
+regional tiles. Previously all four declared `-123.04` regardless of content.
+
+#### Two things worth recording for next time
+
+**1. `finalize_mbtiles.py` cannot convert a WAL archive while `cfr_tiles` is running.**
+The chain's finalize step failed with `sqlite3.OperationalError: database is locked` on
+`street.mbtiles`, which still had `-wal`/`-shm` files. `PRAGMA journal_mode = DELETE` needs an
+exclusive lock, and mbtileserver holds the file open. `cadastral` and `satellite` appeared to
+succeed only because they were *already* in `delete` mode, so their pragma was a no-op — the
+script was one archive away from reporting success on work it had not done.
+
+Fix applied by hand: `docker stop cfr_tiles` → finalize → `docker start cfr_tiles`. **The
+runbook's step 4 is wrong as written** and needs the stop/start added.
+
+**The chain's failure guard did its job**: it refused to restart `cfr_tiles` after the failed
+finalize and exited non-zero, rather than pressing on and leaving un-checkpointed archives to
+fail differently under a read-only mount.
+
+**2. `Pillow` was missing from the kiosk venv.** `compile_mbtiles.py` imports `PIL` at module
+level, so the first launch died instantly with `ModuleNotFoundError`. Installed 12.3.0. The
+runbook only mentioned `shapely`.
+
+#### Timings, measured
+
+| Layer | Duration | Rate |
+|:--|:--|:--|
+| `street` | 13 min (87,502 tiles) | 112.6 tiles/s |
+| `street_nolabels` | 13 min | ~112 tiles/s |
+| `satellite` | 29 min | ~110 tiles/s |
+| **`cadastral`** | **8 h 35 min** | **~10 tiles/s** |
+
+**The City's ArcGIS MapServer is ~11× slower than the Carto and ArcGIS World Imagery CDNs**
+and dominated the run — 8.5 of the 9.5 hours. Budget for that before scheduling any future
+cadastral re-crawl; the estimate of "~2.5–3 hours total" was wrong because it assumed a
+uniform rate across all four sources.

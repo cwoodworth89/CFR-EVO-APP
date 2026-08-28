@@ -24,6 +24,12 @@ Settled 2026-08-26. **Street styles stop at z19**, satellite goes to z20.
 
 Against 226 GB free, so disk is not a constraint — crawl time is.
 
+> **Measured 2026-08-27.** The three CDN-backed layers ran at ~110 tiles/s (13 min, 13 min and
+> 29 min). **`cadastral` took 8 h 35 min at ~10 tiles/s** — the City's ArcGIS MapServer is
+> roughly 11× slower than the Carto and Esri CDNs and dominates the whole run. Budget about
+> **9.5 hours**, essentially all of it cadastral. Assuming a uniform rate across sources gave
+> a "2.5–3 hour" estimate that was badly wrong.
+
 **Why the street styles stop at 19.** Carto's raster basemaps are vector-derived and gain
 little between z19 and z20, while z20 alone is roughly 4× every other zoom combined. Stopping
 at 19 saves **644,584 tiles (~2.0 GB)** across the two styles. Leaflet still zooms past
@@ -41,8 +47,11 @@ roofline/driveway detail is the operational reason that layer exists.
 Fast, safe to run in the foreground.
 
 ```bash
-ssh tcfire@100.95.146.94 'cd /home/tcfire/CFR-EVO-APP && git pull && .venv/bin/pip install shapely 2>&1 | tail -2'
+ssh tcfire@100.95.146.94 'cd /home/tcfire/CFR-EVO-APP && git pull && .venv/bin/pip install shapely Pillow 2>&1 | tail -2'
 ```
+
+> **Both** are required. `compile_mbtiles.py` imports `PIL` at module level, so a missing
+> Pillow kills the run instantly with `ModuleNotFoundError` — found the hard way 2026-08-27.
 
 ```bash
 ssh tcfire@100.95.146.94 'cd /home/tcfire/CFR-EVO-APP && export DATABASE_URL=$(docker exec cfr_api printenv DATABASE_URL | sed "s/@postgres:/@localhost:/") && .venv/bin/python backend/scripts/export_tile_coverage.py'
@@ -110,14 +119,26 @@ ssh tcfire@100.95.146.94 'pkill -f compile_mbtiles && echo stopped'
 
 ---
 
-## 4. Finalize — REQUIRED before the tile server can read the archives
+## 4. Finalize — REQUIRED, and `cfr_tiles` MUST be stopped first
 
 `cfr_tiles` mounts `backend/data/tiles/` **read-only**, so any archive still in SQLite WAL mode
-fails with `SQLITE_CANTOPEN`. Checkpoint to `journal_mode = DELETE` (CLAUDE.md §1):
+fails with `SQLITE_CANTOPEN`. Checkpoint to `journal_mode = DELETE` (CLAUDE.md §1).
+
+> **Corrected 2026-08-27 after this step failed in the real run.** `PRAGMA journal_mode =
+> DELETE` needs an **exclusive** lock, and mbtileserver holds every archive open — so
+> finalizing while `cfr_tiles` runs dies with
+> `sqlite3.OperationalError: database is locked`.
+>
+> Worse, it can *look* like it worked: archives already in `delete` mode finalize fine because
+> the pragma is a no-op, so the script reported two successes before hitting the one archive
+> that actually needed converting. **Stop the container first.**
 
 ```bash
-ssh tcfire@100.95.146.94 'cd /home/tcfire/CFR-EVO-APP && .venv/bin/python backend/scripts/finalize_mbtiles.py && docker restart cfr_tiles && sleep 4 && docker ps --filter name=cfr_tiles --format "{{.Status}}"'
+ssh tcfire@100.95.146.94 'cd /home/tcfire/CFR-EVO-APP && docker stop cfr_tiles && sleep 2 && .venv/bin/python backend/scripts/finalize_mbtiles.py 2>&1 | tail -25 && docker start cfr_tiles && sleep 5 && docker ps --filter name=cfr_tiles --format "{{.Status}}"'
 ```
+
+Every archive should report `Integrity: ok` and `Journal Mode: delete`. Allow a couple of
+minutes — checkpointing the 7.6 GB satellite archive is not instant.
 
 ---
 

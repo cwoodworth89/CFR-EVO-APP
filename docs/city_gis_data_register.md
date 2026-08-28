@@ -239,6 +239,29 @@ bookkeeping for non-addressable land?
 
 ---
 
+## 11. One civic address spanning several legal parcels
+
+**Status: OPEN — low urgency, clarification.** Measured 2026-08-28. See punch-list #48 for
+the code-side half, which is ours.
+
+1,509 addresses in `Addresses.dbf` appear on more than one feature. They never differ in
+`HOUSE`, `STREET`, `STREETTYPE`, `UNIT` or `UNITTYPE` — only in `LEGALDESC`, `FOLIO` and
+`GIS_ID`. So one civic address covers several legal lots, which reads as legitimate.
+
+What makes it operationally awkward is the spread. Of the 1,452 duplicated addresses that
+carry a house number, **631 have features more than 25 m apart and 143 more than 100 m**.
+`2865 Glen Dr` is 8 features across 216 m.
+
+**Ask:** Is one civic address across multiple legal parcels expected? Is there an attribute
+identifying the **primary** parcel — the one a visitor or a crew would actually arrive at?
+That would let us pick the right one instead of choosing by a rule of our own.
+
+**Workaround:** we currently keep whichever the shapefile lists first, which is arbitrary.
+Punch-list #48 covers making that deterministic; the choice of rule is on hold pending this
+answer, because a municipal "primary parcel" flag would beat any rule we invent.
+
+---
+
 ## Closed items
 
 ### `Deer's Leap Pl` — OURS, not a City gap

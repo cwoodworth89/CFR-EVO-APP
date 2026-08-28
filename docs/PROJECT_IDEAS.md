@@ -333,12 +333,15 @@ is currently nothing between that keystroke and total loss of the HITL corpus.
    `pg_dump -t public.gate_keys` into the repo gives git history, authorship, and diffs
    for hand-curated rows. Direction is strictly DB → file: the dump is a backup
    artifact, never an input, so no second source of truth is created.
-4. ⏳ **Audio corpus archival** — the largest asset by volume and the one with no
-   regeneration path at all. **Acknowledged and deliberately deferred (Curtis,
-   2026-08-27)** — the pull needs to happen, but not now. Note that the database
-   backup in step 1 protects only *half* of the ground-truth corpus: the `verified_*`
-   columns are useless without the `*.wav` files they were transcribed from. Until this
-   lands, the pairing is one disk failure away from being lost.
+4. ✅ **Audio corpus archival** — done 2026-08-28 via
+   [`pull_audio.ps1`](../backend/scripts/pull_audio.ps1). 522 files / 760 MB pulled and
+   verified file-for-file against the kiosk (508 in `backend/audio_files`, 14 in
+   `frontend/public/recordings`). **Both halves of the ground-truth corpus are now
+   protected** — the `verified_*` columns by step 1, and the `*.wav` files they were
+   transcribed from by this.
+   *This is a point-in-time copy.* New dispatches accumulate continuously, so re-run the
+   pull periodically; it is incremental, so repeat runs only fetch what is new. Run it
+   on the hall LAN or real broadband — a tethered phone hotspot measured ~60x slower.
 5. ✅ **Documented restore drill** — run and passed 2026-08-27; see the runbook header.
    Previously: an untested backup is a hypothesis. The restore path
    must be written down and actually exercised once.

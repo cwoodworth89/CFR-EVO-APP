@@ -35,10 +35,14 @@
 param(
     [string]$KioskHost = 'tcfire@100.95.146.94',
     [string]$DestRoot  = (Join-Path $env:USERPROFILE 'Nextcloud\Documents\Projects\Coding\CFR-EVO-Backups\audio'),
-    [string[]]$RemoteDirs = @(
-        '/home/tcfire/CFR-EVO-APP/backend/audio_files',
-        '/home/tcfire/CFR-EVO-APP/frontend/public/recordings'
-    ),
+    # Label => remote path. Labels are explicit rather than derived from the
+    # path leaf because BOTH source trees end in "recordings"
+    # (backend/audio_files/recordings and frontend/public/recordings); keying on
+    # the leaf silently merged them into one local folder.
+    [hashtable]$RemoteDirs = [ordered]@{
+        'backend_audio_files'  = '/home/tcfire/CFR-EVO-APP/backend/audio_files'
+        'frontend_recordings'  = '/home/tcfire/CFR-EVO-APP/frontend/public/recordings'
+    },
     # When set, refuses to run unless the active Wi-Fi SSID matches. Guards
     # against starting a ~768 MB pull on a metered phone hotspot.
     [string]$RequireSsid,
@@ -76,16 +80,29 @@ Log "destination: $DestRoot"
 $totalNew = 0; $totalSkip = 0; $totalBytes = 0L
 $startedAt = Get-Date
 
-foreach ($remote in $RemoteDirs) {
-    $leaf    = Split-Path $remote -Leaf
+foreach ($leaf in $RemoteDirs.Keys) {
+    $remote  = $RemoteDirs[$leaf]
     $destDir = Join-Path $DestRoot $leaf
     if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
 
-    # One listing call: "<size> <name>" per file. Cheaper and far less fragile
-    # than an ssh round trip per file across several hundred files.
-    $listing = ssh -o ConnectTimeout=15 $KioskHost "find '$remote' -maxdepth 1 -type f -printf '%s %f\n' 2>/dev/null"
+    # One listing call: "<size> <relative path>" per file. Cheaper and far less
+    # fragile than an ssh round trip per file across several hundred files.
+    #
+    # RECURSIVE, and %P (path relative to the search root) rather than %f
+    # (basename). An earlier version used -maxdepth 1 with %f: every one of the
+    # 508 files lives one level down in audio_files/recordings/, so it matched
+    # nothing, logged "no files", and exited 0 -- reporting success while
+    # skipping 718 MB. A silent gap presented as a clean run is the same defect
+    # class as a fabricated value (CLAUDE.md 6.1), so an empty listing for a
+    # directory that exists is now treated as suspicious, not as "done".
+    $listing = ssh -o ConnectTimeout=15 $KioskHost "find '$remote' -type f -printf '%s %P\n' 2>/dev/null"
     if ($LASTEXITCODE -ne 0) { Die "could not list $remote" }
-    if (-not $listing) { Log "$leaf : no files"; continue }
+    if (-not $listing) {
+        $exists = ssh -o ConnectTimeout=15 $KioskHost "test -d '$remote' && echo yes || echo no"
+        if ($exists.Trim() -eq 'yes') { Die "$leaf : directory exists but listed zero files -- refusing to report success" }
+        Log "$leaf : directory absent on kiosk, skipping"
+        continue
+    }
 
     $entries = @($listing -split "`n" | Where-Object { $_.Trim() })
     Log "$leaf : $($entries.Count) file(s) on kiosk"
@@ -96,7 +113,11 @@ foreach ($remote in $RemoteDirs) {
         $parts = $line.Trim() -split ' ', 2
         if ($parts.Count -ne 2) { continue }
         $size = [int64]$parts[0]; $name = $parts[1]
-        $dest = Join-Path $destDir $name
+        # $name may carry a subdirectory (e.g. "recordings/DISP-2026-C39B88.wav"),
+        # so mirror the remote tree locally rather than flattening it.
+        $dest = Join-Path $destDir ($name -replace '/', '\')
+        $destParent = Split-Path $dest -Parent
+        if (-not (Test-Path $destParent)) { New-Item -ItemType Directory -Path $destParent -Force | Out-Null }
 
         if ((Test-Path $dest) -and ((Get-Item $dest).Length -eq $size)) { $totalSkip++; continue }
 

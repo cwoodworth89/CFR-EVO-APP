@@ -104,6 +104,74 @@ class TestQueryStreet:
         assert ar.query_street("Silver Springs Blvd", "BLVD") == "SILVER SPRINGS BLVD"
 
 
+class TestApostropheHandling:
+    """public.parcels and public.roads disagree on apostrophes.
+
+    Verified 2026-08-28 against the kiosk database: "Deer's Leap" is the ONLY street
+    name containing an apostrophe anywhere in parcels, roads, road_names or
+    intersections -- and it appears in parcels only. The road layer spells it
+    "Deers Leap Place".
+
+    15 addressed parcels therefore looked like they sat on a street with no centreline,
+    a shape indistinguishable from a genuinely missing municipal road. Because it is the
+    only such name, stripping the apostrophe cannot collide two real streets.
+    """
+
+    @pytest.fixture
+    def real_normalizer(self, monkeypatch):
+        """The REAL normalize_street_name, not the module-level stub.
+
+        The autouse _suffix_vocabulary fixture replaces ar.normalize_street_name with a
+        simplified stub for the matching tests. That stub does not strip apostrophes, so
+        asserting against it here would test the stub and pass regardless of the fix.
+        This patches only the database accessor and exercises the real function.
+        """
+        from gis_service import normalization as norm
+        monkeypatch.setattr(norm, "get_suffix_mappings", lambda: {
+            "AVENUE": "AVE", "AVE": "AVE", "PLACE": "PL", "PL": "PL",
+            "STREET": "ST", "ST": "ST",
+        })
+        norm.reset_suffix_cache()
+        return norm.normalize_street_name
+
+    def test_both_spellings_normalize_alike(self, real_normalizer):
+        assert real_normalizer("Deer's Leap Pl") == real_normalizer("Deers Leap Place")
+        assert real_normalizer("Deer's Leap Pl") == "DEERS LEAP PL"
+
+    def test_typographic_apostrophe_too(self, real_normalizer):
+        # A transcript or an operator correction may carry either character.
+        assert real_normalizer("Deer’s Leap Pl") == real_normalizer("Deers Leap Pl")
+
+    def test_an_ordinary_street_is_untouched(self, real_normalizer):
+        assert real_normalizer("Gordon Avenue") == "GORDON AVE"
+
+
+class TestTitleAddress:
+    """Display casing must not break on the apostrophe it just learned to match.
+
+    str.title() capitalizes after every non-letter, so the first correctly-resolving
+    Deer's Leap address rendered on the kiosk as "1690 Deer'S Leap Pl".
+    """
+
+    def test_apostrophe_does_not_capitalize(self):
+        from gis_service.normalization import title_address
+        assert title_address("1690 DEER'S LEAP PL") == "1690 Deer's Leap Pl"
+
+    def test_typographic_apostrophe_too(self):
+        from gis_service.normalization import title_address
+        assert title_address("DEER’S LEAP") == "Deer’s Leap"
+
+    def test_hyphens_still_title_case(self):
+        # Deliberately NOT repaired: "Mary Hill By-Pass" wants both parts capitalized,
+        # so hyphens are left to str.title().
+        from gis_service.normalization import title_address
+        assert title_address("MARY HILL BY-PASS ROAD") == "Mary Hill By-Pass Road"
+
+    def test_ordinary_address_unchanged(self):
+        from gis_service.normalization import title_address
+        assert title_address("3030 GORDON AVE") == "3030 Gordon Ave"
+
+
 class _FakeResult:
     def __init__(self, rows):
         self._rows = rows

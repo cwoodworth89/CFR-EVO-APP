@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional, Tuple, List, Any
 from sqlalchemy import text
-from .normalization import normalize_street_name, get_suffix_mappings
+from .normalization import normalize_street_name, get_suffix_mappings, title_address
 
 try:
     from thefuzz import fuzz
@@ -320,7 +320,7 @@ class AddressResolver:
                     dest_lng = best_row['front_lng'] or best_row['entrance_lng'] or best_row['lng']
                     rings = self._extract_rings(best_row['geom_geojson'])
                     st_type = best_row['streettype'] or ''
-                    clean_addr = f"{best_row['house']} {best_row['street']} {st_type}".strip().title()
+                    clean_addr = title_address(f"{best_row['house']} {best_row['street']} {st_type}".strip())
                     return {
                         "address": clean_addr,
                         "lat": float(dest_lat),
@@ -418,7 +418,7 @@ class AddressResolver:
                         # the road segment's address range, so it is a position on the
                         # street rather than a property -- say so, or it displays
                         # identically to an exact parcel match (CLAUDE.md §6.1).
-                        requested = f"{house} {fullname}".strip().title()
+                        requested = title_address(f"{house} {fullname}".strip())
                         return {
                             "address": requested,
                             "lat": float(point['lat']),
@@ -473,7 +473,7 @@ class AddressResolver:
                     mid_lat = (points[0][0] + points[1][0]) / 2
                     mid_lng = (points[0][1] + points[1][1]) / 2
                     return {
-                        "address": f"{street} {street_type} (between {cross_street_1} & {cross_street_2})".strip().title(),
+                        "address": title_address(f"{street} {street_type} (between {cross_street_1} & {cross_street_2})".strip()),
                         "lat": mid_lat,
                         "lng": mid_lng,
                         "rings": [],
@@ -488,7 +488,7 @@ class AddressResolver:
                     }
                 elif len(points) == 1:
                     return {
-                        "address": f"{street} {street_type} (near {cross_street_1})".strip().title(),
+                        "address": title_address(f"{street} {street_type} (near {cross_street_1})".strip()),
                         "lat": points[0][0],
                         "lng": points[0][1],
                         "rings": [],
@@ -633,7 +633,7 @@ class AddressResolver:
                     )
                     return None
 
-                requested = f"{house} {street} {street_type}".strip().title()
+                requested = title_address(f"{house} {street} {street_type}".strip())
                 delta = int(row['house_delta'])
 
                 # Confidence degrades with how far the substituted number is from the
@@ -677,7 +677,7 @@ class AddressResolver:
                 """), {"street": street, "stype": street_type or ''}).mappings().fetchone()
                 if result and result['cnt'] > 0 and result['avg_lat'] is not None:
                     return {
-                        "address": f"{street} {street_type}".strip().title(),
+                        "address": title_address(f"{street} {street_type}".strip()),
                         "lat": float(result['avg_lat']),
                         "lng": float(result['avg_lng']),
                         "rings": [],
@@ -702,7 +702,7 @@ class AddressResolver:
                 """), {"fullname": fullname, "street": street}).mappings().fetchone()
                 if result and result['lat'] is not None:
                     return {
-                        "address": f"{street} {street_type}".strip().title(),
+                        "address": title_address(f"{street} {street_type}".strip()),
                         "lat": float(result['lat']),
                         "lng": float(result['lng']),
                         "rings": [],
@@ -741,7 +741,7 @@ class AddressResolver:
                     if score > best_score:
                         best_score = score
                         st = row['streettype'] or ''
-                        best_addr = f"{house} {row['street']} {st}".strip().title()
+                        best_addr = title_address(f"{house} {row['street']} {st}".strip())
                         tied_streets = {db_norm}
                     elif score == best_score and best_addr is not None:
                         tied_streets.add(db_norm)

@@ -68,8 +68,20 @@ renumbering — at least as strongly as an export gap.
 **Workaround:** the address does not resolve and surfaces as the amber Tier 1 card. Honest,
 but the crew gets no location.
 
-**Not yet done our side:** confirm whether they are present in the source `Addresses.shp`.
-Until that check is run this could still be an import defect rather than a City gap.
+**Our side is ruled out — confirmed 2026-08-28.** Read directly from the source
+`Addresses.dbf` (69,708 records) with `backend/scripts/read_dbf.py`, no database involved.
+House numbers present on Cottonwood between 615 and 645:
+
+```
+615, 616, 620, 622, 625, 628, [627 / 629 / 631 ABSENT], 633, 635, 637, 639
+```
+
+The gap in our database is exactly the gap in the City's file, so this is not an import
+defect. Also checked: `Addresses.dbf` has its own `STATUS` column, and its entire domain is
+`Active` (69,704) plus 4 blanks — nothing is being filtered out by status the way the roads
+import was doing.
+
+**This one is ready to send to the City as-is.**
 
 ---
 
@@ -244,4 +256,18 @@ and it must not be raised with them.
 Recorded here because it is the strongest argument for the "rule out our own bugs first" rule
 at the top of this document — the shape was identical to a genuine missing street.
 
-**Follow-up on our side:** apostrophe handling in street normalization. Not yet done.
+**Follow-up on our side: DONE 2026-08-28.** `normalize_street_name()` now strips both the
+ASCII and typographic apostrophe. Verified first that `Deer's Leap` is the **only**
+apostrophe-bearing street name anywhere in `parcels`, `roads`, `road_names` or
+`intersections` — and that it appears in `parcels` alone — so stripping cannot collide two
+real streets.
+
+`1690 Deer's Leap Pl` and `1690 Deers Leap Pl` now both resolve to the parcel at confidence
+100. Corpus replay over 305 records: **zero changes**, as expected — no historical dispatch
+has gone to this street, so the fix is preventative rather than corrective.
+
+That first correct resolution exposed a second, smaller defect: `str.title()` capitalizes
+after every non-letter, so the address rendered as `1690 Deer'S Leap Pl`. Address display now
+goes through `title_address()`, which leaves a letter following an intra-word apostrophe
+lower case. Hyphens are deliberately left alone — `Mary Hill By-Pass` wants both parts
+capitalized.

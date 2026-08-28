@@ -82,10 +82,22 @@ class ParsedAddress:
     has_block_indicator: bool = False  # True if original had 'block'/'blk'
 
 def normalize_street_name(name: str) -> str:
-    """Normalizes street name suffix to municipal abbreviation."""
+    """Normalizes street name suffix to municipal abbreviation.
+
+    Apostrophes are stripped because the municipal layers disagree with each other:
+    public.parcels stores "Deer's Leap" while public.roads and public.road_names store
+    "Deers Leap Place". Matching is exact on the street name, so 15 addressed parcels
+    appeared to sit on a street with no centreline -- indistinguishable, on inspection,
+    from a genuinely missing road (see docs/city_gis_data_register.md, closed item).
+
+    Verified 2026-08-26: this is the ONLY apostrophe in any street name across parcels,
+    roads, road_names and intersections, so stripping cannot collide two real streets.
+    Both the ASCII apostrophe and the typographic one are removed, since a transcript or
+    an operator correction may carry either.
+    """
     if not name:
         return ""
-    clean = re.sub(r'[,.]', '', name.strip()).upper()
+    clean = re.sub(r"[,.'’]", '', name.strip()).upper()
     clean = re.sub(r'\b(?:BLOCK|BLK|OF)\b', '', clean).strip()
     words = clean.split()
     if not words:
@@ -94,6 +106,25 @@ def normalize_street_name(name: str) -> str:
     if len(words) > 1 and words[-1] in mappings:
         words[-1] = mappings[words[-1]]
     return " ".join(words)
+
+def title_address(text: str) -> str:
+    """Title-case an address for display, without breaking apostrophes.
+
+    str.title() capitalizes after every non-letter, so "Deer's Leap" becomes
+    "Deer'S Leap" -- which is what the kiosk showed once apostrophe-bearing streets
+    started resolving. The letter after an apostrophe that sits between two letters is
+    part of the same word, so it stays lower case.
+
+    Deliberately narrow: only the apostrophe case is repaired. Municipal street names
+    also contain hyphens ("Mary Hill By-Pass"), where title-casing each part IS
+    correct, so hyphens are left to str.title().
+    """
+    if not text:
+        return ""
+    return re.sub(r"(?<=[A-Za-z])(['’])([A-Za-z])",
+                  lambda m: m.group(1) + m.group(2).lower(),
+                  str(text).title())
+
 
 def normalize_intersection_key(street1: str, street2: str) -> str:
     """Forms a canonical, alphabetically sorted intersection key."""

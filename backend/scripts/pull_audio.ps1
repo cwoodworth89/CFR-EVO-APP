@@ -16,15 +16,19 @@
     byte size are skipped, so re-running continues where it stopped rather than
     starting over. Interrupted files land as .part and are re-pulled next run.
 
-    THROUGHPUT DEPENDS ENTIRELY ON THE TAILSCALE PATH. Measured 2026-08-27:
-    a relayed connection (relay "sea") moved 10.6 MB in ~4 minutes -- roughly
-    45 KB/s, which would put this transfer near five hours. A direct connection
-    on the same LAN as the kiosk is orders of magnitude faster. Check first:
+    THROUGHPUT DEPENDS ON THE LAPTOP'S UPLINK, not on Tailscale as such.
+    Measured 2026-08-27: 10.6 MB in ~4 minutes, roughly 45 KB/s, with the
+    laptop tethered to a phone hotspot on poor cell reception -- that would put
+    this transfer near five hours. Measured 2026-08-28 on the same LAN as the
+    kiosk: ~2,700 KB/s, about sixty times faster.
+
+    The relay/direct state reported below is a useful SYMPTOM of this (a
+    hotspot behind carrier NAT tends to relay, a shared LAN goes direct) but it
+    is not the cause. Do not read "direct" as a promise of speed on a weak
+    link. The honest rule is simpler: run this on the hall network, or on any
+    real broadband connection, and avoid it on cell tethering.
 
         tailscale status | Select-String cfr-mapping
-
-    "direct <ip>:<port>" is the fast path. "relay <name>" is not; prefer to wait
-    for a direct path rather than start a multi-hour relayed pull.
 
 .EXAMPLE
     backend\scripts\pull_audio.ps1

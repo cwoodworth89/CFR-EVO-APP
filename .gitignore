@@ -243,3 +243,12 @@ archive/
 *.laz
 backend/data/staging/
 frontend/public/data/*.zip
+
+# Database dumps. Backups live OUTSIDE this repo by design
+# (CFR-EVO-Backups is a sibling directory, and /home/tcfire/cfr-backups on the
+# kiosk), so this is a second line of defence, not the primary one. A dump
+# contains dispatch records -- addresses, call details, HITL corrections -- and
+# must never reach a remote. See docs/PROJECT_IDEAS.md #9.
+*.sql.gz
+cfr-full-*.sql
+cfr-critical-*.sql

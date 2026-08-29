@@ -3560,3 +3560,53 @@ Roughly 30 seconds per site. The top 100 is an afternoon.
 * **Do not offer a "clear all" or bulk-apply.** These are per-site human judgements.
 * The kiosk should show `entrance_note` when an override is in play, so crews know why the pin
   is where it is rather than wondering if it is wrong.
+
+---
+
+### 14 (analysed). PA leakage — the discriminator is 647 Hz, and 595 Hz is what breaks the filter
+> **Status**: ⚠️ **Open — root cause found and a rule validated against 122 real tone events.
+> Not implemented: the change affects whether a real dispatch can be dropped (§7.2).**
+> Full analysis: [`docs/briefings/pa_tone_discriminator.md`](./briefings/pa_tone_discriminator.md).
+
+**647 Hz appears in 15 of 15 system-labelled PA events**, and in all three operator-`[PA]`-tagged
+dispatches that occurred while `tone_spectral_history.jsonl` was running. It is the only
+consistent PA marker — the tone's other component wanders (588, 576, 610, 526, 556…).
+
+**Why the existing PA rejection fails.** `audio_listener.py:139` reads
+`if pa_matches and not apparatus_matches`, so any apparatus match wins the tie — and with
+`MATCH_THRESHOLD_PERCENT = 0.50`, a single frequency within ±8 Hz is enough to "match" a
+two-tone fingerprint. A PA page's harmonics routinely graze one:
+
+```
+TRIGGER-1787409188  [561, 591, 647, 728, 842, 905, 1338]
+   647 -> PA 647      | 591 -> PA 595   => PA 100%
+   728 -> Rescue 727  => Rescue 50%     => apparatus wins, PA page dispatched
+```
+
+**And 595 Hz is not a PA signature at all** — it is present in **59 of 107** non-PA events, more
+than half of real dispatches. Engine Tone's 600 Hz also sits 5 Hz from it, inside the ±8 Hz
+tolerance, so those fingerprints are not separable on that component.
+
+**Rules scored against all 122 events:**
+
+| Rule | PA caught | **Real dispatches wrongly dropped** |
+|:--|--:|--:|
+| Current (`pa and not apparatus`) | 15 / 24 | 0 |
+| **`647 Hz present`** | **24 / 24** | **0** |
+| `647 Hz and apparatus < 100%` | 23 / 24 | 0 |
+| `PA >= 50%` (PA wins outright) | 24 / 24 | **54** |
+| `PA = 100%` | 6 / 24 | 0 |
+
+Against strict ground truth only (15 system-labelled + 3 operator-tagged, excluding inference),
+`647 Hz present` is **18/18 with zero false positives**.
+
+The intuitive fix — letting PA win outright — is the **worst** option, dropping 54 real
+dispatches, exactly because 595 Hz is common in genuine tones.
+
+**Blocked on the operator** (all three in the briefing): confirm six untagged candidates are
+PA (`87EA26`, `A9D408`, `8E6CAD`, `2410A2`, `D467FE`, `002248`); confirm the mid-call PA tone
+case recorded on `DISP-2026-282647` cannot be affected; and choose whether to ship directly or
+run log-only first.
+
+**Also noted**: `647.00` already sits in `GOLDEN_FINGERPRINTS` with no provenance. Whatever
+ships should cite this analysis (§6.3 tier 3) or a published PA tone spec if one exists.

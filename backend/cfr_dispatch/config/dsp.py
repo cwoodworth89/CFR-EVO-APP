@@ -91,3 +91,52 @@ GOLDEN_FINGERPRINTS = {
     "Dispatch Announcement": [1000],
 }
 
+
+
+# ---------------------------------------------------------------------------
+# NON-DISPATCH REJECTION (punch-list #14) — LOG-ONLY UNTIL EXPLICITLY ENABLED
+#
+# Two rules that identify audio which triggered the listener but is NOT a
+# dispatch. Both are validated (see docs/briefings/pa_tone_discriminator.md), and
+# both are DISABLED by default: with ENFORCE False they only log what they WOULD
+# have rejected, changing no behaviour.
+#
+# The asymmetry is why. Admitting a PA page is an annoyance; suppressing a real
+# dispatch means a crew is not alerted. Log-only converts a 122-event sample into
+# live operational evidence before anything is actually suppressed, and it leaves
+# two open operator questions harmless in the meantime: whether six untagged 647 Hz
+# candidates are genuinely PA, and whether a PA tone occurring mid-dispatch could
+# ever reach this decision.
+#
+# To enforce, set REJECT_NON_DISPATCH_ENFORCE = True and restart cfr-agent.
+# Review backend/dispatch.log for "WOULD REJECT" lines first.
+REJECT_NON_DISPATCH_ENFORCE = False
+
+# --- PA pages -------------------------------------------------------------
+# 647 Hz is the only stable PA marker: present in 15/15 labelled PA events and
+# 18/18 under strict ground truth, with 0 of 98 real dispatches touched. Measured
+# 2026-08-29 over backend/data/tone_spectral_history.jsonl (§6.3 tier 3).
+#
+# Do NOT use the PA Tone fingerprint's other component, 595 Hz, for this: it
+# appears in 59 of 107 non-PA events. Letting PA win on a 595 match drops 54 real
+# dispatches. 647 alone is the discriminator.
+PA_DISCRIMINATOR_HZ = 647
+
+# --- Mains hum ------------------------------------------------------------
+# 60 Hz odd harmonics land on Chief's 660 and Rescue's 892+8, so interference can
+# register as a dispatch. Confirmed once: DISP-2026-483052, a 6.6 s "dispatch"
+# transcribed as "recording", whose peaks were 300/420/540/660/780/900/1260/1380/
+# 1500 — every one an odd multiple of 60.
+#
+# Safe BY CONSTRUCTION, not merely by sample: every apparatus fingerprint contains
+# at least one frequency that is NOT a multiple of 60 (Engine 1350 = 22.5x, Chief
+# 440 = 7.33x, Rescue both, PA both), so a genuine page cannot satisfy "every peak
+# is a multiple of 60".
+#
+# !! That guarantee is tied to the values in GOLDEN_FINGERPRINTS above. If any
+# !! fingerprint is ever revised so that ALL of its frequencies are multiples of
+# !! 60 (e.g. Chief -> [420, 660]), this rule would start rejecting real pages.
+# !! Re-check the table in docs/briefings/pa_tone_discriminator.md on any change.
+MAINS_HUM_FUNDAMENTAL_HZ = 60.0      # North American grid
+MAINS_HUM_TOLERANCE_HZ = 4.0
+MAINS_HUM_MIN_PEAKS = 4              # too few peaks is not evidence of a series

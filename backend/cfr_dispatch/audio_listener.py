@@ -21,6 +21,11 @@ from cfr_dispatch.config.dsp import (
     GOLDEN_FINGERPRINTS,
     FREQUENCY_TOLERANCE_HZ,
     MATCH_THRESHOLD_PERCENT,
+    REJECT_NON_DISPATCH_ENFORCE,
+    PA_DISCRIMINATOR_HZ,
+    MAINS_HUM_FUNDAMENTAL_HZ,
+    MAINS_HUM_TOLERANCE_HZ,
+    MAINS_HUM_MIN_PEAKS,
     MAX_DISPATCH_DURATION_S,
     MIN_PHASE_1_DURATION_S,
     PHASE_1_CHECK_INTERVAL_S,
@@ -34,6 +39,8 @@ from audio_service import (
     get_rms,
     analyze_live_audio,
     get_all_matches,
+    has_pa_marker,
+    is_mains_hum,
     capture_full_dispatch,
     enqueue_dispatch_task,
     resolve_audio_device
@@ -135,6 +142,42 @@ def run_audio_listener_loop(dispatch_queue):
                         all_matches = get_all_matches(live_frequencies, GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT)
                         pa_matches = [m for m in all_matches if m[0] == "PA Tone"]
                         apparatus_matches = [m for m in all_matches if m[0] in ("Chief Tone", "Engine Tone", "Rescue Tone")]
+
+                        # --- Non-dispatch rejection (punch-list #14) ---
+                        # Evaluated BEFORE the apparatus branch, because the defect is
+                        # precisely that a PA page or mains hum grazes an apparatus
+                        # fingerprint at the 50% floor and wins the old tie-break.
+                        #
+                        # Gated by REJECT_NON_DISPATCH_ENFORCE, default False: it logs
+                        # what it WOULD reject and changes nothing. Suppressing a real
+                        # dispatch means a crew is not alerted, so this earns its way in
+                        # on live evidence before it is allowed to act.
+                        reject_reason = None
+                        if has_pa_marker(live_frequencies, PA_DISCRIMINATOR_HZ, FREQUENCY_TOLERANCE_HZ):
+                            reject_reason = f"PA page ({PA_DISCRIMINATOR_HZ} Hz marker present)"
+                        elif is_mains_hum(live_frequencies, MAINS_HUM_FUNDAMENTAL_HZ,
+                                          MAINS_HUM_TOLERANCE_HZ, MAINS_HUM_MIN_PEAKS):
+                            reject_reason = (f"mains hum (every peak a multiple of "
+                                             f"{MAINS_HUM_FUNDAMENTAL_HZ:.0f} Hz)")
+
+                        if reject_reason:
+                            would_have = [m[0] for m in apparatus_matches] or ["nothing"]
+                            if REJECT_NON_DISPATCH_ENFORCE:
+                                logging.info(
+                                    f"REJECTED: {reject_reason}. Would otherwise have "
+                                    f"dispatched as {', '.join(would_have)}. "
+                                    f"Peaks: {sorted(live_frequencies)}")
+                                log_tone_spectral_history(None, ["PA Tone"] if pa_matches else [],
+                                                          live_frequencies, is_pa_page=True)
+                                is_capturing_tone = False
+                                baseline_rms_history.clear()
+                                baseline_rms_history.append(NOISE_AMPLITUDE_THRESHOLD / 2.5)
+                                continue
+                            # Log-only: fall through and behave exactly as before.
+                            logging.warning(
+                                f"WOULD REJECT: {reject_reason}, but "
+                                f"REJECT_NON_DISPATCH_ENFORCE is off - proceeding as "
+                                f"{', '.join(would_have)}. Peaks: {sorted(live_frequencies)}")
 
                         if pa_matches and not apparatus_matches:
                             logging.info("TONE DETECTED: 'PA Tone' (station paging). Disregarding and resetting listener.")

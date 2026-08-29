@@ -275,3 +275,43 @@ is a poor trade for a defect seen once in 122 events.
 **Bundle it with the 647 Hz PA fix instead.** Both change the same decision point in the same
 function, so they share one deploy, one restart and one verification pass. The PA fix is
 already validated and waiting only on operator decisions; when those land, both go together.
+
+
+---
+
+## Implemented 2026-08-29 — LOG-ONLY, not enforcing
+
+Both rules are in, bundled as one change to the tone gate. **`REJECT_NON_DISPATCH_ENFORCE`
+defaults to `False`**, so behaviour is unchanged: the listener logs what it *would* have
+rejected and carries on.
+
+That deliberately defers all three open decisions rather than pre-empting them — nothing is
+suppressed, so an unconfirmed candidate or a mid-call PA tone cannot cost a dispatch, and the
+log supplies the live evidence to settle both.
+
+| File | Change |
+|:--|:--|
+| `config/dsp.py` | `REJECT_NON_DISPATCH_ENFORCE`, `PA_DISCRIMINATOR_HZ = 647`, mains-hum constants, all with provenance |
+| `dsp_tone_spotter.py` | `has_pa_marker()`, `is_mains_hum()` |
+| `audio_listener.py` | rejection evaluated **before** the apparatus branch |
+| `config/__init__.py`, `audio_service/__init__.py` | re-exports |
+
+Named `has_pa_marker`, not `is_pa_page`, because `log_tone_spectral_history` already takes an
+`is_pa_page` parameter and shadowing it would be a trap.
+
+**Verified with the shipped helpers** against all 122 logged events:
+
+```
+PA pages caught             : 24/24
+mains hum caught            :  1/1
+GENUINE DISPATCHES REJECTED :  0 of 97
+```
+
+### To enforce, later
+
+1. Read the log first: `ssh tcfire@100.95.146.94 "grep 'WOULD REJECT' /home/tcfire/CFR-EVO-APP/backend/dispatch.log"`
+2. Every line should be a PA page or hum. **If a real dispatch appears there, do not enforce.**
+3. Then set `REJECT_NON_DISPATCH_ENFORCE = True` and `sudo systemctl restart cfr-agent`.
+
+> Deploying this needs a `cfr-agent` restart, which briefly drops the audio listener — a live
+> call in that window is missed. Worth timing.

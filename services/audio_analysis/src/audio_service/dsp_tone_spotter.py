@@ -94,6 +94,48 @@ def get_all_matches(live_frequencies: set, golden_fingerprints: dict, frequency_
     matched.sort(key=lambda x: x[1], reverse=True)
     return matched
 
+def has_pa_marker(live_frequencies, discriminator_hz: float, tolerance_hz: float) -> bool:
+    """True when the station PA tone's marker frequency is present.
+
+    Named has_pa_marker, not is_pa_page: audio_listener.log_tone_spectral_history
+    already takes an is_pa_page parameter, and shadowing it would be a trap.
+
+    Punch-list #14. 647 Hz is the discriminator: present in 15/15 labelled PA
+    events and 18/18 under strict ground truth, and in 0 of 98 real dispatches
+    (measured 2026-08-29 against tone_spectral_history.jsonl).
+
+    Deliberately does NOT consider the PA fingerprint's other component, 595 Hz,
+    which appears in 59 of 107 non-PA events; matching on it drops 54 real
+    dispatches. See docs/briefings/pa_tone_discriminator.md.
+    """
+    return any(abs(f - discriminator_hz) <= tolerance_hz for f in live_frequencies)
+
+
+def is_mains_hum(live_frequencies, fundamental_hz: float, tolerance_hz: float,
+                 min_peaks: int) -> bool:
+    """True when EVERY detected peak is a multiple of the mains fundamental.
+
+    Electrical interference presents as a harmonic series; 60 Hz odd harmonics
+    land on Chief's 660 Hz and just above Rescue's 892 Hz, so hum can register as
+    a dispatch (DISP-2026-483052).
+
+    Requires ALL peaks to fit the series, which is what makes it safe: every
+    apparatus fingerprint contains at least one frequency that is not a multiple
+    of 60, so a genuine page cannot satisfy this. That property depends on the
+    values in GOLDEN_FINGERPRINTS -- see the warning beside them before changing
+    any fingerprint.
+
+    min_peaks guards against calling two or three stray peaks a "series".
+    """
+    freqs = list(live_frequencies)
+    if len(freqs) < min_peaks or fundamental_hz <= 0:
+        return False
+    return all(
+        abs(f - round(f / fundamental_hz) * fundamental_hz) <= tolerance_hz
+        for f in freqs
+    )
+
+
 def filter_known_tones(audio_data: np.ndarray, tone_name: str, sample_rate: int, golden_fingerprints: dict) -> np.ndarray:
     """
     Applies causal forward IIR notch filters at the golden fingerprint frequencies

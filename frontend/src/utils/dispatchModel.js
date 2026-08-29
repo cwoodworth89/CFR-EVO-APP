@@ -137,6 +137,68 @@ export function isSameDispatch(a, b) {
   return a.id != null && a.id === b.id;
 }
 
+// Fields the operator can actually SEE on the kiosk. A re-broadcast that changes
+// none of these has changed nothing as far as the crew is concerned, whatever else
+// moved in the payload (timestamps, confidence, audio_url, routing internals).
+//
+// Deliberately excludes routing_metrics: OSRM re-runs on every rebuild and can
+// return a different duration by a second for an identical call, which would make
+// the badge fire on noise -- exactly what this is meant to stop.
+const OPERATOR_VISIBLE_FIELDS = [
+  'address',
+  'incident_type',
+  'responding_units',
+  'subaddress',
+  'intersection',
+  'lat',
+  'lng',
+  'map_grid',
+  'radio_channel',
+  'response_type',
+  'location_type',
+  'requested_address',
+  'resolution_note',
+];
+
+function sameValue(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    const ax = Array.isArray(a) ? a : [];
+    const bx = Array.isArray(b) ? b : [];
+    return ax.length === bx.length
+      && ax.every((v, i) => String(v ?? '').trim() === String(bx[i] ?? '').trim());
+  }
+  // null, undefined and '' all mean "not present" and must not read as a change.
+  const an = a ?? '';
+  const bn = b ?? '';
+  if (an === '' && bn === '') return true;
+  if (typeof an === 'number' || typeof bn === 'number') {
+    const af = Number(an);
+    const bf = Number(bn);
+    if (!Number.isNaN(af) && !Number.isNaN(bf)) return af === bf;
+  }
+  return String(an).trim() === String(bn).trim();
+}
+
+/**
+ * Names of the operator-visible fields that differ between two records.
+ *
+ * Empty array => nothing the crew can see has changed, so the kiosk must NOT
+ * announce an update. MQTT QoS 1 is at-least-once, so a duplicate delivery of an
+ * identical payload is the contract, not an anomaly; the two-phase pipeline also
+ * re-broadcasts after correcting the address and grid. Previously the kiosk
+ * flashed "UPDATED" on ANY re-delivery, so it claimed a change had happened when
+ * often none had -- an operational claim with nothing behind it (CLAUDE.md 6.1).
+ * Punch-list #34.
+ *
+ * Returns the field list rather than a boolean so the badge can say WHAT changed.
+ */
+export function getVisibleChanges(current, incoming) {
+  if (!current || !incoming) return [];
+  return OPERATOR_VISIBLE_FIELDS.filter(
+    (f) => !sameValue(current[f], incoming[f])
+  );
+}
+
 /** Whether a call carries usable coordinates. */
 export function hasCoordinates(call) {
   return !!call

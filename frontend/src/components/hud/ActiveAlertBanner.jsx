@@ -1,6 +1,25 @@
 import React from 'react';
 import { getUnitBadgeStyle, getShortCallsign, formatUnitEtaDisplay } from './unitFormat';
 
+// Operator-facing names for the fields getVisibleChanges() reports. Falls through
+// to the raw key so a newly-tracked field is still readable rather than hidden.
+const UPDATE_FIELD_LABELS = {
+  address: 'address',
+  incident_type: 'incident',
+  responding_units: 'units',
+  subaddress: 'unit #',
+  intersection: 'cross streets',
+  lat: 'location',
+  lng: 'location',
+  map_grid: 'map grid',
+  radio_channel: 'talk group',
+  response_type: 'response',
+  location_type: 'location type',
+  requested_address: 'requested address',
+  resolution_note: 'location note',
+};
+const FIELD_LABELS_FOR_UPDATE = (f) => UPDATE_FIELD_LABELS[f] || f;
+
 export default function ActiveAlertBanner({
   activeCall,
   unitEtas = [],
@@ -12,6 +31,7 @@ export default function ActiveAlertBanner({
   isEmergency = true,
   isReviewMode = false,
   isRecentlyUpdated = false,
+  updatedFields = [],
   isTvMode = false,
   elapsedFormatted = '00:00',
   timeoutFormatted = '03:00',
@@ -43,9 +63,20 @@ export default function ActiveAlertBanner({
             </div>
           )}
 
+          {/* Names the changed fields rather than asserting a bare "UPDATED".
+              The operator reported being told a call had updated with nothing to
+              show for it -- see punch-list #34. The badge now only renders when
+              getVisibleChanges() found something, and says what. */}
           {isRecentlyUpdated && (
-            <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold text-[10px] animate-bounce">
-              ⚡ UPDATED
+            <span
+              className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold text-[10px] animate-bounce"
+              title={updatedFields.length
+                ? `Changed: ${updatedFields.map(FIELD_LABELS_FOR_UPDATE).join(', ')}`
+                : undefined}
+            >
+              ⚡ UPDATED{updatedFields.length
+                ? `: ${updatedFields.slice(0, 2).map(FIELD_LABELS_FOR_UPDATE).join(', ')}${updatedFields.length > 2 ? ` +${updatedFields.length - 2}` : ''}`
+                : ''}
             </span>
           )}
         </div>

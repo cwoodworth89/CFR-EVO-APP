@@ -30,6 +30,7 @@ export default function KioskView({ kioskState }) {
     isReviewMode,
     isTvMode,
     isRecentlyUpdated,
+    updatedFields,
     elapsedFormatted,
     timeoutFormatted,
     resetTimeoutClock,
@@ -220,6 +221,7 @@ export default function KioskView({ kioskState }) {
         isEmergency={isEmergency}
         isReviewMode={isReviewMode}
         isRecentlyUpdated={isRecentlyUpdated}
+        updatedFields={updatedFields}
         isTvMode={isTvMode}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}

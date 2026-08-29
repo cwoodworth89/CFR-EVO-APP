@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatchListener } from './useDispatchListener';
-import { isSameDispatch } from '../utils/dispatchModel';
+import { isSameDispatch, getVisibleChanges } from '../utils/dispatchModel';
 
 const DEFAULT_TIMEOUT_SECONDS = 300; // 5 minutes
 
@@ -10,6 +10,8 @@ export function useKioskQueue() {
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [isTvMode, setIsTvMode] = useState(false);
   const [isRecentlyUpdated, setIsRecentlyUpdated] = useState(false);
+  // Which operator-visible fields changed, for the badge tooltip. Empty when idle.
+  const [updatedFields, setUpdatedFields] = useState([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [timeoutSecondsLeft, setTimeoutSecondsLeft] = useState(DEFAULT_TIMEOUT_SECONDS);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
@@ -39,11 +41,22 @@ export function useKioskQueue() {
   }, []);
 
   // Trigger brief 4-second "⚡ CALL UPDATED" flash animation
-  const triggerUpdateFlash = useCallback(() => {
+  // Announce an update ONLY when something the operator can see actually changed.
+  //
+  // Callers pass the changed field names from getVisibleChanges(); an empty list is
+  // a no-op. MQTT QoS 1 is at-least-once, so a duplicate delivery of an unchanged
+  // call is the contract rather than an anomaly, and the two-phase pipeline
+  // re-broadcasts after correcting the address and grid. This used to fire on ANY
+  // re-delivery, so the kiosk told the operator data had changed when frequently
+  // nothing had. Punch-list #34.
+  const triggerUpdateFlash = useCallback((changedFields) => {
+    if (!changedFields || changedFields.length === 0) return;
+    setUpdatedFields(changedFields);
     setIsRecentlyUpdated(true);
     if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
     updateFlashTimeoutRef.current = setTimeout(() => {
       setIsRecentlyUpdated(false);
+      setUpdatedFields([]);
     }, 4000);
   }, []);
 
@@ -89,7 +102,9 @@ export function useKioskQueue() {
       // the corrected values, which is what an operator needs, and is what an UPDATE
       // event would have done.
       if (isSameDispatch(current, newCall)) {
-        triggerUpdateFlash();
+        // Merge regardless -- the corrected values are what the operator needs --
+        // but only ANNOUNCE it if the merge actually changes something visible.
+        triggerUpdateFlash(getVisibleChanges(current, newCall));
         return { ...current, ...newCall };
       }
 
@@ -118,7 +133,7 @@ export function useKioskQueue() {
     // would have overwritten each other's units, transcript and coordinates.
     setActiveCall((current) => {
       if (isSameDispatch(current, updatedCall)) {
-        triggerUpdateFlash();
+        triggerUpdateFlash(getVisibleChanges(current, updatedCall));
         return { ...current, ...updatedCall };
       }
       return current;
@@ -241,6 +256,7 @@ export function useKioskQueue() {
     isReviewMode,
     isTvMode,
     isRecentlyUpdated,
+    updatedFields,
     elapsedFormatted: formatTime(elapsedSeconds),
     timeoutFormatted: formatTime(timeoutSecondsLeft),
     isTimerPaused,

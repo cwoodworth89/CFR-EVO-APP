@@ -134,9 +134,29 @@ file, yet a proposed safety guarantee depended on it. `entrance_lat` held a copy
 centroid. `STATUS` on roads records ownership, not service state, and filtering it as though
 it meant "in service" dropped 45 streets carrying 1,918 parcels.
 
-**The operator knows things the data does not surface.** Two of my measurement approaches were
-wrong and were corrected by someone naming three trailer parks I would never have looked for.
-Ask.
+**Ask the operator. He is the subject-matter expert, not a stakeholder to be informed.**
+
+Curtis has nearly 15 years of on-the-floor firefighting experience and is building this for
+his own crews. On any question of fire-ground reality — how a call is dispatched, what a crew
+needs on arrival, what an address means operationally, which sites are awkward — **his answer
+outranks an inference from the data.**
+
+This is not deference for its own sake. Measured across one session, he was right and I was
+wrong six times, in ways no query would have reached:
+
+| He said | What it corrected |
+|:--|:--|
+| Three trailer parks: 201 Cayer, 4200 Dewdney Trunk, 101 Schoolhouse | My detector scored all three as **perfectly healthy**. 265 pads sharing one footprint agree on one arrival point, so "agreement" hid a 12-hectare site. The metric was wrong. |
+| "Booth is houses" | I had classified a cadastre resolution issue as a trailer park. |
+| "2865 Glen Dr isn't 8 lots, it's 77 units" | My framing was misleading; the 8 were duplicate features of the bare address. |
+| "Always use the addressed street unless overridden" | I tested every counterexample I could construct — corner lots, rear-lane access, campuses, flag lots — and could not break it. It became the core rule. |
+| "Do we need all this complex code?" | Correct. Once the street is filtered, four of five scoring terms have nothing left to decide. |
+| "The Raspberry Pi premise is right for the full deployment" | Invalidated a challenge I had raised against another team on hardware grounds. |
+
+**The division of authority that works:** he is authoritative on the fire ground and the city;
+measurement is authoritative on what the software actually does. Both have caught real defects
+this week. Neither substitutes for the other — but when a measurement disagrees with him about
+the world, the measurement is the thing to re-examine first.
 
 ---
 

@@ -262,6 +262,56 @@ answer, because a municipal "primary parcel" flag would beat any rule we invent.
 
 ---
 
+## 12. Several separate house numbers sharing one parcel, with no unit designator
+
+**Status: OPEN.** Found 2026-08-29 from operator knowledge of Booth Ave. Related to item 11,
+but the inverse shape: item 11 is one address across many parcels; this is many addresses on
+one parcel.
+
+**818 parcels carry more than one distinct house number with no unit designator, covering
+2,067 house numbers.** The largest carries 27. **146 of them span more than one street.**
+
+These are not unit-numbered — `1520 Booth Ave` and `1540 Booth Ave` are distinct civic
+addresses, not `1520 Booth Ave #1` and `#2`. The operator confirms the Booth Ave ones are
+houses.
+
+Examples, by size:
+
+| `gis_id` | House numbers | Street | Footprint |
+|:--|--:|:--|--:|
+| `!8180021` | 27 | Burke Mountain | 240,263 m² |
+| `!2170194` | 22 | Marathon | 4,306 m² |
+| `!2220916` | 22 | Marathon | 4,137 m² |
+| `!4020026` | 20 | Howie | 2,942 m² |
+| `!2170300` | 17 | **Booth** | 16,333 m² |
+
+**Most of this is probably correct and we are not calling it an error.** 1,462 of the affected
+rows carry a `FOLIO` and 1,671 carry a `LEGALDESC`, which is what one would expect for
+strata or bare-land-strata rowhousing: each home is a separately titled strata lot inside a
+single fee-simple parcel. The cadastre showing one polygon is then accurate.
+
+**Booth Ave is the case that does not fit that explanation.** All 17 rows on `!2170300` have
+**blank `FOLIO` and blank `LEGALDESC`** — so unlike the majority, there is no title record
+attached to any of them. `1520`, `1540`, `1550`, `1560`, `1564`, `1566`, `1568`, `1570`,
+`1574`, `1580`, `1582`, `1584`, `1590`, `1594` Booth Ave, plus `273`, `277`, `287` (this
+parcel also spans a second street).
+
+**Ask:**
+1. Is one parcel per strata/rowhouse development the intended representation, with the
+   individual homes carried only as address points? If so we will treat it as correct and
+   stop flagging it.
+2. Separately, why does `!2170300` (Booth Ave) carry 17 civic addresses with no folio and no
+   legal description, when comparable groups carry both? Is that parcel mid-subdivision, or
+   is the title linkage missing?
+
+**Operational impact, and why it is not urgent:** each of the 2,067 addresses resolves to a
+location — they share the parcel's geometry, so a crew reaches the right property. What they
+do not get is the individual home within it. That is the same problem as the multi-unit sites
+in `docs/complex_sites_for_review.csv` and is handled the same way: a reviewed access point
+per site, not a code fix.
+
+---
+
 ## Closed items
 
 ### `Deer's Leap Pl` — OURS, not a City gap

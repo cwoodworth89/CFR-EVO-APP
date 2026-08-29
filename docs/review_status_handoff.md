@@ -6,6 +6,8 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — **29 numbered items**, the live work queue
+* [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
+  arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
   corpus baselines, the ground-truth corpus, and three traps. Start there if that is the task.
 * [`docs/city_gis_data_register.md`](./city_gis_data_register.md) — **authoritative-data gaps for the City GIS team.** Anything the municipal source gets wrong belongs there, not in code.

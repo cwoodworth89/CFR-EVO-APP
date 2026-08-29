@@ -113,6 +113,72 @@ site-vs-access-point distinction this work is about.
 
 ---
 
+## Where this sits against the code freeze — an honest accounting
+
+The operator's read is that this went off course. Partly yes, and it is worth being precise
+about which part, because the answer differs by dimension.
+
+### On substance: on course
+
+Every change fixed a defect that was **measured, not suspected**, and most were already on the
+punch list. Items closed or advanced: **#19** (the `token_set_ratio` subset trap on the main
+address path), **#12** (centroids reported as exact addresses), **#1** (the four live
+wrong-location cases), **#42** (the roads import discarding 242 segments). Items opened with
+evidence rather than speculation: **#48**, **#49**.
+
+Nothing here was a feature. The nearest thing to one — the amber approximate-location banner —
+displays a `resolution_note` the pipeline was already computing and then discarding.
+
+### On scope: it grew, and nobody decided to let it
+
+The session began as "review the punch list" and ended having rewritten how arrival points are
+computed for all 65,401 parcels. Each step followed from the last: #19 exposed the wrong-street
+snapping, which exposed the frozen backfill, which exposed the roads filter, which exposed the
+complexes. That is a defensible chain, but no one ever stood back and asked whether the whole
+chain belonged in a freeze.
+
+### On mode: drifted from review to change
+
+`feedback_qa_issue_intake` records the working agreement as **log to the punch list, then
+read-only characterisation, no fixes unless asked.** Every fix here *was* asked for. But the
+asking followed from what surfaced, so the drift is real even though each step was authorised.
+
+### New surface area added during a freeze
+
+This is the part that most deserves scrutiny:
+
+| Added | |
+|:--|:--|
+| Columns | `entrance_set_by`, `entrance_set_at`, `entrance_note`, `access_far_corner_m` |
+| Table | `parcels_frontpoint_snapshot_20260828` (temporary, drop after adoption settles) |
+| Vocabulary category | `xstreet_descriptor`, 9 rows |
+| Migrations | 5 |
+| Production data rewritten | parcel front points (twice), 8 dispatch records, 1 `verified_address` |
+
+All of it is recoverable and documented, and `entrance_*` reuses columns that already existed.
+But four new columns and a new vocabulary category is schema growth, and a freeze is exactly
+when that should be a conscious decision rather than a consequence.
+
+### Correctly deferred
+
+* **The Valhalla migration** — a total routing-engine replacement, paused after review. That
+  would have been genuinely off course.
+* **The access-point review UX** (#49) — recognised as a feature and deferred at the
+  operator's direction.
+* **OSRM profile tuning** (#1) — still blocked pending documentation.
+
+### What should happen before more work lands
+
+1. **Decide whether the freeze still holds.** If it does, the arrival-point work should be the
+   last structural change and the rest of the queue is documentation and review. If it has
+   effectively lapsed, say so, because the team is behaving as though it has.
+2. **Settle the other team's `import_parcels_PROPOSED.py`** so there is one parcel import, not
+   two candidates.
+3. **Drop `parcels_frontpoint_snapshot_20260828`** once that is settled.
+4. Treat **#49 as the first post-freeze feature**, not as continuing work.
+
+---
+
 ## Traps that cost time here
 
 **Agreement is not correctness.** A metric that can only confirm its own assumption proves

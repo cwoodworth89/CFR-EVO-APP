@@ -53,10 +53,18 @@ TONE_ZSCORE_THRESHOLD = 30.0
 # CAVEAT: Chief Tone rests on only 4 observations. It is the least evidenced of
 # the three and should be re-checked as the corpus grows.
 #
-# PRECISION IS FICTIONAL. analyze_live_audio() reports integer Hz
-# (int(fft_freqs[p]) in dsp_tone_spotter.py), so the two-decimal values here are a
-# precision the detector cannot produce or match. They are harmless given
-# FREQUENCY_TOLERANCE_HZ, but do not read them as measurements to 0.01 Hz.
+# INTEGERS, DELIBERATELY. analyze_live_audio() reports integer Hz
+# (int(fft_freqs[p]) in dsp_tone_spotter.py), so a two-decimal fingerprint states a
+# precision the detector can neither produce nor match. The former values
+# (440.20 / 660.34 / 727.09 / 891.99) were rounded to whole Hz on 2026-08-29 --
+# every shift was under 0.35 Hz against a tolerance of 8.
+#
+# Re-scored across all 122 logged events, exactly ONE match set changed, and it was
+# already garbage: TRIGGER-1787533320 gained "Rescue Tone" because 891.99 -> 892
+# admits a peak at exactly 900 Hz. That event's peaks are 300/420/540/660/780/900/
+# 1260/1380/1500 -- every one an odd harmonic of 60 Hz, i.e. MAINS HUM, not a pager
+# tone. It had already false-matched Chief Tone on 660 and produced a 6.6 s
+# "dispatch" (DISP-2026-483052, transcript "recording"). See punch-list #14.
 #
 # TWO OTHER COPIES OF THESE NUMBERS EXIST AND DISAGREE:
 #   backend/scripts/calibrate_audio_interactive.py -- Chief 437.50/656.25,
@@ -76,10 +84,10 @@ TONE_ZSCORE_THRESHOLD = 30.0
 # before changing the PA entry.
 # ---------------------------------------------------------------------------
 GOLDEN_FINGERPRINTS = {
-    "PA Tone":               [595.00, 647.00],
-    "Chief Tone":            [440.20, 660.34],
-    "Engine Tone":           [600.00, 1350.00],
-    "Rescue Tone":           [727.09, 891.99],
-    "Dispatch Announcement": [1000.00]
+    "PA Tone":               [595, 647],
+    "Chief Tone":            [440, 660],
+    "Engine Tone":           [600, 1350],
+    "Rescue Tone":           [727, 892],
+    "Dispatch Announcement": [1000],
 }
 

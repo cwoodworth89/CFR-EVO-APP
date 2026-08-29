@@ -186,3 +186,56 @@ loses **no** real dispatch even at ±2 Hz — but it does not solve the PA colli
 Even at ±2 Hz three PA pages still graze an apparatus fingerprint, so **647 Hz remains the
 fix**. Tightening to 4 is free hardening on this corpus, but Chief Tone's 4 samples are thin
 evidence for narrowing anything — recommend leaving tolerance alone until the corpus grows.
+
+
+---
+
+## Addendum 2026-08-29b — fictional precision removed, and a third leak class found
+
+Operator decision: drop the two-decimal values. `GOLDEN_FINGERPRINTS` is now whole Hz:
+
+```python
+"PA Tone":     [595, 647]      "Chief Tone":  [440, 660]
+"Engine Tone": [600, 1350]     "Rescue Tone": [727, 892]
+"Dispatch Announcement": [1000]
+```
+
+Every shift was under 0.35 Hz against a ±8 Hz tolerance. Re-scored across all 122 logged
+events, **exactly one** match set changed — and it turned out to be worth finding.
+
+### The one changed event is mains hum, not a pager tone
+
+`TRIGGER-1787533320` gained `Rescue Tone`, because `891.99 → 892` admits a peak at exactly
+900 Hz that was previously outside by 0.01 Hz. Its peaks:
+
+```
+300, 420, 540, 660, 780, 900, 1260, 1380, 1500
+```
+
+Every one is an **odd harmonic of 60 Hz** — 60 × 5, 7, 9, 11, 13, 15, 21, 23, 25. That is
+electrical mains interference, not a dispatch tone.
+
+It had **already** false-matched `Chief Tone` before the rounding, because 660 is both an odd
+60 Hz harmonic and Chief's second frequency. It produced a real record: **`DISP-2026-483052`**,
+6.59 s, transcript *"recording"*.
+
+So the rounding did not create a false positive — it exposed one that was already there, and
+the tightened value simply gave the same garbage event a second wrong label.
+
+### This is a third leak class, separate from PA
+
+| Class | Mechanism | Status |
+|:--|:--|:--|
+| PA pages | 647 Hz page grazes an apparatus fingerprint at the 50% floor | rule validated, awaiting operator |
+| **Mains hum** | **60 Hz odd harmonics land on 660 (Chief) and 900 (Rescue)** | **newly found, unaddressed** |
+| Short noise | — | not investigated |
+
+A harmonic-series test would be a clean discriminator: if the detected peaks are all integer
+multiples of ~60 Hz, it is interference, and no pager tone should be reported. That is a
+different filter from the 647 Hz PA rule and should be evaluated on its own evidence rather
+than bolted on — there is currently **one** confirmed example, which is not enough to design
+against.
+
+**Worth watching for**: `DISP-2026-483052` is a 6.6-second "dispatch" with the transcript
+*"recording"*. If more short records with that shape appear, they are candidates for the same
+cause.

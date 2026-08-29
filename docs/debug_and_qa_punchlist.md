@@ -3413,3 +3413,33 @@ symptom at the edges.
 original suggestion came from inferring purpose from file size instead of decoding one tile
 (§7.1). The semantics are now an inline comment at the PNG-validation site so nobody
 "optimises" blanks away later.
+
+---
+
+### Status sync, 2026-08-27
+
+* **#38 (parcel front points on the wrong street)** — ⏳ **being handled by another agent.**
+  Not to be worked here; see the roads/GIS thread. The measurement stands as recorded:
+  `1178 Heffley Cres` sits 0.0 m from Pinetree Way and 109.2 m from Heffley Crescent, with a
+  sampled ~11.5% of parcels more than 60 m from their own named street.
+
+* **#42 (roads `STATUS` filter)** — ✅ **Closed by another agent** in `302af14`
+  *"fix(gis): import roads of every status, and repair the import script itself"*, which took
+  the recommended shape rather than deleting the filter. Verified against the kiosk database:
+
+  | | Before | Now |
+  |:--|--:|--:|
+  | `public.roads` rows | 3,214 | **3,451** |
+  | Distinct `status` values | `OPERATING` only | **`METRO, MOT, OPERATING, PRIVATE`** |
+  | Parcel streets with no matching road | 45 | **17** |
+
+  So 28 of the 45 missing streets are resolvable again, and jurisdiction is preserved rather
+  than flattened. **17 remain** — worth a look in that thread, since they are now a different
+  and smaller problem than the `STATUS` filter (likely name-form mismatches rather than absent
+  geometry, given `Highway #1` and the strata roads are back).
+
+* **#41 (parcel import / `629 Cottonwood Ave`)** — partly overtaken by `e0466df`
+  *"account for the 4,307-row parcel gap — reconciled, but selection is arbitrary"*. The
+  remaining action from this thread is unchanged and independent: **`Addresses.shp` is dated
+  2025-06-22, over a year old.** Re-pull and re-import; the upsert preserves pre-plans, lockbox
+  notes and Street View headings.

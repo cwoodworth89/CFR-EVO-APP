@@ -192,8 +192,10 @@ export default function VerificationSidebar({
                 )}
               </div>
               <audio
+                key={selectedCall.id || selectedCall.dispatch_id}
                 ref={audioRef}
                 controls
+                preload="auto"
                 src={audioSignedUrl || selectedCall.audio_url}
                 className="w-full h-8 rounded accent-sky-500 bg-slate-900"
               />

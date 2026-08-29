@@ -344,12 +344,6 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         if (formContainerRef.current) {
           formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(err => console.warn('Audio auto-play prevented:', err));
-          }
-        }, 300);
       } else {
         setSelectedCall(updatedCall);
       }

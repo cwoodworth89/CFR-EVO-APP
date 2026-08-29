@@ -295,21 +295,40 @@ def download_cadastral_tile(
             with urllib.request.urlopen(req, timeout=15) as resp:
                 if resp.status == 200:
                     data = resp.read()
-                    # Verify PNG signature (89 50 4E 47 0D 0A 1A 0A) and minimum byte size
+                    # Verify PNG signature (89 50 4E 47 0D 0A 1A 0A) and minimum byte size.
+                    #
+                    # A BLANK TILE IS A VALID RESULT -- DO NOT FILTER IT OUT.
+                    # The MapServer answers any request outside its cadastral extent
+                    # with an 885-byte fully transparent PNG (256x256, alpha 0, one
+                    # distinct pixel, md5 72accbca6aa1edbf6fec07c32f2df94a). Measured
+                    # 2026-08-27: 488,668 of the archive's 606,946 tiles are exactly
+                    # that image -- 80.5% of it.
+                    #
+                    # Blank does NOT mean wrong, and most blanks are INSIDE the city:
+                    # at z20 a tile is ~30 m across and parcels render as outlines, so
+                    # a tile landing inside a lot, a park or the river has nothing to
+                    # draw. Storing them is what lets the tile server answer
+                    # "correctly empty" rather than the frontend painting its "no map
+                    # data" hatch over real but featureless ground. Discarding blanks
+                    # to save space would reintroduce punch-list #40 at the edges.
                     if len(data) >= 50 and data[:8] == b'\x89PNG\r\n\x1a\n':
                         return (z, x, y_tms, data)
                     elif b"error" in data[:200].lower():
-                        logger.debug(f"ArcGIS returned error message for tile {tile}: {data[:120]}")
+                        logger.warning(f"ArcGIS returned an error body for tile {tile}: {data[:120]}")
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
                 time.sleep(1.0 * (2 ** (attempt - 1)))
             else:
-                logger.debug(f"HTTPError {e.code} for tile {tile}")
+                # WARNING, not debug: logging runs at INFO, so a debug line is
+                # discarded and the run reports only a failure COUNT with no cause.
+                # That cost a re-run with forced DEBUG to identify 8 failures on
+                # 2026-08-27 -- the same defect class as punch-list #26.
+                logger.warning(f"HTTPError {e.code} for tile {tile} (retries exhausted)")
         except Exception as e:
             if attempt < max_retries:
                 time.sleep(0.5 * (2 ** (attempt - 1)))
             else:
-                logger.debug(f"Exception fetching tile {tile}: {e}")
+                logger.warning(f"Exception fetching tile {tile} (retries exhausted): {e}")
 
     return None
 

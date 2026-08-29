@@ -239,3 +239,39 @@ against.
 **Worth watching for**: `DISP-2026-483052` is a 6.6-second "dispatch" with the transcript
 *"recording"*. If more short records with that shape appear, they are candidates for the same
 cause.
+
+
+### Is the harmonic gap worth fixing on its own? Measured 2026-08-29
+
+**Rule tested**: every detected peak within 4 Hz of a multiple of 60 Hz, with at least 4 peaks.
+
+```
+flagged as hum:                    1 of 122 events  (TRIGGER-1787533320)
+real dispatch events wrongly hit:  0 of 98
+```
+
+**The safety argument is structural, not just empirical**, which matters given the sample is
+n=1. A genuine page can never satisfy "all peaks are multiples of 60" because every apparatus
+fingerprint contains at least one frequency that is not:
+
+| Tone | Frequencies | as multiples of 60 |
+|:--|:--|:--|
+| Engine | 600, 1350 | 10.0, **22.5** |
+| Chief | 440, 660 | **7.33**, 11.0 |
+| Rescue | 727, 892 | **12.12**, **14.87** |
+| PA | 595, 647 | **9.92**, **10.78** |
+
+So false positives are excluded by construction, not by luck of the sample.
+
+> ⚠️ **That guarantee is tied to the current fingerprints.** If Chief were ever revised to
+> something like `[420, 660]` — both multiples of 60 — the rule would start eating real Chief
+> pages. Anyone changing `GOLDEN_FINGERPRINTS` must re-check this table.
+
+**Recommendation: do not ship it on its own.** It is safe and small, but it touches the live
+tone gate in `audio_listener.py`, and deploying that requires `sudo systemctl restart
+cfr-agent`, which briefly drops the audio listener — a real call in that window is missed. That
+is a poor trade for a defect seen once in 122 events.
+
+**Bundle it with the 647 Hz PA fix instead.** Both change the same decision point in the same
+function, so they share one deploy, one restart and one verification pass. The PA fix is
+already validated and waiting only on operator decisions; when those land, both go together.

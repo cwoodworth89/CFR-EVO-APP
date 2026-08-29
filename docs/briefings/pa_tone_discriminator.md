@@ -123,3 +123,66 @@ conservative rollout.
 > **Provenance note**: 647.00 Hz currently appears in `GOLDEN_FINGERPRINTS` with no source.
 > Whatever ships should cite this analysis (§6.3 tier 3, measured on this system) and, if the
 > station PA has a published tone specification, that should supersede it.
+
+
+---
+
+## Addendum 2026-08-29 — do the apparatus fingerprints have provenance?
+
+**No. None of it.** The operator asked what date the Chief/Engine/Rescue fingerprints were
+analysed, from how many calls, on what hardware and recorder. Searched the config, the docs
+(`hardware_specification.md`, `test_procedures.md`), the calibration script and the git
+history: **there is no record of any of it.** The values simply appear.
+
+The nearest thing to a clue is `backend/tests/test_listener.py`, whose values are marked
+*"Source fingerprints, 16kHz"* and are spaced exactly **7.8125 Hz** apart — `16000 / 2048`,
+i.e. a 2048-point FFT at a 16 kHz sample rate. That is a fingerprint of the *analysis*, not a
+provenance record, but it is consistent with the current `AUDIO_SAMPLE_RATE = 16000`.
+
+### Three copies exist and they disagree
+
+| Source | Chief | Engine | Rescue |
+|:--|:--|:--|:--|
+| **`config/dsp.py`** (used by the pipeline) | 440.20, 660.34 | 600.00, 1350.00 | 727.09, 891.99 |
+| `scripts/calibrate_audio_interactive.py` | 437.50, 656.25 | 601.56, 1351.56 | 726.56, 890.62, **2179.69** |
+| `tests/test_listener.py` | 5-point spread | 5-point spread | 5-point spread |
+
+None imports from another. The calibration tool the docs tell operators to run for tone
+verification is therefore checking against **different numbers than the live system uses**.
+
+### But the values themselves are correct
+
+Validated against the 98 confirmed real-dispatch events in `tone_spectral_history.jsonl`:
+
+| Tone | Events | Observed | Configured | Drift |
+|:--|--:|:--|:--|--:|
+| Engine | 54 | 600 and 1350, **zero variance** | 600.00, 1350.00 | 0.0 Hz |
+| Rescue | 40 | 726 and 892 | 727.09, 891.99 | −1.1 Hz |
+| Chief | **4** | 440 and 659 | 440.20, 660.34 | −1.3 Hz |
+
+**So re-deriving them is not needed — the numbers are right.** What was missing is their
+history, and that has now been written into `config/dsp.py` citing this measurement.
+
+Two things worth acting on:
+
+* **Chief Tone rests on 4 observations.** Re-check as the corpus grows; it is the least
+  evidenced of the three.
+* **The two-decimal precision is fictional.** `analyze_live_audio()` returns
+  `int(fft_freqs[p])`, so the detector cannot produce or match 0.01 Hz. Harmless under the
+  tolerance, but it reads as a precision that was never measured.
+
+### Tolerance could tighten, but it is not the PA fix
+
+Observed drift is ≤1.3 Hz against a ±8 Hz tolerance. Scored across all 122 events, tightening
+loses **no** real dispatch even at ±2 Hz — but it does not solve the PA collision either:
+
+| Tolerance | Real dispatches losing their tone | PA pages still grazing apparatus |
+|--:|--:|--:|
+| 8 (current) | 0 | 9 |
+| 4 | 0 | 9 |
+| 3 | 0 | 7 |
+| 2 | 0 | 3 |
+
+Even at ±2 Hz three PA pages still graze an apparatus fingerprint, so **647 Hz remains the
+fix**. Tightening to 4 is free hardening on this corpus, but Chief Tone's 4 samples are thin
+evidence for narrowing anything — recommend leaving tolerance alone until the corpus grows.

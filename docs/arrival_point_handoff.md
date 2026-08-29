@@ -113,12 +113,21 @@ site-vs-access-point distinction this work is about.
 
 ---
 
-## Where this sits against the code freeze — an honest accounting
+## Where this sits against the freeze
 
-The operator's read is that this went off course. Partly yes, and it is worth being precise
-about which part, because the answer differs by dimension.
+**Operator clarification, 2026-08-29: it is a FEATURE freeze, not a code freeze. Routing was
+broken, so fixing it is in scope.**
 
-### On substance: on course
+That resolves most of what follows. An earlier draft of this section assessed the work against
+a code freeze and concluded the scope had drifted; under the correct premise it largely had
+not. The assessment is kept below because the distinctions are still worth a reader's
+attention — particularly the new schema surface, which is worth noticing under any freeze.
+
+The test to apply: **was it broken, or is it new?** Everything in the shipped list was broken
+and measurably so. The one genuine feature, the access-point review UX, was recognised as such
+and deferred (#49).
+
+### On substance: in scope
 
 Every change fixed a defect that was **measured, not suspected**, and most were already on the
 punch list. Items closed or advanced: **#19** (the `token_set_ratio` subset trap on the main
@@ -129,15 +138,15 @@ evidence rather than speculation: **#48**, **#49**.
 Nothing here was a feature. The nearest thing to one — the amber approximate-location banner —
 displays a `resolution_note` the pipeline was already computing and then discarding.
 
-### On scope: it grew, and nobody decided to let it
+### On scope: it grew, but the chain was all defect-driven
 
 The session began as "review the punch list" and ended having rewritten how arrival points are
 computed for all 65,401 parcels. Each step followed from the last: #19 exposed the wrong-street
 snapping, which exposed the frozen backfill, which exposed the roads filter, which exposed the
-complexes. That is a defensible chain, but no one ever stood back and asked whether the whole
-chain belonged in a freeze.
+complexes. Every link was a defect. Under a feature freeze that is
+exactly the work; the only thing missing was anyone stating the chain out loud as it grew.
 
-### On mode: drifted from review to change
+### On mode: review became repair, which was the point
 
 `feedback_qa_issue_intake` records the working agreement as **log to the punch list, then
 read-only characterisation, no fixes unless asked.** Every fix here *was* asked for. But the
@@ -169,13 +178,11 @@ when that should be a conscious decision rather than a consequence.
 
 ### What should happen before more work lands
 
-1. **Decide whether the freeze still holds.** If it does, the arrival-point work should be the
-   last structural change and the rest of the queue is documentation and review. If it has
-   effectively lapsed, say so, because the team is behaving as though it has.
-2. **Settle the other team's `import_parcels_PROPOSED.py`** so there is one parcel import, not
+1. **Settle the other team's `import_parcels_PROPOSED.py`** so there is one parcel import, not
    two candidates.
-3. **Drop `parcels_frontpoint_snapshot_20260828`** once that is settled.
-4. Treat **#49 as the first post-freeze feature**, not as continuing work.
+2. **Drop `parcels_frontpoint_snapshot_20260828`** once that is settled.
+3. Treat **#49 as the first post-freeze feature**, not as continuing work — it is a UI that
+   does not exist yet, which is the one thing here that is unambiguously new.
 
 ---
 

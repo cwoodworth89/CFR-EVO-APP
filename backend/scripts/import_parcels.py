@@ -184,43 +184,84 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
 
             logging.info(f"  Found {road_count} road segments in public.roads with geometry.")
 
-            # Identify candidate parcel IDs requiring frontage backfill
+            # EVERY parcel is recomputed, not only those missing a front point.
+            #
+            # This previously selected `front_lat IS NULL OR front_lat = lat`, i.e. backfill
+            # only. With no NULLs left it became a no-op, so the frontage points froze against
+            # whatever road network existed the first time it ran. When the roads import was
+            # fixed on 2026-08-26 and gained 237 segments (private and MOT roads that had been
+            # silently filtered), not one parcel was recomputed. Stale-by-design.
+            #
+            # Recomputation is cheap and the inputs only change at import, so there is no
+            # reason to skip rows.
             candidate_ids = [r[0] for r in conn.execute(text("""
-                SELECT id 
-                FROM public.parcels 
-                WHERE lat IS NOT NULL AND lng IS NOT NULL 
-                  AND (front_lat IS NULL OR front_lat = lat)
+                SELECT id
+                FROM public.parcels
+                WHERE lat IS NOT NULL AND lng IS NOT NULL
+                  AND geom IS NOT NULL
                 ORDER BY id;
             """)).fetchall()]
 
         total_candidates = len(candidate_ids)
         if total_candidates == 0:
-            logging.info("  All parcels already have road-aligned frontage points.")
+            logging.info("  No parcels with geometry to compute frontage for.")
             return 0
 
         logging.info(f"  Calculating road frontage coordinates for {total_candidates} parcels (chunks of {batch_size})...")
 
         chunk_sql = text("""
         UPDATE public.parcels p SET
-            front_lat = ST_Y(nearest.pt),
-            front_lng = ST_X(nearest.pt)
+            front_lat  = ST_Y(nearest.pt),
+            front_lng  = ST_X(nearest.pt),
+            updated_at = now()
         FROM (
             SELECT DISTINCT ON (p2.id)
-                p2.id as parcel_id,
-                ST_ClosestPoint(r.geom, ST_SetSRID(ST_MakePoint(p2.lng, p2.lat), 4326)) as pt
+                p2.id AS parcel_id,
+                -- Measured to the parcel POLYGON, not its centroid. The centroid of a large
+                -- or irregular lot can be far from the street, and on 177 parcels citywide it
+                -- falls OUTSIDE the parcel entirely (L-shaped and wrapped sites). 2865 Glen Dr
+                -- is 8 legal lots whose centroid sits 135.6 m from Glen Drive, which is how
+                -- every centroid-based method ended up choosing a neighbouring road.
+                ST_ClosestPoint(r.geom, p2.geom) AS pt
             FROM public.parcels p2
             CROSS JOIN LATERAL (
-                SELECT geom FROM public.roads r2
+                -- CONSTRAINED TO THE STREET THE ADDRESS NAMES.
+                --
+                -- This is the whole correction. It previously took the nearest road of ANY
+                -- name, which put 1,813 parcels on a street their address does not name --
+                -- 2865 Glen Dr landed on Guildford Way, 254 m from where a crew should stop.
+                --
+                -- The street is not a preference to be weighed against geometry: the address
+                -- states it, and both sides are municipal data (parcels.street against
+                -- roads.roadname). A scoring weight can be outvoted by parallelism or road
+                -- class; a filter cannot. Department decision 2026-08-29.
+                --
+                -- Apostrophes are stripped on both sides because the cadastre writes
+                -- "Deer's Leap" and the road layer writes "Deers Leap" -- our normalization
+                -- gap, not a City one.
+                SELECT r2.geom
+                FROM public.roads r2
                 WHERE r2.geom IS NOT NULL
-                ORDER BY r2.geom <-> ST_SetSRID(ST_MakePoint(p2.lng, p2.lat), 4326)
+                  AND upper(replace(r2.roadname, '''', ''))
+                      = upper(replace(p2.street, '''', ''))
+                ORDER BY r2.geom <-> p2.geom
                 LIMIT 1
             ) r
             WHERE p2.id >= :min_id AND p2.id <= :max_id
               AND p2.lat IS NOT NULL AND p2.lng IS NOT NULL
-              AND (p2.front_lat IS NULL OR p2.front_lat = p2.lat)
+              AND p2.geom IS NOT NULL
+              AND p2.street IS NOT NULL AND btrim(p2.street) <> ''
         ) nearest
         WHERE p.id = nearest.parcel_id;
         """)
+        # NOTE: parcels whose addressed street has no matching road are deliberately left
+        # untouched rather than snapped to the nearest road of another name. There are 54 of
+        # them, every one tracked in docs/city_gis_data_register.md as a municipal data gap.
+        # They surface as an approximate location rather than a confident wrong one (§6.1).
+        #
+        # NOTE: entrance_lat / entrance_lng are NEVER written here. Those hold the
+        # operator-verified access point, and human knowledge must survive the pipeline that
+        # regenerates the computed values.
 
         start_t = time.time()
         total_updated = 0

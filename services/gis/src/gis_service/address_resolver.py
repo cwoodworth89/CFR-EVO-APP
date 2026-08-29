@@ -316,8 +316,21 @@ class AddressResolver:
                     )
 
                 if best_row is not None:
-                    dest_lat = best_row['front_lat'] or best_row['entrance_lat'] or best_row['lat']
-                    dest_lng = best_row['front_lng'] or best_row['entrance_lng'] or best_row['lng']
+                    # Precedence: operator-verified entrance, then the computed frontage
+                    # point, then the parcel centroid.
+                    #
+                    # This used to read front -> entrance -> centroid. Since front_lat is
+                    # populated on all 65,401 parcels, entrance_lat was unreachable -- and it
+                    # held a copy of the centroid anyway, so reaching it would have changed
+                    # nothing. A company officer who records that the gate is off the rear
+                    # lane must outrank a geometric calculation; that is the whole point of
+                    # recording it.
+                    #
+                    # The centroid remains the last resort. It is a real position for the
+                    # parcel, not a fabricated one, and only applies if a parcel somehow has
+                    # no frontage point at all.
+                    dest_lat = best_row['entrance_lat'] or best_row['front_lat'] or best_row['lat']
+                    dest_lng = best_row['entrance_lng'] or best_row['front_lng'] or best_row['lng']
                     rings = self._extract_rings(best_row['geom_geojson'])
                     st_type = best_row['streettype'] or ''
                     clean_addr = title_address(f"{best_row['house']} {best_row['street']} {st_type}".strip())

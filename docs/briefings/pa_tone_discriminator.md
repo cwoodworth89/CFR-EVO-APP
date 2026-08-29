@@ -315,3 +315,60 @@ GENUINE DISPATCHES REJECTED :  0 of 97
 
 > Deploying this needs a `cfr-agent` restart, which briefly drops the audio listener — a live
 > call in that window is missed. Worth timing.
+
+
+---
+
+## Operator decisions, 2026-08-29 — all three answered
+
+1. **All six candidates are PA**, and tagged as such. `87EA26`, `A9D408`, `8E6CAD`, `2410A2`,
+   `D467FE`, `002248`. The 647 Hz rule's ground truth is now operator-confirmed rather than
+   partly inferred.
+2. **`DISP-2026-282647` is excluded from the analysis.** Its PA tone arrives mid-call; the
+   operator has also excluded it from the STT training set.
+3. **Log-only for now.** `REJECT_NON_DISPATCH_ENFORCE` stays `False`.
+
+### Re-verified against the confirmed labels, 125 events
+
+```
+confirmed PA / system-PA : 25   caught 25
+everything else          : 99   flagged  1   <- the known mains-hum event
+GENUINE DISPATCHES WRONGLY FLAGGED: 0
+```
+
+The 647 Hz rule is now **25/25 on operator-confirmed ground truth**, with the only other flag
+being the interference case it is meant to catch.
+
+---
+
+## Chief Tone: 4 → 3, and why tagging alone will not grow it
+
+Re-measured after screening out PA and hum:
+
+| Tone | Events | Observed | Configured | Drift |
+|:--|--:|:--|:--|--:|
+| Engine | 55 | 600 / 1350, zero variance | 600, 1350 | 0.0 |
+| Rescue | 41 | 726 / 892 | 727, 892 | −1.0 |
+| **Chief** | **3** | 440 / 659 | 440, 660 | −1.0 |
+
+**Chief dropped from 4 to 3: one of the original four was the mains-hum event.** The warning
+that hum might be contaminating the Chief sample turned out to be true, and it was 25% of it.
+
+### The important practical point
+
+**Tagging historical records in the review panel does not add spectral samples.**
+`tone_spectral_history.jsonl` is written by the listener at detection time, so it only grows
+when new calls actually arrive. The log went 122 → 125 today; the operator's tagging improved
+the PA *ground truth* (via the database join) but added nothing to the Chief *frequency*
+evidence.
+
+**But the audio is archived, so it can be backfilled.** There are **20 Chief-toned dispatches
+with stored WAVs** against 3 in the spectral log. Re-running `analyze_live_audio()` over the
+first 3.5 s of each archived recording would reconstruct the same peak data the listener would
+have logged, taking Chief from 3 samples to as many as 20 — enough to actually judge the
+fingerprint.
+
+That is a contained offline script over `backend/data/audio/`, touching no live path. Worth
+doing before any decision about the Chief fingerprint, and it would also let every apparatus
+tone be re-validated on the full 487-recording corpus rather than on whatever happened to be
+live since 2026-08-21.

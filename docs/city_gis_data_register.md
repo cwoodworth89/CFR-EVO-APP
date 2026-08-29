@@ -312,6 +312,40 @@ per site, not a code fix.
 
 ---
 
+## 13. Is there a driveway curb-cut / property access point layer?
+
+**Status:** open question, never asked.
+
+`docs/emergency_routing_gis_parcels_standard.md` §2.7 specifies a Tier 2 resolution step
+sourced from a municipal *"Curb-Cut & Ingress Layer (`access_points.shp`)"* — a point per
+property marking where the driveway apron meets the street. That tier sits directly above our
+computed frontage point in its hierarchy.
+
+**We do not hold such a layer, and nothing in the Coquitlam Open Data Portal that we have
+imported contains one.** The proposal did not record where it expected the file to come from,
+so the tier has never been reachable.
+
+This is worth asking about rather than assuming, because it is the one input that would
+materially reduce the review queue in punch-list #49. Our computed arrival point is the closest
+point on the addressed street to the parcel polygon — correct for ordinary lots, and an
+approximation on the 1,395 large sites in `docs/complex_sites_for_review.csv`, each of which
+otherwise needs a human decision.
+
+**Questions for City GIS:**
+
+1. Does the City maintain a driveway / curb-cut / property-access point layer, in any form —
+   Engineering, Transportation, or as part of development permit records?
+2. If so, what is its coverage? Full-city, or only new subdivisions since some date?
+3. Is there an authoritative source for **gated** access — strata gate locations, keypad or
+   Knox box positions? (We would not expect this in open data, but it is worth establishing
+   whether it exists anywhere before we collect it by hand.)
+
+**If the answer is no**, that is a useful answer too: it settles that operator-recorded
+entrance points are the only path, and #49's review UX becomes the whole solution rather than
+a fallback. Record the answer here either way.
+
+---
+
 ## Closed items
 
 ### `Deer's Leap Pl` — OURS, not a City gap

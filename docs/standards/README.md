@@ -31,6 +31,14 @@ no WAN.
 > inventory pass is planned. Until a row says HELD, treat this table as a list of known
 > gaps, not as a source.
 
+> [!CAUTION]
+> **`docs/emergency_routing_gis_parcels_standard.md` is not a source, despite its contents.**
+> It was written as an "Authoritative Engineering Standard, Release 1.0.0" and cites NENA,
+> NFPA and APCO clauses precisely throughout — but it was never ratified, and **it holds none
+> of the documents it cites**, exactly as this table records. It was retitled to *Design
+> Proposal (UNADOPTED)* on 2026-08-29 and annotated with its measured errors in its own §0.
+> Do not treat a clause number found there as provenance; every one of them is unverified.
+
 ## Status
 
 | Subsystem | Governing standard (expected) | Status | Notes |

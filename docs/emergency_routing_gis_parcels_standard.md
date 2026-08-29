@@ -1,17 +1,142 @@
-# Architectural Decision Standard & Engineering Specification: Emergency Vehicle Routing to Cadastral GIS Parcels
+# Design Proposal (UNADOPTED): Emergency Vehicle Routing to Cadastral GIS Parcels
 
-**Document Identifier**: `CFR-EVO-STD-GIS-ROUTING-2026`  
-**Classification**: Public Safety Operational Standard / Core Architecture  
-**Target Platform**: Coquitlam Fire Rescue Emergency Vehicle Operations (CFR EVO)  
-**Target Subsystems**: `cfr_api` (FastAPI Gateway), `cfr_valhalla` (Valhalla Routing Service), `cfr_postgres` (PostgreSQL 16 + PostGIS 3.4), `cfr_kiosk` (Wayland Touchscreen HUD)  
-**Primary Metric Coordinate Reference System (CRS)**: `EPSG:26910` (NAD83 / UTM Zone 10N)  
-**Display / Geodetic CRS**: `EPSG:4326` (WGS84) / `EPSG:3857` (Web Mercator)  
-**Date of Ratification**: August 2026  
-**Document Status**: Authoritative Engineering Standard (Release 1.0.0)
+> [!CAUTION]
+> **This is not a standard, and it was never ratified.** It was retitled and re-classified on
+> 2026-08-29 because its previous framing — *"Authoritative Engineering Standard, Release
+> 1.0.0"* — caused it to be read as a description of the system CFR EVO actually runs. It is
+> not. Large parts of it describe software that does not exist, data the City of Coquitlam does
+> not publish to us, and compliance with standards this project does not hold.
+>
+> **Read §0 below before acting on any part of it.**
+
+**Document Identifier**: `CFR-EVO-PROPOSAL-GIS-ROUTING-2026`
+**Classification**: Unadopted design proposal / research write-up. **Not an operational
+authority.** Nothing in it may be cited as provenance for a constant (CLAUDE.md §6.3, §7.4).
+**Target Platform**: Coquitlam Fire Rescue Emergency Vehicle Operations (CFR EVO)
+**Subsystems it assumes**: `cfr_api` (FastAPI Gateway), `cfr_postgres` (PostgreSQL 16 +
+PostGIS 3.4), `cfr_kiosk`, and **`cfr_valhalla` — which is not deployed and was never
+adopted.** The system routes on OSRM (`cfr_osrm`, stock `driving` profile, MLD algorithm).
+**CRS it assumes**: `EPSG:26910` (NAD83 / UTM Zone 10N) as the primary metric CRS.
+**The database as built does not use 26910 in any column** — all geometry is `EPSG:4326`.
+**Originally dated**: August 2026
+**Status**: ⚠️ **UNADOPTED — annotated for known errors 2026-08-29.** Superseded in part by
+what was actually built; see §0.
+
+
+---
+
+## §0 What in this document is true — read before anything else
+
+Added 2026-08-29 by the QA/GIS workstream. Everything below §0 is the document as originally
+written, annotated in place. **Original claims are left visible and corrections recorded beside
+them rather than overwriting them**, so a reader can see both what was asserted and what was
+found.
+
+Every finding here was **measured against the running kiosk system or the working tree**, not
+inferred from reading. The queries are reproducible on request.
+
+### The part that is genuinely good, and was adopted
+
+**§2.1–§2.4 — boundary-edge decomposition and multi-criteria frontage scoring — is sound work,
+and its central insight is now in production.** Snapping a parcel by its polygon boundary rather
+than its centroid is what fixed large sites: `2865 Glen Dr`'s centroid is 135.6 m from Glen
+Drive, and on 177 parcels citywide the centroid falls outside the parcel entirely.
+
+What was **not** adopted is its treatment of the street name as a scoring weight. The proposal's
+`(1.0 + 2.0 * I_name)` prior gives the addressed street a 3× advantage and then lets
+parallelism, edge length and road class outvote it. That is a weight overruling a municipal
+fact, and it put **1,813 of 65,399 parcels on a street their address does not name**. In
+production the street name is a **filter**, not a prior — see
+[`briefings/addressed_street_snapping_decision.md`](./briefings/addressed_street_snapping_decision.md).
+
+### Claims that are measurably false
+
+| § | The document says | Measured |
+|:--|:--|:--|
+| §3.1.3 | Response zones *"form a seamless planar partition with **zero slivers, zero gaps, and zero overlapping polygons**"* | **0.2937 km²** of the city lies in no zone; **33 overlapping zone pairs**; those overlaps total 0.0001 km² — they *are* slivers. Two junctions already fall in the gap and resolve to no map grid. |
+| §3.1.2 | Road centrelines carry `Z_Level` for bridge / surface / tunnel separation | **There is no `Z_LEVEL`, level or elevation attribute** in the City's `Roads.shp` or in `public.roads`. A safety guarantee was built on a field that does not exist; it could never have fired. |
+| §3.1.2 | Segments carry left/right **parity** (`O` / `E`) | `public.roads` has `left_begin`, `left_end`, `right_begin`, `right_end` — the ranges exist. **There is no parity field.** |
+| §3.1.1 | *"Every geocoded address in CFR EVO records its placement method"* (`PlacementMethod`) | **No such column exists** on `public.parcels`. Nothing records placement method. |
+| §1.4 | `ST_Buffer(geom, 50)` to build a 50 m exclusion ring | The geometry is 4326, so `ST_Buffer` buffers in **degrees**. As written this yields a **57,232,823 km²** polygon — roughly 11% of the Earth. The correct form is `ST_Buffer(geom::geography, 50)::geometry` (0.019 km²). |
+
+### Software this document describes that does not exist
+
+| § | Described | Reality |
+|:--|:--|:--|
+| §1.5, §1.4, §4.3 | Valhalla as the primary routing engine, `exclude_polygons`, request-time dynamic costing | **Valhalla is not deployed.** There is no `cfr_valhalla` container. Routing is OSRM on the **stock `driving` profile**. The Valhalla migration was reviewed and **paused**. |
+| §3.4 | An OSRM Lua profile `evo.lua` carrying emergency tagging rules | **No `.lua` file exists anywhere in the repository.** No custom profile has ever been written. |
+| §2.5 | `parcel_access_overrides` + `parcel_access_overrides_history`, audit triggers, Knox / FDC / staging coordinates | **Neither table exists.** What was built instead is `public.parcels.entrance_lat/lng` with `entrance_set_by`, `entrance_set_at`, `entrance_note`. All 65,401 entrance points are currently NULL and there is no UI to set one — punch-list #49. |
+| §2.6 | Three PL/pgSQL functions | Only `fn_calculate_parcel_road_snap` is registered in the database, and **it is called by nothing**. `fn_determine_arrival_side_and_heading` and `fn_resolve_incident_routing_destination` do not exist. |
+| §2.7 Tier 2 | A municipal curb-cut / ingress layer, `access_points.shp` | **The City does not publish this to us and we do not hold it.** The tier is unreachable. |
+| §3.5 | Grade-aware routing, DEM ingestion, downhill speed caps by slope | **There is no elevation or DEM data anywhere in the system.** `public.roads` has no grade, incline or elevation column, and no HGT / GeoTIFF raster is held. Every equation in §3.5 has no input. |
+| §2.7 | A 5-tier resolution hierarchy | What is built is **three** tiers: `entrance → front → centroid`. Tiers 2 and 3 as described have no data source. |
+
+### Numbers presented as authority that have no source
+
+CLAUDE.md §6.3 requires every operational constant to name where it came from, and §7.4 requires
+the clause rather than the document. Neither is satisfied anywhere below.
+
+* **§1.1 Table 1.1** — the engine benchmark was **not measured on this system**. Our OSRM
+  measures **44.6 MiB** container RSS against the table's "~80 MB", **232 MB** on disk against
+  "~110 MB", and a **median 1.4 ms** route against a stated floor of 1.5 ms. The table's figures
+  should not be quoted for this deployment — and the comparison that actually matters is on
+  **Raspberry Pi**, which neither the table nor our measurement covers.
+* **§1.2 Table 1.2** — apparatus weights, heights, turning radii and speed factors are presented
+  as CFR fleet specification. **They are not sourced from CFR's fleet.** No apparatus
+  specification document is held. They must be confirmed against the actual apparatus by the
+  department before any of them influences a route. `APPARATUS_TIERS` in
+  `services/gis/src/gis_service/routing_engine.py` is **deliberately staged and not applied**
+  (CLAUDE.md §6.4) for exactly this reason.
+* **§1.3** — gate and preemption delays (`+10 s`, `+15 s`, `+30 s`, `+45 s`, and `+1.5 s` vs
+  `+12.0 s`) carry **no cited source of any kind**. Whether Coquitlam runs Opticom / EMTRAC
+  preemption at all is unconfirmed. §1.3.4's proposal to treat `no_left_turn` and `no_u_turn` as
+  permitted is an **operational and legal policy decision the department has not made.**
+* **§2.7 Table 2.1** — the per-tier confidence figures (100% / 95% / 85% / 75% / 50%) and the
+  latency figures are invented. Confidence in this system is **not calibrated**: score 100 was
+  wrong on 8% of reviewed calls, while the 81–89 band was flawless (punch-list #32).
+* **§3.2** — NFPA clause numbers are cited precisely (`1225 §18.2`, `1710 §4.1.2.1`, `1900 §5.7`,
+  `1141 §5.2`). **This project holds none of those documents** — see
+  [`standards/README.md`](./standards/README.md), where every row reads `NOT HELD`. The figures
+  may well be correct; they are **unverified**, and a precise-looking clause number on an
+  unverified figure is worse than no citation, because it stops the next reader checking.
+* **§3.5 Table 3.2** — the thermal brake simulation is an unvalidated model with invented inputs
+  (250 kg of brake steel, a 350 kW retarder, 150 °C ambient) and, as above, no elevation data to
+  run on.
+* **§4.3 Table 4.1** — the polygon-vertex benchmark was not measured on this system, and it
+  benchmarks a Valhalla feature that is not deployed.
+* **§3.6 Table 3.3** — the academic citations are **unverified**. They have not been checked
+  against the publications and several could not be located. Treat none of them as support for a
+  value until the paper is in hand (CLAUDE.md §7.3 — recollection is not provenance).
+
+### How to use this document
+
+1. **Never cite it as provenance.** It is not a source. If you need a governing authority, start
+   at [`standards/README.md`](./standards/README.md); if nothing there covers your decision,
+   stop and raise it with the operator (CLAUDE.md §7.2).
+2. **§2.1–§2.4 is worth reading** for the frontage-scoring approach, with the street-name
+   correction noted above.
+3. **Treat the rest as a wish list** — and note that several of the wishes need data the City
+   does not publish. Those belong in
+   [`city_gis_data_register.md`](./city_gis_data_register.md) as requests, not in code as
+   assumptions.
+4. **Anything adopted from here needs its own provenance**, gathered independently.
+
+Full review correspondence, with the queries behind every figure above:
+[`briefings/valhalla_standard_review_response.md`](./briefings/valhalla_standard_review_response.md)
+and
+[`briefings/snapping_proposal_review_response.md`](./briefings/snapping_proposal_review_response.md).
 
 ---
 
 ## Executive Summary & Document Control
+
+> [!WARNING]
+> **This summary describes a proposed pipeline, not the one that runs.** It presents itself as
+> establishing "the comprehensive, authoritative engineering standard" and as providing what is
+> "required for autonomous software agents to implement and deploy the production routing
+> pipeline". It was never adopted, and following it as written would build against a routing
+> engine, database tables and municipal layers that do not exist. See §0.
+
 
 Emergency Vehicle Operations (EVO) and Computer-Aided Dispatch (CAD) systems operate under life-critical time constraints governed by statutory public safety standards (**NENA**, **NFPA**, **APCO**). Unlike civilian turn-by-turn routing—which optimizes for passenger vehicle fuel economy, toll avoidance, or average traffic flow—heavy municipal fire apparatus (pumpers, quints, heavy rescues, and 105-foot aerial ladders weighing between 16,000 kg and 38,500 kg) operate under strict physical envelopes, complex legal exemptions, dynamic road obstructions, steep topographic grade resistance, and severe thermal brake fade risks.
 
@@ -70,6 +195,14 @@ graph TD
 
 ## 1.1 Architectural & Performance Benchmark Matrix
 
+> [!WARNING]
+> **These figures were not measured on this system.** Measured on the current test kiosk, our
+> OSRM uses **44.6 MiB** RSS (table: "~80 MB"), **232 MB** on disk (table: "~110 MB"), and
+> returns a **median 1.4 ms** route — below the table's stated 1.5 ms floor. The production
+> fleet is **Raspberry Pi**, which neither this table nor our kiosk measurement represents.
+> Do not quote this table for this deployment.
+
+
 To establish the optimal routing infrastructure for CFR EVO's 100% offline station kiosks (Intel N100 mini-PCs and Raspberry Pi 5 single-board computers) and apparatus Mobile Data Terminals (MDTs), three premier open-source routing engines were benchmarked: **OSRM (Open Source Routing Machine)**, **Valhalla**, and **GraphHopper**.
 
 ### Table 1.1: Comprehensive Routing Engine Benchmark & Architectural Matrix
@@ -92,6 +225,16 @@ To establish the optimal routing infrastructure for CFR EVO's 100% offline stati
 ---
 
 ## 1.2 Apparatus Profiling & Physical Constraints
+
+> [!CAUTION]
+> **These are not CFR's apparatus specifications.** No fleet specification document is held, and
+> the weights, heights, turning radii and speed factors below have no departmental source. The
+> "Governing Standard" column cites NFPA 1900, NFPA 1141, AASHTO and SAE J1106 — **this project
+> holds none of them** (`docs/standards/README.md`). Confirm every figure against the actual
+> apparatus with the department before any of it influences a route. `APPARATUS_TIERS` in
+> `services/gis/src/gis_service/routing_engine.py` is deliberately **staged and not applied**
+> (CLAUDE.md §6.4) for this reason.
+
 
 Emergency apparatus exhibit physical mass and geometric footprints that divergence sharply from civilian vehicles. CFR EVO categorizes apparatus into three operational physical tiers:
 
@@ -163,6 +306,15 @@ classDiagram
 
 ## 1.3 Legal Exemptions, Turn Restrictions & Code 3 Speed Models
 
+> [!CAUTION]
+> **None of the delay constants below carry a source, and none of these exemptions is
+> implemented.** The gate delays (+10 s / +15 s / +30 s / +45 s) and the preemption figures
+> (+1.5 s under Opticom vs +12.0 s without) are unsourced; whether Coquitlam operates signal
+> preemption at all is unconfirmed. §1.3.4 proposes treating `no_left_turn` and `no_u_turn` as
+> permitted — that is an **operational and legal policy decision the department has not made**,
+> not an engineering parameter.
+
+
 Under the **British Columbia Motor Vehicle Act (RSBC 1996, c. 318, §122 - Exemption for Emergency Vehicles)** and **NFPA 1500**, emergency apparatus responding in **Code 3 (Emergency / Lights & Siren)** mode possess statutory privileges, subject to the exercise of due regard for life and safety:
 
 ### 1. One-Way Street Contraflow (`oneway=yes`)
@@ -187,6 +339,14 @@ Under the **British Columbia Motor Vehicle Act (RSBC 1996, c. 318, §122 - Exemp
 
 ## 1.4 Dynamic Road Closures & Exclusion Polygons
 
+> [!CAUTION]
+> **The `ST_Buffer` call in the diagram below is wrong by a factor of roughly 10^10.** Our
+> geometry is `EPSG:4326`, so `ST_Buffer(geom, 50)` buffers in **degrees**, not metres, and
+> produces a **57,232,823 km²** exclusion polygon — about 11% of the Earth. The correct form is
+> `ST_Buffer(geom::geography, 50)::geometry`, which gives 0.019 km². The rest of the section
+> describes Valhalla `exclude_polygons`, which is **not deployed**.
+
+
 Real-time impediments—such as CP Rail mainline freight train blockages at Cape Horn or King Edward St, municipal water main failures, downed BC Hydro transmission lines, and 3-alarm structure fire hose lays—must be avoided dynamically during path calculation.
 
 ```mermaid
@@ -209,6 +369,16 @@ flowchart LR
 
 ## 1.5 Primary Engine Selection Justification
 
+> [!CAUTION]
+> **Valhalla was not selected, and is not deployed.** There is no `cfr_valhalla` container. CFR
+> EVO routes on **OSRM** with the stock `driving` profile (MLD). The Valhalla migration was
+> reviewed and **paused** — see
+> [`briefings/valhalla_standard_review_response.md`](./briefings/valhalla_standard_review_response.md),
+> whose central objection stands: the measured defect was *which coordinate is handed to the
+> router*, which is decided before any engine is involved, so an engine swap would not have
+> fixed it.
+
+
 **Valhalla is selected as the primary emergency routing engine for CFR EVO**, with a containerized **OSRM deployment retained strictly as a secondary failover and baseline compatibility layer**. Valhalla is the only open-source C++ routing engine that natively reconciles the core operational conflict of municipal emergency dispatch: the requirement for **sub-15ms multi-apparatus query latency** combined with **100% request-time dynamic parameterization** (arbitrary vehicle dimensions, axle weights, turn-penalty matrices, elevation-grade drag, and live polygon roadblock injection) without requiring graph recompilation or multi-process daemon replication. While OSRM achieves ultra-low memory overhead (~80MB RAM) and sub-5ms routing via Contraction Hierarchies and Multi-Level Dijkstra, its graph weights and Lua profiles are statically baked during offline preprocessing; supporting three distinct apparatus classes (Light, General, Heavy) and dynamic incident roadblock exclusions in OSRM requires running three separate daemon processes on isolated ports or resorting to external waypoint-steering hacks. GraphHopper provides flexible runtime Custom Models but imposes a severe JVM runtime footprint (1.2–2.0GB heap RSS), non-deterministic garbage collection pause spikes (50–200ms), and 15–25s cold-start bootstrap times that degrade reliability on constrained kiosk hardware (Raspberry Pi 5 / Intel N100). Valhalla’s modern C++ tile hierarchy (Levels 0–2), LRU in-memory tile cache (~120–250MB RAM), native 3D LiDAR/HGT digital elevation integration, and query-level `exclude_polygons` and `costing_options` JSON payloads enable CFR EVO to calculate custom, physically accurate, elevation-adjusted routes for multiple dispatched units (Engine, Ladder, Squad, Chief) and steer around real-time CP Rail track blockages in a single API round-trip under 15ms.
 
 ---
@@ -216,6 +386,15 @@ flowchart LR
 # Section 2: Street-to-Parcel Routing Architecture & Geometric Edge Matching
 
 ## 2.1 Failure Modes of Naive Centroid Snapping
+
+> [!NOTE]
+> **§2.1–§2.4 is the sound part of this document, and its central insight was adopted.**
+> Measuring to the parcel **polygon** rather than the centroid is what fixed large sites. One
+> thing was not adopted: the street name is a **filter** in production, never a scoring weight —
+> the `(1.0 + 2.0 * I_name)` prior in §2.2 put 1,813 parcels on a street their address does not
+> name. See
+> [`briefings/addressed_street_snapping_decision.md`](./briefings/addressed_street_snapping_decision.md).
+
 
 Naive centroid snapping calculates the geometric center of a parcel polygon ($C = \text{ST\_Centroid}(P)$ or $C = \text{ST\_PointOnSurface}(P)$) and projects an orthogonal vector to the closest road centerline segment in the spatial index:
 
@@ -437,6 +616,14 @@ $$Z = \vec{V}_{\text{road}} \times \vec{V}_{\text{disp}} = (x_2 - x_1)(y_{\text{
 
 ## 2.5 Production PostgreSQL / PostGIS DDL Schema
 
+> [!CAUTION]
+> **Neither table below exists, and this DDL was never applied.** What was built instead is
+> `public.parcels.entrance_lat` / `entrance_lng` with `entrance_set_by`, `entrance_set_at` and
+> `entrance_note` for attribution. All 65,401 entrance points are currently NULL and there is no
+> interface to set one — punch-list #49. The Knox box, FDC, staging and ingress coordinates
+> below have **no data source**; nothing publishes them to us.
+
+
 The following production-ready DDL defines the `public.parcel_access_overrides` and `public.parcel_access_overrides_history` tables, including spatial GiST indexes, check constraints, generated geometry columns, and automated audit triggers.
 
 ```sql
@@ -634,6 +821,14 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_audit_parcel_access_overrides();
 ---
 
 ## 2.6 Production PostGIS PL/pgSQL Functions
+
+> [!CAUTION]
+> **Of the three functions below, only `fn_calculate_parcel_road_snap` is registered in the
+> database — and it is called by nothing.** `fn_determine_arrival_side_and_heading` and
+> `fn_resolve_incident_routing_destination` do not exist. Front points are computed by
+> `backend/scripts/import_parcels.py`, not by any of this. Whether to wire the one registered
+> function in or drop it is still open.
+
 
 ### Function 1: `fn_calculate_parcel_road_snap`
 Computes the optimal road snapping point along a parcel's primary frontage using boundary edge decomposition and multi-criteria scoring.
@@ -1050,6 +1245,16 @@ $$;
 
 ## 2.7 5-Tier Fallback Resolution Hierarchy
 
+> [!CAUTION]
+> **What is built is three tiers, not five: `entrance → front → centroid`**
+> (`services/gis/src/gis_service/address_resolver.py`). Tier 1's `parcel_access_overrides`
+> table does not exist; Tier 2's municipal curb-cut layer `access_points.shp` **is not published
+> to us and is not held**, making that tier unreachable. The confidence figures (100% / 95% /
+> 85% / 75% / 50%) and latency figures are invented — confidence in this system is **not
+> calibrated**, and score 100 was wrong on 8% of reviewed calls while the 81–89 band was
+> flawless (punch-list #32).
+
+
 To guarantee deterministic, sub-millisecond route endpoint calculation under all operational conditions, the routing pipeline adheres to a strict 5-Tier Fallback Hierarchy:
 
 ### Table 2.1: 5-Tier Fallback Resolution Hierarchy
@@ -1068,16 +1273,30 @@ To guarantee deterministic, sub-millisecond route endpoint calculation under all
 
 ## 3.1 NENA (National Emergency Number Association) Standards Integration
 
+> [!CAUTION]
+> **This project does not hold NENA-STA-006, and three of the claims below are measurably
+> false.** "Strictly align" cannot be asserted against a document nobody here has read.
+> Specifically: there is **no `PlacementMethod` column** on `public.parcels`; there is **no
+> `Z_Level` field** in the City's roads data, so the overpass safety rule could never have
+> fired; there is **no parity field** (the address ranges do exist as `left_begin` / `left_end`
+> / `right_begin` / `right_end`); and the zones are **not** a seamless partition — 0.2937 km² of
+> the city lies in no zone and 33 zone pairs overlap. Corrections are marked inline below.
+
+
 CFR EVO's spatial data model and geocoding pipeline strictly align with the **NENA Standard for NG9-1-1 GIS Data Model (NENA-STA-006.3-2026)** and related standards:
 
 1. **Site/Structure Address Points (SSAP - NENA-STA-006.3 §3.2)**:
    - **`PlacementMethod` Attribute**: Every geocoded address in CFR EVO records its placement method (`Structure`, `Site`, `PropertyAccess`, `Geocoding`, `Unknown`). Tier 1 overrides are classified as authoritative `PropertyAccess` points.
+   > ❌ **Measured false.** `public.parcels` has no `PlacementMethod` column. Nothing in CFR EVO records a placement method.
    - **Sub-Addressing**: Compliant with NENA CLDXF tokens (`Building`, `Floor`, `Unit`, `Room`).
 2. **Road Centerlines (RCL - NENA-STA-006.3 §3.1)**:
    - **Planar Z-Level Separation**: Bridges (`Z_Level = 1`), surface streets (`Z_Level = 0`), and tunnels (`Z_Level = -1`) must maintain distinct integer levels. Non-intersecting overpasses (e.g., Highway 1 / Lougheed Hwy interchanges) do not create planar nodes, preventing false turns across elevated spans.
+   > ❌ **Measured false.** There is no `Z_LEVEL`, level or elevation attribute in the City's `Roads.shp` or in `public.roads`. This guarantee rests on a field that does not exist and could never have fired.
    - **Address Range & Parity**: Road segments maintain `FromAddr_L`, `ToAddr_L`, `FromAddr_R`, `ToAddr_R` with left/right parity (`O` = Odd, `E` = Even) to validate side-of-street numbering.
+   > ⚠️ **Half true.** The ranges exist as `left_begin` / `left_end` / `right_begin` / `right_end` in `public.roads`. **There is no parity field**, and nothing validates side-of-street numbering.
 3. **Emergency Service Boundaries (ESB - NENA-STA-006.3 §3.3)**:
    - Station primary response zones (1..134 grids) form a seamless planar partition with **zero slivers, zero gaps, and zero overlapping polygons**.
+   > ❌ **Measured false.** 0.2937 km² of the city lies in no zone; 33 zone pairs overlap, totalling 0.0001 km² — those overlaps *are* slivers. `Lincoln Ave & Oxford St` and `Lincoln Ave & Shaughnessy St` already fall in the gap and resolve to no map grid. This should read as a **requirement**, not a description of the data.
 4. **Location Validation Function (LVF - NENA-STA-015.2-2022)**:
    - Pre-validates CAD addresses against the authoritative municipal GIS dataset prior to route calculation, flagging unresolvable addresses with explicit circular uncertainty bounds.
 5. **Canadian Alignment (CRTC ESWG TIF 90 / TIF 92)**:
@@ -1086,6 +1305,16 @@ CFR EVO's spatial data model and geocoding pipeline strictly align with the **NE
 ---
 
 ## 3.2 NFPA Standards Compliance
+
+> [!CAUTION]
+> **This project holds no NFPA document.** Every row of `docs/standards/README.md` reads
+> `NOT HELD`, NFPA standards are licensed, and none has been obtained. The clause numbers below
+> (`1225 §18.2`, `1710 §4.1.2.1`, `1900 §5.7`, `1141 §5.2`) are stated precisely but are
+> **unverified against the standards themselves**. The figures may well be right — but a
+> precise-looking citation on an unchecked figure is worse than none, because it stops the next
+> reader checking (CLAUDE.md §7.4). Nothing here is a compliance statement; it is a list of
+> objectives this project has not yet been able to verify it meets.
+
 
 In accordance with project integrity mandates, all operational constants, timing objectives, and vehicle physics are grounded directly in published NFPA standards:
 
@@ -1120,6 +1349,11 @@ flowchart LR
 
 ## 3.3 APCO Standards Compliance
 
+> [!CAUTION]
+> **No APCO standard is held, and neither item below is implemented.** There is no AVL telemetry
+> feed, and no EIDD interchange of any kind. This is aspiration, not compliance.
+
+
 1. **APCO ANS 1.102.2 / APCO ANS 1.112.1 (CAD Public Safety GIS Identifiers & Functional Standards)**:
    - Enforces unique identification linking CAD incident records, Automatic Vehicle Location (AVL) telemetry GPS feeds, and GIS feature layers.
 2. **NENA/APCO Emergency Incident Data Document (EIDD)**:
@@ -1128,6 +1362,14 @@ flowchart LR
 ---
 
 ## 3.4 OpenStreetMap (OSM) Emergency Tagging Taxonomy & Translation Rules
+
+> [!CAUTION]
+> **Neither translation column below exists.** There is no `evo.lua` — **no `.lua` file exists
+> anywhere in this repository**, and no custom OSRM profile has ever been written; OSRM runs the
+> stock `driving` profile. Valhalla is not deployed, so the costing column has no target either.
+> Whether our OSM extract even carries `maxweight`, `maxheight` or `incline` on Coquitlam roads
+> is unverified. Treat this table as a proposal for work not started.
+
 
 ### Table 3.1: OSM Emergency & Physical Restriction Tagging Matrix
 
@@ -1146,6 +1388,15 @@ flowchart LR
 ---
 
 ## 3.5 Topographic Slope Physics & Heavy Vehicle Dynamics
+
+> [!CAUTION]
+> **There is no elevation data anywhere in this system, so none of this section can run.**
+> `public.roads` has no grade, incline or elevation column, and no DEM/HGT/GeoTIFF raster is
+> held. Every equation below is unfed. The apparatus inputs are invented as well — 250 kg of
+> brake steel, a 350 kW retarder and a 150 °C ambient rotor temperature have no source, and the
+> Table 3.2 simulation has not been validated against anything. **Do not derive a speed cap, a
+> route penalty or an ETA from this section.**
+
 
 Coquitlam features extreme topography across Westwood Plateau, Burke Mountain, Chineside, and Austin Heights, with roadway grades ranging from $8\%$ to $>20\%$.
 
@@ -1240,6 +1491,14 @@ A multi-lane arterial with Opticom preemption ($\mu = 3.5\text{ min}, \sigma = 0
 ---
 
 ## 3.6 Academic Literature Review & Formal Citations
+
+> [!CAUTION]
+> **These citations are unverified.** None has been checked against the actual publication and
+> several could not be located. Presenting them as "the formal empirical and mathematical
+> foundation" of the document overstates what is known. Under CLAUDE.md §7.3, a remembered
+> citation is not provenance — treat none of these as support for a value until the paper is in
+> hand.
+
 
 The following peer-reviewed literature and engineering standards provide the formal empirical and mathematical foundation for this standard:
 
@@ -1730,6 +1989,12 @@ The routing pipeline outputs a consolidated JSON structure consumed directly by 
 
 ## 4.3 Exclusion Polygon Simplification & Computational Complexity Benchmark
 
+> [!CAUTION]
+> **Not measured on this system, and it benchmarks a feature that is not deployed.** Valhalla's
+> `exclude_polygons` does not exist in CFR EVO. "Mandatory Architecture Rule (F-03)" below is
+> mandatory on nothing — no such rule is enforced anywhere in the codebase.
+
+
 In the Valhalla routing engine, `exclude_polygons` accepts GeoJSON linear rings (`[[[lng, lat], ...]]`). During graph expansion in Bidirectional A*, candidate edge segments are evaluated against active polygons using an in-memory 2D bounding box test followed by a ray-casting point-in-polygon (PIP) algorithm.
 
 Ray-casting PIP evaluation complexity scales strictly linearly with polygon vertex count: $O(V)$. Unsimplified buffer rings around complex multi-segment road features (e.g. CP Rail mainlines, Fraser River flood zones) generate 500 to 2,000+ vertices.
@@ -1749,16 +2014,27 @@ All queries generating dynamic exclusion polygons for Valhalla `/route` payloads
 
 ---
 
-# Document Ratification & Provenance
+# Document Provenance (NOT ratified)
+
+> [!CAUTION]
+> **This document was never ratified by anyone with authority over CFR operations.** The
+> "Approved By" line below names roles internal to the drafting process, not the fire
+> department. The standards listed as "Referenced" were **named, not consulted** — this project
+> holds none of them, as recorded in [`standards/README.md`](./standards/README.md). A reference
+> list a reader cannot distinguish from a bibliography of documents actually read is the single
+> thing that made this write-up look authoritative, so it is corrected here rather than removed.
+
 
 * **Original Author**: Worker 1 (Architectural Standard & Research Report Author)
 * **Remediation Author**: Worker 2 (Standard Remediation Author)
-* **Approved By**: CFR EVO System Architecture Team & Reviewer 2
+* **Approved By**: *(drafting-process roles only — no CFR operational sign-off exists)* CFR EVO System Architecture Team & Reviewer 2
 * **Peer Review & Challenge Verification**:
   - Challenger 1 (Adversarial Spatial Algorithms & PostGIS Logic)
   - Challenger 2 (Routing Engine & Apparatus Physics Adversarial Stress-Test)
   - Reviewer 2 (GIS & Public Safety Systems Gate Review)
-* **Referenced Standards**:
+* **Standards named in this document — NONE of which this project holds** (see
+  [`standards/README.md`](./standards/README.md); NFPA and NENA documents are licensed and have
+  not been obtained). Every figure this document attributes to them is **unverified**:
   - NENA-STA-006.3-2026 (NG9-1-1 GIS Data Model)
   - NENA-STA-010.3b-2021 (i3 Standard for NG9-1-1)
   - NENA-STA-015.2-2022 (Location Validation Function)
@@ -1770,4 +2046,4 @@ All queries generating dynamic exclusion polygons for Valhalla `/route` payloads
   - APCO ANS 1.102.2 / APCO ANS 1.112.1 (CAD Public Safety GIS Identifiers)
   - British Columbia Motor Vehicle Act (RSBC 1996, c. 318, §122)
 
-*End of Standard Specification.*
+*End of proposal. Nothing above is adopted except where §0 says so.*

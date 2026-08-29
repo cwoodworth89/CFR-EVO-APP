@@ -98,7 +98,7 @@ by nothing. Decide whether to wire it in or drop it.
 It holds the pre-correction state. Pre-*snapping* state is in
 `cfr-full-20260828-031501.sql.gz`.
 
-### 4. City GIS register has 12 open items.
+### 4. City GIS register has 13 open items.
 `docs/city_gis_data_register.md`. Highest value: obtaining **NENA-STA-006** would turn the
 first row of `docs/standards/README.md` from `NOT HELD` to `HELD` and governs exactly the
 site-vs-access-point distinction this work is about.

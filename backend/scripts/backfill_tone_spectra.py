@@ -55,12 +55,30 @@ sys.path.insert(0, BACKEND_DIR)
 from audio_service.dsp_tone_spotter import (  # noqa: E402
     analyze_live_audio, get_all_matches, has_pa_marker, is_mains_hum,
 )
-from cfr_dispatch.config.dsp import (  # noqa: E402
-    GOLDEN_FINGERPRINTS, FREQUENCY_TOLERANCE_HZ, MATCH_THRESHOLD_PERCENT,
-    NUM_PEAKS_TO_FIND, TONE_ZSCORE_THRESHOLD, TONE_ANALYSIS_DURATION_SECONDS,
-    PA_DISCRIMINATOR_HZ, MAINS_HUM_FUNDAMENTAL_HZ, MAINS_HUM_TOLERANCE_HZ,
-    MAINS_HUM_MIN_PEAKS,
-)
+# Load config/dsp.py DIRECTLY rather than via `from cfr_dispatch.config.dsp import`.
+# That package's __init__ injects sibling service paths and pulls in sounddevice,
+# which fails on a headless SSH session with
+#   PortAudioError: PulseAudio_Initialize: Can't connect to server
+# The documented workaround is XDG_RUNTIME_DIR=/run/user/1000, but an offline
+# analysis script has no business needing audio hardware at all. Loading the module
+# by path keeps it runnable anywhere, including a dev machine with no PortAudio.
+import importlib.util as _ilu  # noqa: E402
+
+_dsp_path = os.path.join(BACKEND_DIR, "cfr_dispatch", "config", "dsp.py")
+_spec = _ilu.spec_from_file_location("_cfr_dsp_config", _dsp_path)
+_dsp = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_dsp)
+
+GOLDEN_FINGERPRINTS = _dsp.GOLDEN_FINGERPRINTS
+FREQUENCY_TOLERANCE_HZ = _dsp.FREQUENCY_TOLERANCE_HZ
+MATCH_THRESHOLD_PERCENT = _dsp.MATCH_THRESHOLD_PERCENT
+NUM_PEAKS_TO_FIND = _dsp.NUM_PEAKS_TO_FIND
+TONE_ZSCORE_THRESHOLD = _dsp.TONE_ZSCORE_THRESHOLD
+TONE_ANALYSIS_DURATION_SECONDS = _dsp.TONE_ANALYSIS_DURATION_SECONDS
+PA_DISCRIMINATOR_HZ = _dsp.PA_DISCRIMINATOR_HZ
+MAINS_HUM_FUNDAMENTAL_HZ = _dsp.MAINS_HUM_FUNDAMENTAL_HZ
+MAINS_HUM_TOLERANCE_HZ = _dsp.MAINS_HUM_TOLERANCE_HZ
+MAINS_HUM_MIN_PEAKS = _dsp.MAINS_HUM_MIN_PEAKS
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("backfill")

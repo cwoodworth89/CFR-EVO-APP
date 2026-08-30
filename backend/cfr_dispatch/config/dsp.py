@@ -108,9 +108,27 @@ GOLDEN_FINGERPRINTS = {
 # candidates are genuinely PA, and whether a PA tone occurring mid-dispatch could
 # ever reach this decision.
 #
-# To enforce, set REJECT_NON_DISPATCH_ENFORCE = True and restart cfr-agent.
-# Review backend/dispatch.log for "WOULD REJECT" lines first.
-REJECT_NON_DISPATCH_ENFORCE = False
+# ENFORCING since 2026-08-29 (operator decision). Set False to return to log-only.
+#
+# The evidence is the archived-audio backfill, NOT the log-only stage -- there was
+# no traffic in the hour it ran, so it caught nothing. backfill_tone_spectra.py
+# re-analysed all 520 stored recordings instead, which covers the entire corpus
+# rather than one quiet evening:
+#
+#   647 Hz marker in operator-tagged PA pages      22/22   (and 25/25 in the live log)
+#   real dispatches the rule would have suppressed   0
+#
+# The mid-call PA worry was measured rather than argued. The backfill records WHERE
+# each marker sits: PA pages carry it at a median offset of 0.00 s, while real
+# dispatches that contain 647 Hz carry it at a median of 12.50 s -- mid-call, far
+# outside the window the listener examines. Of 39 non-PA recordings containing
+# 647 Hz, exactly one has it inside the first 3.5 s, and that one has no database
+# record at all (an orphaned WAV; 521 recordings against 506 rows).
+#
+# This flag governs BOTH rules. The mains-hum rule rides along by design -- it is
+# safe by construction (see the note beside GOLDEN_FINGERPRINTS) and shares this
+# decision point, so bundling avoided a second listener restart.
+REJECT_NON_DISPATCH_ENFORCE = True
 
 # --- PA pages -------------------------------------------------------------
 # 647 Hz is the only stable PA marker: present in 15/15 labelled PA events and

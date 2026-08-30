@@ -351,3 +351,59 @@ is currently nothing between that keystroke and total loss of the HITL corpus.
 * Retention policy for dispatch audio — is there a privacy or records-retention
   constraint from the department? See [`privacy.md`](./privacy.md).
 * Does `backend/.env` recovery belong in a sealed document rather than any repository?
+
+---
+
+### 10. ♻️ Auto-Recover From a Stale Chunk After a Frontend Deploy
+
+**Prompted by a real incident, 2026-08-29.** A live dispatch arrived
+(`DISP-2026-AAFDB8`, Alarm Activated - High Risk, 1123 Westwood St) and the kiosk
+showed **APPLICATION DIAGNOSTIC ERROR** instead of the map:
+
+```
+TypeError: error loading dynamically imported module:
+http://100.95.146.94/assets/KioskView-B0Wnod_F.js
+```
+
+**Nothing was wrong with the dispatch.** The backend was flawless — Phase 1 TTA 5.14 s,
+address matched 100%, MQTT published, Phase 2 verified. The record is complete. Only the
+display failed.
+
+#### The mechanism, and why it is nastier than it looks
+
+`npm run build` emits content-hashed chunks and **deletes the previous ones**. A kiosk
+browser tab that was already open still holds the *old* `index.html`, which references
+hashes that no longer exist on disk:
+
+```
+present after rebuild : KioskView-Bu8ZsJK9.js
+tab was asking for    : KioskView-B0Wnod_F.js   (deleted by the rebuild)
+```
+
+`KioskView` is **lazy-loaded**, so the stale reference is harmless until the moment a call
+arrives — the tab looks perfectly healthy in the meantime. **A rebuild silently arms this
+in every open tab, and it detonates on the next real dispatch.** That is the worst
+possible timing and precisely what happened.
+
+The existing error boundary caught it and offered *Reload Application*, so nothing was
+lost — but a crew was looking at an error card instead of a map during a live call.
+
+#### Proposed fix
+
+Vite raises a `vite:preloadError` event when a dynamic import fails. Handling it with a
+single automatic `location.reload()` turns the crash into a brief flicker:
+
+```js
+window.addEventListener('vite:preloadError', () => { window.location.reload(); });
+```
+
+**Guard against a reload loop** — if the reload also fails (server genuinely down, not a
+stale chunk), a naive handler reloads forever. Use a `sessionStorage` marker so it retries
+once and then falls through to the existing error boundary.
+
+#### Interim mitigation (operator, 2026-08-29)
+
+Deferred; **be deliberate about hard-reloading the kiosk tab (`Ctrl+Shift+R`) after any
+frontend deploy.** That is the whole fix, it just depends on remembering. Worth noting the
+risk window is any time between a rebuild and the next reload, so a deploy left unreloaded
+overnight is a dispatch waiting to fail.

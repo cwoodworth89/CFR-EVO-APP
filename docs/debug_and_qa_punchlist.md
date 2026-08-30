@@ -3846,3 +3846,83 @@ only flattened into a string for `target.intersection` and for the reconstructed
 **Related and already fixed:** the same fields were omitted from the `DispatchData` copies in
 `phase2.py`, which dropped them from the reconstructed transcript. Fixed 2026-08-29; this entry
 is the remaining display half.
+
+
+---
+
+### 52. An ampersand in the "near" clause silently discarded the second cross street
+> **Status**: ✅ **Fixed 2026-08-30.** Found on the first live call after the #51 transcript fix
+> deployed — `DISP-2026-AAFDB8`, which proved the fix worked *and* exposed this underneath it.
+
+**Announced:** *"1123 Westwood St, **Near, Anson, Avenue & Lincoln Ave**, Use Talk Group 5
+Coquitlam, Map Grid 8, 2"*
+
+**Captured:** `cross_streets: ["Anson Ave"]` — Lincoln Ave gone.
+
+**Cause.** `clean_location_text` (`backend/cfr_dispatch/parser/location.py`) strips trailing
+junk after a street type, so `"Burlington Drive 105"` becomes `"Burlington Drive"`. Its negative
+lookahead protected `and`, `near`, `cross roads`, `cross street` and `cross of` — **but not
+`&`**. So the second cross street parsed as trailing junk and was cut:
+
+```
+'Anson, Avenue & Lincoln Ave'  -> clean_location_text -> 'Anson, Avenue'
+'Anson Ave, and Lincoln Ave'   -> clean_location_text -> 'Anson Ave, and Lincoln Ave'
+```
+
+Everything downstream was correct and irrelevant: both `fuzzy_correct_cross_roads`
+(`location.py:211`) and the column split (`announcement.py:158`) handle `&` properly. They never
+saw it, because the text was already truncated.
+
+**Why it survived this long.** Locution speaks the clause both ways, and the announcement repeats
+itself. This call's **second** round said *"Near, Anson Ave, and Lincoln Ave"* — which parses
+correctly. Round 1 wins the address unconditionally (punch-list #44), so the broken form is the
+one that was kept. Any call announcing the second round first would have looked fine.
+
+**Fix.** `&` added to the negative lookahead, with the measurement inline. Five regression tests
+in `backend/tests/test_pipeline_unit.py::TestCrossRoadCleaning` cover both separator forms and
+confirm trailing unit numbers and business names are *still* stripped.
+
+**Not investigated:** `at` is also a separator in `fuzzy_correct_cross_roads` and is likewise
+absent from the lookahead. It was left alone deliberately — unlike `&`, `at` plausibly introduces
+a landmark rather than a street (*"Lougheed Highway at Superstore"*), and stripping that is
+probably correct. No live example has been measured either way.
+
+---
+
+### 53. The dispatch agent makes a WAN call to huggingface.co on every start
+> **Status**: ⚠️ **Open — not reproduced under WAN failure.** Observed 2026-08-29 in
+> `cfr-agent` startup logs while deploying.
+
+```
+Aug 29 20:26:12 cfr-mapping-tcfh cfr-agent[3321015]: INFO - Loading local faster-whisper
+  model 'base' (device=cpu, compute_type=int8)...
+Aug 29 20:26:12 cfr-mapping-tcfh cfr-agent[3321015]: INFO - HTTP Request: GET
+  https://huggingface.co/api/models/Systran/faster-whisper-base/revision/main "HTTP/1.1 200 OK"
+```
+
+CLAUDE.md §1 requires the entire system — STT included — to function with no internet. The kiosk
+currently has WAN, so this returns 200 and nothing is visibly wrong. The question is what happens
+when it does not.
+
+`faster-whisper` resolves the model through `huggingface_hub`, which checks the repo for a newer
+revision before falling back to the local cache. Two things need establishing, in order:
+
+1. **Does it fail fast or hang?** `huggingface_hub` normally catches connection errors and falls
+   back to cache, but the timeout is not short. If it stalls, **agent startup stalls with it**,
+   and the audio listener is down for that whole window — the same class of outage as a stalled
+   worker (#28), reached a different way.
+2. **Does it fall back at all** if the cache is present but the revision check fails in some
+   other way (DNS resolving to a captive portal, TLS interception, an HTTP 5xx rather than a
+   connection refusal)?
+
+**Do not "fix" this before measuring it.** The obvious change is `local_files_only=True`, or the
+`HF_HUB_OFFLINE=1` environment variable, and it is probably right — but it also pins the kiosk to
+whatever is in the cache, so the model can never be updated without a deliberate step. That is
+arguably the correct trade for this system; it should still be a decision rather than a
+side effect.
+
+**How to test it honestly:** block egress to `huggingface.co` on the kiosk (a null route or an
+`/etc/hosts` entry), restart `cfr-agent`, and time how long it takes to reach *"Background
+Dispatch Worker process initialized and ready."* Compare against the ~2 s it takes today. That
+is a real measurement of the offline guarantee rather than an assumption about it, and it is the
+only way to know whether this is a latent outage or a harmless log line.

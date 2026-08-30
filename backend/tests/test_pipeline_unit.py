@@ -119,3 +119,40 @@ class TestPipelineUnit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCrossRoadCleaning(unittest.TestCase):
+    """`clean_location_text` strips trailing junk after a street type.
+
+    It must not treat the second cross street as junk. Measured on
+    DISP-2026-AAFDB8 (2026-08-30), announced "Near, Anson, Avenue & Lincoln Ave":
+    the ampersand was absent from the stripper's negative lookahead, so
+    "Anson Avenue & Lincoln Ave" was cut to "Anson, Avenue" and Lincoln Ave never
+    reached cross_street_2. The `and` form of the same announcement was unaffected,
+    which is why this survived -- Locution speaks it both ways.
+    """
+
+    CALL_TYPES = ["Alarm Activated", "Medical Aid", "Structure Fire"]
+    UNITS = ["Engine 1", "Rescue 2"]
+
+    def _clean(self, text):
+        from cfr_dispatch.parser.location import clean_location_text
+        return clean_location_text(text, self.CALL_TYPES, self.UNITS)
+
+    def test_ampersand_keeps_the_second_cross_street(self):
+        self.assertEqual(self._clean("Anson, Avenue & Lincoln Ave"),
+                         "Anson, Avenue & Lincoln Ave")
+
+    def test_and_form_still_keeps_both(self):
+        self.assertEqual(self._clean("Anson Ave, and Lincoln Ave"),
+                         "Anson Ave, and Lincoln Ave")
+
+    def test_trailing_unit_number_is_still_stripped(self):
+        self.assertEqual(self._clean("Burlington Drive 105"), "Burlington Drive")
+
+    def test_trailing_business_name_is_still_stripped(self):
+        self.assertEqual(self._clean("Lougheed Highway Superstore"), "Lougheed Highway")
+
+    def test_near_clause_is_still_protected(self):
+        self.assertEqual(self._clean("Westwood Street near Anson Ave"),
+                         "Westwood Street near Anson Ave")

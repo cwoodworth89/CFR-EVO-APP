@@ -3699,12 +3699,12 @@ paired with a test asserting an import leaves `entrance_*` untouched, since the 
 demonstrates that a comment alone does not hold this invariant.
 
 ### 51. Add cross_street_1 and cross_street_2 to the review panel for HITL verification
-> **Status**: ?? **Open � Feature request logged.**
+> **Status**: ?? **Open — Feature request logged.**
 * **Requirement**: The parser extracts cross_street_1 and cross_street_2, but they need to be fully exposed, verifiable, and editable by dispatchers in the Human-In-The-Loop (HITL) review panel.
 * **Context**: This will allow operators to correct or confirm cross streets during the review process, ensuring accuracy for routed crews.
 
 ### 52. Kiosk review button formatting and review rating functionality
-> **Status**: ?? **Open � Feature request logged.**
+> **Status**: ?? **Open — Feature request logged.**
 * **Requirement**: We need to pivot to checking the "review" button to see how its UI and ergonomics look and feel on the physical kiosk display.
 * **Feature Addition**: We need to implement a review rating system so that operators can rate the quality of the dispatch/review (e.g. confidence or accuracy ratings) directly from the kiosk interface.
 
@@ -3926,3 +3926,41 @@ side effect.
 Dispatch Worker process initialized and ready."* Compare against the ~2 s it takes today. That
 is a real measurement of the offline guarantee rather than an assumption about it, and it is the
 only way to know whether this is a latent outage or a harmless log line.
+
+
+---
+
+### 44. Kiosk crashed on a live dispatch — stale chunk after a frontend deploy
+> **Status**: ⚠️ **Open — cause confirmed, fix deferred to
+> [`PROJECT_IDEAS.md` #10](./PROJECT_IDEAS.md).** Interim mitigation is operator
+> discipline: hard-reload the kiosk tab after every frontend deploy.
+
+A real call (`DISP-2026-AAFDB8`, Alarm Activated - High Risk, 1123 Westwood St) arrived at
+20:32 and the kiosk showed
+`TypeError: error loading dynamically imported module: .../KioskView-B0Wnod_F.js`
+instead of the map.
+
+**Everything except the display worked.** Four things were suspected; three were exonerated
+by measurement rather than assumption:
+
+| Suspect | Verdict |
+|:--|:--|
+| The newly-enforced PA/hum filter | **Not at fault.** Zero `REJECTED` lines; the call matched Engine Tone at 100% |
+| The dispatch pipeline | **Flawless.** Phase 1 TTA 5.14 s, address 100%, MQTT INSERT + UPDATE, Phase 2 verified |
+| ntfy | **Published fine.** `messages_published` 410 → 411; message on the topic with correct address, units and grid |
+| The frontend build | **This was it** |
+
+**ntfy's apparent failure was delivery, not publication.** `subscribers=0` at the moment of
+the call — the operator's phone had dropped off Tailscale. Reconnecting delivered it. No code
+defect, and worth remembering as a diagnosis: a published-but-undelivered notification looks
+identical to a broken notifier from the operator's side.
+
+**The actual cause.** `npm run build` deletes the previous content-hashed chunks. The kiosk
+tab still held the pre-rebuild `index.html`, so it requested `KioskView-B0Wnod_F.js`, which
+the 20:07 rebuild had removed (`KioskView-Bu8ZsJK9.js` is current). `KioskView` is
+**lazy-loaded**, so the stale reference sits invisible until a call needs it — a rebuild
+silently arms this in every open tab and it detonates on the next real dispatch.
+
+**This was my error.** I rebuilt the frontend, said a hard reload was needed, and did not
+confirm it had happened before the kiosk sat through a live call in that state. A deploy is
+not finished when the build succeeds; it is finished when the tab has been reloaded.

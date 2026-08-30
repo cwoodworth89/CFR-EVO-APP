@@ -116,3 +116,60 @@ Flag two things, not eight:
 Everything else measured here should stay silent. Wiring is not yet done: the comparator is
 built and tested but not called from `phase2.py`, deliberately, while the confidence-column
 removal is in flight.
+
+---
+
+## Addendum, same day: flag AFTER the geocoder, not at parse time
+
+**Operator question:** *"Are we doing flags right on phase1/2 after sanitizing and parsing?
+Because our offline scripts do a good job correcting simple mistakes."*
+
+They do, and the measurement says the flag belongs later than where it is computed today.
+
+### Where correction actually happens
+
+| Stage | What it corrects | Applies to |
+|:--|:--|:--|
+| `sanitize_transcript` | phonetic dictionary, number words, `&` → `and` | whole transcript |
+| parse | suffix normalisation, `clean_location_text` | address + cross streets |
+| parse | **`fuzzy_correct_street`** | **cross streets ONLY** (`announcement.py:123`) |
+| **geocode** | street/parcel matching, intersection resolution | **the main address** |
+
+The asymmetry is the point: **cross streets are fuzzy-corrected during parsing, the main
+address is not.** The address is corrected at the geocoder — which is *after* the point
+Phase 2 compares. So the comparison is currently run against uncorrected text.
+
+### Measured, same 493-record corpus
+
+| Stage compared | disagree n | FAILED% | agree FAILED% | lift | flag rate |
+|:--|--:|--:|--:|--:|--:|
+| **parsed** (today's comparison point) | 98 | 14.1% | 5.3% | 2.7× | 24% |
+| **geocoded** | **21** | **14.3%** | **3.0%** | **4.8×** | **6.4%** |
+
+**The geocoder resolves 79% of parsed-stage disagreements** — 98 drop to 21. Flagging at
+parse time would raise roughly **77 false alarms** on calls the system corrected by itself,
+which is precisely the operator's point.
+
+The post-geocode flag is strictly better: nearly double the lift at a quarter of the flag
+rate. And the *agree* bucket gets cleaner as well (5.3% → 3.0% FAILED), meaning the calls
+that leave it are disproportionately the bad ones — the separation genuinely improves rather
+than the flag merely firing less.
+
+### Caveats, which matter here more than usual
+
+* **n = 21 is small.** Three FAILED out of twenty-one. The lift is real in direction but the
+  rate carries a wide interval; do not quote 14.3% as a precise figure.
+* **~73 calls are missing from the geocoded row** because `get_coordinates` returned `None`
+  for one or both rounds, and they are dropped rather than counted. Those are very likely
+  the worst calls, so the geocoded *agree* bucket is flattered by their absence. **A round
+  that will not geocode at all is its own flag class** and needs handling explicitly, not
+  by omission.
+* Comparing post-geocode means **geocoding each round separately**. Phase 2 currently
+  geocodes once — in the mismatch branch only — so this is new work per call. It should be
+  timed on the Raspberry Pi rather than the dev kiosk before being assumed free.
+
+### What this changes
+
+The comparator itself does not change — it compares whatever observations it is handed. What
+changes is **what to hand it**: resolved `target`-level results, not parsed candidates. That
+places the flag after `build_dispatch_payload`, not inside the parse step.

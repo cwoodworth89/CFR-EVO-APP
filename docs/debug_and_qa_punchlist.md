@@ -4151,3 +4151,82 @@ briefing.** Blocked behind **#31**: `RESPONSE_TYPE_UNKNOWN` is one of the flags,
 amber border should be driven by this same flag set rather than a second parallel mechanism —
 otherwise the kiosk grows two independent notions of "needs attention", which is the defect
 this item exists to remove.
+
+---
+
+### 55. XStreets are fuzzy-substituted at threshold 75 — the same defect the project already removed
+> **Status**: 🔴 **Open — live silent substitution.** Found 2026-08-30 answering the operator's
+> question *"why do we only fuzzy the xstreets and not the main address?"* The answer is that we
+> should probably stop fuzzing the xstreets.
+
+`fuzzy_correct_cross_roads` → `fuzzy_correct_street` (`backend/cfr_dispatch/parser/location.py`)
+silently rewrites each announced cross street to the best `fuzz.ratio` match in
+`COQUITLAM_STREETS`, accepting anything at or above:
+
+```python
+threshold = 90 if len(clean_base) <= 4 else 75
+```
+
+**This is the exact practice removed from the intersection resolver**, whose module docstring
+states the reason at length: *"THERE IS NO SAFE SCORE THRESHOLD for street names in this city."*
+That removal was at threshold **80**. This path runs at **75**, and it is still live.
+
+#### Measured against the real vocabulary, 2026-08-30
+
+For each of the 1,079 distinct street names, the best `fuzz.ratio` against a **different real
+Coquitlam street**:
+
+| | |
+|:--|--:|
+| Streets whose nearest *other real street* scores ≥ 75 | **938 (86.9%)** |
+| Streets whose nearest *other real street* scores ≥ 90 | 40 (3.7%) |
+
+At threshold 75, **for 87% of real streets there exists another real street that clears the
+bar.** The threshold is not separating anything — it admits substitution of one genuine
+Coquitlam street for another across most of the city:
+
+```
+aberdeen avenue  -> eden avenue      85
+adler avenue     -> palmer avenue    88
+adiron avenue    -> adair avenue     88
+admiral court    -> cardinal court   81
+agate place      -> sage place       86
+```
+
+Every one of those pairs is two real, distinct streets. A cross street misheard anywhere near
+one of them is rewritten to the other with no record that a substitution occurred.
+
+#### Why the main address is not treated this way, and should not be
+
+The asymmetry looks like the main address is missing a feature. It is the reverse: **the main
+address is handled the safe way.** The geocoder does not auto-substitute — a non-exact match
+returns suggestions with `is_ambiguous`, `requested_address` and a `resolution_note`, and the
+operator sees the substitution rather than inheriting it (CLAUDE.md §6.1, and the
+`intersection_resolver` docstring).
+
+So the correct direction is **not** "fuzzy the address too". It is to give cross streets the
+same treatment the address already gets: resolve them against `public.roads` / `public.parcels`
+and, when there is no exact match, report rather than rewrite.
+
+#### Mitigating facts, stated so this is not overclaimed
+
+* Cross streets are **proximity references, not routing destinations** —
+  `geocoder.py:139-152` records that they may not intersect the incident street at all and may
+  name things that are not streets (`Turning Lane`, `Mall Access`). A wrong cross street
+  misleads a crew confirming their block; it does not by itself send them anywhere.
+* `_verify_cross_streets` in `address_resolver.py` independently checks names against real
+  roads before using them to narrow, so a fabricated cross street does not silently steer the
+  geocoder — it is checked there.
+* Failing the threshold returns the text unchanged, so a miss degrades to raw text.
+
+That said, the substituted value **is** what reaches `target.cross_streets`, the reconstructed
+transcript, and the HITL verification prefill — so it reaches the training corpus.
+
+#### Not yet measured
+
+How often the substitution actually fires on the corpus, and how often it changes the value to
+something the operator later contradicted. Cross streets are not in `verified_*`, so there is no
+direct ground truth; the honest test is a sample of substitutions read against the audio.
+**Do not remove it before measuring that** — it may be correcting more than it breaks, and
+"probably unsafe" is not the same as "measured harmful". The threshold evidence above says the
+guard is not doing what it claims, not yet that the feature is net negative.

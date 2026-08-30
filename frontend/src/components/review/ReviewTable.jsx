@@ -109,6 +109,7 @@ export default function ReviewTable({
             <option value="engine">Engine</option>
             <option value="rescue">Rescue</option>
             <option value="chief">Chief</option>
+            <option value="none">— No Tones —</option>
           </select>
 
           <select

@@ -276,7 +276,22 @@ export default function DispatchReview({ onClose, onReviewCall }) {
     // Tone Filter
     if (toneFilter !== 'all') {
       const callTones = getCallTones(c);
-      if (!callTones.includes(toneFilter)) return false;
+      // 'none' finds calls the TONE SPOTTER recorded nothing for. Added 2026-08-29
+      // for punch-list #14: while clearing Chief tags off PA pages it is easy to
+      // strip one from a real dispatch, and this is how you check. It also surfaces
+      // recordings whose tones were genuinely lost rather than mistagged -- e.g.
+      // DISP-2026-DD939E, whose audio was clipped at both ends so the tones never
+      // reached the detector.
+      //
+      // Tests target.tone_name directly, NOT getCallTones(): that helper also
+      // DERIVES tones from the responding units, so a real dispatch with units but
+      // no stored tone would come back as "has tones" and never appear here --
+      // hiding exactly the case this filter exists to find.
+      if (toneFilter === 'none') {
+        if ((c.target?.tone_name || '').trim() !== '') return false;
+      } else if (!callTones.includes(toneFilter)) {
+        return false;
+      }
     }
 
     // Unit Filter

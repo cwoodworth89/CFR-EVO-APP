@@ -4266,3 +4266,102 @@ and it is a straightforward normalisation bug rather than a judgement call.
 * Cross streets are **proximity references, not routing destinations** (`geocoder.py:139-152`) —
   a wrong one misleads a crew confirming their block rather than sending them somewhere. That
   bounds the severity; it does not make silent substitution acceptable.
+
+
+---
+
+### 45 (closed). `confidence_score` retired, named review flags shipped
+> **Status**: ✅ **Closed 2026-08-30.** Deployed and verified on the kiosk. Supersedes #32.
+
+The score is gone from code, database and every UI surface. `compute_review_flags()`
+(`backend/cfr_dispatch/pipeline/review_flags.py`) emits eight named conditions stored in
+`target.review_flags`, with the count in `target.review_flag_count`. No severity tiers, per
+the operator — weights would reintroduce the unsourced-constant problem being removed.
+
+**Surfaces**: flag count in the review row with reasons on hover; the full list in the
+verification sidebar (that is the reviewer's actual job, so it is not hidden behind a hover);
+a badge on the kiosk so crews see what is uncertain. `low_confidence` filter → `flagged`.
+
+**Three fabricated numbers found and removed on the way**, all the same defect class as the
+score itself:
+
+* `phase2` set `"confidence_score": 100.0` after address verification — **erasing metadata
+  flags it had never looked at**. Now recomputes.
+* Elsewhere it took the geocoder's confidence `or 80.0` — inventing a number when the
+  resolver reported none.
+* `evaluations.py` returned a hardcoded **96.4** average confidence when the query was null:
+  a fabricated statistic presented as measured. Nothing consumed it; replaced by a flagged
+  count, which needs no default because zero rows means zero.
+
+Also removed one of the two independent copies of the 90 threshold — `verify_location` now
+derives from a named condition (`LOCATION_UNRESOLVED` / `LOCATION_SUBSTITUTED`).
+
+#### The operator's question found a bug I had introduced
+
+*"Phase 1 flags a missing map grid, phase 2 round 2 picks it up — is the flag still valid?"*
+
+Checking it revealed the flags were being written at the **top level** of the payload. There
+is no `review_flags` column, and the API applies updates via `setattr` over a Pydantic
+`model_dump`, so a top-level key with no schema field is **silently dropped**. The flags were
+computed and thrown away — precisely the defect as `response_type` dying in local scope, which
+is what this whole thread began with.
+
+They now live in `target`, which the frontend already reads and which phase 2 replaces
+wholesale. That makes the lifecycle correct by construction. Of four phase-2 update paths, the
+two that recompute the address recompute the flags with it; the two that retain phase 1 data
+(geocoding failed, no candidate) keep phase 1's flags, which is right because phase 1's data
+is what remains stored.
+
+**26 tests**, including that resolving one field must not clear the others — superseding is a
+recompute, not a reset. Full suite **203 passed** before the flag-lifecycle additions.
+
+#### Deployment note — a sequencing error worth not repeating
+
+**The migration was run before the code was deployed.** The correct order is code first (the
+new code tolerates the column present or absent), then migrate. Instead there was a ~40 minute
+window in which the running API still mapped a dropped column, so a dispatch arriving would
+have failed to persist. No call arrived, but that was luck rather than design.
+
+Migration: `backend/migrations/2026-08-29_drop_confidence_score.sql`. 513 rows intact. The
+dropped values remain recoverable from `cfr-critical-20260829-200615.sql.gz`.
+
+---
+
+### 46. The API image was 22 GB because it baked in 10.7 GB of bind-mounted data
+> **Status**: ✅ **Closed 2026-08-30.** Image 22.2 GB → **1.27 GB**; 223 GB of disk reclaimed.
+
+Found because an API rebuild stalled for ~10 minutes on `exporting layers` during the #45
+deploy, holding open the migration window above.
+
+`backend/api/Dockerfile` does `COPY backend /app/backend`, and there was **no `.dockerignore`**:
+
+| Path | Size | Needed in the image? |
+|:--|--:|:--|
+| `backend/data` | 9.9 GB | **No** — bind-mounted |
+| `backend/audio_files` | 766 MB | **No** — bind-mounted |
+| `backend/models` | 73 MB | No |
+| API code (`cfr_dispatch` + `api` + `scripts`) | **~1.6 MB** | Yes |
+
+`docker-compose.yml` already bind-mounts `./backend/data` and
+`./backend/audio_files/recordings`, so **the baked-in copy was shadowed the instant the
+container started and never read.** It also made the image quietly misleading: it held a frozen
+snapshot of the tiles and recordings from build time, which would be served if a mount ever
+went missing. Stale data served silently is worse than absent data failing loudly.
+
+**The build cache was the larger hoard.** `docker image prune -af` reclaimed only 1.9 GB;
+`docker system df -v` showed **221.9 GB of build cache** across 143 unused entries, each having
+cached an 11 GB context copy. `image prune` does not touch it — that needs `docker builder
+prune`.
+
+| | Before | After |
+|:--|--:|--:|
+| API image | 22.2 GB | **1.27 GB** |
+| Build cache | 221.9 GB | **0** |
+| Disk free | 172 GB | **395 GB** |
+
+Verified on the rebuilt image rather than assumed: API healthy at 513 dispatches, audio serving
+1.78 MB **from the bind mount**, and `/app/backend/data` reporting 9.9 GB inside the container —
+the mount, not the image.
+
+`.dockerignore` also excludes tests, logs, docs, frontend sources and `.env` files. A secret
+committed to an image layer survives deletion of the file.

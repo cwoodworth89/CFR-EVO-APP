@@ -148,7 +148,11 @@ class TestAmpersandSurvivesSanitize(unittest.TestCase):
                "1, 1, 2, 3, Westwood St, Near, Anson, Avenue & Lincoln Ave, "
                "Use Talk Group, 5 Coquitlam, Map Grid, 8, 2")
         d = parse_dispatch_announcement(raw, UNITS_VOCABULARY)[0]
-        self.assertEqual(d.cross_street_1, "Anson Avenue")
+        # Both in the abbreviated house form. This asserted "Anson Avenue" when written,
+        # pinning a second bug: fuzzy_correct_street returned the expanded municipal name
+        # while the untouched leg kept "Lincoln Ave", so one clause held both conventions.
+        # Fixed with the suffix-doubling bug (punch-list #56).
+        self.assertEqual(d.cross_street_1, "Anson Ave")
         self.assertEqual(d.cross_street_2, "Lincoln Ave")
 
 
@@ -238,3 +242,54 @@ class TestCoalesceAcrossRounds(unittest.TestCase):
     def test_no_candidates_is_not_an_error(self):
         from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
         self.assertEqual(_coalesce_across_rounds([], None, None), (None, None, None))
+
+
+class TestStreetSuffixDoubling(unittest.TestCase):
+    """fuzzy_correct_street must not re-append a suffix the municipal name already has.
+
+    Its docstring said it matched against "known Coquitlam BASE street names". The list
+    actually holds FULL names, so it split the announced name into base + suffix, scored
+    the base against full names, and re-appended the caller's suffix to the winner --
+    "Christmas Way" -> "Christmas Way Way". Ten of the 23 unmatched cross streets in the
+    corpus were this, every one of them a real street (punch-list #56).
+    """
+
+    # A stand-in for COQUITLAM_STREETS: full municipal names, as the real list holds them.
+    STREETS = [
+        "Christmas Way", "King Edward Street", "King Edward Slip Lane", "Pinetree Way",
+        "Pinetree Close", "Burlington Drive", "Turnberry Lane", "Honeysuckle Lane",
+        "Austin Avenue", "Tahsis Avenue", "Gordon Avenue",
+    ]
+
+    def _f(self, name):
+        from cfr_dispatch.parser.location import fuzzy_correct_street
+        return fuzzy_correct_street(name, self.STREETS)
+
+    def test_suffix_is_not_doubled(self):
+        for announced, expected in [
+            ("Christmas Way", "Christmas Way"),
+            ("King Edward Street", "King Edward St"),
+            ("Pinetree Way", "Pinetree Way"),
+            ("Burlington Drive", "Burlington Dr"),
+            ("Turnberry Lane", "Turnberry Ln"),
+            ("Honeysuckle Lane", "Honeysuckle Ln"),
+        ]:
+            self.assertEqual(self._f(announced), expected)
+
+    def test_same_base_different_suffix_does_not_swap(self):
+        """Both bases score 100; without the tie-break the vocabulary order would decide."""
+        self.assertEqual(self._f("Pinetree Way"), "Pinetree Way")
+        self.assertEqual(self._f("Pinetree Close"), "Pinetree Close")
+
+    def test_a_real_misspelling_is_still_corrected(self):
+        # The correction the project documented as worth keeping.
+        self.assertEqual(self._f("Tasis Ave"), "Tahsis Ave")
+
+    def test_an_unmatched_name_degrades_to_raw_text(self):
+        self.assertEqual(self._f("Nonexistent Boulevard"), "Nonexistent Boulevard")
+
+    def test_cross_road_clause_round_trips(self):
+        from cfr_dispatch.parser.location import fuzzy_correct_cross_roads
+        self.assertEqual(
+            fuzzy_correct_cross_roads("Christmas Way and Gordon Ave", self.STREETS),
+            "Christmas Way and Gordon Ave")

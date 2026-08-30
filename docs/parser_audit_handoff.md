@@ -385,3 +385,92 @@ a value at all.
 * **Measure, don't infer.** Every wrong conclusion in this work — including three of mine,
   two recorded in §5 — came from reading, and every correction came from running something.
   A ten-second probe would have prevented each one.
+
+---
+
+# Update, 2026-08-30 — what changed, and a correction
+
+Written by the QA/debug session of 2026-08-29/30. Read this before starting an automated
+parser test run; several things this document listed as open are now closed, and one thing
+said verbally in that session was **overstated and is corrected here.**
+
+## The correction, first
+
+Late in the session I described "parse-boundary bleed" — cross-street values swallowing the
+talk group, the call type, or the next round:
+
+```
+Private Driveway Use Easttalk Group 5 Coquitlam
+Summit Middle School Access Broom 1415 Parkway Blvd
+Westwood Cyclist Struck Westwood Street
+```
+
+That was reported as if it were a live parser defect. **It is not, on the live path.**
+Measured against what actually reaches the database:
+
+| | |
+|:--|--:|
+| Stored `target.cross_streets` values | 110 |
+| Distinct | 59 |
+| Containing a talk-group / unit / call-type token | **0** |
+| Longer than four words | **0** |
+
+The bleed appears only when re-deriving **every candidate from every round**, as the
+comparison harness does. Those candidates never win — they are filtered before storage. The
+finding is real as a latent parser weakness and worth a test, but it is **not** evidence
+that the parser is producing bad output today, and it should not be the reason to open an
+audit.
+
+The general lesson is the one in [`qa_harnesses.md`](./qa_harnesses.md) §6: a rate measured
+over intermediate values is not a rate over what shipped.
+
+## Closed since 2026-08-23
+
+| Was | Now |
+|:--|:--|
+| §4.3b — *"the two rounds are redundancy, and it is not being used"* | **Partly closed.** XStreets and subaddress now coalesce across rounds (`phase2._coalesce_across_rounds`). Address still does not — round 1 wins, punch-list #44 is still open. |
+| §7 — *"confidence does not measure correctness"* | **Closed by operator ruling.** The confidence score is being removed outright, not recalibrated; warnings move to the amber flag model. Punch-list #54 records the measurement, #32 is superseded. |
+| XStreets missing from the reconstructed transcript | **Fixed** (`703173c`). Both `DispatchData` copies in `phase2.py` omitted `cross_street_1/2`, so the announced "near" clause never reached the transcript the operator rates against. This was the cause of the PERFECT-rating collapse from 65.3% to 16.1%. |
+| `&` deleted by sanitisation | **Fixed** (`55b6c4a`). `sanitize_transcript` stripped it as punctuation, so "Anson Avenue & Lincoln Ave" lost Lincoln Ave entirely. Now rewritten to " and " before the punctuation strip. |
+| Street suffix doubling | **Fixed** (`faa9c8c`). `fuzzy_correct_street` scored the announced *base* against *full* municipal names and re-appended the caller's suffix: "Christmas Way" → "Christmas Way Way". Verified 0 of 1,320 re-derived values now double. |
+| Intersections read back alphabetically | **Fixed** (`703173c`). `public.intersections` stores the pair sorted, so the answer ignored the announced order on 10 of 12 resolved intersection dispatches. |
+
+## New, and open
+
+* **#56 — bring XStreets onto the address's resolution path.** `fuzzy_correct_street` accepts
+  a match at `fuzz.ratio >= 75`; **938 of 1,079 real street names have a *different* real
+  Coquitlam street scoring at or above that.** The threshold separates almost nothing. The
+  main address is already handled safely (suggestions + `is_ambiguous`, never silent
+  substitution). Specified in the punch list, not built.
+* **#51 — the kiosk never reads `target.cross_streets`** and labels the `intersection` field
+  "cross streets" to the operator.
+* **Round-disagreement flags** — comparator built and corpus-scored
+  ([`briefings/round_disagreement_signal.md`](./briefings/round_disagreement_signal.md)),
+  wired into nothing. Of eight fields only two carry signal; five are noise and two of those
+  point the *wrong way*.
+
+## For an automated test run — start from what exists
+
+**Do not build a new harness.** These are current:
+
+| Harness | Covers |
+|:--|:--|
+| `backend/scripts/backtest_parser_corpus.py` | parser vs `verified_*` — see `qa_harnesses.md` §2 |
+| `backend/scripts/backtest_regression.py` | before/after over the corpus |
+| `backend/scripts/backtest_round_comparison.py` | cross-round agreement, scored against ratings |
+| `backend/scripts/trace_geocode_corpus.py` | which geocoder rung answered — §3, *needs review* |
+| — | **STT harness still does not exist** (§4, punch-list #46) |
+
+Read [`qa_harnesses.md`](./qa_harnesses.md) **before quoting any number from them.** It
+documents the traps that make a rate wrong, and every one has already bitten someone here.
+
+Two more, learned on 2026-08-30 and not yet in that document:
+
+* **The operator's `quality_rating` and `review_notes` beat any derived metric.** An inferred
+  address-accuracy metric put a regression at 2026-08-08; the ratings put it a week later and
+  far more sharply, and showed `FAILED` flat while calls moved PERFECT → OPERATIONAL — the
+  signature of a *dropped field*, which is what identified the actual cause. Query the
+  ratings first.
+* **Punch-list numbers are colliding across concurrent sessions.** There are two #51s, and a
+  #55 written in this session had to be renumbered to #56. Agree a numbering convention
+  before a team starts appending.

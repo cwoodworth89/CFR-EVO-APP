@@ -3984,8 +3984,21 @@ not finished when the build succeeds; it is finished when the tab has been reloa
 ---
 
 ### 54. Confidence 100 means "the two STT passes agreed", not "the location is right"
-> **Status**: 🔴 **Open — measured, not fixed.** Operator hypothesis 2026-08-30, confirmed
-> against 510 records the same day. This is the mechanism behind punch-list #32.
+> **Status**: 🟡 **Superseded by operator ruling, 2026-08-30 — the confidence score is being
+> scrapped entirely, not recalibrated.** Warnings move to the amber banner / flag model (§5).
+> The measurement below stands as the reason, and as the baseline any replacement signal has to
+> beat. Supersedes punch-list #32, which asked for recalibration.
+>
+> **Operator ruling (CLAUDE.md §6.3 tier 4 — the operator is the authority):** a single number
+> conflating transcription agreement with location correctness is not fixable by choosing a
+> better number. There will be **no numeric confidence shown to crews**. A location is either
+> resolved, or it carries an explicit warning saying what is uncertain and why.
+>
+> This is the same conclusion the project already reached for response codes: an unparsed value
+> is `NULL`, never a guess, and the honest unknown beats the plausible number (§6.1).
+>
+> Original finding follows. Operator hypothesis 2026-08-30, confirmed against 510 records the
+> same day.
 
 **The operator's question:** *"If Whisper fails to hear the right street name twice, and they
 both agree with the misheard term, that scores 100%? Shouldn't the failure come at the geocoder

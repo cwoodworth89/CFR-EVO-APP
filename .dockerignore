@@ -1,0 +1,61 @@
+# Build context exclusions for the API image.
+#
+# WHY THIS EXISTS: backend/api/Dockerfile does `COPY backend /app/backend`, and there
+# was no .dockerignore, so the image carried the WHOLE backend directory -- 11 GB, of
+# which ~1.6 MB is actual API code. Measured on the kiosk 2026-08-30:
+#
+#     backend/data          9.9 GB   the MBTiles archives
+#     backend/audio_files   766 MB   dispatch recordings
+#     backend/models         73 MB   model caches
+#     backend/cfr_dispatch + api + scripts   ~1.6 MB   <- what the API needs
+#
+# All of that bulk is BIND-MOUNTED at runtime by docker-compose.yml:
+#
+#     - ./backend/audio_files/recordings:/app/backend/audio_files/recordings
+#     - ./backend/data:/app/backend/data
+#
+# so the baked-in copy is shadowed the instant the container starts and is never
+# read. It was pure dead weight: a 22 GB image, ~10 minutes of "exporting layers" on
+# every rebuild, and 168 GB of accumulated images on the kiosk.
+#
+# It was also quietly misleading -- the image held a FROZEN snapshot of the tiles and
+# recordings from whenever it was last built, which would be served if a mount were
+# ever missing. Absent data failing loudly beats stale data served silently.
+
+# --- The bulk, all mounted at runtime ---
+backend/data/
+backend/audio_files/
+backend/models/
+
+# --- Never belongs in a runtime image ---
+backend/tests/
+backend/migrations/
+*.log
+*.log.*
+dispatch.log*
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+
+# --- Frontend: the API serves none of this ---
+frontend/node_modules/
+frontend/dist/
+frontend/src/
+
+# --- Repo furniture ---
+.git/
+.github/
+docs/
+.agents/
+.claude/
+*.md
+!backend/api/requirements.txt
+
+# --- Secrets must never enter an image layer ---
+.env
+*.env
+!.env.example
+backend/.env
+backend/.env.*
+frontend/.env.local

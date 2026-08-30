@@ -3711,8 +3711,46 @@ demonstrates that a comment alone does not hold this invariant.
 ---
 
 ### 51. The kiosk shows the junction field labelled "cross streets", and never reads the real one
-> **Status**: 🔴 **Open — UX. Data is correct and already reaching the kiosk; the display
-> picks the wrong field.** Found 2026-08-29 while auditing XStreets representation end to end.
+> **Status**: 🔴 **Open — HIGH. This is the cause of the operator-visible quality regression,
+> not a cosmetic issue.** Found 2026-08-29 while auditing XStreets representation end to end;
+> confirmed the same day against `quality_rating`.
+
+#### It is the regression
+
+The operator reported that calls were "almost all perfect" for a stretch and then started
+"missing xstreets". `quality_rating` shows it precisely, and **`FAILED` stays flat throughout** —
+calls moved **PERFECT → OPERATIONAL**, the signature of a dropped field rather than a wrong
+answer:
+
+| Week | House-address calls announcing "near" | `intersection` overloaded with them | Carried in `cross_streets` | **PERFECT** |
+|:--|--:|--:|--:|--:|
+| Jul 20 | 56 | 56 | 0 | 57.1% |
+| Aug 3 | 42 | 42 | 0 | 62.7% |
+| Aug 10 | 52 | **52** | 0 | **65.3%** |
+| Aug 17 | 58 | 31 | 1 | 38.4% |
+| Aug 24 | 44 | **0** | 43 | **16.1%** |
+
+**The near roads were always displayed through `intersection`.** Until mid-August the pipeline
+overloaded that field with them, and the kiosk reads `intersection` — so they appeared, and calls
+rated PERFECT. The 2026-08-21 geocoder work **correctly** stopped overloading it, and
+`cross_streets` **correctly** began carrying them. Both changes were right. But nothing taught the
+kiosk to read the new field, so the data moved into a column the UI has never mapped and vanished
+from the display.
+
+The migration and the ratings collapse track each other exactly, in opposite directions. This is
+the display half of punch-list #35: that entry fixed the *pipeline* dropping `cross_streets`; the
+*frontend* was never updated to read them.
+
+**No dispatch data is lost today** — `target.cross_streets` is populated on 43 of 44 recent
+qualifying calls. The kiosk simply does not render it, and the operator correctly reads that as
+the system having got worse.
+
+> **On attribution.** These calls span many development sessions and deploys, so the week
+> boundaries above track **when code reached the kiosk**, not when it was committed. The claim
+> here is only that the field migration and the ratings collapse coincide — which the per-call
+> counts show directly, independent of any commit. Nothing here says a change was wrong; the two
+> pipeline changes were both improvements, and the defect is the frontend that was never brought
+> along.
 
 **Two different things share one operator-facing label.**
 [`config/models.py:14-16`](../backend/cfr_dispatch/config/models.py:14) draws the distinction
@@ -3746,6 +3784,7 @@ discarded at the last step — but on the display path.
 |:--|--:|
 | Dispatches with `target.cross_streets` populated | 71 |
 | Ever rendered on the kiosk | **0** |
+| Recent qualifying calls carrying them | 43 / 44 |
 | `target.cross_streets` stored as a JSON array | 71 / 71 |
 | `target.intersection` using ` and ` | 222 / 222 |
 

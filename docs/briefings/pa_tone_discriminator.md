@@ -372,3 +372,66 @@ That is a contained offline script over `backend/data/audio/`, touching no live 
 doing before any decision about the Chief fingerprint, and it would also let every apparatus
 tone be re-validated on the full 487-recording corpus rather than on whatever happened to be
 live since 2026-08-21.
+
+
+---
+
+## Backfill results, 2026-08-29 — Chief confirmed, and the mid-call question answered
+
+`backfill_tone_spectra.py` re-analysed **520 archived recordings** (1 unreadable), giving an
+evidence base independent of the live spectral log.
+
+### Chief Tone is confirmed: 3 samples → 20
+
+| Tone | Recordings | 440 / 600 / 727 | 660 / 1350 / 892 | Drift |
+|:--|--:|:--|:--|--:|
+| **Chief** | **20** (log had 3) | present in **20/20** | present in **20/20** | **0.0 Hz** |
+| Engine | 309 (log had 55) | 307/309 | 304/309 | 0.0 Hz |
+| Rescue | 227 (log had 41) | 188/227 | 175/227 | 0.0 Hz |
+
+**`Chief Tone: [440, 660]` is correct.** Both frequencies appear in every one of the 20
+recordings with zero median drift. The thinnest fingerprint in the system is now the
+best-attested per-sample, and it needs no change.
+
+### The mid-call PA question, answered with data rather than reasoning
+
+Decision 2 was previously settled by argument — *"tone analysis runs on the first 3.5 s, so a
+mid-call PA tone should not reach the decision"* — and flagged as reasoning, not measurement.
+The backfill measures it, because it records **where** in each recording the marker was found:
+
+| | median offset | max |
+|:--|--:|--:|
+| Operator-tagged PA pages | **0.00 s** | 13.75 s |
+| Non-PA recordings containing 647 Hz | **12.50 s** | 16.50 s |
+
+Clean separation. A PA page's marker is at the very start; when 647 Hz turns up in a real
+dispatch it is **mid-call**, a dozen seconds in — exactly the `DISP-2026-282647` pattern, and
+far outside the window the live listener examines.
+
+**39 of 498** non-PA recordings contain 647 Hz somewhere, but only **one** has it within the
+first 3.5 s: `DISP-2026-AB76A8` — which **has no database record at all.** It is one of ~15
+orphaned WAVs (521 recordings vs 506 rows), so it is not a dispatch the rule could wrongly
+suppress.
+
+**Zero real dispatches in the corpus would be affected by the live 647 Hz rule.** That is now
+measured rather than argued.
+
+### The 647 rule re-confirmed on independent data
+
+| | |
+|:--|--:|
+| Operator-tagged PA with the 647 marker | **22 / 22** |
+| Mains hum flagged | 1 |
+
+### One thing worth watching: Rescue is the weaker fingerprint now
+
+Rescue's frequencies appear in only **83%** and **77%** of its recordings, against Engine's 99%
+and Chief's 100%, and its observed spread is wider (707–745, 873–912 versus Chief's 655–660).
+Median drift is still 0.0 Hz, so the values are right — but Rescue is now the least consistently
+detected tone, which inverts the earlier picture where Chief looked weakest simply for lack of
+samples. Worth a look if Rescue calls ever start being missed.
+
+> **Caveat, restated.** The backfill slides a 3.5 s window and keeps the best-matching one,
+> whereas the listener analyses the trigger window. The offset data above is exactly why that
+> difference matters and why it is recorded in the script's docstring: a backfilled row finds
+> the best tone in the file, a live row finds the tone that fired the listener.

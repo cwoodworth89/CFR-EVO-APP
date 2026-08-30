@@ -196,6 +196,16 @@ def sanitize_transcript(text: str) -> str:
     pattern = r'\b(' + '|'.join(number_words.keys()) + r')\b'
     text = re.sub(pattern, lambda m: number_words[m.group(0)], text)
 
+    # "&" is a separator, not punctuation. Locution speaks the same cross-street clause
+    # both ways -- "Anson Avenue & Lincoln Ave" in one round, "Anson Ave, and Lincoln Ave"
+    # in the next -- so it has to survive the strip below as the word it stands for.
+    # Deleting it outright leaves "anson avenue lincoln ave", which has no separator for
+    # the cross-street split to find, and clean_location_text then removes the second
+    # street as trailing junk after a street type.
+    # Measured on DISP-2026-AAFDB8 (2026-08-30): announced "Near, Anson, Avenue & Lincoln
+    # Ave", stored as cross_streets ["Anson Ave"] -- Lincoln Ave lost here.
+    text = re.sub(r'\s*&\s*', ' and ', text)
+
     # Strip punctuation except alphanumeric characters and spaces
     text = re.sub(r'[^a-z0-9\s]', '', text)
     

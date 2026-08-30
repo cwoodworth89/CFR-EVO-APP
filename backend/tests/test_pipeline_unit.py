@@ -121,15 +121,44 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class TestAmpersandSurvivesSanitize(unittest.TestCase):
+    """`&` separates two cross streets and must survive sanitisation as a word.
+
+    Measured on DISP-2026-AAFDB8 (2026-08-30), announced
+    "Near, Anson, Avenue & Lincoln Ave" and stored as cross_streets ["Anson Ave"].
+    `sanitize_transcript` stripped the ampersand to nothing, leaving
+    "near anson avenue lincoln ave" with no separator at all; clean_location_text
+    then correctly removed "lincoln ave" as trailing junk after a street type.
+
+    Locution speaks the same clause both ways -- this call's second round said
+    "Anson Ave, and Lincoln Ave", which parses fine -- and round 1 wins the address
+    (punch-list #44), so the broken form was the one kept.
+    """
+
+    def test_ampersand_becomes_a_word_not_nothing(self):
+        from cfr_dispatch.parser.sanitize import sanitize_transcript
+        out = sanitize_transcript("Westwood St, Near, Anson, Avenue & Lincoln Ave")
+        self.assertIn("anson avenue and lincoln ave", out)
+        self.assertNotIn("avenue lincoln", out)
+
+    def test_both_cross_streets_reach_the_dataclass(self):
+        from cfr_dispatch.parser import parse_dispatch_announcement
+        from cfr_dispatch.config.vocab import UNITS_VOCABULARY
+        raw = ("Coquitlam Engine 1, Respond Emergency, Alarm Activated, High Risk, "
+               "1, 1, 2, 3, Westwood St, Near, Anson, Avenue & Lincoln Ave, "
+               "Use Talk Group, 5 Coquitlam, Map Grid, 8, 2")
+        d = parse_dispatch_announcement(raw, UNITS_VOCABULARY)[0]
+        self.assertEqual(d.cross_street_1, "Anson Avenue")
+        self.assertEqual(d.cross_street_2, "Lincoln Ave")
+
+
 class TestCrossRoadCleaning(unittest.TestCase):
     """`clean_location_text` strips trailing junk after a street type.
 
-    It must not treat the second cross street as junk. Measured on
-    DISP-2026-AAFDB8 (2026-08-30), announced "Near, Anson, Avenue & Lincoln Ave":
-    the ampersand was absent from the stripper's negative lookahead, so
-    "Anson Avenue & Lincoln Ave" was cut to "Anson, Avenue" and Lincoln Ave never
-    reached cross_street_2. The `and` form of the same announcement was unaffected,
-    which is why this survived -- Locution speaks it both ways.
+    It must not treat the second cross street as junk. These cover the lookahead
+    guard in location.py, which is defence in depth: sanitisation now rewrites `&`
+    to " and " before this function sees it, so the ampersand case is unreachable
+    from the announcement path and these pin the behaviour rather than the fix.
     """
 
     CALL_TYPES = ["Alarm Activated", "Medical Aid", "Structure Fire"]

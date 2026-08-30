@@ -97,11 +97,14 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
     # Strip trailing numbers, suite numbers, or building details after street type (unless followed by "and" / "near")
     # e.g., "Burlington Drive 105" -> "Burlington Drive", "Lougheed Highway Superstore" -> "Lougheed Highway"
     street_types = r"street|avenue|drive|way|road|crescent|boulevard|place|court|highway|lane|st|ave|rd|dr|ln|ct|blvd|hwy|wy"
-    # `&` is in the lookahead for the same reason `and` is: Locution speaks the second
-    # cross street either way, and without it this strips the second street outright.
-    # Measured on DISP-2026-AAFDB8 (2026-08-30), announced "Near, Anson, Avenue &
-    # Lincoln Ave": "Anson Avenue & Lincoln Ave" was cut to "Anson, Avenue" here, so
-    # Lincoln Ave never reached cross_street_2 and the crew lost half the XStreets.
+    # `&` is in the lookahead for the same reason `and` is: it separates two cross
+    # streets, and without it the second one is stripped as trailing junk.
+    #
+    # Defence in depth only -- it does NOT fix the measured defect. In the live pipeline
+    # `sanitize_transcript` runs first and now rewrites `&` to " and ", so no ampersand
+    # reaches this function from the announcement path. That rewrite is the actual fix
+    # for DISP-2026-AAFDB8 (2026-08-30). This guard exists so the bug does not come back
+    # silently if some other caller passes unsanitised text.
     match = re.search(r'\b(' + street_types + r')\b(?!\s*&|\s+(?:and|near|cross\s+roads|cross\s+street|cross\s+of))\s+(.*)', text, re.IGNORECASE)
     if match:
         text = text[:match.end(1)].strip()

@@ -3859,33 +3859,48 @@ Coquitlam, Map Grid 8, 2"*
 
 **Captured:** `cross_streets: ["Anson Ave"]` — Lincoln Ave gone.
 
-**Cause.** `clean_location_text` (`backend/cfr_dispatch/parser/location.py`) strips trailing
-junk after a street type, so `"Burlington Drive 105"` becomes `"Burlington Drive"`. Its negative
-lookahead protected `and`, `near`, `cross roads`, `cross street` and `cross of` — **but not
-`&`**. So the second cross street parsed as trailing junk and was cut:
+> ⚠️ **First diagnosis was wrong, corrected the same hour.** I initially blamed
+> `clean_location_text`'s negative lookahead in `location.py`, shipped that in `6d2d907`, and
+> re-tested against the live call — **it still returned `cross_street_2: None`.** The cause is
+> upstream: I had traced the stages using the *raw* transcript, when the parser sanitises first.
+> Recorded rather than overwritten, because a fix that did not work is the more useful thing to
+> know about.
+
+**Cause.** `sanitize_transcript` strips every non-alphanumeric character to nothing
+(`backend/cfr_dispatch/parser/sanitize.py`), and `&` is punctuation to that rule. The separator
+is **deleted before any cross-street logic runs**:
 
 ```
-'Anson, Avenue & Lincoln Ave'  -> clean_location_text -> 'Anson, Avenue'
-'Anson Ave, and Lincoln Ave'   -> clean_location_text -> 'Anson Ave, and Lincoln Ave'
+announced : "Westwood St, Near, Anson, Avenue & Lincoln Ave, Use Talk Group, 5"
+sanitized : "westwood st near anson avenue lincoln ave use talk group 5"
+                                  ^ no separator left at all
 ```
 
-Everything downstream was correct and irrelevant: both `fuzzy_correct_cross_roads`
-(`location.py:211`) and the column split (`announcement.py:158`) handle `&` properly. They never
-saw it, because the text was already truncated.
+`clean_location_text` then behaves **correctly**: it sees `anson avenue lincoln ave`, finds the
+street type `avenue`, and strips `lincoln ave` as trailing junk — the same rule that turns
+`Burlington Drive 105` into `Burlington Drive`. Everything downstream is correct too and never
+gets the chance to matter: both `fuzzy_correct_cross_roads` (`location.py:211`) and the column
+split (`announcement.py:158`) handle `&` properly, but there is no `&` left to handle.
 
-**Why it survived this long.** Locution speaks the clause both ways, and the announcement repeats
-itself. This call's **second** round said *"Near, Anson Ave, and Lincoln Ave"* — which parses
+**Why it survived this long.** Locution speaks the clause both ways and the announcement repeats
+itself. This call's **second** round said *"Near, Anson Ave, and Lincoln Ave"*, which parses
 correctly. Round 1 wins the address unconditionally (punch-list #44), so the broken form is the
-one that was kept. Any call announcing the second round first would have looked fine.
+one kept. Any call whose first round used "and" looked fine.
 
-**Fix.** `&` added to the negative lookahead, with the measurement inline. Five regression tests
-in `backend/tests/test_pipeline_unit.py::TestCrossRoadCleaning` cover both separator forms and
-confirm trailing unit numbers and business names are *still* stripped.
+**Fix.** `sanitize_transcript` now rewrites `&` to `" and "` *before* the punctuation strip, so
+the separator survives as the word it stands for. Verified end to end on the real announcement:
+`cross_street_1='Anson Avenue'`, `cross_street_2='Lincoln Ave'`, transcript reads
+*"...near anson avenue and lincoln avenue..."*. Backend suite 162 passed.
 
-**Not investigated:** `at` is also a separator in `fuzzy_correct_cross_roads` and is likewise
-absent from the lookahead. It was left alone deliberately — unlike `&`, `at` plausibly introduces
-a landmark rather than a street (*"Lougheed Highway at Superstore"*), and stripping that is
-probably correct. No live example has been measured either way.
+The `location.py` lookahead from `6d2d907` is **kept as defence in depth and relabelled as
+such** — it is unreachable from the announcement path now, and its comment says so rather than
+claiming credit for the fix.
+
+**Not investigated:** `split_intersection_parts` also treats `/` and `@` as intersection
+separators, and the same punctuation strip deletes both. No live example has been measured, so
+they are left alone — but they are the identical defect if Locution ever speaks them. `at` is
+likewise absent from the `location.py` lookahead and left alone deliberately: unlike `&` it
+plausibly introduces a landmark rather than a street (*"Lougheed Highway at Superstore"*).
 
 ---
 

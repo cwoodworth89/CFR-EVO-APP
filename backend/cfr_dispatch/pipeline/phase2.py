@@ -155,7 +155,6 @@ def process_phase_2_finalize(
         final_addr = "Unknown Location"
         final_lat = None
         final_lng = None
-        final_conf = 0.0
 
         if not p1_data:
             # Single-phase fallback
@@ -173,7 +172,8 @@ def process_phase_2_finalize(
             final_addr = db_payload.get("address") or target.get("address", "Unknown Location")
             final_lat = target.get("lat")
             final_lng = target.get("lng")
-            final_flags = db_payload.get("review_flags", [])
+            # Flags live in target, not at the top level -- see payload_builder.
+            final_flags = target.get("review_flags", [])
         else:
             p1_candidate = next((d for d in p1_data["candidates"] if d.address or d.intersection), None)
             p2_candidate = next((d for d in all_candidates if d.address or d.intersection), None)
@@ -276,10 +276,10 @@ def process_phase_2_finalize(
                     resolution_note=target_payload.get("resolution_note"),
                     location_type=target_payload.get("location_type"),
                 )
+                target_payload["review_flags"] = p2_flags
+                target_payload["review_flag_count"] = len(p2_flags)
                 update_payload = {
                     "verify_location": False,
-                    "review_flags": p2_flags,
-                    "review_flag_count": len(p2_flags),
                     "audio_url": audio_url,
                     "audio_duration": audio_duration,
                     "raw_transcript": raw_transcript,
@@ -299,7 +299,6 @@ def process_phase_2_finalize(
                 final_addr = p1_address
                 final_lat = p1_target.get("lat")
                 final_lng = p1_target.get("lng")
-                final_conf = 100.0
 
             else:
                 # MISMATCH DETECTED -> ATTEMPT PHASE 2 CORRECTION
@@ -386,10 +385,10 @@ def process_phase_2_finalize(
                             resolution_note=target_payload.get("resolution_note"),
                             location_type=target_payload.get("location_type"),
                         )
+                        target_payload["review_flags"] = p2_flags
+                        target_payload["review_flag_count"] = len(p2_flags)
                         update_payload = {
                             "verify_location": False,
-                            "review_flags": p2_flags,
-                            "review_flag_count": len(p2_flags),
                             "audio_url": audio_url,
                             "audio_duration": audio_duration,
                             "raw_transcript": raw_transcript,
@@ -422,7 +421,6 @@ def process_phase_2_finalize(
                         final_addr = res["address"]
                         final_lat = res["lat"]
                         final_lng = res["lng"]
-                        final_conf = float(res.get("confidence", 80.0))
                     else:
                         # Geocoding failed for Phase 2, preserve Phase 1 data with verify_location=True
                         logging.warning(f"[{dispatch_id}] Phase 2 geocoding failed. Retaining Phase 1 with verify_location=True.")

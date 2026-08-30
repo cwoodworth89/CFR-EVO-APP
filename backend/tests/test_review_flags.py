@@ -92,3 +92,69 @@ def test_every_flag_has_operator_facing_wording():
     for flag in emitted:
         assert flag in FLAG_LABELS, f"{flag} has no label"
     assert len(emitted) == 8, "expected every flag to fire on a worst-case dispatch"
+
+
+class TestFlagLifecycle:
+    """Where flags live, and how phase 2 supersedes phase 1.
+
+    The operator asked: if phase 1 flags a missing map grid and phase 2's second
+    round picks it up, is the stale flag cleared? Answering it exposed a real bug --
+    the flags were being written at the TOP LEVEL of the payload, where the API drops
+    them, because there is no review_flags column and updates are applied with
+    `setattr` over a Pydantic model_dump. They now live in `target`, which is what
+    the frontend reads and what phase 2 replaces wholesale.
+    """
+
+    def test_flags_are_written_into_target_not_the_top_level(self):
+        """A top-level key with no schema field is silently discarded by the API."""
+        import inspect
+        from cfr_dispatch.pipeline import payload_builder
+
+        src = inspect.getsource(payload_builder)
+        target_block = src[src.index("target_payload = {"):src.index("db_payload = {")]
+        db_block = src[src.index("db_payload = {"):]
+
+        assert '"review_flags": review_flags,' in target_block, \
+            "review_flags must be inside target_payload or the API drops them"
+        assert '"review_flags"' not in db_block.split("}")[0], \
+            "review_flags must NOT be a top-level db_payload key"
+
+    def test_phase2_recomputes_rather_than_clearing(self):
+        """Phase 2 confirming an ADDRESS says nothing about a missing talk group.
+
+        The earlier code set confidence_score = 100.0 here, which erased metadata
+        problems it had not looked at.
+        """
+        import inspect
+        from cfr_dispatch.pipeline import phase2
+
+        src = inspect.getsource(phase2)
+        assert src.count("compute_review_flags(") >= 2, \
+            "each phase 2 update path must recompute flags, not assume them away"
+        # Comments still name confidence_score to explain what was removed, so this
+        # checks executable lines only rather than the raw source.
+        code = "\n".join(
+            line for line in src.splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        assert "confidence_score" not in code, \
+            "confidence_score must not survive in executable phase 2 code"
+
+    def test_a_resolved_grid_clears_the_flag(self):
+        """The operator's example: phase 1 has no grid, phase 2 hears it."""
+        p1 = compute_review_flags(**{**CLEAN, "map_grid": ""})
+        assert NO_MAP_GRID in p1
+
+        # Phase 2 recomputes with the grid it heard on the second round.
+        p2 = compute_review_flags(**{**CLEAN, "map_grid": "88"})
+        assert NO_MAP_GRID not in p2
+        assert p2 == [], "no other flag should appear from resolving the grid"
+
+    def test_resolving_one_field_does_not_clear_the_others(self):
+        """Superseding must be a recompute, not a reset."""
+        p1 = compute_review_flags(**{**CLEAN, "map_grid": "", "radio_channel": ""})
+        assert set(p1) == {NO_MAP_GRID, NO_TALK_GROUP}
+
+        p2 = compute_review_flags(**{**CLEAN, "map_grid": "88", "radio_channel": ""})
+        assert p2 == [NO_TALK_GROUP], \
+            "the talk group is still missing and must survive the grid being resolved"

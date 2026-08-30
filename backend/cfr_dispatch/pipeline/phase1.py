@@ -159,7 +159,8 @@ def process_phase_1_check(
 
                 total_tta_s = (metrics["dsp_ms"] + metrics["stt_ms"] + metrics["gis_ms"] + metrics["bcast_ms"]) / 1000.0
                 
-                flags = db_payload.get("review_flags", [])
+                # Flags live in target, not at the top level -- see payload_builder.
+                flags = (db_payload.get("target") or {}).get("review_flags", [])
 
                 logging.info(
                     f"[METRICS] [{dispatch_id}] Phase 1 TTA: {total_tta_s:.2f}s "

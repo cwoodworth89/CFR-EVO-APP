@@ -32,6 +32,8 @@ export default function VerificationSidebar({
   verifiedMapGrid,
   setVerifiedMapGrid,
   verifiedTones,
+  verifiedResponseType = null,
+  setVerifiedResponseType = () => {},
   setVerifiedTones,
   qualityRating,
   setQualityRating,
@@ -398,6 +400,50 @@ export default function VerificationSidebar({
               }}
               className="w-full min-h-[140px] max-h-[320px] bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl p-2.5 focus:outline-none font-mono leading-relaxed overflow-y-auto"
             />
+          </div>
+
+          {/* Response Verification (punch-list #31 / #45)
+              Modelled on the tone selectors below, with one difference that matters:
+              tones are MULTI-select (handleToneToggle pushes into an array) while a
+              response type is mutually exclusive. Copying the tone code literally
+              would allow a call to be both routine and emergency.
+
+              UNKNOWN is a first-class answer, not an empty state. A reviewer
+              confirming the dispatch never announced a response type is the ground
+              truth the RESPONSE_TYPE_UNKNOWN flag needs to be validated against. */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                Response Type
+              </label>
+              <span
+                onClick={() => setVerifiedResponseType(selectedCall.target?.response_type ?? null)}
+                className="text-[8px] text-slate-500 hover:text-sky-400 font-bold truncate max-w-[90px] cursor-pointer transition-colors"
+                title="Click to import what the system parsed"
+              >
+                Sys: {selectedCall.target?.response_type || 'Unknown'} 📥
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'routine', label: '🟢 Routine', on: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]' },
+                { value: 'emergency', label: '🔴 Emergency', on: 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.2)]' },
+                { value: null, label: '⬜ Unknown', on: 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)]' },
+              ].map(opt => (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => setVerifiedResponseType(opt.value)}
+                  className={`py-2 rounded-xl text-[10px] font-extrabold uppercase font-mono border transition-all cursor-pointer flex items-center justify-center ${
+                    verifiedResponseType === opt.value
+                      ? `${opt.on} font-black`
+                      : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tone Verification */}

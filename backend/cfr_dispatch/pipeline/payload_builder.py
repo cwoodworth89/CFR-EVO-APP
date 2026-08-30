@@ -208,6 +208,16 @@ def build_dispatch_payload(
         "radio_channel": radio_channel,
         "routing_metrics": routing_metrics,
         "cross_streets": target_cross_streets,
+        # Named reasons this dispatch may need a human look, and their count
+        # (punch-list #45). These live in TARGET, not at the top level: there is no
+        # review_flags column, and the API applies updates with
+        # `setattr(call, key, val)` over a Pydantic model_dump, so a top-level key
+        # with no schema field is silently DROPPED. Putting them here also means
+        # phase 2 replacing `target` wholesale replaces the flags with it, which is
+        # exactly the lifecycle wanted -- a stale phase 1 flag cannot outlive the
+        # correction that fixed it.
+        "review_flags": review_flags,
+        "review_flag_count": len(review_flags),
         # 'routine' | 'emergency' | None. None means the dispatch did not announce it
         # or it did not transcribe -- never a guess. Punch-list #31.
         "response_type": detected_resp,
@@ -259,10 +269,6 @@ def build_dispatch_payload(
         "raw_transcript": raw_transcript,
         "sanitized_transcript": reconstructed_transcript,
         "verify_location": verify_location,
-        # Named reasons this dispatch may need a human look, and their count.
-        # Replaces confidence_score (punch-list #45).
-        "review_flags": review_flags,
-        "review_flag_count": len(review_flags),
         "is_test": is_test
     }
     

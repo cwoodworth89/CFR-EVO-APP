@@ -47,6 +47,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const [includeInTraining, setIncludeInTraining] = useState(true);
   const [reviewNotes, setReviewNotes] = useState('');
   const [verifiedTones, setVerifiedTones] = useState([]);
+  // 'routine' | 'emergency' | null. Null is a real answer, not 'unset':
+  // the reviewer confirming the dispatch never announced one is exactly the
+  // ground truth RESPONSE_TYPE_UNKNOWN needs (punch-list #31, #45).
+  const [verifiedResponseType, setVerifiedResponseType] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [stage1Open, setStage1Open] = useState(false);
@@ -163,6 +167,16 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         setVerifiedMapGrid(selectedCall.target?.verified_map_grid || '');
         setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
+        // Prefer the reviewer's own correction, then what the parser heard, then
+        // null. Null is a real state here — "the dispatch did not announce one".
+        setVerifiedResponseType(
+          selectedCall.target?.verified_response_type
+          ?? selectedCall.target?.response_type
+          ?? null);
+        setVerifiedResponseType(
+          selectedCall.target?.verified_response_type
+          ?? selectedCall.target?.response_type
+          ?? null);
         setQualityRating(selectedCall.quality_rating || 'PENDING');
         setReviewNotes(selectedCall.target?.review_notes || selectedCall.review_notes || '');
 
@@ -334,6 +348,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         include_in_training: includeInTraining,
         subaddress: verifiedSubaddress || null,
         verified_talkgroup: verifiedTalkgroup || null,
+        verified_response_type: verifiedResponseType,
         verified_map_grid: verifiedMapGrid || null,
         review_notes: reviewNotes || null
       };
@@ -636,6 +651,8 @@ export default function DispatchReview({ onClose, onReviewCall }) {
             verifiedMapGrid={verifiedMapGrid}
             setVerifiedMapGrid={setVerifiedMapGrid}
             verifiedTones={verifiedTones}
+            verifiedResponseType={verifiedResponseType}
+            setVerifiedResponseType={setVerifiedResponseType}
             setVerifiedTones={setVerifiedTones}
             qualityRating={qualityRating}
             setQualityRating={setQualityRating}

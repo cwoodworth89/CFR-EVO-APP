@@ -63,6 +63,33 @@ class TestGeocoderOrchestrator:
         assert abs(res["lat"] - 49.27832) < 0.0001
         assert res["is_ambiguous"] is False
 
+    def test_step2_intersection_keeps_the_announced_street_order(self, mock_validator):
+        """The junction reads back leading with the street the dispatcher said first.
+
+        public.intersections stores the pair alphabetically, so the stored name is
+        "Christmas Way & Westwood St" either way. Announced the other way round, the
+        answer used to read back reversed -- 10 of 12 resolved intersection dispatches
+        did. The coordinate is the same junction; only the label order changes.
+        """
+        res = mock_validator.get_coordinates("Westwood St and Christmas Way")
+        assert res is not None
+        assert res["address"] == "Westwood St & Christmas Way"
+        assert abs(res["lat"] - 49.27832) < 0.0001
+        assert res["is_ambiguous"] is False
+
+    def test_step2_street_spellings_stay_municipal_when_order_is_flipped(self, mock_validator):
+        """Only the ORDER comes from the announcement -- never the spelling.
+
+        Guards the reorder against becoming a channel for transcription noise: the
+        announced leg is used to decide which street leads, and the municipal name is
+        what gets rendered.
+        """
+        res = mock_validator.get_coordinates("Mariner Way and Lougheed Hwy", target_map_grid="74")
+        assert res is not None
+        assert res["address"] == "Mariner Way & Lougheed Hwy"
+        # 'Hwy' not expanded, 'Mariner Way' spelled as public.intersections has it.
+        assert "Lougheed Hwy" in res["address"]
+
     def test_step2_multi_junction_disambiguation(self, mock_validator):
         res_74 = mock_validator.get_coordinates("Lougheed Hwy & Mariner Way", target_map_grid="74")
         assert res_74 is not None

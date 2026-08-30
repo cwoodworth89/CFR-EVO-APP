@@ -178,6 +178,13 @@ def process_phase_2_finalize(
                             call_type=p2_incident_type,
                             address=clean_address_string(p1_target.get("address")) or (p1_candidate.address if p1_candidate else best_p2_candidate.address),
                             intersection=best_p2_candidate.intersection,
+                            # XStreets are parser-derived and were being dropped here:
+                            # omitted from this copy they default to None, so the "near
+                            # <road> and <road>" the dispatcher announced never reached
+                            # the reconstructed transcript -- measured absent on live
+                            # calls that had them in `target.cross_streets`.
+                            cross_street_1=best_p2_candidate.cross_street_1,
+                            cross_street_2=best_p2_candidate.cross_street_2,
                             radio_channel=p2_channel,
                             map_grid=p2_grid,
                             subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")
@@ -270,6 +277,11 @@ def process_phase_2_finalize(
                                     call_type=p2_incident_type,
                                     address=clean_address_string(res["address"]),
                                     intersection=best_p2_candidate.intersection,
+                                    # See the note on the Phase 1 agreement path above:
+                                    # omitting these dropped the announced XStreets from
+                                    # the reconstructed transcript.
+                                    cross_street_1=best_p2_candidate.cross_street_1,
+                                    cross_street_2=best_p2_candidate.cross_street_2,
                                     radio_channel=p2_channel,
                                     map_grid=p2_grid,
                                     subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")

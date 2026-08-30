@@ -3697,3 +3697,73 @@ shape is to drop `entrance_lat`/`entrance_lng` from the INSERT column list entir
 get SQL NULL, matching what `front_lat` already relies on falling through to. That should be
 paired with a test asserting an import leaves `entrance_*` untouched, since the existing comment
 demonstrates that a comment alone does not hold this invariant.
+
+### 51. Add cross_street_1 and cross_street_2 to the review panel for HITL verification
+> **Status**: ?? **Open � Feature request logged.**
+* **Requirement**: The parser extracts cross_street_1 and cross_street_2, but they need to be fully exposed, verifiable, and editable by dispatchers in the Human-In-The-Loop (HITL) review panel.
+* **Context**: This will allow operators to correct or confirm cross streets during the review process, ensuring accuracy for routed crews.
+
+### 52. Kiosk review button formatting and review rating functionality
+> **Status**: ?? **Open � Feature request logged.**
+* **Requirement**: We need to pivot to checking the "review" button to see how its UI and ergonomics look and feel on the physical kiosk display.
+* **Feature Addition**: We need to implement a review rating system so that operators can rate the quality of the dispatch/review (e.g. confidence or accuracy ratings) directly from the kiosk interface.
+
+---
+
+### 51. The kiosk shows the junction field labelled "cross streets", and never reads the real one
+> **Status**: 🔴 **Open — UX. Data is correct and already reaching the kiosk; the display
+> picks the wrong field.** Found 2026-08-29 while auditing XStreets representation end to end.
+
+**Two different things share one operator-facing label.**
+[`config/models.py:14-16`](../backend/cfr_dispatch/config/models.py:14) draws the distinction
+deliberately, and the parser honours it
+([`announcement.py:173-175`](../backend/cfr_dispatch/parser/announcement.py:173) makes them
+mutually exclusive):
+
+* `intersection` — **the address itself is a junction** (`Gordon Ave and Christmas Way`)
+* `cross_street_1` / `_2` — **a house address plus nearby streets** (`2653 Sandstown Crescent,
+  near Sandstown Court & Nunes Creek Drive`)
+
+Operationally these are not the same. The first is where the crew is going; the second is how
+they confirm they are on the right block. The printed run sheet labels the second "XStreets:",
+which is why that is the name used through the codebase
+([`geocoder.py:139-152`](../services/gis/src/gis_service/geocoder.py:139)).
+
+**What the kiosk does.** [`dispatchModel.js:56`](../frontend/src/utils/dispatchModel.js:56) maps
+`intersection` and nothing else — **`cross_streets` is not in the frontend model at all** and no
+component reads it. Then
+[`ActiveAlertBanner.jsx:11`](../frontend/src/components/hud/ActiveAlertBanner.jsx:11) labels
+`intersection` to the operator as **`'cross streets'`**.
+
+So the crew sees the *junction* field under the *XStreets* label, while the actual announced
+cross streets travel all the way to the kiosk in `target.cross_streets` and are dropped at
+render. This is the same defect as the transcript one fixed in `phase2.py` — carried data
+discarded at the last step — but on the display path.
+
+**Measured, kiosk database 2026-08-29:**
+
+| | |
+|:--|--:|
+| Dispatches with `target.cross_streets` populated | 71 |
+| Ever rendered on the kiosk | **0** |
+| `target.cross_streets` stored as a JSON array | 71 / 71 |
+| `target.intersection` using ` and ` | 222 / 222 |
+
+**Storage is not the problem.** The parser keeps two fields, `public.intersections` keeps two
+columns, and `target.cross_streets` is a proper array on every record that has one. The value is
+only flattened into a string for `target.intersection` and for the reconstructed transcript.
+
+#### What the UX needs
+
+1. **Add `cross_streets` to `dispatchModel.js`** so it reaches components at all.
+2. **Two distinct slots on the alert banner** — the junction (or civic address) as the
+   destination, and XStreets as a separate confirmation line. Do not merge them: a house-address
+   call has both, and they mean different things.
+3. **Relabel** `intersection` in `UPDATE_FIELD_LABELS` to something that is not "cross streets"
+   — it is the incident location when the call is a junction.
+4. **Show nothing rather than something wrong** when `cross_streets` is empty (§6.1). Most calls
+   have no XStreets and the slot should simply be absent.
+
+**Related and already fixed:** the same fields were omitted from the `DispatchData` copies in
+`phase2.py`, which dropped them from the reconstructed transcript. Fixed 2026-08-29; this entry
+is the remaining display half.

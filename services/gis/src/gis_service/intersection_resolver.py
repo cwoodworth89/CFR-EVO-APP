@@ -49,7 +49,11 @@ fact cannot be made safe (CLAUDE.md 6.1).
 import re
 import logging
 from typing import List, Tuple, Optional
-from .normalization import normalize_intersection_key, split_intersection_parts
+from .normalization import (
+    normalize_intersection_key,
+    normalize_street_name,
+    split_intersection_parts,
+)
 
 try:
     from thefuzz import fuzz
@@ -103,7 +107,12 @@ class IntersectionResolver:
 
         # 1. Exact match -- the only path that yields a resolved answer.
         if norm_key in self._cache:
-            cands = [dict(c, match_type='exact') for c in self._cache[norm_key]]
+            # Carry the street the dispatcher said FIRST, so _payload can render the
+            # junction in announced order rather than the alphabetical order it is
+            # stored in. Only recorded on this path: an exact key match proves both
+            # legs are the same pair, so ordering them involves no guessing.
+            cands = [dict(c, match_type='exact', spoken_first=normalize_street_name(s1))
+                     for c in self._cache[norm_key]]
             return cands, 100
 
         # A street crossed with itself is a parser artifact, not a location. It used to
@@ -180,7 +189,7 @@ class IntersectionResolver:
     def _payload(self, c: dict, candidates: List[dict], *, ambiguous: bool,
                  confidence: float, requested: str = None, note: str = None) -> dict:
         return {
-            "address": c["name"],
+            "address": self._name_in_spoken_order(c),
             "lat": c["lat"],
             "lng": c["lng"],
             "rings": [],
@@ -191,6 +200,37 @@ class IntersectionResolver:
             "requested_address": requested,
             "resolution_note": note,
         }
+
+    @staticmethod
+    def _name_in_spoken_order(c: dict) -> str:
+        """Render the junction leading with the street the dispatcher said first.
+
+        `public.intersections` stores the pair alphabetically -- measured 2026-08-29,
+        `street_a < street_b` on all 1,995 rows -- so `c['name']` is in alphabetical
+        order regardless of what was announced. On 10 of the 12 intersection dispatches
+        that resolved through this path, that read back reversed from the announcement:
+        "Westwood St and Loheed Highway" was spoken and `Lougheed Highway & Westwood St`
+        was stored.
+
+        The street SPELLINGS stay municipal -- only the order comes from the
+        announcement, so a transcription error like "Loheed" is still corrected to
+        "Lougheed Highway" here.
+
+        Safe because `spoken_first` is set only on an exact key match, where both legs
+        are already known to be the same pair (`lookup`). No fuzzy matching is involved;
+        the only question is which of the two the dispatcher led with. If that cannot be
+        answered unambiguously, the stored order is kept.
+        """
+        name = c.get("name") or ""
+        spoken_first = c.get("spoken_first")
+        if not spoken_first or " & " not in name:
+            return name
+        left, right = (p.strip() for p in name.split(" & ", 1))
+        leads_with_right = normalize_street_name(right) == spoken_first
+        leads_with_left = normalize_street_name(left) == spoken_first
+        if leads_with_right and not leads_with_left:
+            return f"{right} & {left}"
+        return name
 
     @staticmethod
     def _metres(a: Tuple[float, float], b: Tuple[float, float]) -> float:

@@ -59,6 +59,37 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None,
         logging.error(f"[{dispatch_id}] Error saving dispatch audio: {e}", exc_info=True)
         return None, 0.0
 
+def _coalesce_across_rounds(all_candidates, p1_candidate, p1_target):
+    """First non-empty XStreet and subaddress across every parsed round.
+
+    Locution announces each call twice and Phase 2 re-transcribes the whole recording,
+    so the same field is observed two or more times independently. STT damages the rounds
+    differently -- on DISP-2026-AAFDB8 round 1 was heard as "Anson Avenue & Lincoln Ave"
+    and round 2 as "Anson Ave, and Lincoln Ave" -- so a field one round drops the other
+    often still carries.
+
+    Returns `(cross_street_1, cross_street_2, subaddress)`, falling back to the Phase 1
+    candidate and then the Phase 1 target, mirroring how `map_grid` and `radio_channel`
+    are resolved.
+
+    **Fills blanks only.** Where two rounds hold genuinely different values the first
+    non-empty wins and the disagreement is not recorded. That is deliberate: recovering a
+    missing field and arbitrating between two conflicting ones are different problems, and
+    the second needs an operator-facing decision that does not exist yet.
+    """
+    def first(attr):
+        return next((getattr(d, attr) for d in all_candidates if getattr(d, attr, None)), None)
+
+    p1_get = (lambda attr: getattr(p1_candidate, attr, None)) if p1_candidate else (lambda attr: None)
+    target = p1_target or {}
+
+    return (
+        first("cross_street_1") or p1_get("cross_street_1"),
+        first("cross_street_2") or p1_get("cross_street_2"),
+        first("subaddress") or p1_get("subaddress") or target.get("subaddress"),
+    )
+
+
 def process_phase_2_finalize(
     task: dict,
     validator: Any,
@@ -167,6 +198,20 @@ def process_phase_2_finalize(
                 p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
                 p2_incident_type = match_incident_type(transcript, CALL_TYPES)
 
+                # XStreets and subaddress coalesce across rounds, the same way map_grid and
+                # radio_channel above already do. Locution announces the call twice and STT
+                # damages the two rounds differently, so a field one round lost the other
+                # often still has. Taking them from `best_p2_candidate` alone used only the
+                # first round carrying an address (punch-list #44), discarding the other
+                # round's copy -- measured on DISP-2026-AAFDB8, where round 1 lost
+                # "Lincoln Ave" and round 2 kept it.
+                #
+                # This fills blanks only. Where the rounds disagree, the first non-empty
+                # still wins and the disagreement is not surfaced; deciding between two
+                # different answers is a separate question from recovering a missing one.
+                p2_cross_1, p2_cross_2, p2_subaddress = _coalesce_across_rounds(
+                    all_candidates, p1_candidate, p1_target)
+
                 reconstructed_transcript = transcript
                 best_p2_candidate = p2_candidate or p1_candidate
                 if best_p2_candidate:
@@ -183,11 +228,11 @@ def process_phase_2_finalize(
                             # <road> and <road>" the dispatcher announced never reached
                             # the reconstructed transcript -- measured absent on live
                             # calls that had them in `target.cross_streets`.
-                            cross_street_1=best_p2_candidate.cross_street_1,
-                            cross_street_2=best_p2_candidate.cross_street_2,
+                            cross_street_1=p2_cross_1,
+                            cross_street_2=p2_cross_2,
                             radio_channel=p2_channel,
                             map_grid=p2_grid,
-                            subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")
+                            subaddress=p2_subaddress
                         )
                         reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                     except Exception as r_err:
@@ -266,6 +311,10 @@ def process_phase_2_finalize(
                         p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
                         p2_incident_type = match_incident_type(transcript, CALL_TYPES)
 
+                        # See the note on the Phase 1 agreement path above.
+                        p2_cross_1, p2_cross_2, p2_subaddress = _coalesce_across_rounds(
+                            all_candidates, p1_candidate, p1_target)
+
                         reconstructed_transcript = transcript
                         best_p2_candidate = p2_candidate or p1_candidate
                         if best_p2_candidate:
@@ -280,11 +329,11 @@ def process_phase_2_finalize(
                                     # See the note on the Phase 1 agreement path above:
                                     # omitting these dropped the announced XStreets from
                                     # the reconstructed transcript.
-                                    cross_street_1=best_p2_candidate.cross_street_1,
-                                    cross_street_2=best_p2_candidate.cross_street_2,
+                                    cross_street_1=p2_cross_1,
+                                    cross_street_2=p2_cross_2,
                                     radio_channel=p2_channel,
                                     map_grid=p2_grid,
-                                    subaddress=best_p2_candidate.subaddress or p1_target.get("subaddress")
+                                    subaddress=p2_subaddress
                                 )
                                 reconstructed_transcript = reconstruct_template_transcript(candidate_copy)
                             except Exception as r_err:
@@ -306,8 +355,8 @@ def process_phase_2_finalize(
                             "map_grid": p2_grid,
                             "radio_channel": p2_channel
                         }
-                        if p1_target.get("subaddress") or (best_p2_candidate and best_p2_candidate.subaddress):
-                            target_payload["subaddress"] = p1_target.get("subaddress") or best_p2_candidate.subaddress
+                        if p2_subaddress:
+                            target_payload["subaddress"] = p2_subaddress
                         if best_p2_candidate and best_p2_candidate.intersection:
                             target_payload["intersection"] = best_p2_candidate.intersection
 

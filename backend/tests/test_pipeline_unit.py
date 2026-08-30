@@ -185,3 +185,56 @@ class TestCrossRoadCleaning(unittest.TestCase):
     def test_near_clause_is_still_protected(self):
         self.assertEqual(self._clean("Westwood Street near Anson Ave"),
                          "Westwood Street near Anson Ave")
+
+
+class TestCoalesceAcrossRounds(unittest.TestCase):
+    """Phase 2 recovers a field one round lost from the round that kept it.
+
+    Locution announces every call twice and Phase 2 re-transcribes the whole
+    recording, so each field is observed independently more than once. STT damages
+    the rounds differently. Before this, XStreets and subaddress were taken only
+    from the first candidate carrying an address -- round 1 -- so anything round 1
+    dropped was lost even when round 2 had it (punch-list #44).
+    """
+
+    def _cand(self, **kw):
+        from cfr_dispatch.config.models import DispatchData
+        kw.setdefault("raw_text", "")
+        return DispatchData(**kw)
+
+    def test_round_2_supplies_what_round_1_dropped(self):
+        from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
+        r1 = self._cand(address="1123 Westwood St", cross_street_1="Anson Ave")
+        r2 = self._cand(address="1123 Westwood St", cross_street_1="Anson Ave",
+                        cross_street_2="Lincoln Ave")
+        x1, x2, sub = _coalesce_across_rounds([r1, r2], None, {})
+        self.assertEqual(x1, "Anson Ave")
+        self.assertEqual(x2, "Lincoln Ave")
+
+    def test_round_1_still_wins_when_both_rounds_have_it(self):
+        from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
+        r1 = self._cand(cross_street_1="Anson Avenue", cross_street_2="Lincoln Ave")
+        r2 = self._cand(cross_street_1="Anson Ave", cross_street_2="Lincoln Avenue")
+        x1, x2, _ = _coalesce_across_rounds([r1, r2], None, {})
+        self.assertEqual(x1, "Anson Avenue")
+        self.assertEqual(x2, "Lincoln Ave")
+
+    def test_subaddress_recovered_from_either_round(self):
+        from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
+        r1 = self._cand(address="1457 Hockaday St")
+        r2 = self._cand(address="1457 Hockaday St", subaddress="Unit 203")
+        _, _, sub = _coalesce_across_rounds([r1, r2], None, {})
+        self.assertEqual(sub, "Unit 203")
+
+    def test_falls_back_to_phase_1_candidate_then_target(self):
+        from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
+        p1 = self._cand(cross_street_1="Anson Ave")
+        x1, x2, sub = _coalesce_across_rounds(
+            [self._cand(address="1123 Westwood St")], p1, {"subaddress": "Unit 5"})
+        self.assertEqual(x1, "Anson Ave")
+        self.assertIsNone(x2)
+        self.assertEqual(sub, "Unit 5")
+
+    def test_no_candidates_is_not_an_error(self):
+        from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
+        self.assertEqual(_coalesce_across_rounds([], None, None), (None, None, None))

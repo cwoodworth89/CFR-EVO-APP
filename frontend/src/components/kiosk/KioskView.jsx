@@ -90,11 +90,18 @@ export default function KioskView({ kioskState }) {
     );
   }
 
-  // Priority classification for border
-  const isEmergency =
-    activeCall.priority_code <= 2 ||
-    String(activeCall.priority_code).toLowerCase() === 'emergency' ||
-    String(activeCall.response_type).toLowerCase() === 'emergency';
+  // Response classification. Coquitlam transmits "respond routine" / "respond
+  // emergency"; those two strings are what the parser emits and what
+  // public.vocabulary stores, so there is nothing to translate and no numeric code
+  // (operator ruling 2026-08-23, punch-list #30).
+  //
+  // The previous test also read `priority_code <= 2`, a field that has never existed
+  // in the database or the backend. Every branch evaluated undefined, so isEmergency
+  // was permanently false and every dispatch rendered routine. Punch-list #31.
+  const responseType = (activeCall.response_type || '').toLowerCase().trim();
+  const isEmergency = responseType === 'emergency';
+  // Distinct from "not emergency": unknown is a flagged condition, not routine.
+  const isResponseUnknown = responseType === '';
 
   // Parse responding units list (preserving exact order dispatched from database)
   const extractCallUnits = (call) => {
@@ -173,7 +180,12 @@ export default function KioskView({ kioskState }) {
     ? `*TEST* ${rawIncident}`
     : rawIncident;
 
-  const borderColor = isEmergency ? 'border-red-600' : 'border-emerald-500';
+  // Green routine / red emergency are a stylistic cue for drivers; amber overrides
+  // both and means "needs attention regardless of response type" (operator, #30).
+  // An unknown response type is one such condition (#31).
+  const borderColor = isResponseUnknown ? 'border-amber-500'
+    : isEmergency ? 'border-red-600'
+    : 'border-emerald-500';
 
   return (
     <div
@@ -221,6 +233,7 @@ export default function KioskView({ kioskState }) {
         isEmergency={isEmergency}
         isReviewMode={isReviewMode}
         isRecentlyUpdated={isRecentlyUpdated}
+        isResponseUnknown={isResponseUnknown}
         updatedFields={updatedFields}
         isTvMode={isTvMode}
         elapsedFormatted={elapsedFormatted}

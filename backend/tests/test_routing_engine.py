@@ -335,10 +335,10 @@ class TestStockOSRMMetrics:
         with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None)):
             assert engine.calculate_route(
                 dest_lat=49.2622, dest_lng=-122.8174, response_type="emergency"
-            )["response_mode"] == "Emergency (Code 3)"
+            )["response_mode"] == "Emergency"
             assert engine.calculate_route(
                 dest_lat=49.2622, dest_lng=-122.8174, response_type="routine"
-            )["response_mode"] == "Routine (Code 1)"
+            )["response_mode"] == "Routine"
 
     def test_unit_metrics_respects_supplied_road_distance(self):
         engine = EVORoutingEngine()

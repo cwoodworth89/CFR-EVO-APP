@@ -36,7 +36,9 @@ def parse_destructive(raw_text: str, units_vocab: List[str] = None) -> DispatchD
 
     agency = None
     units = []
-    response_type = "routine"
+    # None, not "routine": an unparsed response type must not be invented.
+    # Overwritten below when the transcript actually announces one. Punch-list #31.
+    response_type = None
     incident_type = "Unknown Incident"
     map_grid = None
     radio_channel = None

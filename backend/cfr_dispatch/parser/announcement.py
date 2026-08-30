@@ -358,8 +358,12 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
         units_part = "units"
         
     # 2. Priority
-    resp = (dispatch.response_type or "routine").lower()
-    priority_part = f"respond {resp}"
+    # This reconstructs the spoken template for WER scoring, so an unannounced
+    # response type must not be invented as "routine" -- that would score the
+    # backtest against words the dispatcher never said. Omit the clause instead.
+    # Punch-list #31.
+    resp = (dispatch.response_type or "").lower().strip()
+    priority_part = f"respond {resp}" if resp else ""
     
     # 3. Call Type
     call_type_part = (dispatch.call_type or "incident").lower()

@@ -29,6 +29,7 @@ export default function ActiveAlertBanner({
   displayAddress = '',
   displayIncident = '',
   isEmergency = true,
+  isResponseUnknown = false,
   isReviewMode = false,
   isRecentlyUpdated = false,
   updatedFields = [],
@@ -50,10 +51,16 @@ export default function ActiveAlertBanner({
       {/* Left: Priority Code, Responding Units with Live ETAs, Talk Group & Pre-Plan */}
       <div className="flex flex-col items-start gap-1.5 text-left max-w-md">
         <div className="flex items-center gap-2">
+          {/* Coquitlam transmits "respond routine" / "respond emergency" -- those are the
+              terms, and there is no numeric code (operator ruling 2026-08-23, #30).
+              UNKNOWN is its own amber state, not a silent fall-through to routine (#31). */}
           <div className={`px-3 py-1 rounded-lg font-black uppercase text-[11px] tracking-wider shadow ${
-            isEmergency ? 'bg-red-600 text-white animate-pulse' : 'bg-emerald-600 text-white'
+            isResponseUnknown ? 'bg-amber-500 text-slate-950'
+              : isEmergency ? 'bg-red-600 text-white animate-pulse'
+              : 'bg-emerald-600 text-white'
           }`}>
-            {isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'}
+            {isResponseUnknown ? '⚠️ Response Unknown'
+              : isEmergency ? '🚨 Emergency' : '🟢 Routine'}
           </div>
 
           {(isReviewMode || activeCall?.isReview) && (

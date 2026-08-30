@@ -219,7 +219,7 @@ def process_phase_2_finalize(
                         candidate_copy = DispatchData(
                             raw_text=best_p2_candidate.raw_text,
                             units=p2_units_str,
-                            response_type=best_p2_candidate.response_type or "routine",
+                            response_type=best_p2_candidate.response_type,
                             call_type=p2_incident_type,
                             address=clean_address_string(p1_target.get("address")) or (p1_candidate.address if p1_candidate else best_p2_candidate.address),
                             intersection=best_p2_candidate.intersection,
@@ -322,7 +322,7 @@ def process_phase_2_finalize(
                                 candidate_copy = DispatchData(
                                     raw_text=best_p2_candidate.raw_text,
                                     units=p2_units_str,
-                                    response_type=best_p2_candidate.response_type or "routine",
+                                    response_type=best_p2_candidate.response_type,
                                     call_type=p2_incident_type,
                                     address=clean_address_string(res["address"]),
                                     intersection=best_p2_candidate.intersection,

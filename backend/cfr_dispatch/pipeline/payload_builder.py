@@ -179,15 +179,21 @@ def build_dispatch_payload(
         
     # Calculate per-unit routing metrics from home hall origins (accounting for Emergency vs Routine response)
     routing_metrics = []
+    # Parsed once, and NOT defaulted. An unparsed response type is None and stays
+    # None all the way to the kiosk, which renders it UNKNOWN on an amber border
+    # (operator ruling 2026-08-23, CLAUDE.md 6.1). This previously defaulted to
+    # "emergency" here and to "routine" in four other places, so the same unparsed
+    # call was routed one way and reconstructed the other. Punch-list #31.
+    detected_resp = next((d.response_type for d in all_candidates if d.response_type), None)
+
     if lat is not None and lng is not None and responding_units:
         try:
             from gis_service.routing_engine import EVORoutingEngine
             router = EVORoutingEngine()
-            detected_resp = next((d.response_type for d in all_candidates if d.response_type), "emergency")
             routing_metrics = router.calculate_units_routing(
                 responding_units, lat, lng, response_type=detected_resp,
                 destination_options=local_geocode_result.get("endpoints"))
-            logging.info(f"[{dispatch_id}] Computed {detected_resp} routing metrics for {len(routing_metrics)} responding units.")
+            logging.info(f"[{dispatch_id}] Computed {detected_resp or 'unknown (routing at emergency speed)'} routing metrics for {len(routing_metrics)} responding units.")
         except Exception as route_err:
             logging.warning(f"[{dispatch_id}] Could not compute routing metrics: {route_err}")
 
@@ -200,7 +206,10 @@ def build_dispatch_payload(
         "map_grid": map_grid,
         "radio_channel": radio_channel,
         "routing_metrics": routing_metrics,
-        "cross_streets": target_cross_streets
+        "cross_streets": target_cross_streets,
+        # 'routine' | 'emergency' | None. None means the dispatch did not announce it
+        # or it did not transcribe -- never a guess. Punch-list #31.
+        "response_type": detected_resp,
     }
     for k in ("location_type", "segment", "endpoints", "length_m",
               "resolution_note", "requested_address"):
@@ -225,7 +234,7 @@ def build_dispatch_payload(
             candidate_copy = DispatchData(
                 raw_text=all_candidates[0].raw_text,
                 units=units_str,
-                response_type=all_candidates[0].response_type or "routine",
+                response_type=all_candidates[0].response_type,
                 call_type=incident_type,
                 address=best_address,
                 intersection=all_candidates[0].intersection,

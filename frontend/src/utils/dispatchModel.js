@@ -74,7 +74,15 @@ export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
     // what was called in and where the pin actually is.
     requested_address: target.requested_address || null,
 
-    priority_code: record.priority_code,
+    // 'routine' | 'emergency' | null. Null means the dispatch did not announce it or
+    // it did not transcribe -- the kiosk shows UNKNOWN on an amber border rather than
+    // guessing (CLAUDE.md 6.1). Punch-list #31.
+    //
+    // Replaces priority_code, which was mapped here for months despite never being a
+    // column in public.dispatches nor produced anywhere in the backend -- so
+    // KioskView's isEmergency test read undefined and EVERY call rendered routine,
+    // including all 343 emergency ones.
+    response_type: target.response_type ?? record.response_type ?? null,
     // Confidence cutoff of 90 — measured on this system 2026-08-23 (CLAUDE.md §6.3 tier 3),
     // NOT a standard. It was inherited without provenance; this analysis was run to decide
     // whether to keep it, and it is RETAINED PROVISIONALLY pending more HITL reviews.

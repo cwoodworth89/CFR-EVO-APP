@@ -27,7 +27,7 @@ export const APPARATUS_TIERS = {
     subtitle: 'Medic, Squad (SQ1-4), Command Car, LAV, Specialty',
     weightTons: 5,
     color: '#38bdf8',
-    staged: { speedCode3KmH: 52.0, speedCode1KmH: 38.0, turnPenaltySec: 3 }
+    staged: { speedEmergencyKmH: 52.0, speedRoutineKmH: 38.0, turnPenaltySec: 3 }
   },
   GENERAL: {
     key: 'GENERAL',
@@ -35,7 +35,7 @@ export const APPARATUS_TIERS = {
     subtitle: 'Engine (E1-4), Rescue (R1-4), Quint (Q5), Pumper',
     weightTons: 22,
     color: '#10b981',
-    staged: { speedCode3KmH: 45.0, speedCode1KmH: 32.0, turnPenaltySec: 5 }
+    staged: { speedEmergencyKmH: 45.0, speedRoutineKmH: 32.0, turnPenaltySec: 5 }
   },
   HEAVY: {
     key: 'HEAVY',
@@ -43,7 +43,7 @@ export const APPARATUS_TIERS = {
     subtitle: 'Ladder (L1-4), Tower Platform, Water Tender (T1-4, WT4)',
     weightTons: 35,
     color: '#f59e0b',
-    staged: { speedCode3KmH: 38.0, speedCode1KmH: 28.0, turnPenaltySec: 8 }
+    staged: { speedEmergencyKmH: 38.0, speedRoutineKmH: 28.0, turnPenaltySec: 8 }
   }
 };
 

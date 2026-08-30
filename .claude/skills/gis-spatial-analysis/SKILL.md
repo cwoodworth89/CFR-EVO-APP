@@ -103,6 +103,22 @@ Hydrants within a 500-meter radius of the incident are retrieved and color-coded
 
 ## 6. LiDAR 3D Spatial Intelligence & Topography Engine
 
+> [!CAUTION]
+> **None of §6 is implemented, and the data it needs is not held.** Verified 2026-08-30:
+> there is **no elevation, DEM, HGT or point-cloud data anywhere in the system**, `public.roads`
+> has no grade, incline or elevation column, and no point-cloud classification, canopy model or
+> floodplain analysis exists in the codebase. `FLAG_OVERHEAD_OBSTRUCTION` appears nowhere.
+>
+> Two statements below are not merely unbuilt but **false as written**: §6.2 says *"the routing
+> engine biases against routes with >15% downhill gradients"* — OSRM runs the **stock `driving`
+> profile** with no elevation input and no custom Lua profile exists in the repository, so no
+> such bias is applied to anything.
+>
+> Read §6 as a wish list. Do not cite any figure in it as provenance (CLAUDE.md §6.3), and do
+> not build on it without first obtaining the elevation data it assumes. The same content, with
+> the same problem, appears in `docs/emergency_routing_gis_parcels_standard.md` §3.5, which is
+> annotated there for the same reason.
+
 CFR EVO integrates point-cloud LiDAR data, Digital Surface Models (DSM), and Digital Elevation Models (DEM/DTM) to provide tactical 3D spatial awareness for apparatus dispatch, tactical positioning, and route computation.
 
 ```

@@ -70,6 +70,13 @@ CREATE INDEX IF NOT EXISTS idx_road_closures_active ON road_closures(active);
 
 ## 4. Spatial Collision Detection Workflow
 
+> [!WARNING]
+> **Not implemented. Verified 2026-08-30: `closure_warnings` appears nowhere in the codebase**,
+> and no corridor-buffer collision check runs during dispatch processing. The section below
+> describes a design, not current behaviour, and the worked JSON is an illustration rather than
+> a payload you will observe. Treat it as a specification to build against (CLAUDE.md §7.5 —
+> absence is recorded, not silent).
+
 When a new dispatch is processed by `cfr_dispatch.pipeline.payload_builder`:
 1. The target location point $(lat, lng)$ and estimated primary route corridor are buffered by 100 meters.
 2. The buffer is queried against all active `road_closures` in the database.

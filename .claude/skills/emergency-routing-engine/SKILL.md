@@ -64,6 +64,17 @@ flowchart LR
 ```
 
 ### A. Online: Google Maps Directions API
+
+> [!CAUTION]
+> **Not present in the system, and contrary to the architecture.** Verified 2026-08-30:
+> `departure_time`, `traffic_model` and the Directions endpoint appear nowhere in the codebase.
+> CLAUDE.md §1 requires turn-by-turn routing to work with **no WAN connectivity and no
+> per-request API fees**, so an online routing mode is not a fallback this system is allowed to
+> depend on.
+>
+> **All routing goes through §B, the local OSRM container**, which runs the stock `driving`
+> profile (punch-list #1 — the profile has never been tuned). Leave this subsection only as a
+> record of a path that was considered and not taken.
 * **Endpoint**: `https://maps.googleapis.com/maps/api/directions/json`
 * **Parameters**:
   - `origin`: Hall apron coordinates (e.g. Hall 1 `49.29109654571679,-122.79072561861948`)

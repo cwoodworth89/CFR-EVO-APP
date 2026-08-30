@@ -29,7 +29,7 @@ This skill governs the collection, database aggregation, statistical modeling, a
    - Stage 1: Audio Ingestion & DSP Bandpass Filtering (`t_dsp`)
    - Stage 2: Faster-Whisper Local STT Transcription (`t_stt`)
    - Stage 3: Municipal GIS Address Parsing & Parcel Matching (`t_gis`)
-   - Stage 4: PostgreSQL Persistence & Mosquitto MQTT Broadcast (`t_publish`)
+   - Stage 4: PostgreSQL Persistence & Mosquitto MQTT Broadcast (`t_bcast`, recorded as `bcast_ms`)
 2. **Speech-to-Text Benchmark & Model Progression**:
    - Historical Word Error Rate (WER) and Match Error Rate (MER) tracked across models (`base`, fine-tuned models, vocabulary injections).
 3. **Human-in-the-Loop (HITL) Feedback & Correction Rate**:

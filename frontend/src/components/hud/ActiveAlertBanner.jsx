@@ -1,5 +1,6 @@
 import React from 'react';
 import { getUnitBadgeStyle, getShortCallsign, formatUnitEtaDisplay } from './unitFormat';
+import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
 
 // Operator-facing names for the fields getVisibleChanges() reports. Falls through
 // to the raw key so a newly-tracked field is still readable rather than hidden.
@@ -74,6 +75,22 @@ export default function ActiveAlertBanner({
               The operator reported being told a call had updated with nothing to
               show for it -- see punch-list #34. The badge now only renders when
               getVisibleChanges() found something, and says what. */}
+          {/* Named reasons the system thinks this call needs attention (#45). The
+              crew sees WHAT is uncertain, not a score. Reasons are on hover here and
+              listed in full in the review panel. */}
+          {(() => {
+            const flags = getReviewFlags(activeCall);
+            if (flags.length === 0) return null;
+            return (
+              <span
+                className="bg-amber-500 text-slate-950 px-2 py-0.5 rounded font-black text-[10px] uppercase tracking-wider cursor-help"
+                title={flags.map(f => `• ${flagLabel(f)}`).join('\n')}
+              >
+                ⚠️ {flags.length} {flags.length === 1 ? 'Flag' : 'Flags'}
+              </span>
+            );
+          })()}
+
           {isRecentlyUpdated && (
             <span
               className="bg-sky-600 text-white px-2 py-0.5 rounded font-bold text-[10px] animate-bounce"

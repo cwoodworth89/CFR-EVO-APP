@@ -12,6 +12,10 @@ from cfr_dispatch.parser import (
     CALL_TYPES
 )
 
+from cfr_dispatch.pipeline.review_flags import (
+    compute_review_flags, LOCATION_UNRESOLVED, LOCATION_SUBSTITUTED,
+)
+
 def clean_address_string(addr: str) -> str:
     """Strips postal codes and regional/provincial suffix boilerplate from address strings."""
     if not addr:
@@ -77,7 +81,6 @@ def build_dispatch_payload(
             verify_location_override = True
         
     local_geocode_result = None
-    confidence_score = 0.0
     
     first_candidate = unique_addresses[0] if unique_addresses else "Unknown Location"
     
@@ -88,7 +91,6 @@ def build_dispatch_payload(
             "lng": None,
             "rings": []
         }
-        confidence_score = 100.0
     elif first_candidate == "Unknown Location":
         local_geocode_result = {
             "address": first_candidate,
@@ -96,7 +98,6 @@ def build_dispatch_payload(
             "lng": None,
             "rings": []
         }
-        confidence_score = 0.0
     else:
         for i, candidate_address in enumerate(unique_addresses):
             logging.debug(f"[{dispatch_id}] Attempting Local Geocode for Candidate #{i+1}: '{candidate_address}'")
@@ -107,8 +108,7 @@ def build_dispatch_payload(
                 cross_street_2=cross_street_2
             ) if validator else None
             if res:
-                conf = res.get("confidence", 85.0)
-                logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}' (Score: {conf}%)")
+                logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}'")
                 local_geocode_result = {
                     "address": res["address"],
                     "lat": res["lat"],
@@ -123,7 +123,6 @@ def build_dispatch_payload(
                           "resolution_note", "requested_address"):
                     if res.get(k) is not None:
                         local_geocode_result[k] = res[k]
-                confidence_score = float(conf)
                 break
         
         if not local_geocode_result:
@@ -134,7 +133,6 @@ def build_dispatch_payload(
                 "lng": None,
                 "rings": []
             }
-            confidence_score = 0.0
 
     best_address = clean_address_string(local_geocode_result["address"])
     lat = local_geocode_result["lat"]
@@ -153,32 +151,6 @@ def build_dispatch_payload(
 
     radio_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), None)
     
-    # Structured Confidence Scoring
-    verify_location = False
-    if best_address == "Contact dispatch for location information":
-        confidence_score = 100.0
-        verify_location = False
-    else:
-        base_confidence = confidence_score if confidence_score is not None else 0.0
-        penalties = 0.0
-        if lat is None or lng is None:
-            penalties += 30.0
-        if not responding_units or len(responding_units) == 0 or (len(responding_units) == 1 and responding_units[0] == "Unknown Unit"):
-            penalties += 20.0
-        if not map_grid or str(map_grid).strip() == "" or str(map_grid).lower() == "none":
-            penalties += 15.0
-        if not radio_channel or str(radio_channel).strip() == "" or str(radio_channel).lower() == "none":
-            penalties += 15.0
-        
-        confidence_score = max(0.0, base_confidence - penalties)
-        if confidence_score < 90.0:
-            verify_location = True
-            
-    if verify_location_override is not None:
-        verify_location = verify_location_override
-        
-    # Calculate per-unit routing metrics from home hall origins (accounting for Emergency vs Routine response)
-    routing_metrics = []
     # Parsed once, and NOT defaulted. An unparsed response type is None and stays
     # None all the way to the kiosk, which renders it UNKNOWN on an amber border
     # (operator ruling 2026-08-23, CLAUDE.md 6.1). This previously defaulted to
@@ -186,6 +158,35 @@ def build_dispatch_payload(
     # call was routed one way and reconstructed the other. Punch-list #31.
     detected_resp = next((d.response_type for d in all_candidates if d.response_type), None)
 
+    # Named review flags replace the old confidence score (punch-list #45).
+    #
+    # What was here: the geocoder's score minus 30 for no coordinates, 20 for no
+    # units, 15 for no map grid, 15 for no talk group, with anything under 90
+    # setting verify_location. A correct address with an untranscribed talk group
+    # scored 85; a confidently WRONG address scored 100. The penalties had no
+    # provenance, were not commensurable, and destroyed the very information they
+    # consumed -- by the time the operator saw "85" the missing field was gone.
+    review_flags = compute_review_flags(
+        lat=lat,
+        lng=lng,
+        responding_units=responding_units,
+        incident_type=incident_type,
+        map_grid=map_grid,
+        radio_channel=radio_channel,
+        response_type=detected_resp,
+        resolution_note=local_geocode_result.get("resolution_note"),
+        location_type=local_geocode_result.get("location_type"),
+    )
+
+    # verify_location survives as the operator-facing "check this location" marker,
+    # but is now driven by a NAMED condition rather than an arithmetic threshold.
+    verify_location = LOCATION_UNRESOLVED in review_flags or LOCATION_SUBSTITUTED in review_flags
+
+    if verify_location_override is not None:
+        verify_location = verify_location_override
+        
+    # Calculate per-unit routing metrics from home hall origins (accounting for Emergency vs Routine response)
+    routing_metrics = []
     if lat is not None and lng is not None and responding_units:
         try:
             from gis_service.routing_engine import EVORoutingEngine
@@ -257,8 +258,11 @@ def build_dispatch_payload(
         "timestamp": timestamp,
         "raw_transcript": raw_transcript,
         "sanitized_transcript": reconstructed_transcript,
-        "confidence_score": confidence_score,
         "verify_location": verify_location,
+        # Named reasons this dispatch may need a human look, and their count.
+        # Replaces confidence_score (punch-list #45).
+        "review_flags": review_flags,
+        "review_flag_count": len(review_flags),
         "is_test": is_test
     }
     

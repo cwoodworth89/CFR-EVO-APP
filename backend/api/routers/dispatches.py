@@ -44,7 +44,6 @@ def serialize_call(call: LiveCallModel) -> dict:
         "target": call.target or {},
         "raw_transcript": call.raw_transcript,
         "sanitized_transcript": call.sanitized_transcript,
-        "confidence_score": float(call.confidence_score) if call.confidence_score is not None else 0.0,
         "verify_location": call.verify_location,
         "origins": call.origins or [],
         "audio_url": call.audio_url,
@@ -102,13 +101,19 @@ def get_dispatch_stats(db: Session = Depends(get_db)):
     total_calls = db.query(LiveCallModel).count()
     verified_calls = db.query(LiveCallModel).filter(LiveCallModel.feedback_submitted == True).count()
     unverified_calls = total_calls - verified_calls
-    avg_confidence = db.query(func.avg(LiveCallModel.confidence_score)).scalar() or 0.0
+    # average_confidence was removed 2026-08-29 (punch-list #45) along with the
+    # score itself. Nothing consumed it. Flagged-dispatch count replaces it: a
+    # countable condition rather than an average of a number that conflated address
+    # correctness with metadata completeness.
+    flagged_calls = db.query(LiveCallModel).filter(
+        LiveCallModel.target["review_flag_count"].as_integer() > 0
+    ).count()
 
     return {
         "total_dispatches": total_calls,
         "verified_dispatches": verified_calls,
         "unverified_dispatches": unverified_calls,
-        "average_confidence": round(float(avg_confidence), 1)
+        "flagged_dispatches": flagged_calls
     }
 
 

@@ -159,12 +159,13 @@ def process_phase_1_check(
 
                 total_tta_s = (metrics["dsp_ms"] + metrics["stt_ms"] + metrics["gis_ms"] + metrics["bcast_ms"]) / 1000.0
                 
-                conf = db_payload.get("confidence_score", 0.0)
+                flags = db_payload.get("review_flags", [])
 
                 logging.info(
                     f"[METRICS] [{dispatch_id}] Phase 1 TTA: {total_tta_s:.2f}s "
                     f"(DSP: {metrics['dsp_ms']:.0f}ms, STT: {metrics['stt_ms']:.0f}ms, GIS: {metrics['gis_ms']:.0f}ms, MQTT: {metrics['bcast_ms']:.0f}ms) | "
-                    f"Units: {responding_units} | Addr: '{best_addr}' ({conf:.0f}% conf)"
+                    f"Units: {responding_units} | Addr: '{best_addr}'"
+                    f"{' | FLAGS: ' + ', '.join(flags) if flags else ''}"
                 )
 
                 return Phase1Result(
@@ -176,7 +177,7 @@ def process_phase_1_check(
                     address=best_addr,
                     lat=target.get("lat"),
                     lng=target.get("lng"),
-                    confidence_score=conf,
+                    review_flag_count=len(flags),
                     is_triggered=True,
                     db_payload=db_payload,
                     metrics=metrics

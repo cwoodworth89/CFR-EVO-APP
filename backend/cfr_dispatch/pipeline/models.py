@@ -31,7 +31,9 @@ class Phase1Result:
     address: str
     lat: float | None
     lng: float | None
-    confidence_score: float
+    # Count of named review flags. Replaced confidence_score 2026-08-29
+    # (punch-list #45); the flag names themselves live in db_payload.
+    review_flag_count: int = 0
     is_triggered: bool = False
     db_payload: dict = field(default_factory=dict)
     metrics: dict = field(default_factory=dict)
@@ -45,7 +47,9 @@ class Phase2Result:
     final_address: str
     lat: float | None
     lng: float | None
-    confidence_score: float
+    # Count of named review flags. Replaced confidence_score 2026-08-29
+    # (punch-list #45); the flag names themselves live in db_payload.
+    review_flag_count: int = 0
     audio_url: str | None = None
     audio_duration: float = 0.0
     db_payload: dict = field(default_factory=dict)

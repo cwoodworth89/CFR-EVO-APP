@@ -32,6 +32,8 @@ from notification_service import (
     post_to_ntfy
 )
 
+from cfr_dispatch.pipeline.review_flags import compute_review_flags
+
 def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None, save_to_disk: bool = True) -> Tuple[str | None, float]:
     """Computes duration and conditionally saves audio buffer locally via notification_service."""
     try:
@@ -171,7 +173,7 @@ def process_phase_2_finalize(
             final_addr = db_payload.get("address") or target.get("address", "Unknown Location")
             final_lat = target.get("lat")
             final_lng = target.get("lng")
-            final_conf = db_payload.get("confidence_score", 0.0)
+            final_flags = db_payload.get("review_flags", [])
         else:
             p1_candidate = next((d for d in p1_data["candidates"] if d.address or d.intersection), None)
             p2_candidate = next((d for d in all_candidates if d.address or d.intersection), None)
@@ -263,9 +265,21 @@ def process_phase_2_finalize(
                     "radio_channel": p2_channel
                 }
 
+                # Recompute rather than asserting a clean result. Phase 2 confirmed
+                # the ADDRESS; it says nothing about a missing talk group or grid, and
+                # the old "confidence_score": 100.0 here silently erased those.
+                p2_flags = compute_review_flags(
+                    lat=target_payload.get("lat"), lng=target_payload.get("lng"),
+                    responding_units=responding_units, incident_type=p2_incident_type,
+                    map_grid=p2_grid, radio_channel=p2_channel,
+                    response_type=(best_p2_candidate.response_type if best_p2_candidate else None),
+                    resolution_note=target_payload.get("resolution_note"),
+                    location_type=target_payload.get("location_type"),
+                )
                 update_payload = {
                     "verify_location": False,
-                    "confidence_score": 100.0,
+                    "review_flags": p2_flags,
+                    "review_flag_count": len(p2_flags),
                     "audio_url": audio_url,
                     "audio_duration": audio_duration,
                     "raw_transcript": raw_transcript,
@@ -360,9 +374,22 @@ def process_phase_2_finalize(
                         if best_p2_candidate and best_p2_candidate.intersection:
                             target_payload["intersection"] = best_p2_candidate.intersection
 
+                        # Recomputed, not defaulted. The old line took the geocoder's
+                        # confidence "or 80.0" -- a fabricated number when the resolver
+                        # reported none (CLAUDE.md 6.1).
+                        p2_flags = compute_review_flags(
+                            lat=target_payload.get("lat"), lng=target_payload.get("lng"),
+                            responding_units=responding_units, incident_type=p2_incident_type,
+                            map_grid=target_payload.get("map_grid"),
+                            radio_channel=target_payload.get("radio_channel"),
+                            response_type=(best_p2_candidate.response_type if best_p2_candidate else None),
+                            resolution_note=target_payload.get("resolution_note"),
+                            location_type=target_payload.get("location_type"),
+                        )
                         update_payload = {
                             "verify_location": False,
-                            "confidence_score": float(res.get("confidence", 80.0)),
+                            "review_flags": p2_flags,
+                            "review_flag_count": len(p2_flags),
                             "audio_url": audio_url,
                             "audio_duration": audio_duration,
                             "raw_transcript": raw_transcript,
@@ -436,7 +463,7 @@ def process_phase_2_finalize(
             final_address=final_addr,
             lat=final_lat,
             lng=final_lng,
-            confidence_score=final_conf,
+            review_flag_count=len(final_flags),
             audio_url=audio_url,
             audio_duration=audio_duration,
             metrics=metrics

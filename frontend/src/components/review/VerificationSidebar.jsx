@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { TALK_GROUPS, toTitleCase } from './verificationConstants';
+import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
 
 // Shown only when the parser produced nothing for a field. These placeholders used to carry
 // worked examples ("e.g. 2648 Sandstone Cres", "e.g. Structure Fire", "e.g. E1, L1"), which
@@ -142,20 +143,34 @@ export default function VerificationSidebar({
             <h3 className="font-black text-white text-sm uppercase tracking-wide font-mono">
               Review: {selectedCall.dispatch_id}
             </h3>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-[10px] text-slate-400 font-mono">Confidence:</span>
-              <span className={`text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                selectedCall.confidence_score >= 80
-                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                  : selectedCall.confidence_score >= 40
-                  ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                  : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-              }`}>
-                {selectedCall.confidence_score !== undefined && selectedCall.confidence_score !== null
-                  ? `${Math.round(selectedCall.confidence_score)}%`
-                  : 'N/A'}
-              </span>
-            </div>
+            {/* The reviewer's whole job is these reasons, so they are listed in full
+                here rather than hidden behind a hover as in the row. Replaced the
+                confidence percentage (punch-list #45), which conflated address
+                correctness with metadata completeness and showed neither. */}
+            {(() => {
+              const flags = getReviewFlags(selectedCall);
+              if (flags.length === 0) {
+                return (
+                  <div className="mt-1 text-[10px] font-mono text-emerald-400">
+                    ✓ No system flags
+                  </div>
+                );
+              }
+              return (
+                <div className="mt-1.5 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1.5">
+                  <div className="text-[10px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                    ⚠️ {flags.length} system {flags.length === 1 ? 'flag' : 'flags'} — verify or refute
+                  </div>
+                  <ul className="mt-1 space-y-0.5">
+                    {flags.map(f => (
+                      <li key={f} className="text-[10px] font-mono text-amber-100/90 leading-snug">
+                        • {flagLabel(f)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
           </div>
 
           {typeof onReviewCall === 'function' && (

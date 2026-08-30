@@ -44,7 +44,13 @@ def get_metrics_summary(db: Session = Depends(get_db)):
     """Calculates overall dispatch metrics, latency telemetry, and container stack health."""
     total_calls = db.query(LiveCallModel).count()
     verified_calls = db.query(LiveCallModel).filter(LiveCallModel.feedback_submitted == True).count()
-    avg_confidence = db.query(func.avg(LiveCallModel.confidence_score)).scalar() or 96.4
+    # Replaced average_confidence 2026-08-29 (punch-list #45). Note the old line
+    # fell back to a HARDCODED 96.4 when the query returned null -- a fabricated
+    # statistic presented as measured (CLAUDE.md 6.1). A count has no such default:
+    # zero rows means zero flagged.
+    flagged_calls = db.query(LiveCallModel).filter(
+        LiveCallModel.target["review_flag_count"].as_integer() > 0
+    ).count()
 
     latest_eval = db.query(EvaluationHistoryModel).order_by(desc(EvaluationHistoryModel.created_at)).first()
 
@@ -52,7 +58,7 @@ def get_metrics_summary(db: Session = Depends(get_db)):
         "status": "online",
         "total_dispatches": total_calls,
         "verified_dispatches": verified_calls,
-        "average_confidence": round(float(avg_confidence), 1),
+        "flagged_dispatches": flagged_calls,
         "telemetry": {
             "phase1_alert_latency_s": 12.4,
             "phase2_total_latency_s": 47.2,

@@ -31,7 +31,6 @@ class DispatchCreateSchema(BaseModel):
     target: Optional[Dict[str, Any]] = {}
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
-    confidence_score: Optional[float] = 0.0
     verify_location: Optional[bool] = False
     origins: Optional[List[str]] = []
     audio_url: Optional[str] = None
@@ -50,7 +49,6 @@ class DispatchUpdateSchema(BaseModel):
     target: Optional[Dict[str, Any]] = None
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
-    confidence_score: Optional[float] = None
     verify_location: Optional[bool] = None
     origins: Optional[List[str]] = None
     audio_url: Optional[str] = None

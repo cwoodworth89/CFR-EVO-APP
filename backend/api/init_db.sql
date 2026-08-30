@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS public.dispatches (
     
     raw_transcript TEXT,
     sanitized_transcript TEXT,
-    confidence_score NUMERIC(5,2) DEFAULT 0.0,
     verify_location BOOLEAN DEFAULT FALSE,
     origins TEXT[] DEFAULT '{}',
     

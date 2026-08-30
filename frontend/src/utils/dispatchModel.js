@@ -83,27 +83,15 @@ export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
     // KioskView's isEmergency test read undefined and EVERY call rendered routine,
     // including all 343 emergency ones.
     response_type: target.response_type ?? record.response_type ?? null,
-    // Confidence cutoff of 90 — measured on this system 2026-08-23 (CLAUDE.md §6.3 tier 3),
-    // NOT a standard. It was inherited without provenance; this analysis was run to decide
-    // whether to keep it, and it is RETAINED PROVISIONALLY pending more HITL reviews.
-    //
-    // Against 202 reviewed calls, comparing the system address to the operator's
-    // verified_address after normalising suffixes, unit numbers and "(street centroid)"
-    // annotations — i.e. "would the crew have reached the right address":
-    //
-    //   score 0     10 reviewed   100% wrong      (hard resolution failures)
-    //   score 45-78 20 reviewed    60% wrong
-    //   score 81-89 15 reviewed     0% wrong
-    //   score 91-96  9 reviewed     0% wrong
-    //   score 100   148 reviewed    8% wrong
-    //
-    // The break is at 80, not 90 — 81-89 was flawless on address. A cut at 90 is therefore
-    // CONSERVATIVE (it flags a band that has not actually failed) rather than wrong, which is
-    // the safe direction for a warning. Not moved to 80 because 81-89 has only 15 reviewed
-    // calls, and because score 100 still misses 8%, so confidence is not a complete proxy for
-    // geocode correctness. Tracked for revision in punch-list #32.
-    verify_location: record.verify_location
-      ?? (record.confidence_score ? record.confidence_score >= 90 : true),
+    // Named reasons this dispatch may need a human look, and their count.
+    // Replaced confidence_score 2026-08-29 (punch-list #45): that was a
+    // metadata-completeness score labelled as confidence, and it destroyed the
+    // information it consumed.
+    review_flags: target.review_flags ?? record.review_flags ?? [],
+    review_flag_count: target.review_flag_count ?? record.review_flag_count ?? 0,
+    // Set by the backend from a NAMED condition (LOCATION_UNRESOLVED or
+    // LOCATION_SUBSTITUTED), no longer from an arithmetic threshold.
+    verify_location: record.verify_location ?? false,
     map_grid: target.verified_map_grid || target.map_grid || '',
     radio_channel: target.verified_talkgroup || target.radio_channel || '',
     tone_name: target.tone_name || '',

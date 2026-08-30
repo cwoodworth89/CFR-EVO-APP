@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatTimestampPT, getCallTones } from './reviewFormat';
+import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
 
 // This column shows the CALL DATA as it now stands: the operator's verified value where one
 // exists, otherwise what the system produced. Operator decision 2026-08-23 (punch-list #39) —
@@ -81,7 +82,7 @@ export default function ReviewTable({
           {[
             { id: 'all', label: 'All Dispatches' },
             { id: 'needs_review', label: '⏳ Needs HITL Review' },
-            { id: 'low_confidence', label: '⚠️ Low Confidence' },
+            { id: 'flagged', label: '⚠️ Flagged' },
             { id: 'fine_tuned', label: '✅ Verified' }
           ].map(tab => (
             <button
@@ -169,7 +170,7 @@ export default function ReviewTable({
                 <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono sticky top-0 z-10">
                   <th className="py-2.5 px-3 w-[18%] bg-slate-900">Date / Dispatch ID</th>
                   <th className="py-2.5 px-3 w-[10%] text-center bg-slate-900">Tones</th>
-                  <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Conf &gt;90%</th>
+                  <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900" title="Number of named conditions the system flagged for review. Hover a count for the reasons.">Flags</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">HITL Reviewed</th>
                   <th className="py-2.5 px-3 w-[11%] text-center bg-slate-900">Training Status</th>
                   <th className="py-2.5 px-3 w-[28%] bg-slate-900" title="Verified values where the operator corrected them, otherwise system output. Amber bold = corrected by a reviewer; hover it for the system's original hypothesis.">
@@ -231,13 +232,23 @@ export default function ReviewTable({
                         </div>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        {call.confidence_score !== undefined && call.confidence_score !== null ? (
-                          <span className={`text-[11px] font-mono font-bold ${call.confidence_score >= 90 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {call.confidence_score >= 90 ? '🟢 Yes' : '🔴 No'} ({Math.round(call.confidence_score)}%)
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 font-mono text-[10px]">N/A</span>
-                        )}
+                        {/* Flag count, reasons on hover. Replaces the confidence
+                            percentage, which blended address correctness with metadata
+                            completeness and threw away which was which (#45). */}
+                        {(() => {
+                          const flags = getReviewFlags(call);
+                          if (flags.length === 0) {
+                            return <span className="text-emerald-400 font-mono text-[11px] font-bold">✓ 0</span>;
+                          }
+                          return (
+                            <span
+                              className="text-amber-300 font-mono text-[11px] font-bold cursor-help"
+                              title={flags.map(f => `• ${flagLabel(f)}`).join('\n')}
+                            >
+                              ⚠️ {flags.length}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-3 text-center">
                         {call.feedback_submitted ? (

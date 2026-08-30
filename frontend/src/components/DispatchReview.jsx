@@ -271,7 +271,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
     // Status Filter
     if (statusFilter === 'needs_review' && c.feedback_submitted) return false;
     if (statusFilter === 'fine_tuned' && !c.feedback_submitted) return false;
-    if (statusFilter === 'low_confidence' && ((c.confidence_score ?? 100) >= 80)) return false;
+    // 'flagged' = the system named at least one reason to look. Replaces the
+    // low_confidence filter, which keyed off a score that no longer exists (#45).
+    if (statusFilter === 'flagged'
+        && (c.review_flags ?? c.target?.review_flags ?? []).length === 0) return false;
 
     // Tone Filter
     if (toneFilter !== 'all') {

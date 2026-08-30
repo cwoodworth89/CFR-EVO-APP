@@ -28,7 +28,9 @@ class LiveCallModel(Base):
     
     raw_transcript = Column(Text, nullable=True)
     sanitized_transcript = Column(Text, nullable=True)
-    confidence_score = Column(Numeric(5, 2), default=0.0)
+    # confidence_score was removed 2026-08-29 (punch-list #45). It was a
+    # metadata-completeness score labelled as confidence; named review flags
+    # in target.review_flags replace it.
     verify_location = Column(Boolean, default=False)
     origins = Column(SafeArray, default=[])
     

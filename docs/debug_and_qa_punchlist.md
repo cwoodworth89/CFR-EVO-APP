@@ -4154,79 +4154,115 @@ this item exists to remove.
 
 ---
 
-### 55. XStreets are fuzzy-substituted at threshold 75 — the same defect the project already removed
-> **Status**: 🔴 **Open — live silent substitution.** Found 2026-08-30 answering the operator's
-> question *"why do we only fuzzy the xstreets and not the main address?"* The answer is that we
-> should probably stop fuzzing the xstreets.
+### 56. Bring XStreets onto the same resolution path as main addresses
+> **Status**: 🔵 **Improvement — specified, not built.** Operator direction 2026-08-30:
+> *"I think it'll be important ALL streets follow the same path."* Reframed from a defect
+> report; the underlying measurement that motivated it is kept below.
 
-`fuzzy_correct_cross_roads` → `fuzzy_correct_street` (`backend/cfr_dispatch/parser/location.py`)
-silently rewrites each announced cross street to the best `fuzz.ratio` match in
-`COQUITLAM_STREETS`, accepting anything at or above:
+**The principle.** Every street reference in a dispatch — the address, and each cross street —
+should be resolved against municipal data by one path, and report rather than rewrite when it
+cannot be resolved.
 
-```python
-threshold = 90 if len(clean_base) <= 4 else 75
-```
+#### Today the two are handled oppositely
 
-**This is the exact practice removed from the intersection resolver**, whose module docstring
-states the reason at length: *"THERE IS NO SAFE SCORE THRESHOLD for street names in this city."*
-That removal was at threshold **80**. This path runs at **75**, and it is still live.
+| | Main address | Cross streets |
+|:--|:--|:--|
+| Resolution | geocoder against `public.parcels` / `public.roads` / `public.intersections` | `fuzz.ratio` against a name list |
+| No exact match | returns suggestions, `is_ambiguous`, `requested_address`, `resolution_note` | **silently rewritten** to the best match |
+| Operator sees the substitution | yes | no |
 
-#### Measured against the real vocabulary, 2026-08-30
+The asymmetry looks like the address is missing a feature. It is the reverse: **the address is
+already on the safe path.**
 
-For each of the 1,079 distinct street names, the best `fuzz.ratio` against a **different real
-Coquitlam street**:
+#### Why the fuzzy threshold cannot be the answer
+
+`fuzzy_correct_street` (`backend/cfr_dispatch/parser/location.py`) accepts the best match at
+`threshold = 90 if len(base) <= 4 else 75`. Measured across the 1,079 real street names, best
+`fuzz.ratio` against a **different real Coquitlam street**:
 
 | | |
 |:--|--:|
 | Streets whose nearest *other real street* scores ≥ 75 | **938 (86.9%)** |
 | Streets whose nearest *other real street* scores ≥ 90 | 40 (3.7%) |
 
-At threshold 75, **for 87% of real streets there exists another real street that clears the
-bar.** The threshold is not separating anything — it admits substitution of one genuine
-Coquitlam street for another across most of the city:
-
 ```
 aberdeen avenue  -> eden avenue      85
 adler avenue     -> palmer avenue    88
-adiron avenue    -> adair avenue     88
 admiral court    -> cardinal court   81
 agate place      -> sage place       86
 ```
 
-Every one of those pairs is two real, distinct streets. A cross street misheard anywhere near
-one of them is rewritten to the other with no record that a substitution occurred.
+Those are pairs of real, distinct streets. At 75 the threshold admits substituting one genuine
+Coquitlam street for another across most of the city. This is the practice already removed from
+`intersection_resolver` — *"THERE IS NO SAFE SCORE THRESHOLD for street names in this city"* —
+and that removal was at **80**.
 
-#### Why the main address is not treated this way, and should not be
+#### What the cross streets in the corpus actually are
 
-The asymmetry looks like the main address is missing a feature. It is the reverse: **the main
-address is handled the safe way.** The geocoder does not auto-substitute — a non-exact match
-returns suggestions with `is_ambiguous`, `requested_address` and a `resolution_note`, and the
-operator sees the substitution rather than inheriting it (CLAUDE.md §6.1, and the
-`intersection_resolver` docstring).
+56 distinct values across all dispatches; **33 match municipal data, 23 do not.** The 23 are
+three different problems, and only one of them is a data gap:
 
-So the correct direction is **not** "fuzzy the address too". It is to give cross streets the
-same treatment the address already gets: resolve them against `public.roads` / `public.parcels`
-and, when there is no exact match, report rather than rewrite.
+**a. Our own suffix doubling — 10 of 23. Not a data gap; a normalisation defect.**
+```
+Burlington Drive Dr    Christmas Way Way    Guildford Way Way    Honeysuckle Lane Lane
+King Edward Street St  Pinetree Way Way     Primrose Lane Lane   Turnberry Lane Ln
+Burlington Drive Drive Inlet Street Way
+```
+All real streets with the suffix applied twice. These match after the suffix handling is fixed,
+and they need no vocabulary and no fuzzy matching at all.
 
-#### Mitigating facts, stated so this is not overclaimed
+**b. STT errors — 6.** `Loheed Hwy`, `Gabriela Dr`, `Sandstown Court`, `Town Center Blvd`,
+`Gislaison Avenue`, `Nunes Creek Dr`. These are exactly what should surface as *unresolved and
+flagged*, not be silently rewritten — see the round-comparison evidence that when two rounds
+disagree on a street name, the operator's answer often matches **neither**
+([`briefings/round_disagreement_signal.md`](./briefings/round_disagreement_signal.md)).
 
-* Cross streets are **proximity references, not routing destinations** —
-  `geocoder.py:139-152` records that they may not intersect the incident street at all and may
-  name things that are not streets (`Turning Lane`, `Mall Access`). A wrong cross street
-  misleads a crew confirming their block; it does not by itself send them anywhere.
-* `_verify_cross_streets` in `address_resolver.py` independently checks names against real
-  roads before using them to narrow, so a fabricated cross street does not silently steer the
-  geocoder — it is checked there.
-* Failing the threshold returns the text unchanged, so a miss degrades to raw text.
+**c. Genuine non-street references — 7.** `Turning Lane`, `Turning Ln`, `Mall Access Turning
+Ln`, `Access Road`, `Unnamed Lane`, `Glen Elementary School Access`, `Gleneagle Secondary School
+Access`.
 
-That said, the substituted value **is** what reaches `target.cross_streets`, the reconstructed
-transcript, and the HITL verification prefill — so it reaches the training corpus.
+#### The non-street vocabulary already exists — in `public.vocabulary`, not in `roads`
 
-#### Not yet measured
+Operator expectation was that the new import would carry these. Checked: **`public.roads`
+(3,451 rows) and `public.road_names` (1,079) contain zero** matches for `turning`, `access` or
+`driveway` — they are road centrelines, and these are not roads.
 
-How often the substitution actually fires on the corpus, and how often it changes the value to
-something the operator later contradicted. Cross streets are not in `verified_*`, so there is no
-direct ground truth; the honest test is a sample of substitutions read against the audio.
-**Do not remove it before measuring that** — it may be correcting more than it breaks, and
-"probably unsafe" is not the same as "measured harmful". The threshold evidence above says the
-guard is not doing what it claims, not yet that the feature is net negative.
+They are already captured, from the arrival-point workstream, as
+**`public.vocabulary` category `xstreet_descriptor`, 9 terms**:
+
+```
+Access Rd | Access Road | Mall Access | Park Access | Private Driveway
+School Access | Turn Ln | Turning Lane | Turning Ln
+```
+
+So the data needed for a single unified path **already exists**; it simply lives in two tables,
+which is correct — a turning lane is not a road centreline and should not be forced into one.
+
+#### The unified path
+
+For every street reference, address and cross street alike:
+
+1. **Exact match against municipal data** (`public.roads` / `road_names`, and `public.parcels`
+   for the address). Resolved.
+2. **Else exact match against `xstreet_descriptor`.** Resolved as a *descriptor*, not a road —
+   it has no geometry and must never be used to narrow a location, only displayed.
+3. **Else unresolved.** Keep the announced text verbatim, mark it, and let it raise the flag.
+   Never substitute.
+
+Fix the suffix doubling first (class a): it removes 10 of the 23 without any resolution logic,
+and it is a straightforward normalisation bug rather than a judgement call.
+
+#### Constraints
+
+* **`_verify_cross_streets` (`address_resolver.py`) is the existing precedent** and already does
+  step 1 correctly before using cross streets to narrow. The unified path should extend that,
+  not duplicate it.
+* A descriptor resolved at step 2 **must not reach the narrowing logic** — `Mall Access` has no
+  geometry and anchoring on it would silently answer a different question.
+* Removing `fuzzy_correct_street` is the intended end state, but **measure before deleting**: how
+  often it fires, and whether it corrects more than it breaks, is still unknown. Cross streets
+  have no `verified_*` ground truth, so the honest test is a sample of substitutions read against
+  the audio.
+* Cross streets are **proximity references, not routing destinations** (`geocoder.py:139-152`) —
+  a wrong one misleads a crew confirming their block rather than sending them somewhere. That
+  bounds the severity; it does not make silent substitution acceptable.

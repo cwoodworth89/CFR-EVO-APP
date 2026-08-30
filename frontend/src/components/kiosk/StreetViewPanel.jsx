@@ -3,6 +3,30 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
 
+/**
+ * THE ONE ONLINE-DEPENDENT SURFACE IN AN OFFLINE-FIRST SYSTEM.
+ *
+ * CLAUDE.md §1 requires the whole system to work with no WAN. This panel does not,
+ * and cannot: Google Street View panoramas are fetched live from
+ * maps.googleapis.com and are not licensed for local caching the way the municipal
+ * orthophotos are.
+ *
+ * ACCEPTED RISK, operator decision 2026-08-30. Street View is a pre-arrival
+ * convenience -- a look at the front of the building -- not a dispatch-critical
+ * surface. Everything a crew needs to be dispatched and routed (address, map grid,
+ * parcel outline, satellite imagery, turn-by-turn) is served from local MBTiles and
+ * PostGIS and is unaffected when this panel is blank.
+ *
+ * WHAT THIS MEANS IN PRACTICE:
+ *   * No WAN  -> panel is blank. That is expected, not a defect.
+ *   * The API key is inlined by Vite at BUILD time, so frontend/.env.local must be
+ *     present on the kiosk when `npm run build` runs. It is git-ignored, so a fresh
+ *     clone will not have it.
+ *   * A failed SDK load and a successful one currently look identical: the loading
+ *     spinner is cleared by a 3.5s timer whether or not the panorama mounted, and
+ *     the <iframe> fallback only renders when the key is MISSING or sdkError is set.
+ *     See punch-list #35.
+ */
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';

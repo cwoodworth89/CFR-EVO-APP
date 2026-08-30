@@ -4365,3 +4365,81 @@ the mount, not the image.
 
 `.dockerignore` also excludes tests, logs, docs, frontend sources and `.env` files. A secret
 committed to an image layer survives deletion of the file.
+
+
+---
+
+### 35 (updated). Street View: offline exemption documented; root cause still unknown
+> **Status**: ⚠️ **Still open on the failure itself.** The offline exemption is now
+> documented as an accepted risk (operator, 2026-08-30).
+
+**The exemption is recorded** in a header comment on
+[`StreetViewPanel.jsx`](../frontend/src/components/kiosk/StreetViewPanel.jsx) — where the next
+reader will actually hit it, rather than buried in a doc. Street View is fetched live from
+`maps.googleapis.com` and cannot be cached the way the municipal orthophotos are, so it is the
+one surface that does not satisfy CLAUDE.md §1. Accepted because it is a pre-arrival
+convenience: everything dispatch-critical (address, grid, parcel outline, satellite, routing)
+is served locally and is unaffected when the panel is blank.
+
+**The blank panel is still unexplained.** All three prerequisites were verified on the kiosk
+and all pass: `.env.local` present with the key set, key inlined into `dist/assets/MapBoard-*.js`
+(Vite inlines at build time), and `maps.googleapis.com` reachable — HTTP 200 in 0.17 s. The
+earlier "missing API key" theory is **withdrawn**.
+
+**Leading hypothesis, unverified**: the key lacks Street View or billing entitlement, which
+Google reports to the browser console rather than to the SDK callback. **Needs the kiosk
+browser console (F12) with a call active** — that is the only remaining diagnostic.
+
+**Worth fixing regardless of cause**: a failed SDK load and a successful one are currently
+indistinguishable. The loading spinner is cleared by a 3.5 s timer whether or not the panorama
+mounted (`:283-285`), and the `<iframe>` fallback renders only when the key is *missing* or
+`sdkError` is set — so a silent `StreetViewPanorama` failure leaves a black rectangle with no
+error state (§6.1).
+
+---
+
+### 47. Basemap tile licensing has never been checked — Carto and Esri
+> **Status**: ⚠️ **Open — operator decision required. No code defect; this is a terms question.**
+
+Raised by the operator asking whether pre-crawled tiles need API keys and whether anything was
+watermarked. **Neither.** Checked against `compile_mbtiles.py`:
+
+| Layer | Source | API key |
+|:--|:--|:--|
+| `street`, `street_nolabels` | `basemaps.cartocdn.com` (Carto Voyager / light, OSM-derived) | **none** |
+| `satellite` | `server.arcgisonline.com` Esri World Imagery (Maxar-sourced) | **none** |
+| `cadastral` | City of Coquitlam ArcGIS MapServer | none |
+| 7.5 cm orthophotos | City of Coquitlam S3 | none |
+
+Every source is unauthenticated. Once crawled, the tiles are static PNG/JPG inside SQLite
+MBTiles served locally by `mbtileserver` — **nothing phones home at runtime**, which is the
+offline architecture working as designed. These endpoints either serve a real tile or serve
+nothing; there is no degraded or watermarked tier to fall into, so the archives hold genuine
+imagery.
+
+**The real exposure is licensing.** The project has bulk-downloaded roughly **789,000 tiles
+from Carto** and **431,000 from Esri** and stored them permanently for offline redistribution
+on municipal equipment. Neither provider's terms have been read. Bulk pre-caching for
+redistribution is the use such terms most commonly restrict, and the Esri imagery is
+Maxar-sourced with its own conditions on top.
+
+**The City layers are not in question** — orthophotos and cadastral are covered by the Open
+Government Licence, which is exactly why they can be cached indefinitely.
+
+#### Options, roughly in order of soundness
+
+1. **Read the two sets of terms.** This may well be permitted; nobody knows yet, and that is
+   the whole problem (§7.2 — do not improvise a domain model, and licensing is a domain).
+2. **Self-host the street basemap from raw OSM** (Protomaps / OpenMapTiles). OSM data is ODbL,
+   so rendering and caching your own tiles removes Carto from the picture entirely. Highest
+   effort, lowest ongoing risk, and it fits the offline-first architecture better than
+   depending on a third-party CDN's goodwill.
+3. **Licence Esri imagery for offline use**, or drop regional satellite and rely on the City
+   7.5 cm orthophotos inside the municipal boundary — which is where crews actually operate.
+   The orthos are already the higher-resolution source there.
+4. **Status quo, recorded as an accepted risk** with a decision and a date, the way the Street
+   View exemption now is.
+
+Recorded as a gap in [`docs/standards/README.md`](./standards/README.md) per §7.5. **The
+operator wants a high-level review of which map sources the system should be using** — this
+item is where that belongs.

@@ -3711,24 +3711,64 @@ demonstrates that a comment alone does not hold this invariant.
 ---
 
 ### 51. The kiosk shows the junction field labelled "cross streets", and never reads the real one
-> **Status**: 🔴 **Open — HIGH. This is the cause of the operator-visible quality regression,
-> not a cosmetic issue.** Found 2026-08-29 while auditing XStreets representation end to end;
-> confirmed the same day against `quality_rating`.
+> **Status**: 🔴 **Open — genuine display defect, but NOT the cause of the ratings regression.**
+> Found 2026-08-29 while auditing XStreets representation end to end.
+>
+> ⚠️ **Correction, same day.** This entry first claimed to be the cause of the PERFECT-rating
+> collapse. It is not, and the error is recorded rather than overwritten. The operator rates
+> **the reconstructed transcript in the review panel against the audio** — not the kiosk
+> dispatch display. The regression is the transcript, tracked below and fixed in `703173c`;
+> the kiosk display gap described in this entry is real but separate and was never what the
+> ratings measured.
 
-#### It is the regression
+#### The regression was the transcript, not this
 
-The operator reported that calls were "almost all perfect" for a stretch and then started
-"missing xstreets". `quality_rating` shows it precisely, and **`FAILED` stays flat throughout** —
-calls moved **PERFECT → OPERATIONAL**, the signature of a dropped field rather than a wrong
-answer:
+Both symptoms share one upstream cause — the pipeline stopped overloading `intersection` with
+the near roads, which was correct — but they surface in different places and only the transcript
+one drove the ratings.
 
-| Week | House-address calls announcing "near" | `intersection` overloaded with them | Carried in `cross_streets` | **PERFECT** |
-|:--|--:|--:|--:|--:|
-| Jul 20 | 56 | 56 | 0 | 57.1% |
-| Aug 3 | 42 | 42 | 0 | 62.7% |
-| Aug 10 | 52 | **52** | 0 | **65.3%** |
-| Aug 17 | 58 | 31 | 1 | 38.4% |
-| Aug 24 | 44 | **0** | 43 | **16.1%** |
+`reconstruct_template_transcript` reaches the near clause two ways: `cross_street_1/2`, or
+failing that `elif dispatch.intersection`. While `intersection` was overloaded, the second path
+fired and the clause appeared. When that stopped, nothing replaced it, because **both
+`DispatchData` copies in `phase2.py` omitted `cross_street_1/2`** — and Phase 2's
+`sanitized_transcript` overwrites the one `payload_builder` built correctly.
+
+Measured on house-number calls where the dispatcher announced "near", against the operator's own
+rating:
+
+| Week | Calls announcing "near" | Clause kept in transcript | **PERFECT** |
+|:--|--:|--:|--:|
+| Jul 20 | 56 | 96.4% | 57.1% |
+| Jul 27 | 66 | 59.1% | 46.8% |
+| Aug 3 | 42 | 85.7% | 62.7% |
+| Aug 10 | 52 | **96.2%** | **65.3%** |
+| Aug 17 | 58 | 55.2% | 38.4% |
+| Aug 24 | 44 | **2.3%** | **16.1%** |
+
+The two columns move together week for week, including the Jul 27 dip in both. **Fixed in
+`703173c`**, verified against the real `DISP-2026-9E8BF5` payload:
+
+```
+before: ...2653 sandstone crescent, use talk group 10 combined response coquitlam, map grid 73
+after:  ...2653 sandstone crescent, near sandstown court and nunes creek drive, use talk
+        group 10 combined response coquitlam, map grid 73
+```
+
+Not yet deployed to the kiosk at time of writing; backend changes need `cfr-agent` restarted.
+
+#### The display gap this entry is actually about
+
+The same upstream change moved the near roads out of `intersection` on the kiosk path too. The
+kiosk reads `intersection` and nothing else, so it stopped showing them there as well — a real
+defect, just not the one being rated:
+
+| Week | House-address calls announcing "near" | `intersection` overloaded with them | Carried in `cross_streets` |
+|:--|--:|--:|--:|
+| Jul 20 | 56 | 56 | 0 |
+| Aug 3 | 42 | 42 | 0 |
+| Aug 10 | 52 | **52** | 0 |
+| Aug 17 | 58 | 31 | 1 |
+| Aug 24 | 44 | **0** | 43 |
 
 **The near roads were always displayed through `intersection`.** Until mid-August the pipeline
 overloaded that field with them, and the kiosk reads `intersection` — so they appeared, and calls

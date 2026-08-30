@@ -4443,3 +4443,60 @@ Government Licence, which is exactly why they can be cached indefinitely.
 Recorded as a gap in [`docs/standards/README.md`](./standards/README.md) per §7.5. **The
 operator wants a high-level review of which map sources the system should be using** — this
 item is where that belongs.
+
+---
+
+## 🧾 Session batch, 2026-08-29/30 — XStreets, rounds, and the confidence ruling
+
+Recorded so the fixes below are findable by symptom, not only by commit. Every one was
+measured against the live kiosk or the corpus before and after (§6.6).
+
+### Shipped and verified
+
+| Commit | Defect | Verification |
+|:--|:--|:--|
+| `703173c` | **Intersections read back alphabetically.** `public.intersections` stores the pair sorted (`street_a < street_b` on all 1,995 rows), so the answer ignored the announced order on **10 of 12** resolved intersection dispatches. `lookup()` now records which leg was spoken first and `_payload` leads with it; spellings stay municipal, only the order comes from the announcement. Safe because `spoken_first` is set only on an exact key match, where both legs are already the same pair — no fuzzy matching. | live geocode on kiosk, both orders |
+| `703173c` | **XStreets never reached the reconstructed transcript.** Both `DispatchData` copies in `phase2.py` omitted `cross_street_1/2`. This is what the operator was rating as "missing xstreets" — see #51. | live re-parse |
+| `55b6c4a` | **`sanitize_transcript` deleted `&`.** Stripped as punctuation, leaving `"anson avenue lincoln ave"` with no separator, so `clean_location_text` correctly removed the second street as trailing junk. Now rewritten to `" and "` before the strip. See #52. | real call `DISP-2026-AAFDB8` |
+| `53a74e5` | **XStreets and subaddress did not coalesce across rounds** — taken from the first candidate carrying an address, so anything round 1 dropped was lost even when round 2 had it. `_coalesce_across_rounds` now mirrors how `map_grid` and `radio_channel` already resolve. Partially advances #44. | 5 unit tests + live |
+| `faa9c8c` | **Street suffix doubling.** `fuzzy_correct_street`'s docstring said it matched "known Coquitlam **base** street names"; the list holds **full** names. It scored the base against full names then re-appended the caller's suffix — `"Christmas Way"` → `"Christmas Way Way"`. Ten of the 23 unmatched cross streets were this, all real streets. Now scores base against base, returns the municipal name, and breaks ties on suffix agreement so `"Pinetree Way"` cannot be answered with `"Pinetree Close"`. | **0 of 1,320** re-derived values now double |
+| `922e582` | **Cross-round comparator + backtest harness** (`round_comparison.py`, `backtest_round_comparison.py`). Built and corpus-scored; **wired into nothing**, deliberately. | 19 tests |
+
+### 57. Candidate-level parse bleed — latent, not live
+> **Status**: 🔵 **Open, low priority. Explicitly NOT a live defect** — recorded because it was
+> observed and mis-described in conversation before being measured, and the correction belongs
+> in writing (§6.6).
+
+Re-deriving **every candidate from every round** yields cross-street values that have swallowed
+the talk group, the call type, or the next round:
+
+```
+Private Driveway Use Easttalk Group 5 Coquitlam
+Summit Middle School Access Broom 1415 Parkway Blvd
+Westwood Cyclist Struck Westwood Street
+School Rescue 2 Ladder 1
+```
+
+**None of this reaches the database.** Measured against stored `target.cross_streets`:
+
+| | |
+|:--|--:|
+| Stored values | 110 |
+| Distinct | 59 |
+| Containing a talk-group / unit / call-type token | **0** |
+| Longer than four words | **0** |
+
+Those candidates never win. The cross-roads segment boundary
+(`announcement.py:110-119`) is bounded by the talk-group anchor, so a round whose anchor is
+missing or misheard runs the segment on to the end. It is worth a guard and a test — an
+upper bound on plausible cross-street length would catch every example above — but it is
+**not** evidence the parser is producing bad output today, and it should not be cited as one.
+
+### Also recorded, no separate entry
+
+* **`is_ambiguous` is never persisted.** 0 of 510 records carry the key in `target`, while
+  `requested_address` reaches 12. The geocoder computes ambiguity and it is dropped before
+  storage, so the §5 candidate-selector banner cannot fire from a stored record. Detail in #54.
+* **Punch-list numbers are colliding across concurrent sessions.** There are two **#51**s, and a
+  #55 written in this session had to be renumbered to **#56**. Agree a convention before
+  several agents append here.

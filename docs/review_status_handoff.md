@@ -18,6 +18,58 @@ Companion documents:
 
 ---
 
+## Update, 2026-08-30 — XStreets, the two rounds, and the confidence ruling
+
+The body of this document is from 2026-08-23 and remains accurate on system state and
+environment. This section records what has changed since, so a new session starts current.
+
+**Operator ruling: the confidence score is scrapped, not recalibrated.** Warnings move to
+the amber banner / flag model (§5). No numeric confidence is shown to crews — a location is
+either resolved or it carries an explicit warning naming what is uncertain. Punch-list #54
+records the measurement behind it; #32 is superseded. The column is being removed in a
+separate session.
+
+**A quality regression was found and closed.** The operator's `quality_rating` showed PERFECT
+falling 65.3% → 38.4% → 16.1% across three weeks while `FAILED` stayed flat — calls moving
+PERFECT → OPERATIONAL, the signature of a *dropped field* rather than a wrong answer. Cause:
+the announced "near" XStreets stopped reaching the reconstructed transcript that the operator
+reviews against the audio. Both `DispatchData` copies in `phase2.py` omitted
+`cross_street_1/2`; the clause had previously survived only because the pipeline was
+overloading `intersection` with it. Fixed and deployed.
+
+**Six defects fixed and verified** — see the punch-list section *"Session batch, 2026-08-29/30"*
+for the full table with commits and verification: intersections reading back alphabetically,
+XStreets missing from the transcript, `sanitize_transcript` deleting `&`, XStreets and
+subaddress not coalescing across rounds, street-suffix doubling, and the entrance-seeding trap
+(#50, logged not fixed).
+
+**New and open:** #51 (the kiosk labels `intersection` "cross streets" and never reads
+`target.cross_streets`), #53 (the agent makes a WAN call to huggingface.co on every start),
+#56 (bring XStreets onto the address's resolution path — the fuzzy threshold of 75 is cleared
+by a *different real Coquitlam street* for 938 of 1,079 names), #57 (latent candidate-level
+parse bleed).
+
+**Built but wired into nothing:** a cross-round comparator and its backtest harness
+(`round_comparison.py`, `backtest_round_comparison.py`). Corpus-scored in
+[`briefings/round_disagreement_signal.md`](./briefings/round_disagreement_signal.md): of eight
+fields only **two** carry signal, five are noise, and two of those point the *wrong way*. The
+flag also belongs **after** the geocoder, not at parse time — the geocoder resolves 79% of
+parsed-stage disagreements, so flagging early would raise ~77 false alarms.
+
+### The habit that mattered most this session
+
+**Read the operator's `quality_rating` and `review_notes` before any derived metric.** An
+inferred address-accuracy metric put the regression a week early and pointed at the wrong
+subsystem. The ratings found it immediately. Curtis logs real mistakes there deliberately;
+they are ground truth about what went wrong, and no query substitutes for them.
+
+Two corrections from this session are recorded rather than overwritten, because both were
+stated confidently before being checked: cross-street "parse bleed" was described as a live
+defect and is not (#57), and three transcripts were called broken when the dispatcher had
+genuinely said the intersection twice and the reconstruction was correct.
+
+---
+
 ## Read this part even if you read nothing else
 
 **Every serious defect found across two days of review was a missing or wrong *source*,

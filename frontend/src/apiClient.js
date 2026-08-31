@@ -53,15 +53,15 @@ export const getTileLayerConfig = (style = 'SATELLITE') => {
   let url = `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`;
   // Deepest zoom actually crawled per layer -- must match "max_zoom" in
   // compile_mbtiles.py LAYER_CONFIGS. Street styles stop at 18 (operator
-  // decision 2026-08-30, punch-list #47); aerial goes to 21 because the City's
-  // 7.5cm orthos land pixel-for-pixel on z21. Leaflet upscales beyond this, so the map still
+  // decision 2026-08-30, punch-list #47); aerial goes to 20 because that is
+  // where the City's imagery cache ends. Leaflet upscales beyond this, so the map still
   // zooms to maxZoom -- it just stops requesting new tiles.
   let maxNativeZoom = 18;
   let attribution = '© OpenStreetMap contributors (100% Offline Local Cache)';
   
   if (s === 'SATELLITE') {
     url = `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`;
-    maxNativeZoom = 21;   // z21-native, see BASE_LAYERS.SATELLITE
+    maxNativeZoom = 20;   // City cache ends at z20, see BASE_LAYERS.SATELLITE
     attribution = 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)';
   } else if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
     url = `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`;

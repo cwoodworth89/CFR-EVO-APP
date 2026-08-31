@@ -22,8 +22,8 @@ This rule file defines domain constraints, runtime environments, and workflow st
 
 > [!CAUTION]
 > **The Open Government Licence covers City data only.** It does not reach
-> `basemaps.cartocdn.com` (street layers) or Esri World Imagery (`satellite.mbtiles`) — the
-> City neither owns nor sublicenses either, and building this for the department does not
+> `basemaps.cartocdn.com`, the source of the street layers — the City neither owns nor
+> sublicenses it, and building this for the department does not
 > inherit rights the department never held. Carto began stamping unauthenticated tiles
 > `API KEY REQUIRED` between the original crawl and the 2026-08-27 re-crawl, which is that
 > licence answering for itself. **Do not raise the street layers' `max_zoom` while Carto is

@@ -39,8 +39,8 @@ export const BASE_LAYERS = {
     maxZoom: 22,
   },
   // Aerial imagery. Serves the City of Coquitlam 2025 7.5cm orthophotos ONLY
-  // (`ortho.mbtiles`, Open Government Licence), deliberately with no Esri
-  // fallback beneath it.
+  // (`ortho.mbtiles`, Open Government Licence), crawled from the City's own
+  // imagery service, with no Esri fallback beneath it.
   //
   // Until 2026-08-30 this key pointed at `services/satellite`, which is Esri
   // World Imagery end to end -- the orthos had never been ingested, despite this
@@ -53,10 +53,12 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    // z21-native. The source is 7.5cm/px; z21 is 7.46cm/px at this latitude, a
-    // 1.005 ratio -- effectively pixel-for-pixel, with no downsample. z20 would
-    // be 9.7cm/px and visibly softer. Operator decision 2026-08-30.
-    maxNativeZoom: 21,
+    // z20. That is where the City's own imagery cache ends -- z21 returns 404,
+    // verified at three locations 2026-08-31 -- and it is the honest limit for a
+    // 7.5cm source: z20 is 9.74 cm/px here, z21 would be 4.87 cm/px with nothing
+    // real to fill it. Leaflet upscales past this, so the map still reaches
+    // maxZoom 22; it just stops requesting tiles that do not exist.
+    maxNativeZoom: 20,
     maxZoom: 22
   },
   OSM: {

@@ -23,7 +23,7 @@ CFR EVO serves all high-resolution aerial imagery, street basemaps, and municipa
 
 | Service Name | Archive File | Format | Zoom Levels | URL Endpoint |
 |---|---|---|---|---|
-| `satellite` | `satellite.mbtiles` | JPEG (Quality 85) | Z12–Z20 | `http://${hostname}:8081/services/satellite/tiles/{z}/{x}/{y}.jpg` |
+| `ortho` | `ortho.mbtiles` | JPEG | Z12–Z20 | `http://${hostname}:8081/services/ortho/tiles/{z}/{x}/{y}.jpg` |
 | `street` | `street.mbtiles` | PNG | Z12–Z18 | `http://${hostname}:8081/services/street/tiles/{z}/{x}/{y}.png` |
 | `street_nolabels` | `street_nolabels.mbtiles` | PNG | Z12–Z18 | `http://${hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png` |
 | `cadastral` | `cadastral.mbtiles` | PNG32 (Transparent) | Z14–Z20 | `http://${hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png` |
@@ -75,7 +75,7 @@ Probe individual tile delivery (using `GET`):
 curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/cadastral/tiles/16/10400/22800.png
 
 # Verify Satellite Z18 tile
-curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/satellite/tiles/18/41984/89445.jpg
+curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/ortho/tiles/18/41984/89445.jpg
 ```
 Expected response: `200 image/png (...) bytes` or `200 image/jpeg (...) bytes`.
 
@@ -120,7 +120,7 @@ python3 backend/scripts/crawl_cadastral_tiles.py \
 
 ### 5.2 Multi-Layer Compiler (`compile_mbtiles.py`)
 
-Ingests loose disk tiles and raw TMS orthophotos from `gdal2tiles` into `satellite.mbtiles`, `street.mbtiles`, and `street_nolabels.mbtiles`:
+Crawls and compiles `ortho.mbtiles` (City imagery service), `street.mbtiles` and `street_nolabels.mbtiles` (Carto). The `gdal2tiles`/MrSID ingest path was removed 2026-08-31 — see `gis-pipeline-sync` §4.1:
 
 ```bash
 python3 backend/scripts/compile_mbtiles.py --layer all --workers 32
@@ -135,7 +135,7 @@ python3 backend/scripts/compile_mbtiles.py --layer all --workers 32
    ```javascript
    export const BASE_LAYERS = {
      SATELLITE: {
-       url: `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
+       url: `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`,
        fallbackUrl: null,
        maxNativeZoom: 20,
        maxZoom: 22,

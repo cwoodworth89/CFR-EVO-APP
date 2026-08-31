@@ -49,8 +49,6 @@ The offline basemap pipeline. See the `mbtiles-tile-server` skill before touchin
 |:--|:--|
 | `compile_mbtiles.py` | Builds the MBTiles archives served by `cfr_tiles`. |
 | `crawl_cadastral_tiles.py` | Pre-caches the City cadastral overlay. |
-| `precache_satellite_tiles.py` | Pre-caches satellite raster tiles for the response area. |
-| `ingest_coquitlam_orthos.py` | Ingests the City 2025 7.5cm orthophotos into `ortho.mbtiles`. |
 | `finalize_mbtiles.py` | Checkpoints WAL and sets `journal_mode = DELETE`. **Required** — the tile volume is mounted read-only and will not open a WAL archive. |
 | `calc_tile_counts.py` | Estimates tile counts for a bounding box and zoom range before a crawl. |
 | `export_tile_coverage.py` | Regenerates `coquitlam_tile_coverage.geojson`. |

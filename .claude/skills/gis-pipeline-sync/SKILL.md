@@ -78,121 +78,78 @@ All offline base layers and property overlays are packaged into monolithic SQLit
 > **SQLite WAL Mode Read-Only Lock Constraint**:
 > Because `cfr_tiles` mounts `backend/data/tiles/` as **read-only (`:ro`)**, all scripts compiling `.mbtiles` archives must execute `PRAGMA wal_checkpoint(FULL)` and `PRAGMA journal_mode = DELETE` before closing the database to avoid `SQLITE_CANTOPEN` errors.
 
-### 4.1 Orthophoto Ingestion (7.5cm City of Coquitlam MrSID)
+### 4.1 Orthophoto Crawl (7.5cm City of Coquitlam imagery)
 
-> [!CAUTION]
-> **`compile_mbtiles.py --layer satellite` does NOT ingest the orthophotos.** It crawls
-> **Esri World Imagery** from `server.arcgisonline.com` into `satellite.mbtiles`. Until
-> 2026-08-30 this section said otherwise, and as a result the orthos were never ingested at
-> all while the UI attributed the layer to the City — every tile in `satellite.mbtiles` was
-> measured byte-identical to live Esri. The orthos build a **separate `ortho.mbtiles`**.
+**The City serves its own imagery cache. Crawl that — do not build tiles from the raw
+MrSID.** Measured 2026-08-31 on the same ground at z20, edge-energy sharpness:
 
-**Source**: `/home/tcfire/data_staging/Coquitlam_2025_7.5cm.zip` (9.01 GB) → one MrSID file,
-`BCCOQU25-SID-7.5CM.sid` (9.04 GB).
+| Source | Sharpness |
+|:--|--:|
+| **City `Imagery_2025` service** | **1344** |
+| Best possible local build from the raw MrSID | 954 |
+| Esri World Imagery | 664 |
+| The MrSID-derived archive this replaced | 540 |
 
-| Property | Value (measured 2026-08-30 via `gdalinfo`) |
-|:--|:--|
-| Raster size | 279,000 × 216,000 px (60.3 gigapixels) |
-| CRS | NAD83 / UTM Zone 10N (EPSG:26910) |
-| Pixel size | 0.075 m exactly |
-| Extent (WGS84) | −122.8995, 49.2165 → −122.6110, 49.3628 |
-| Encoding | MrSID/MG3, GeoExpress 9.5.5 |
-
-The extent fully covers `public.city_boundary` (−122.89343, 49.21987 → −122.62109, 49.35117).
-
-#### The GDAL image matters
-
-**MrSID is a proprietary format.** The official `ghcr.io/osgeo/gdal:ubuntu-full-latest`
-image has **no MrSID driver** — verified 2026-08-30, `gdalinfo --formats` returns only the
-unrelated NSIDC sea-ice driver. Use **`klokantech/gdal`** (GDAL 2.4.4), which carries the
-LizardTech DSDK and also has MBTiles read-write and `gdal2tiles.py`:
+The City's own rendering is the sharpest available and needs no resampling from us, so its
+tiles are stored exactly as published. The MrSID pipeline that preceded this is retired —
+see the deprecation note at the end of this section.
 
 ```bash
-docker run --rm klokantech/gdal gdalinfo --formats | grep -i mrsid
-#   MrSID -raster- (rov): Multi-resolution Seamless Image Database (MrSID)
+python backend/scripts/compile_mbtiles.py --layer ortho --workers 8
 ```
 
-#### The pipeline
+* **Output**: `backend/data/tiles/ortho.mbtiles` → `/services/ortho/tiles/{z}/{x}/{y}.jpg`
+* **Source**: `CachedServices/Imagery_2025/MapServer/tile/{z}/{row}/{col}` — a
+  `singleFusedMapCache` in EPSG:3857 whose LOD resolutions match the standard Web Mercator
+  scheme exactly (verified), so `{z}/{y}/{x}` maps 1:1 onto our grid.
+* **Licence**: Open Government Licence – Coquitlam. Attribution:
+  `Contains information licensed under the Open Government Licence – Coquitlam.`
+* **Scale**: 430,845 tiles over z12–20 within the municipal polygon, roughly 11 GB and
+  ~6 hours at the configured rate.
 
-Four steps, run from `/home/tcfire/data_staging` (see `backend/scripts/ingest_coquitlam_orthos.py`).
-Builds into staging and does **not** touch the live tiles directory until verified.
+#### z20 is the maximum, and that is not a choice
 
-```bash
-D=/home/tcfire/data_staging
-SID=/data/extracted/BCCOQU25-SID-7.5CM/BCCOQU25-SID-7.5CM.sid
-run() { docker run --rm -v $D:/data --memory=10g klokantech/gdal "$@"; }
+**`z21` returns HTTP 404 from the City service** — verified at Pinetree, Austin Heights and
+Burke Mountain. The service metadata advertises LODs to 23, but only z0–20 are actually
+cached; the metadata is aspirational, the same way our own archives once declared bounds
+they did not hold (#40).
 
-# 1. Unpack (9.04 GB SID)
-unzip -o $D/Coquitlam_2025_7.5cm.zip -d $D/extracted
+It also matches the physics. At Coquitlam's latitude:
 
-# 2. Warp UTM 10N -> EPSG:3857 at z21 resolution.
-#    -tr is 156543.03392804097 / 2^21; forcing it avoids a second resample in step 3.
-#    Output is 430,208 x 334,575 px (144 gigapixels), so COMPRESS=JPEG and BIGTIFF
-#    are not optional.
-run gdalwarp -t_srs EPSG:3857 -r bilinear     -tr 0.149291068854 0.149291068854     -of GTiff -co TILED=YES -co COMPRESS=JPEG -co PHOTOMETRIC=YCBCR -co BIGTIFF=YES     -multi -wo NUM_THREADS=8 --config GDAL_CACHEMAX 3072     $SID /data/ortho_3857.tif
+| Zoom | Ground resolution | vs the 7.5 cm source |
+|:--|--:|:--|
+| z19 | 19.48 cm/px | 2.6× coarser |
+| **z20** | **9.74 cm/px** | 1.30× coarser |
+| z21 | 4.87 cm/px | 1.54× **finer than the source** |
 
-# 3. Write MBTiles directly -- no TMS directory, no y-flip, no separate compile step.
-run gdal_translate -of MBTILES /data/ortho_3857.tif /data/ortho.mbtiles     -co TILE_FORMAT=JPEG -co QUALITY=85 --config GDAL_CACHEMAX 3072
+Set `maxNativeZoom: 20` and let Leaflet upscale beyond it. **Do not compute ground
+resolution as `156543.03 / 2**z` — that is EPSG:3857 units, not metres. Multiply by
+`cos(latitude)`.** Omitting that factor is what produced a 22 GB z21 archive holding no more
+information than a 6 GB one.
 
-# 4. Overviews ARE the lower zoom levels. Without this the archive is z20 only.
-run gdaladdo -r average /data/ortho.mbtiles 2 4 8 16 32 64 128 256 512
-```
+#### Rate limiting is deliberate
 
-**Keep `-r bilinear`. Do not "improve" it to lanczos.** 7.5 cm down to z20's 9.7 cm is a
-downsample, so the resampling kernel matters. Bilinear and cubic were judged equivalent and
-both clearly better than lanczos by the operator on the kiosk display, 2026-08-30 — lanczos
-rings on the high-contrast edges that matter here (vehicle outlines, lane markings). An
-earlier note in this file recommending lanczos was wrong and is withdrawn.
+`compile_mbtiles.py` runs 32 workers with no pacing against Carto. The `ortho` layer sets
+`rate_limit_sec: 0.05` (~20 req/s) because `geodata.coquitlam.ca` is municipal
+infrastructure belonging to the department's data partner, not a commercial CDN. Matches the
+operator decision of 2026-08-27 for the cadastral crawl.
 
-**Why z21 is the native zoom.** At Coquitlam's latitude z21 is **7.46 cm/px** against the
-source's 7.5 cm — a 1.005 ratio, so the warp is effectively pixel-for-pixel and no detail is
-resampled away. z20 is 9.74 cm/px, a 1.3× downsample that is visibly softer on vehicle edges
-and lane markings at the zoom crews actually use. Operator decision 2026-08-30, after
-comparing tiles side by side on the kiosk display.
+**The limiter is a hard ceiling that worker count does not multiply** — every request
+serialises behind one lock. The 2026-08-27 cadastral crawl ran 8.5 hours pinned at exactly
+5 req/s while 8 workers appeared to be running in parallel.
 
-Cost of z21 over z20: roughly 4× the tiles at the deepest level (~1.4M, ~20 GB) and a
-markedly longer build. **Left at z20 the layer is soft; that was the whole reason for
-ingesting the orthos rather than staying on Esri, so the extra depth is the point.**
+#### Deprecated 2026-08-31: the MrSID pipeline and the Esri layer
 
-Note this contradicts GDAL's own `ZOOM_LEVEL_STRATEGY=AUTO`, which picks z20 because 7.5 is
-numerically nearer 9.74 than 4.87 — that heuristic optimises for tile count, not for keeping
-every source pixel. Forcing `-tr` overrides it.
+Both are **retired**, not merely unused:
 
-#### Deploy
+* `satellite.mbtiles` (Esri World Imagery) — removed. It was never City data, its terms were
+  never read (#47), and the City's own imagery covers the same ground better.
+* `ingest_coquitlam_orthos.py`, `precache_satellite_tiles.py` — deleted.
+* `Coquitlam_2025_7.5cm.zip` and the MrSID/GDAL warp path — no longer part of any pipeline.
+  The raw SID remains a valid archival source, but nothing builds tiles from it.
 
-`gdal_translate` leaves the archive in WAL mode, and `cfr_tiles` mounts
-`backend/data/tiles/` read-only, so it **must** be converted before it is moved in
-(§4 above, and the finalize step needs `cfr_tiles` stopped — see the tile re-crawl runbook):
-
-`finalize_mbtiles.py` takes **no arguments** — it finalizes every `.mbtiles` in
-`backend/data/tiles/`. So the archive must be moved in *first*, and the container must be
-stopped *before* both steps: `PRAGMA journal_mode = DELETE` needs an exclusive lock, and
-mbtileserver holds the files open. This is the step the 2026-08-27 re-crawl got wrong.
-
-```bash
-docker stop cfr_tiles
-mv $D/ortho.mbtiles /home/tcfire/CFR-EVO-APP/backend/data/tiles/
-/home/tcfire/CFR-EVO-APP/.venv/bin/python     /home/tcfire/CFR-EVO-APP/backend/scripts/finalize_mbtiles.py
-docker start cfr_tiles
-curl -s http://localhost:8081/services | python3 -m json.tool   # expect an "ortho" entry
-```
-
-Confirm every archive reports `Journal Mode: delete` and `Integrity: ok` before starting the
-container — a WAL-mode archive fails only later, under the read-only mount.
-
-`mbtileserver` picks up any `.mbtiles` in the mounted directory and names the service after
-the filename, so `ortho.mbtiles` is served at `/services/ortho/tiles/{z}/{x}/{y}.jpg` with
-no config change.
-
-#### Verifying it is actually the orthos
-
-The failure this whole section exists to prevent is *imagery that looks right but comes from
-somewhere else*. Compare a tile against live Esri — if they match byte for byte, you are
-looking at Esri, not the City:
-
-```bash
-python3 backend/scripts/verify_ortho_provenance.py
-```
+If you find yourself reaching for `klokantech/gdal` or a `.sid` file to make basemap tiles,
+stop: crawl the City service instead.
 
 ### 4.2 Vector & Street Basemap MBTiles
 * **Street Layer**: `backend/data/tiles/street.mbtiles` (`/services/street/tiles/{z}/{x}/{y}.png`)
@@ -217,12 +174,12 @@ Verify that the `cfr_tiles` container serves all 4 services with zero WAN reques
 ```powershell
 curl -s http://localhost:8081/services
 ```
-Expected response contains JSON array of available services (`satellite`, `street`, `street_nolabels`, `cadastral`).
+Expected response contains JSON array of available services (`ortho`, `street`, `street_nolabels`, `cadastral`).
 
 Sample tile verification (using GET):
 ```powershell
 # Verify Z18 satellite tile for Town Centre Fire Hall (Hall 1)
-curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/satellite/tiles/18/41984/89445.jpg
+curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/ortho/tiles/18/41984/89445.jpg
 
 # Verify Z16 Cadastral overlay tile
 curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/cadastral/tiles/16/10400/22800.png

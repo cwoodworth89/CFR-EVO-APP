@@ -30,7 +30,9 @@ TRANSPARENT_1X1_PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\
 def _serve_tile(layer: str, z: int, x: int, y: int, ext: Optional[str] = None):
     """Forward tile requests to mbtileserver, falling back to local files or 1x1 transparent PNG."""
     clean_layer = re.sub(r"[^a-zA-Z0-9_-]", "", layer)
-    file_ext = (ext.lower().lstrip(".") if ext else ("jpg" if clean_layer == "satellite" else "png"))
+    # ortho is the only JPEG archive. It was "satellite" until 2026-08-31, when
+    # the Esri layer was retired in favour of the City's own imagery service.
+    file_ext = (ext.lower().lstrip(".") if ext else ("jpg" if clean_layer == "ortho" else "png"))
 
     # 1. Forward request to containerized mbtileserver
     target_url = f"{TILE_SERVER_URL}/services/{clean_layer}/tiles/{z}/{x}/{y}.{file_ext}"

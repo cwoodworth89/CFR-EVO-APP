@@ -155,6 +155,13 @@ def process_phase_2_finalize(
         final_addr = "Unknown Location"
         final_lat = None
         final_lng = None
+        # Initialised here with its siblings, and NOT only inside the single-phase branch
+        # below. The return at the end of this function does len(final_flags) on every
+        # path, so a name bound in one branch raises UnboundLocalError on the others --
+        # the same defect as responding_units, one variable over. It fired only once in
+        # fourteen days because the responding_units crash aborted first; fixing that
+        # unmasked this one, which would then have failed on every dispatch.
+        final_flags = []
 
         if not p1_data:
             # Single-phase fallback
@@ -283,6 +290,7 @@ def process_phase_2_finalize(
                 )
                 target_payload["review_flags"] = p2_flags
                 target_payload["review_flag_count"] = len(p2_flags)
+                final_flags = p2_flags
                 update_payload = {
                     "verify_location": False,
                     "audio_url": audio_url,
@@ -394,6 +402,7 @@ def process_phase_2_finalize(
                         )
                         target_payload["review_flags"] = p2_flags
                         target_payload["review_flag_count"] = len(p2_flags)
+                        final_flags = p2_flags
                         update_payload = {
                             "verify_location": False,
                             "audio_url": audio_url,

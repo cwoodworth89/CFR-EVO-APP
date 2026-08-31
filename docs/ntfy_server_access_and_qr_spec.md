@@ -1,6 +1,6 @@
 # 📱 Ntfy Push Server Access & Mobile Subscription Specification
 
-This document provides technical specifications for the local Ntfy push notification server, topic architecture, security salts, and QR code pairing links for developers and frontend AI agents.
+This document provides technical specifications for the local Ntfy push notification server, topic architecture and QR code pairing links for developers and frontend AI agents.
 
 ---
 
@@ -18,47 +18,47 @@ This document provides technical specifications for the local Ntfy push notifica
 
 ---
 
-## 🔐 2. Topic Architecture & Security Salt Scheme
+## 🔐 2. Topic Architecture
 
-### A. Permanent Master Topic (Chief / Admin)
-- **Topic Name**: `chief-master`
-- **Expiry**: Permanent (No monthly rotation).
-- **Features**:
-  - Receives all station dispatches across all halls and apparatus.
-  - Lock-screen audio file attachments (`Attach: http://<host>:8000/api/audio/<id>.wav`).
-  - Interactive lock-screen action buttons (`view, 🎧 Listen to Call Audio, <url>; view, 🗺️ Open Map Navigation, <url>`).
+**There are two topics, both permanent, neither salted.** An earlier version of this
+document specified `<apparatus_id>-<monthly_salt>` per-apparatus topics rotating monthly on
+an MD5 formula. **That was never built and has been removed** — verified 2026-08-31, no
+`salt`, `master_salt` or rotation logic exists anywhere in `backend/`, `services/` or
+`frontend/src`. The section is deleted rather than annotated so nobody implements against it.
 
-### A2. Permanent Maintainer Topic (Errors)
-- **Topic Name**: `chief-errors`
-- **Expiry**: Permanent, unsalted — same class as `chief-master`, not rotated.
-- **Who subscribes**: the maintainer only. **Not crews.**
-- **Carries**: pipeline exceptions from `process_phase_1_check` and
-  `process_phase_2_finalize` — exception type, message, dispatch id, and the
-  `journalctl` line to run.
-- **Why separate from `chief-master`**: crews subscribe to the dispatch topic. A stack
-  trace is not a dispatch, and mixing them trains people to swipe past both. The salted
-  monthly rotation in §B exists for topics carrying incident detail to apparatus; this
-  carries none.
-- **Override**: `NTFY_ERROR_TOPIC` in the environment.
-- **Origin**: punch-list **#59** — two `UnboundLocalError`s aborted Phase 2 after the
-  audio was written but before the record was updated. Fifteen dispatches lost their
-  audio player. The error named the dispatch and the variable in
-  `journalctl -u cfr-agent` from the first occurrence, and went unread for two days.
-  Punch-list #26 restored that logging; nothing watched it. This is the watching.
+### A. Dispatch Topic — crews and chiefs
+- **Topic**: `chief-master`
+- Receives every station dispatch. Lock-screen audio attachment
+  (`Attach: http://<host>:8000/api/audio/<id>.wav`) and action buttons for listening and
+  navigating.
+- Set by `NTFY_TOPIC` in **both** `backend/.env` (read by the host agent) and
+  `docker-compose.yml` (read by the API container). **They must match** — a mismatch
+  publishes agent and API notifications to different topics, and one of them silently goes
+  nowhere. Confirmed 2026-08-31: both are `chief-master`.
 
-Subscribe the same way as any other topic:
+### B. Error Topic — maintainer only
+- **Topic**: `dev-errors`
+- **Nobody operational subscribes.** Chiefs and crews get dispatches; a stack trace is not a
+  dispatch, and putting one on their topic trains people to swipe past both.
+- Carries pipeline exceptions from `process_phase_1_check` and `process_phase_2_finalize`:
+  exception type and message, dispatch id, and the `journalctl` line to run next.
+- Set by `NTFY_ERROR_TOPIC`, default `dev-errors`.
+- **Why it exists**: punch-list **#59**. Two `UnboundLocalError`s aborted Phase 2 after the
+  audio was written but before the record was updated. Fifteen dispatches lost their audio
+  player. The error named the dispatch and the variable in `journalctl -u cfr-agent` from the
+  first occurrence and went unread for two days. Punch-list #26 restored that logging in
+  August; nothing watched it.
+
 ```
-ntfy://100.95.146.94:8080/chief-errors
+ntfy://100.95.146.94:8080/dev-errors
 ```
 
----
-
-### B. Monthly Secret Apparatus Topics
-- **Format**: `<apparatus_id>-<monthly_salt>` (e.g., `engine-1-aug2026-9f8a3b`, `rescue-2-aug2026-9f8a3b`).
-- **Rotation**: Automatically calculated monthly with a 3-day shift transition grace period.
-- **Salt Formula**:
-  $$\text{Salt} = \text{MonthCode} + \text{"-"} + \text{MD5}(\text{MasterSalt} + \text{"-"} + \text{Year} + \text{"-"} + \text{MonthNum})[0..6]$$
-  *(Example for August 2026: `aug2026-9f8a3b`)*.
+> [!WARNING]
+> **`DriverStationSetup.jsx` hardcodes `cfr-dispatches`** (line 23), which is not what
+> anything publishes to. A driver scanning that QR subscribes to a topic that receives
+> nothing. `ntfy_broker.py` carries the same string as its env default. Both should read
+> `chief-master`, or the topic should come from configuration rather than three separate
+> literals.
 
 ---
 

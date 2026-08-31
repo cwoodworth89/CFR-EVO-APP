@@ -121,7 +121,7 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         return False
 
 
-NTFY_ERROR_TOPIC = os.environ.get("NTFY_ERROR_TOPIC", "chief-errors")
+NTFY_ERROR_TOPIC = os.environ.get("NTFY_ERROR_TOPIC", "dev-errors")
 
 
 def notify_pipeline_error(dispatch_id: str, stage: str, error: BaseException,
@@ -141,10 +141,9 @@ def notify_pipeline_error(dispatch_id: str, stage: str, error: BaseException,
 
     Deliberately separate from `chief-master`
     ----------------------------------------
-    Crews subscribe to the dispatch topic. A stack trace is not a dispatch, and mixing
-    the two trains people to swipe past both. `chief-errors` is permanent and unsalted,
-    matching `chief-master` in §2A of the ntfy spec; the salted monthly rotation in §2B
-    exists for topics that carry incident detail to apparatus, which this does not.
+    `chief-master` goes to chiefs and crews. A stack trace is not a dispatch, and putting
+    one there trains people to swipe past both. `dev-errors` is the maintainer's topic and
+    nobody operational subscribes to it.
 
     Never raises
     ------------

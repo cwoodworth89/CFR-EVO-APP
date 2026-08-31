@@ -219,8 +219,16 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
                 address_normalized=clean_addr.lower(),
                 front_lat=payload.front_lat,
                 front_lng=payload.front_lng,
-                lat=payload.front_lat,
-                lng=payload.front_lng,
+                # centroid_* is deliberately NOT set. This row is created for an address
+                # the municipal parcel data does not contain, so there is no polygon and
+                # therefore no centroid. It used to be filled from front_lat -- inventing
+                # a "centre of the property" that is actually a point on the road. Same
+                # class as punch-list #50, in the other direction: copying one of the
+                # three positions into another.
+                #
+                # NULL is correct and costs nothing: the resolver order is
+                # entrance -> front -> centroid, and front_lat is set here, so the
+                # centroid is never reached (CLAUDE.md §6.1).
                 streetview_heading=payload.heading,
                 streetview_pitch=payload.pitch,
                 streetview_fov=payload.fov
@@ -261,8 +269,16 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
                 address_normalized=clean_addr.lower(),
                 front_lat=payload.front_lat,
                 front_lng=payload.front_lng,
-                lat=payload.front_lat,
-                lng=payload.front_lng,
+                # centroid_* is deliberately NOT set. This row is created for an address
+                # the municipal parcel data does not contain, so there is no polygon and
+                # therefore no centroid. It used to be filled from front_lat -- inventing
+                # a "centre of the property" that is actually a point on the road. Same
+                # class as punch-list #50, in the other direction: copying one of the
+                # three positions into another.
+                #
+                # NULL is correct and costs nothing: the resolver order is
+                # entrance -> front -> centroid, and front_lat is set here, so the
+                # centroid is never reached (CLAUDE.md §6.1).
                 streetview_heading=payload.heading,
                 streetview_pitch=payload.pitch,
                 streetview_fov=payload.fov

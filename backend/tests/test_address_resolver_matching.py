@@ -234,7 +234,11 @@ def _parcel(street, stype, zone, house="3000", pid=1):
     return {
         "id": pid, "address": f"{house} {street} {stype}", "house": house,
         "street": street, "streettype": stype, "zone_id": zone,
-        "lat": 49.28, "lng": -122.79, "front_lat": None, "front_lng": None,
+        # The three positions the resolver reads, in its own order:
+        # entrance -> front -> centroid. `centroid_*` was named lat/lng until
+        # 2026-08-31; the name now says it is the polygon centroid.
+        "centroid_lat": 49.28, "centroid_lng": -122.79,
+        "front_lat": None, "front_lng": None,
         "entrance_lat": None, "entrance_lng": None,
         "geom_geojson": None,
     }

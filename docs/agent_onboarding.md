@@ -96,7 +96,7 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 ## ⚙️ Project Configuration & Environments
 
 * **`.env` files**:
-  * Copy `.env.example` in `/backend` and `/frontend` respectively to configure environment parameters (GCP credentials path, NTFY push topics, and STT engine types).
+  * Copy `.env.example` in `/backend` and `/frontend` respectively to configure environment parameters (database URL, NTFY push topics, MQTT broker). **There is no GCP credentials path** — an earlier version of this line said there was, and cloud STT is forbidden by CLAUDE.md §1.
 * **Consolidated Python Configurations**:
   * All DSP noise floor values, audio sample rates, vocab target directories, and GIS shapefile mappings are centralized and re-exported in [backend/cfr_dispatch/config/\_\_init\_\_.py](../backend/cfr_dispatch/config/__init__.py).
 
@@ -324,4 +324,4 @@ To switch between Google Cloud STT V2 and Local Offline Whisper:
   ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
   ```
 
-
+<!-- audit-ok: backend/migrations/YYYY-MM-DD_short_name.sql -- a naming template, not a real file -->

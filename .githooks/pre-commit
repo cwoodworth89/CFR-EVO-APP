@@ -22,4 +22,43 @@ if git diff --cached --name-only | grep -qE '^frontend/src/.*\.(js|jsx)$'; then
   fi
   echo "pre-commit: no crash-class errors."
 fi
+
+# Documentation checks. Same principle as the crash class above: these fail silently
+# rather than loudly, so nothing surfaces them except a reader following a dead link.
+#
+# Splitting the punch list on 2026-08-31 left 34 links broken for most of a day, and the
+# scripts README described a file that had been deleted -- one that explained how to load
+# vocabulary into a cloud STT service the project forbids. Neither breaks a test.
+#
+# Only runs when the relevant trees are touched, so it costs nothing on a code-only commit.
+PY=$(command -v python3 || command -v python)
+
+if [ -n "$PY" ] && git diff --cached --name-only | grep -qE '^docs/.*\.md$'; then
+  echo "pre-commit: checking documentation links and paths..."
+  if ! PYTHONIOENCODING=utf-8 "$PY" backend/scripts/audit_skill_references.py --docs; then
+    echo
+    echo "COMMIT BLOCKED: documentation points at files that are not there."
+    echo "Fix the path, delete the reference, or -- if the text is deliberately"
+    echo "recording something that was removed -- mark it in that file:"
+    echo
+    echo "    <!-- audit-ok: path/to/thing -- why this is correct -->"
+    echo
+    echo "Bypass with 'git commit --no-verify' if you are certain."
+    exit 1
+  fi
+fi
+
+if [ -n "$PY" ] && git diff --cached --name-only | grep -qE '^backend/scripts/'; then
+  echo "pre-commit: checking backend/scripts/README.md..."
+  if ! PYTHONIOENCODING=utf-8 "$PY" backend/scripts/audit_skill_references.py --scripts; then
+    echo
+    echo "COMMIT BLOCKED: a script has no README row, or a row names no script."
+    echo "A row per script, and a script per row. Already-run scripts belong in"
+    echo "backend/scripts/oneshot/, which is not scanned."
+    echo
+    echo "Bypass with 'git commit --no-verify' if you are certain."
+    exit 1
+  fi
+fi
+
 exit 0

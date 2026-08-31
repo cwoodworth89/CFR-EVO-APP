@@ -117,3 +117,5 @@ Vendor the document into this directory, then update its row with:
 * the date obtained,
 * which clauses actually apply to this system,
 * any deviation, moved into **Known deviations** above with its justification.
+
+<!-- audit-ok: docs/evo_routing_engine.md -- records why that document was deleted -->

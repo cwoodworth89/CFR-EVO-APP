@@ -274,3 +274,5 @@ or an agreed amendment to §6.4 — not a silent change of state.
 We are happy to be wrong on any of these where you have data we do not — particularly the
 Pi-hardware benchmarks, where our figures are explicitly from the wrong machine. Every number
 above is reproducible; ask and we will supply the exact query.
+
+<!-- audit-ok: backend/api/routers/dispatch.py -- the sentence exists to say this path never existed -->

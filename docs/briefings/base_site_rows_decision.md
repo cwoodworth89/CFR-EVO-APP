@@ -196,3 +196,5 @@ behind it.
 **New defect found while verifying this**: those 56 parcels keep the front point the old
 any-road algorithm gave them, because the constrained lookup returns no row and the `UPDATE`
 skips them. Logged as **#58**.
+
+<!-- audit-ok: docs/dispatch_corpus_snapping_benchmark.json -- records the benchmark deleted with the unadopted proposal -->

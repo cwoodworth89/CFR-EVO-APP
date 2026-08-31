@@ -69,3 +69,4 @@ sudo systemctl restart cfr-agent
 > **Git-Ignored Files & Server Synchronization**
 > Files specified in `.gitignore` (such as `backend/.env`, `frontend/.env.local`, offline STT model caches in `backend/models/`, shapefiles in `backend/data/`, and credentials JSON files) are **not** updated by running `git pull` on the remote kiosk. Any modifications to environment variables or ignored configuration assets must be transferred directly via `scp` or edited manually on the server.
 
+<!-- audit-ok: services/gis/src/gis_service/shapefile_loader.py -- records that in-memory shapefile loading was eliminated -->

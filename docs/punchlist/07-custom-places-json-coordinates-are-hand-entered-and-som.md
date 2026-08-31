@@ -81,3 +81,5 @@
 ---
 
 ## 🧪 Test Suite Debt
+
+<!-- audit-ok: backend/data/vocabulary/custom_places.json -- closed item; its subject is the deletion of this file -->

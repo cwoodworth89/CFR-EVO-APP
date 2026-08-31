@@ -122,19 +122,17 @@ def audit_scripts(scripts_dir: str) -> int:
 
 
 LINK = re.compile(r"\]\((?!https?://|file://|mailto:|#)([^)\s]+?)\)")
-# A paragraph that says the path is gone. Matches how this project actually writes them.
+# An explicit, per-file exemption naming the path it excuses:
 #
-# Stem-matched with a trailing \w*, NOT \b. The first version was `\b(delet|remov|...)\b`,
-# which cannot match "deleted": there is no word boundary between `delet` and `ed`, so the
-# alternation was unreachable for every word it was written to catch. It silently matched
-# nothing and every correctly-documented deletion was reported as rot. Same class of defect
-# as everything else in docs/standards/dependency-behaviour.md -- the pattern looked like it
-# said "words starting with delet" and did not.
-GONE = re.compile(
-    r"(?:\b(?:delet|remov|retir|dropp?|supersed|archiv|obsolet|replac|migrat|rename)\w*)"
-    r"|(?:\bno longer\b)|(?:\bnever (?:exist|was)\w*)|(?:\bdo(?:es)?\s+not\s+exist\b)"
-    r"|(?:\bdid not exist\b)|(?:\bused to\b)|(?:\bpreviously\b)|(?:\bgone\b)"
-    r"|(?:\bunadopted\b)|(?:\bnot adopted\b)|(?:\babsent\b)", re.I)
+#     <!-- audit-ok: backend/data/vocabulary/custom_places.json -- records a deletion -->
+#
+# This replaces a word-spotting rule that skipped any paragraph containing "deleted",
+# "removed" and similar. That rule was written to handle 28 findings; once the genuinely
+# stale references were fixed there were 8 left, seven of which say "deleted" or "does not
+# exist" in the sentence itself. A guess is not worth keeping to save eight comments -- and
+# the guess could go quiet on a real finding that happened to share a paragraph with an
+# unrelated deletion. An exemption should be a statement, not an inference.
+AUDIT_OK = re.compile(r"<!--\s*audit-ok:\s*([^\s]+)")
 _IGNORE_CACHE: dict[str, bool] = {}
 
 
@@ -203,6 +201,9 @@ def audit_docs(docs_dir: str) -> int:
             scanned += 1
             text = io.open(p, encoding="utf-8", errors="replace").read()
             prose = FENCE.sub("", text)
+            # Read the exemptions BEFORE stripping fences, so a marker is findable wherever
+            # it was written. Scope is the file: a path excused here is excused throughout it.
+            exempt = set(AUDIT_OK.findall(text))
 
             for m in LINK.finditer(prose):
                 target = m.group(1).split(":")[0].split("#")[0]
@@ -217,13 +218,7 @@ def audit_docs(docs_dir: str) -> int:
                     continue
                 if _git_ignored(repo, target):
                     continue
-                # Scope the removal marker to the enclosing PARAGRAPH, not the line. These
-                # documents wrap at about 95 characters, so "deleted 2026-08-31" routinely
-                # lands a line away from the path it describes. Line scope missed most of them.
-                para_start = prose.rfind("\n\n", 0, m.start()) + 2
-                para_end = prose.find("\n\n", m.end())
-                para = prose[para_start: para_end if para_end != -1 else len(prose)]
-                if GONE.search(para):
+                if target in exempt:
                     continue
                 broken_paths.append((p, target))
 

@@ -345,3 +345,4 @@ Per-case judgement; changes runtime behaviour; must not be bulk-edited.
   polygon; the backend could return an authoritative `in_city` flag now that
   `public.city_boundary` is queryable.
 
+<!-- audit-ok: backend/tests/audio_samples/ -- records that the directory was removed -->

@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-41 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+42 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -47,3 +47,4 @@
 | **58** | 🔴 crew-visible | CLOSED | [Parcels whose street has no road keep a stale front point on a different street](58-parcels-whose-street-has-no-road-keep-a-stale-front-po.md) |
 | **48** | 🔴 crew-visible | CLOSED | [One civic address, many parcels — the import keeps whichever the shapefile lists first](48-one-civic-address-many-parcels-the-import-keeps-whichev.md) |
 | **10** | ⚪ hygiene | CLOSED | [Three test modules have never run in review](10-three-test-modules-have-never-run-in-review.md) |
+| **35b** | 🔴 crew-visible | CLOSED | ["Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`](35b-near-roads-stopped-being-recorded-on-2026-08-21-phase-2.md) |

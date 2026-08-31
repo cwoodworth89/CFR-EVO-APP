@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🔁 Batch follow-up, 2026-08-23 (operator screenshots + kiosk probes) |
 | **Blocks** | 1 |
@@ -107,3 +107,52 @@ Operationally, near roads are how crews confirm they are on the right block, and
 warning of CLAUDE.md §5 does not cover a *silently missing* corroboration field.
 
 ---
+
+---
+
+## 35b (closed). The field was renamed, and the mechanism that dropped it was fixed
+
+> **Status**: ✅ **Closed 2026-08-31.** Operator ruling: the XStreet rename made "near roads"
+> obsolete. Verified against the running database rather than closed on the ruling alone
+> (§6.6).
+
+**Two things had to be true, and both are.**
+
+**1. `cross_streets` is superseded, not broken.** It became `x_street_1` / `x_street_2` in the
+XStreet rename. The legacy key appears on **zero** dispatches in the last seven days — it is
+gone, not empty.
+
+**2. The lossy Phase 2 rebuild is fixed.** Both construction sites in `phase2.py` now spread
+the Phase 1 target first, which is exactly the merge this item recommended and did not apply:
+
+```python
+target_payload = {
+    **p1_target,          # merge, not rebuild
+    "address": p1_address,
+    ...
+}
+```
+
+That matters beyond this item. The same allowlist was also dropping `routing_metrics`,
+`location_type`, `resolution_note` and `requested_address`. `resolution_note` is the field
+**#12** was closed on today, so had the rebuild still been lossy that closure would have been
+wrong. It survives — measured, not assumed.
+
+**Recording is healthy.** `x_street_1` is now populated on *more* calls than say "near",
+because XStreets come from the CAD announcement structure rather than that one word:
+
+| Day | Calls | Said "near" | `x_street_1` | legacy `cross_streets` |
+|:--|--:|--:|--:|--:|
+| 2026-08-31 | 11 | 5 | **9** | 0 |
+| 2026-08-30 | 11 | 6 | **9** | 0 |
+| 2026-08-29 | 13 | 3 | **10** | 0 |
+| 2026-08-28 | 12 | 6 | **9** | 0 |
+| 2026-08-27 | 13 | 4 | **7** | 0 |
+
+Against the regression this item recorded — **1 of 10** on 2026-08-21 and **1 of 13** on
+2026-08-23.
+
+**The lesson stays worth keeping**, and it is why the merge matters more than the rename: a
+correct fix in the geocoder surfaced silent data loss in Phase 2 that had existed since
+`cross_streets` was introduced. An explicit allowlist that must be edited every time a field
+is added is the mechanism that produced the defect; a merge cannot fail the same way.

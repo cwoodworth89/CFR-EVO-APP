@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**28 open** (16 crew-visible) · **41 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**27 open** (15 crew-visible) · **42 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
@@ -32,7 +32,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **30** | 🔴 crew-visible | OPEN | ["Code 1 / Code 3" is not Coquitlam terminology, and the border has no warning or review state](punchlist/30-code-1-code-3-is-not-coquitlam-terminology-and-the-bord.md) |
 | **34a** | 🔴 crew-visible | OPEN | [Apparatus names collide with call-type names, turning STT damage into a confident wrong answer](punchlist/34a-apparatus-names-collide-with-call-type-names-turning-st.md) |
 | **34b** | 🔴 crew-visible | OPEN | [Live overdose call still showed the green ROUTINE (Code 1) badge](punchlist/34b-live-overdose-call-still-showed-the-green-routine-code.md) |
-| **35b** | 🔴 crew-visible | OPEN | ["Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`](punchlist/35b-near-roads-stopped-being-recorded-on-2026-08-21-phase-2.md) |
 
 | **44a** | 🔴 crew-visible | OPEN | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](punchlist/44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **47a** | 🔴 crew-visible | EXTERNAL | [`Chartwell Rd` does not exist in municipal data — three sources give three street names](punchlist/47a-chartwell-rd-does-not-exist-in-municipal-data-three-sou.md) |

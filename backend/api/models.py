@@ -41,6 +41,14 @@ class LiveCallModel(Base):
     verified_address = Column(Text, nullable=True)
     verified_incident = Column(Text, nullable=True)
     verified_units = Column(SafeArray, nullable=True)
+    # Promoted out of the `target` JSON blob 2026-08-31. These are fixed fields a
+    # human types during review, not the geocoder's variable-shaped answer, so they
+    # belong in the schema where they can be typed, indexed and seen.
+    verified_map_grid = Column(Text, nullable=True)
+    verified_talkgroup = Column(Text, nullable=True)
+    verified_response_type = Column(Text, nullable=True)
+    verified_x_street_1 = Column(Text, nullable=True)
+    verified_x_street_2 = Column(Text, nullable=True)
     feedback_submitted = Column(Boolean, default=False)
     quality_rating = Column(String, default="PENDING")
     model_updated = Column(Boolean, default=False)

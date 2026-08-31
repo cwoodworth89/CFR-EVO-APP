@@ -69,8 +69,8 @@ export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
     // Two positional variables, never a list -- position IS the announced order,
     // and collapsing them loses which one was omitted.
     intersection: target.intersection || '',
-    x_street_1: target.verified_x_street_1 || target.x_street_1 || '',
-    x_street_2: target.verified_x_street_2 || target.x_street_2 || '',
+    x_street_1: record.verified_x_street_1 || target.x_street_1 || '',
+    x_street_2: record.verified_x_street_2 || target.x_street_2 || '',
 
     // Coordinates propagate as null when unresolved. Do not add a fallback here.
     lat: target.lat ?? record.lat ?? null,
@@ -109,8 +109,8 @@ export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
     // Set by the backend from a NAMED condition (LOCATION_UNRESOLVED or
     // LOCATION_SUBSTITUTED), no longer from an arithmetic threshold.
     verify_location: record.verify_location ?? false,
-    map_grid: target.verified_map_grid || target.map_grid || '',
-    radio_channel: target.verified_talkgroup || target.radio_channel || '',
+    map_grid: record.verified_map_grid || target.map_grid || '',
+    radio_channel: record.verified_talkgroup || target.radio_channel || '',
     tone_name: target.tone_name || '',
 
     created_at: record.created_at || record.timestamp || null,

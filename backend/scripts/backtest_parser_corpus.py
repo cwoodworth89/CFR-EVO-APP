@@ -261,7 +261,7 @@ def fetch(conn, args):
     cur.execute(
         f"""SELECT dispatch_id, timestamp, raw_transcript,
                    verified_incident, verified_units, verified_address,
-                   target->>'verified_map_grid', target->>'verified_talkgroup'
+                   verified_map_grid, verified_talkgroup
               FROM dispatches WHERE {' AND '.join(where)} ORDER BY timestamp""",
         params,
     )

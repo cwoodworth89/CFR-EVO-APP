@@ -39,6 +39,11 @@ class DispatchCreateSchema(BaseModel):
     verified_address: Optional[str] = None
     verified_incident: Optional[str] = None
     verified_units: Optional[List[str]] = None
+    verified_map_grid: Optional[str] = None
+    verified_talkgroup: Optional[str] = None
+    verified_response_type: Optional[str] = None
+    verified_x_street_1: Optional[str] = None
+    verified_x_street_2: Optional[str] = None
     feedback_submitted: Optional[bool] = False
 
 
@@ -57,6 +62,11 @@ class DispatchUpdateSchema(BaseModel):
     verified_address: Optional[str] = None
     verified_incident: Optional[str] = None
     verified_units: Optional[List[str]] = None
+    verified_map_grid: Optional[str] = None
+    verified_talkgroup: Optional[str] = None
+    verified_response_type: Optional[str] = None
+    verified_x_street_1: Optional[str] = None
+    verified_x_street_2: Optional[str] = None
     feedback_submitted: Optional[bool] = None
     quality_rating: Optional[str] = None
     model_updated: Optional[bool] = None
@@ -68,6 +78,11 @@ class FeedbackSchema(BaseModel):
     verified_address: Optional[str] = None
     verified_incident: Optional[str] = None
     verified_units: Optional[List[str]] = None
+    verified_map_grid: Optional[str] = None
+    verified_talkgroup: Optional[str] = None
+    verified_response_type: Optional[str] = None
+    verified_x_street_1: Optional[str] = None
+    verified_x_street_2: Optional[str] = None
     quality_rating: Optional[str] = None
     review_notes: Optional[str] = None
     feedback_submitted: Optional[bool] = True

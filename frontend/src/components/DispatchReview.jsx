@@ -168,21 +168,18 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         setVerifiedTranscript(selectedCall.verified_transcript || selectedCall.sanitized_transcript || selectedCall.raw_transcript || '');
         setVerifiedAddress(selectedCall.verified_address || '');
         setVerifiedSubaddress(selectedCall.feedback_submitted ? toTitleCase(selectedCall.target?.subaddress || '') : '');
-        setVerifiedMapGrid(selectedCall.target?.verified_map_grid || '');
-        setVerifiedXstreet1(selectedCall.target?.verified_x_street_1
+        // Promoted to real columns 2026-08-31 -- read from the record, not target.
+        setVerifiedMapGrid(selectedCall.verified_map_grid || '');
+        setVerifiedXstreet1(selectedCall.verified_x_street_1
           ?? selectedCall.target?.x_street_1 ?? '');
-        setVerifiedXstreet2(selectedCall.target?.verified_x_street_2
+        setVerifiedXstreet2(selectedCall.verified_x_street_2
           ?? selectedCall.target?.x_street_2 ?? '');
-        setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
+        setVerifiedTalkgroup(selectedCall.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         // Prefer the reviewer's own correction, then what the parser heard, then
         // null. Null is a real state here — "the dispatch did not announce one".
         setVerifiedResponseType(
-          selectedCall.target?.verified_response_type
-          ?? selectedCall.target?.response_type
-          ?? null);
-        setVerifiedResponseType(
-          selectedCall.target?.verified_response_type
+          selectedCall.verified_response_type
           ?? selectedCall.target?.response_type
           ?? null);
         setQualityRating(selectedCall.quality_rating || 'PENDING');
@@ -361,21 +358,24 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         tone_name: tonesString || null,
         include_in_training: includeInTraining,
         subaddress: verifiedSubaddress || null,
-        verified_talkgroup: verifiedTalkgroup || null,
-        verified_response_type: verifiedResponseType,
-        verified_map_grid: verifiedMapGrid || null,
-        // Null means "the dispatch announced none", which is a real answer and
-        // must not be written back as an empty string (CLAUDE.md 6.1).
-        verified_x_street_1: verifiedXstreet1 || null,
-        verified_x_street_2: verifiedXstreet2 || null,
         review_notes: reviewNotes || null
       };
+      // The verified_* fields below are REAL COLUMNS as of 2026-08-31, not target
+      // keys. They are fixed boxes a human fills in, so they belong in the schema
+      // where they can be typed and indexed; target keeps the geocoder's answer,
+      // which legitimately varies in shape. Null means "the dispatch announced
+      // none" -- a real answer, never an empty string (CLAUDE.md 6.1).
 
       const updatedCall = await apiClient.dispatches.update(selectedCall.dispatch_id || selectedCall.id, {
         verified_transcript: verifiedTranscript,
         verified_address: verifiedAddress,
         verified_incident: verifiedIncident,
         verified_units: unitsArray,
+        verified_talkgroup: verifiedTalkgroup || null,
+        verified_response_type: verifiedResponseType,
+        verified_map_grid: verifiedMapGrid || null,
+        verified_x_street_1: verifiedXstreet1 || null,
+        verified_x_street_2: verifiedXstreet2 || null,
         feedback_submitted: true,
         verify_location: false,
         quality_rating: qualityRating,

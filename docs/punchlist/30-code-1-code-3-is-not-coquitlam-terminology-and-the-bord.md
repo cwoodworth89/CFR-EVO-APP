@@ -35,16 +35,16 @@ Confirmed rendering and label sites:
 
 | File | Line | Current |
 |:--|:--|:--|
-| [`frontend/src/components/hud/ActiveAlertBanner.jsx`](../frontend/src/components/hud/ActiveAlertBanner.jsx) | `36` | `isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'` |
-| [`services/gis/src/gis_service/routing_engine.py`](../services/gis/src/gis_service/routing_engine.py) | `309`, `433` | `"response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)"` |
-| [`backend/tests/test_routing_engine.py`](../backend/tests/test_routing_engine.py) | `338`, `341` | asserts both strings — **will fail** when the labels change, and must be updated with them |
+| [`frontend/src/components/hud/ActiveAlertBanner.jsx`](../../frontend/src/components/hud/ActiveAlertBanner.jsx) | `36` | `isEmergency ? '🚨 Emergency (Code 3)' : '🟢 Routine (Code 1)'` |
+| [`services/gis/src/gis_service/routing_engine.py`](../../services/gis/src/gis_service/routing_engine.py) | `309`, `433` | `"response_mode": "Routine (Code 1)" if is_routine else "Emergency (Code 3)"` |
+| [`backend/tests/test_routing_engine.py`](../../backend/tests/test_routing_engine.py) | `338`, `341` | asserts both strings — **will fail** when the labels change, and must be updated with them |
 
 `response_mode` has **no frontend consumer** — the grep above finds it only in the routing
 engine that emits it and the test that asserts it. So the backend and frontend strings are
 independently wrong rather than one feeding the other, and both need changing.
 
 **Related, and the reason this is not purely cosmetic** —
-[`frontend/src/components/kiosk/KioskView.jsx:93`](../frontend/src/components/kiosk/KioskView.jsx#L93):
+[`frontend/src/components/kiosk/KioskView.jsx:93`](../../frontend/src/components/kiosk/KioskView.jsx#L93):
 
 ```js
 const isEmergency =
@@ -68,7 +68,7 @@ will read correctly while classifying incorrectly.
 
 #### 30b. The border colour has only two of the four required states
 
-Confirmed at [`KioskView.jsx:175`](../frontend/src/components/kiosk/KioskView.jsx#L175):
+Confirmed at [`KioskView.jsx:175`](../../frontend/src/components/kiosk/KioskView.jsx#L175):
 
 ```js
 const borderColor = isEmergency ? 'border-red-600' : 'border-emerald-500';

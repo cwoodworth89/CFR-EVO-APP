@@ -82,7 +82,7 @@ captures instead.
 ## 14 (analysed). PA leakage — the discriminator is 647 Hz, and 595 Hz is what breaks the filter
 > **Status**: ⚠️ **Open — root cause found and a rule validated against 122 real tone events.
 > Not implemented: the change affects whether a real dispatch can be dropped (§7.2).**
-> Full analysis: [`docs/briefings/pa_tone_discriminator.md`](./briefings/pa_tone_discriminator.md).
+> Full analysis: [`docs/briefings/pa_tone_discriminator.md`](../briefings/pa_tone_discriminator.md).
 
 **647 Hz appears in 15 of 15 system-labelled PA events**, and in all three operator-`[PA]`-tagged
 dispatches that occurred while `tone_spectral_history.jsonl` was running. It is the only

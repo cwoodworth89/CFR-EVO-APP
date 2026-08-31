@@ -132,8 +132,8 @@ Current code gets this right **by accident**: it matches against both rounds con
 round 2's correct wording is in the string and longest-first finds the qualified type. Any
 move to per-round parsing must therefore choose the most specific answer across rounds, or it
 reintroduces the round-1-wins defect described in
-[`parser_audit_handoff.md`](parser_audit_handoff.md) §5 — which
-[`pipeline/phase2.py:146`](../backend/cfr_dispatch/pipeline/phase2.py) still has for
+[`parser_audit_handoff.md`](../parser_audit_handoff.md) §5 — which
+[`pipeline/phase2.py:146`](../../backend/cfr_dispatch/pipeline/phase2.py) still has for
 addresses (`next(...)`, first candidate wins, unconditionally, across 201 double-round calls).
 
 Related: the subset trap inventory in #19, and `Rescue`'s `token_set_ratio` of 100 above is

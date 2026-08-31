@@ -88,7 +88,7 @@ failure is currently invisible).
 > documented as an accepted risk (operator, 2026-08-30).
 
 **The exemption is recorded** in a header comment on
-[`StreetViewPanel.jsx`](../frontend/src/components/kiosk/StreetViewPanel.jsx) — where the next
+[`StreetViewPanel.jsx`](../../frontend/src/components/kiosk/StreetViewPanel.jsx) — where the next
 reader will actually hit it, rather than buried in a doc. Street View is fetched live from
 `maps.googleapis.com` and cannot be cached the way the municipal orthophotos are, so it is the
 one surface that does not satisfy CLAUDE.md §1. Accepted because it is a pre-arrival

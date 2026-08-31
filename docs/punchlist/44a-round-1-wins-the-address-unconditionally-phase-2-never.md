@@ -23,7 +23,7 @@
 #### Mechanism
 
 `all_candidates` is built by iterating rounds in order
-([`phase2.py:113`](../backend/cfr_dispatch/pipeline/phase2.py)):
+([`phase2.py:113`](../../backend/cfr_dispatch/pipeline/phase2.py)):
 
 ```python
 announcements = split_rounds(transcript, units_vocab)
@@ -31,7 +31,7 @@ for text in announcements:
     all_candidates.extend(parse_dispatch_announcement(text, units_vocab))
 ```
 
-then the address is selected at [`phase2.py:146`](../backend/cfr_dispatch/pipeline/phase2.py):
+then the address is selected at [`phase2.py:146`](../../backend/cfr_dispatch/pipeline/phase2.py):
 
 ```python
 p2_candidate = next((d for d in all_candidates if d.address or d.intersection), None)
@@ -91,7 +91,7 @@ This should also recover part of the **11** "neither" cases, where round 1 won w
 address and neither round matched the verified string exactly.
 
 `validate_address_exists` in
-[`address_resolver.py`](../services/gis/src/gis_service/address_resolver.py) is the obvious
+[`address_resolver.py`](../../services/gis/src/gis_service/address_resolver.py) is the obvious
 hook — noting it currently shares the no-`ORDER BY` tie-break bug inventoried in
 `parser_audit_handoff.md` §6, which should be settled first.
 

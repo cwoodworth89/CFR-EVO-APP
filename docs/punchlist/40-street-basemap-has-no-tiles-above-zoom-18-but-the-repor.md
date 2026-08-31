@@ -308,7 +308,7 @@ per layer at z20 would be fetched for no added detail. Check before committing t
 not after (§7.3a).
 
 
-**Runbook**: [`docs/briefings/tile_recrawl_runbook.md`](./briefings/tile_recrawl_runbook.md) —
+**Runbook**: [`docs/briefings/tile_recrawl_runbook.md`](../briefings/tile_recrawl_runbook.md) —
 `nohup`-launched, resumable crawl commands for a poor connection, plus the pre-crawl z19/z20
 availability check, the mandatory WAL checkpoint, and the verification queries.
 

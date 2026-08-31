@@ -19,17 +19,17 @@ Coquitlam [Units]. Respond [Priority], [Incident Type], [Address] [Subaddress / 
 
 ## 🛠️ Segmented Parser Filters (Template-Aligned Segmentation)
 
-The parser in [parser.py](../backend/cfr_dispatch/parser.py) maps this template directly to separate data fields using anchor keywords:
+The parser in [parser.py](../backend/cfr_dispatch/parser/) maps this template directly to separate data fields using anchor keywords:
 
 | Segment Name | Sample Value | Anchor Keyword / Split logic |
 | :--- | :--- | :--- |
 | **Units** | `Engine 2, Engine 3, Rescue 2` | Precedes the `respond` keyword |
 | **Priority** | `Emergency` | Follows `respond` (e.g. `respond emergency` / `respond routine`) |
-| **Incident Type** | `Alarm Activated - High Risk` | Extracted via lookup matching against [call_types.txt](../backend/data/vocabulary/call_types.txt) |
+| **Incident Type** | `Alarm Activated - High Risk` | Extracted via lookup matching against `public.vocabulary` (`kind = 'call_type'`) — the flat-file vocabulary was migrated into Postgres |
 | **Address** | `1189 Eastwood Street` | Extracted from text following Incident Type up to `near` / `cross roads` |
 | **Subaddress / Business** | `Unit 105` / `Save-on-Foods` | Extracted following main address (or preceding house numbers for businesses) before cross roads |
 | **Cross Streets** | `Primrose Lane and Guildford Way` | Captured between `near` / `cross roads` and `use talk group` anchors |
-| **Radio Channel** | `Talk Group 10 Combined Response` | Extracted after `use talk group` anchor, verified against [radio_channels.txt](../backend/data/vocabulary/radio_channels.txt) |
+| **Radio Channel** | `Talk Group 10 Combined Response` | Extracted after `use talk group` anchor, verified against `public.vocabulary` (`kind = 'radio_channel'`) |
 | **Map Grid** | `84` | Captured after `map grid` / `math grade` anchors |
 
 ---
@@ -39,7 +39,7 @@ The parser in [parser.py](../backend/cfr_dispatch/parser.py) maps this template 
 A critical discovery in our parsing pipeline was that raw Speech-to-Text outputs from Whisper frequently include unpredictable punctuation and formatting (e.g. `"respond, routine, burning complaint..."` vs `"respond emergency medical aid..."`).
 
 To prevent punctuation from breaking regex anchor matching:
-*   `sanitize_transcript(text)` runs at the **very beginning** of `parse_dispatch_announcement()` in [parser.py](../backend/cfr_dispatch/parser.py) before any regex or anchor evaluations occur.
+*   `sanitize_transcript(text)` runs at the **very beginning** of `parse_dispatch_announcement()` in [parser.py](../backend/cfr_dispatch/parser/) before any regex or anchor evaluations occur.
 *   It strips all non-alphanumeric characters (commas, hyphens, periods, quotes), converts word-form numbers to digits (e.g. `"one"` $\rightarrow$ `"1"`), applies phonetic corrections, and normalizes spaces.
 *   **Performance Impact**: Adding top-of-pipeline sanitization boosted production parser accuracy across all 81 historical human-verified calls:
     *   **Responding Units**: 49.4% $\rightarrow$ **97.5%**
@@ -55,7 +55,7 @@ To test alternative parsing philosophies for structured Computer-Aided Dispatch 
 
 ### Design Philosophies
 
-1. **Production Anchor Parser ([parser.py](../backend/cfr_dispatch/parser.py))**:
+1. **Production Anchor Parser ([parser.py](../backend/cfr_dispatch/parser/))**:
    - Uses anchor keyword regexes (`respond`, `near`, `use talk group`, `map grid`) to segment the transcript.
    - Preserves strict street-suffix rules and candidate list outputs.
    - **Strength**: High precision on single-round addresses and clean handling of street suffixes.

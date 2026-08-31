@@ -60,14 +60,14 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | Document | Target Location | Scope | Active Agent Skill |
 | :--- | :--- | :--- | :--- |
 | **Project Overview** | [README.md](../README.md) | High-level system structure and two-phase pipelines. | `dispatch-pipeline-ops` |
-| **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./docs/ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
-| **Call Structure** | [docs/call_structure.md](./docs/call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
-| **GIS Endpoints** | [docs/gis_endpoints.md](./docs/gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
-| **Test Matrix** | [docs/test_procedures.md](./docs/test_procedures.md) | Tone spot checks, database inserts, mic levels. | `e2e-dispatch-testing` |
-| **Hardware Spec** | [docs/hardware_specification.md](./docs/hardware_specification.md) | Pi soundcards and laptop kiosk hardware. | None |
-| **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./docs/laptop_kiosk_setup.md) | Kiosk displays and auto-updates. | `kiosk-remote-ops` |
-| **Milestones** | [docs/milestones.md](./docs/milestones.md) | Development roadmap and releases. | None |
-| **Privacy Compliance** | [docs/privacy.md](./docs/privacy.md) | Voice monitoring rules and local RAM buffer. | None |
+| **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
+| **Call Structure** | [docs/call_structure.md](./call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
+| **GIS Endpoints** | [docs/gis_endpoints.md](./gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
+| **Test Matrix** | [docs/test_procedures.md](./test_procedures.md) | Tone spot checks, database inserts, mic levels. | `e2e-dispatch-testing` |
+| **Hardware Spec** | [docs/hardware_specification.md](./hardware_specification.md) | Pi soundcards and laptop kiosk hardware. | None |
+| **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./laptop_kiosk_setup.md) | Kiosk displays and auto-updates. | `kiosk-remote-ops` |
+| **Milestones** | [docs/milestones.md](./milestones.md) | Development roadmap and releases. | None |
+| **Privacy Compliance** | [docs/privacy.md](./privacy.md) | Voice monitoring rules and local RAM buffer. | None |
 | **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | PostgreSQL index tuning and DSP calibration. | `performance-metrics-analytics` |
 | **Development Freeze Summary** | [docs/development_freeze_summary.md](./development_freeze_summary.md) | Current implementation status (Phase A–F): PostGIS migration, STT vocab biasing, API decomposition, geocoder 2.0. **Start here for current state.** | `gis-spatial-analysis` |
 | **Debug & QA Punch List** | [docs/debug_and_qa_punchlist.md](./debug_and_qa_punchlist.md) | Open bugs and edge cases (routing anomalies, geocoding fallbacks, UI refinements). | `e2e-dispatch-testing` |

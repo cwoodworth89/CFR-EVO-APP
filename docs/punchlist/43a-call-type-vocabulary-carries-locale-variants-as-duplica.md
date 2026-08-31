@@ -19,7 +19,7 @@
 > being guessed at.
 
 **Root cause is the input, not the data.**
-[`VerificationSidebar.jsx:429`](../frontend/src/components/review/VerificationSidebar.jsx)
+[`VerificationSidebar.jsx:429`](../../frontend/src/components/review/VerificationSidebar.jsx)
 captures `verified_incident` as a bare `<input type="text">` — no datalist, no select, no
 validation against `public.vocabulary`. Reviewers hand-type the incident type, so ground truth
 drifts from the vocabulary the parser is matching against. Every item below is downstream of
@@ -107,8 +107,8 @@ signal that they are not calls is that a human emptied their verified fields.
 
 No external standard governs the call-type vocabulary (`source='cfr_curated'`). The operator
 supplied the model on 2026-08-23, and it is now a row in
-[`docs/standards/README.md`](standards/README.md) and a comment block above `CALL_TYPES` in
-[`config/vocab.py`](../backend/cfr_dispatch/config/vocab.py):
+[`docs/standards/README.md`](../standards/README.md) and a comment block above `CALL_TYPES` in
+[`config/vocab.py`](../../backend/cfr_dispatch/config/vocab.py):
 
 > A call type is a **main type** optionally followed by a **sub type**, joined by ` - `.
 > A main type can stand on its own — 25 of 27 currently do — but most calls arrive with the

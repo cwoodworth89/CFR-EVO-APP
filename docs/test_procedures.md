@@ -176,7 +176,7 @@ The python agent runs a background runner and FastAPI server that allows develop
 
 ## 🧪 Procedure 6: Comparative Parser Backtesting Suite (`backtest_parser.py`)
 
-This test script evaluates the performance of the production parser ([parser.py](../backend/cfr_dispatch/parser.py)) against alternative parsing modules (such as [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py)) by benchmarking their extractions against the entire dataset of human-verified calls stored in the local PostgreSQL database.
+This test script evaluates the performance of the production parser ([parser.py](../backend/cfr_dispatch/parser/)) against alternative parsing modules (such as [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py)) by benchmarking their extractions against the entire dataset of human-verified calls stored in the local PostgreSQL database.
 
 ### 🏃 Running the Backtest Suite
 ```powershell

@@ -73,7 +73,7 @@ and they need no vocabulary and no fuzzy matching at all.
 `Gislaison Avenue`, `Nunes Creek Dr`. These are exactly what should surface as *unresolved and
 flagged*, not be silently rewritten — see the round-comparison evidence that when two rounds
 disagree on a street name, the operator's answer often matches **neither**
-([`briefings/round_disagreement_signal.md`](./briefings/round_disagreement_signal.md)).
+([`briefings/round_disagreement_signal.md`](../briefings/round_disagreement_signal.md)).
 
 **c. Genuine non-street references — 7.** `Turning Lane`, `Turning Ln`, `Mall Access Turning
 Ln`, `Access Road`, `Unnamed Lane`, `Glen Elementary School Access`, `Gleneagle Secondary School

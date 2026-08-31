@@ -95,9 +95,9 @@ the system having got worse.
 > along.
 
 **Two different things share one operator-facing label.**
-[`config/models.py:14-16`](../backend/cfr_dispatch/config/models.py:14) draws the distinction
+[`config/models.py:14-16`](../../backend/cfr_dispatch/config/models.py:14) draws the distinction
 deliberately, and the parser honours it
-([`announcement.py:173-175`](../backend/cfr_dispatch/parser/announcement.py:173) makes them
+([`announcement.py:173-175`](../../backend/cfr_dispatch/parser/announcement.py:173) makes them
 mutually exclusive):
 
 * `intersection` — **the address itself is a junction** (`Gordon Ave and Christmas Way`)
@@ -107,12 +107,12 @@ mutually exclusive):
 Operationally these are not the same. The first is where the crew is going; the second is how
 they confirm they are on the right block. The printed run sheet labels the second "XStreets:",
 which is why that is the name used through the codebase
-([`geocoder.py:139-152`](../services/gis/src/gis_service/geocoder.py:139)).
+([`geocoder.py:139-152`](../../services/gis/src/gis_service/geocoder.py:139)).
 
-**What the kiosk does.** [`dispatchModel.js:56`](../frontend/src/utils/dispatchModel.js:56) maps
+**What the kiosk does.** [`dispatchModel.js:56`](../../frontend/src/utils/dispatchModel.js:56) maps
 `intersection` and nothing else — **`cross_streets` is not in the frontend model at all** and no
 component reads it. Then
-[`ActiveAlertBanner.jsx:11`](../frontend/src/components/hud/ActiveAlertBanner.jsx:11) labels
+[`ActiveAlertBanner.jsx:11`](../../frontend/src/components/hud/ActiveAlertBanner.jsx:11) labels
 `intersection` to the operator as **`'cross streets'`**.
 
 So the crew sees the *junction* field under the *XStreets* label, while the actual announced

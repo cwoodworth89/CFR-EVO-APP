@@ -15,7 +15,7 @@
 ## 9. False intersection: DAVID AVE & PANORAMA DR
 > **Status**: ✅ **Closed 2026-08-22 — resolved structurally.** `public.intersections` is
 > now DERIVED from `public.roads` centreline geometry
-> ([`backend/scripts/derive_intersections.py`](../backend/scripts/derive_intersections.py)),
+> ([`backend/scripts/derive_intersections.py`](../../backend/scripts/derive_intersections.py)),
 > so a pair of streets that never meet cannot be stored. 6,499 rows → **1,784**; the
 > `DAVID AVE & PANORAMA DR` rows are gone, and
 > `test_every_intersection_is_geometrically_real` now asserts the invariant over the whole

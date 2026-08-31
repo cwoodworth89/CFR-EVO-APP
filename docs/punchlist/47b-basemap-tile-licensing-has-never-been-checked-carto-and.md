@@ -54,7 +54,7 @@ Government Licence, which is exactly why they can be cached indefinitely.
 4. **Status quo, recorded as an accepted risk** with a decision and a date, the way the Street
    View exemption now is.
 
-Recorded as a gap in [`docs/standards/README.md`](./standards/README.md) per §7.5.
+Recorded as a gap in [`docs/standards/README.md`](../standards/README.md) per §7.5.
 
 #### Resolved in direction, 2026-08-30
 

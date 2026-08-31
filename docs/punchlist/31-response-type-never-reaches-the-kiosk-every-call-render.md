@@ -45,7 +45,7 @@ Yet the information is plainly present in the audio:
 
 #### Consequence
 
-[`KioskView.jsx:93`](../frontend/src/components/kiosk/KioskView.jsx#L93):
+[`KioskView.jsx:93`](../../frontend/src/components/kiosk/KioskView.jsx#L93):
 
 ```js
 const isEmergency =
@@ -68,7 +68,7 @@ propagating a field the backend has never produced.
 
 #### Root cause: the value is computed, used, and then discarded
 
-[`payload_builder.py:186`](../backend/cfr_dispatch/pipeline/payload_builder.py#L186):
+[`payload_builder.py:186`](../../backend/cfr_dispatch/pipeline/payload_builder.py#L186):
 
 ```python
 detected_resp = next((d.response_type for d in all_candidates if d.response_type), "emergency")
@@ -143,7 +143,7 @@ Accordingly:
   the tone selectors — see the briefing below.
 
 > **Handed to the parser agent 2026-08-23**:
-> [`docs/briefings/response_type_persistence.md`](./briefings/response_type_persistence.md)
+> [`docs/briefings/response_type_persistence.md`](../briefings/response_type_persistence.md)
 > covers both the persistence fix and the review-panel control, with the operator ruling and
 > the conflicting-defaults question that must be raised before implementing.
 

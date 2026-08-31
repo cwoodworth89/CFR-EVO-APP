@@ -14,7 +14,7 @@
 
 ## 44. Kiosk crashed on a live dispatch — stale chunk after a frontend deploy
 > **Status**: ⚠️ **Open — cause confirmed, fix deferred to
-> [`PROJECT_IDEAS.md` #10](./PROJECT_IDEAS.md).** Interim mitigation is operator
+> [`PROJECT_IDEAS.md` #10](../PROJECT_IDEAS.md).** Interim mitigation is operator
 > discipline: hard-reload the kiosk tab after every frontend deploy.
 
 A real call (`DISP-2026-AAFDB8`, Alarm Activated - High Risk, 1123 Westwood St) arrived at

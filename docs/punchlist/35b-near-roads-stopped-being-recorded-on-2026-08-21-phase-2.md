@@ -42,7 +42,7 @@ addr='3098 Guildford Quay'  cross_street_1='Eastwood Street'  cross_street_2='Pi
 ```
 
 `build_dispatch_payload` also does the right thing, writing them at
-[`payload_builder.py:203`](../backend/cfr_dispatch/pipeline/payload_builder.py):
+[`payload_builder.py:203`](../../backend/cfr_dispatch/pipeline/payload_builder.py):
 
 ```python
 target_cross_streets = [s for s in [cross_street_1, cross_street_2] if s]
@@ -52,7 +52,7 @@ target_cross_streets = [s for s in [cross_street_1, cross_street_2] if s]
 
 #### Root cause: Phase 2 rebuilds `target` from a hand-picked subset
 
-[`phase2.py:190`](../backend/cfr_dispatch/pipeline/phase2.py) and again at `:272` construct a
+[`phase2.py:190`](../../backend/cfr_dispatch/pipeline/phase2.py) and again at `:272` construct a
 **new** `target_payload` rather than updating the existing one, then PATCH it over the record:
 
 ```python

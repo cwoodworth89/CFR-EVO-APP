@@ -14,7 +14,7 @@
 
 ## 45. Retire `confidence_score`, replace it with named review flags
 > **Status**: 📐 **Design agreed with the operator 2026-08-29, not implemented.**
-> Full spec: [`docs/briefings/replace_confidence_with_flags.md`](./briefings/replace_confidence_with_flags.md).
+> Full spec: [`docs/briefings/replace_confidence_with_flags.md`](../briefings/replace_confidence_with_flags.md).
 > **Supersedes #32** — re-measuring that threshold is polishing a number computed from the
 > wrong ingredients.
 

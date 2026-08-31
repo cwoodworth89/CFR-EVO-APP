@@ -501,6 +501,45 @@ Address labels stay on the **cadastral overlay** regardless. `public.parcels` ho
 authoritative civic addresses; OSM's `housenumber` layer is crowd-sourced and is the wrong
 authority for dispatch. This is why house numbers are dropped from the basemap.
 
+#### Investigated and rejected: "Coquitlam Light Grey" (2026-08-31)
+
+The operator found a **Coquitlam Light Grey** basemap while browsing QtheMap. It is **not
+City data** and is not a shortcut past this work.
+
+All the "Coquitlam Basemap Light Grey" entries on ArcGIS Online are *style* items owned by
+`epw_admin_coquitlam` that render one shared underlying service:
+
+```
+https://tiles.arcgis.com/tiles/B6yKvIZqzuOr0jBR/arcgis/rest/services/Canada_Topographic/VectorTileServer
+  org B6yKvIZqzuOr0jBR = "Community Map of Canada"
+  copyrightText        = "Esri Canada"
+  contributors         = NRCan, the provinces, and municipalities
+```
+
+The City authored the colour theme, not the geometry. **Its `licenseInfo` reads "No
+restriction on use", which is a free-text field describing the City's own style item — the
+City cannot grant rights over Esri Canada's tiles.** Same shape as the Carto and Esri
+problem in #47: a City-branded thing that is actually a third-party basemap. It is also a
+hosted CDN dependency, which the offline architecture forbids regardless of licence.
+
+**The useful part.** The Community Map ingests municipal data, so the Coquitlam roads and
+addresses inside it most likely originate from the City. That means the authoritative
+upstream is data this project **already holds**: `public.roads`, `public.intersections`,
+`public.parcels` and the `Transportation` MapServer.
+
+So the style built for #11 should prefer, inside the municipal boundary:
+
+| Feature | Source |
+|:--|:--|
+| Road centrelines and names | `public.roads` (City, OGL) |
+| Address points | `public.parcels` (City, OGL) — already the cadastral overlay |
+| Building footprints and heights | `Buildings.shp` (City LiDAR, OGL) |
+| Everything outside the boundary | OSM (ODbL) — regional context only |
+
+That is strictly better than both Esri Canada and OSM for the area crews actually work in,
+uses only data already licensed and in PostGIS, and is consistent with CLAUDE.md §6.2.
+OSM then serves the role it is genuinely best at: the world beyond the city limits.
+
 #### Open questions before implementing (§7.2)
 
 * **Licence text has not been read.** ODbL terms, whether rendered tiles are a "Produced

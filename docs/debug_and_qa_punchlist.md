@@ -4471,9 +4471,37 @@ Government Licence, which is exactly why they can be cached indefinitely.
 4. **Status quo, recorded as an accepted risk** with a decision and a date, the way the Street
    View exemption now is.
 
-Recorded as a gap in [`docs/standards/README.md`](./standards/README.md) per §7.5. **The
-operator wants a high-level review of which map sources the system should be using** — this
-item is where that belongs.
+Recorded as a gap in [`docs/standards/README.md`](./standards/README.md) per §7.5.
+
+#### Resolved in direction, 2026-08-30
+
+**Carto answered the licensing question itself.** It now stamps every unauthenticated tile
+`API KEY REQUIRED` — verified live from the kiosk, z14 through z20. The 2026-08-27 re-crawl
+fetched 81,032 z19 tiles per street layer after that change; all watermarked, as is the
+western z17/z18 fill from the #40 gap closure.
+
+The map-source review the operator asked for, with what was decided:
+
+| Layer | Source | Outcome |
+|:--|:--|:--|
+| `street`, `street_nolabels` | Carto CDN | **Replace** — self-hosted OSM vector, `PROJECT_IDEAS.md` #11 |
+| `satellite` | Esri World Imagery | **Superseded inside the city** by the 7.5cm orthos |
+| `ortho` | City of Coquitlam MrSID | **Ingested 2026-08-30** — OGL, was never ingested before |
+| `cadastral` | City ArcGIS | unchanged, OGL |
+
+The City hosts its own cached tile services at `geodata.coquitlam.ca` (`Imagery_1963`
+through `Imagery_2025`, `Topographic`, EPSG:3857, `© City of Coquitlam`). `Imagery_2025` is
+the **same capture** as the 7.5cm zip — confirmed by identical vehicles and shadows in the
+same parking stalls — and is a legal alternative source for the aerial layer.
+`Topographic` is contour linework, **not** a street basemap, so it cannot replace Carto.
+
+**Interim exposure**: z19 has been dropped from both street layers (operator decision,
+they were specified z12–18 and never wanted deeper), removing ~162,000 watermarked tiles.
+Roughly **5,600 watermarked z18 tiles per layer remain** in the western strip until the
+OSM migration lands. Recorded, not hidden.
+
+**Still unread**: Carto's and Esri's actual terms, and ODbL. The conclusions above follow
+from how OGL works and from Carto's own enforcement behaviour, not from the licence text.
 
 ---
 

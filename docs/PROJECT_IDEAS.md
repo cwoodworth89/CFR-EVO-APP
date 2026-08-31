@@ -407,3 +407,104 @@ Deferred; **be deliberate about hard-reloading the kiosk tab (`Ctrl+Shift+R`) af
 frontend deploy.** That is the whole fix, it just depends on remembering. Worth noting the
 risk window is any time between a rebuild and the next reload, so a deploy left unreloaded
 overnight is a dispatch waiting to fail.
+
+---
+
+### 11. 🗺️ Self-Hosted OSM Vector Basemap (MapLibre GL) — replaces Carto
+> **Priority: HIGH.** Operator decision 2026-08-30: direction agreed, work deferred under a
+> feature code freeze. This is not speculative — the target was built, demonstrated and
+> approved; only the migration is outstanding.
+
+#### Why this exists
+
+Carto now stamps every unauthenticated tile `API KEY REQUIRED`. Verified live from the kiosk
+2026-08-30: z14 through z20, all watermarked. The 2026-08-27 re-crawl pulled 81,032 z19 tiles
+per street layer after that change, plus the western z17/z18 fill — all watermarked.
+
+The deeper problem is licensing, not cosmetics (punch-list #47). The City's Open Government
+Licence covers **City data only**; it does not reach Carto or Esri, and the City cannot
+sublicense what it does not own. **The watermark is the terms answering for themselves.**
+
+Self-hosting from OpenStreetMap removes the third party entirely: ODbL data, an open style,
+no key, no CDN, and it fits the offline-first architecture better than depending on a
+commercial CDN's goodwill.
+
+#### What the operator approved, from a working demo
+
+Reviewed side by side against Carto Voyager on 2026-08-30:
+
+| Decision | Detail |
+|:--|:--|
+| Style | **liberty** |
+| Buildings | user-facing **Off / Footprint / 3D** control |
+| Tilt | user-facing, **no auto-tilt** when 3D is selected |
+| Road labels | toggle exists, **build-time only — not exposed to crews** |
+| Places, POIs, house numbers | **dropped** |
+| 3D source | OSM community heights **now**; City LiDAR later — see below |
+
+#### This is a renderer migration, not a tile swap
+
+**Tilt and 3D are impossible in Leaflet** — it is 2D only. They require MapLibre GL, so the
+frontend map engine changes. Measured footprint, 2026-08-30:
+
+```
+15 files, ~2,598 lines importing leaflet / react-leaflet
+27 Marker · 18 Popup · 14 MapContainer · 13 useMap · 11 Tooltip
+ 9 Polygon ·  7 CircleMarker · 6 TileLayer · 4 useMapEvents · 4 Polyline · 3 Pane
+```
+
+Every overlay is react-leaflet and must be reimplemented: hydrants, zones, parcel rings,
+routing lines, station icons, railroad crossings, candidate selectors, and both mini-maps
+(`SatelliteMiniMap`, `PropertySatellitePanel`). **That reimplementation is the bulk of the
+work, not the basemap.**
+
+The raster layers are the easy part — MapLibre handles raster sources natively, so
+`ortho` and `cadastral` carry over as-is.
+
+#### Offline is the hard requirement (CLAUDE.md §1)
+
+The demo used OpenFreeMap's hosted tiles. **That cannot ship** — it is a WAN dependency.
+Everything must be built and served locally:
+
+1. **Tiles** — Planetiler builds an OpenMapTiles-schema vector tileset from an OSM `.pbf`
+   extract (Geofabrik publishes British Columbia). Minutes on the kiosk's 8 cores.
+   `mbtileserver` already serves vector `.mbtiles`, so the existing container is reusable.
+2. **Style JSON** — self-hosted copy of liberty, edited to drop places/POIs/housenumbers.
+3. **Glyphs and sprites** — must be vendored. These are the fiddly part; a missing glyph
+   range silently removes labels rather than erroring.
+4. **MapLibre GL JS** — bundled via npm, no CDN.
+
+#### Verified behaviour worth keeping (§7.3a)
+
+Measured during the demo, all of which will bite again:
+
+* **`map.isStyleLoaded()` returns `false` while tiles are still in flight**, even with the
+  style fully registered and 111 layers present. Gating layer setup on it blocks everything
+  silently. Test `getSource()` instead.
+* **liberty's flat `building` layer is `minzoom: 13, maxzoom: 14`.** Above z14 the style
+  hands off to `building-3d` and the flat layer *cannot draw*. A "footprint" mode at working
+  zooms needs its own fill layer with no `maxzoom` — the stock styles assume 3D above z14.
+* Custom layers are **destroyed on every `setStyle()`** and must be re-added on `styledata`.
+* The tile schema carries `render_height`, `render_min_height`, `colour` and `hide_3d` on
+  `building`, so 3D needs no extra data.
+
+#### Follow-on: 3D buildings from City LiDAR
+
+**Operator decision 2026-08-30: use OSM community heights initially, City data later.**
+
+`Buildings.shp` (City of Coquitlam, LiDAR-derived heights) is the authoritative source and
+should eventually replace OSM's building heights, consistent with CLAUDE.md §6.2. OSM
+coverage looked thin — 32 building polygons in one z18 residential viewport — but this was
+**not** measured against the City layer, so treat it as an observation, not a finding.
+
+Address labels stay on the **cadastral overlay** regardless. `public.parcels` holds 65,401
+authoritative civic addresses; OSM's `housenumber` layer is crowd-sourced and is the wrong
+authority for dispatch. This is why house numbers are dropped from the basemap.
+
+#### Open questions before implementing (§7.2)
+
+* **Licence text has not been read.** ODbL terms, whether rendered tiles are a "Produced
+  Work", and liberty's own style licence. Recorded as recollection, not verified.
+* Required attribution string, and where it renders on a 10-foot display.
+* OSM refresh cadence — the City data has a monthly sync; OSM would need its own.
+* Does anything depend on Leaflet-specific behaviour that has no MapLibre equivalent?

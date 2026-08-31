@@ -1,4 +1,4 @@
-# Handoff: parcel front points, road data, and the review queue
+# Handoff: parcel arrival points, road data, and the review queue
 
 **Written 2026-08-29.** Read this if you are picking up the GIS/geocoder workstream.
 
@@ -11,10 +11,11 @@ Companion documents:
 
 ---
 
-## Terminology — one name per thing
+## Terminology — the outcome, and the three things that can produce it
 
-Standardised 2026-08-31. These are three different positions and they are not
-interchangeable. `address_resolver` takes the first that is set:
+The **arrival point** is what a crew is sent to. Three different positions can
+supply it, and they are not interchangeable. `address_resolver` takes the first
+that is set:
 
 | Term | Column | What it is |
 |:--|:--|:--|
@@ -22,21 +23,25 @@ interchangeable. `address_resolver` takes the first that is set:
 | **front point** | `front_lat` / `front_lng` | The computed arrival position: closest point on the road the address **names**, measured to the parcel **polygon**. This is what a crew is sent to for an ordinary property. |
 | **centroid** | `centroid_lat` / `centroid_lng` | The parcel polygon's centre, computed by us from `geom` — not supplied by the City. Zone point-in-polygon input, map centring, simple per-parcel script work, and the last-resort position. Poor as an arrival point: outside the parcel on 177 rows. |
 
-**This document previously called the front point an "arrival point"**, and other
-documents used both terms for the same field. Normalised to **front point**, because
-that is what the column is called and therefore what a reader will grep for. The file
-name is left alone so existing links keep working.
+**These are not two names for one thing, and an earlier pass on 2026-08-31 wrongly
+normalised them as if they were.** Corrected the same day on the operator's
+clarification, and recorded here rather than overwritten.
 
-*If you would rather the field were called the arrival point everywhere — it is the
-better name, since it says what the position is **for** rather than where it sits — the
-honest fix is renaming the column, not the prose. That is ~122 sites and has not been
-done.*
+* The **arrival point** is the *outcome* — the position a crew is actually sent to.
+  It is whichever of the three above answered. This document is about how that
+  outcome is produced, which is why it is named for it.
+* The **front point** is one *candidate* within that, and literally what it says: the
+  front of the property, on the street the address names. It is the one that answers
+  for an ordinary parcel, but it is not the only one that can.
 
+So "the arrival point is the front point" is true of most calls and false as a
+definition. Use **arrival point** for the answer, and **entrance / front / centroid**
+for which of the three produced it.
 ---
 
 ## The one-line summary
 
-Every parcel now has an front point on the street its address names, computed rather than
+Every parcel now has an arrival point on the street its address names, computed rather than
 guessed, reproducible from the import script. What remains is a review queue of ~1,400 large
 sites and the UI to work it.
 
@@ -73,7 +78,7 @@ sample), and citywide from 1,813 wrong-street to **0**.
 
 ---
 
-## How front points work now
+## How arrival points work now
 
 ```
 entrance_lat/lng   operator-verified access point   ← all NULL today, see #49
@@ -171,7 +176,7 @@ displays a `resolution_note` the pipeline was already computing and then discard
 
 ### On scope: it grew, but the chain was all defect-driven
 
-The session began as "review the punch list" and ended having rewritten how front points are
+The session began as "review the punch list" and ended having rewritten how arrival points are
 computed for all 65,401 parcels. Each step followed from the last: #19 exposed the wrong-street
 snapping, which exposed the frozen backfill, which exposed the roads filter, which exposed the
 complexes. Every link was a defect. Under a feature freeze that is

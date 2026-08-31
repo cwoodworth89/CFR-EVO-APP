@@ -159,8 +159,6 @@ class ParcelModel(Base):
     # Operational (Tactical Property & Pre-Plan Metadata)
     front_lat = Column(Float, nullable=True)
     front_lng = Column(Float, nullable=True)
-    centroid_lat = Column(Float, nullable=True)
-    centroid_lng = Column(Float, nullable=True)
     entrance_lat = Column(Float, nullable=True)
     entrance_lng = Column(Float, nullable=True)
 

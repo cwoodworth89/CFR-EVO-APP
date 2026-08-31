@@ -145,8 +145,6 @@ def verify_four_failure_cases(engine) -> list:
                 "distance_m": dist_m,
                 "front_lat": row["front_lat"],
                 "front_lng": row["front_lng"],
-                "centroid_lat": row["lat"],
-                "centroid_lng": row["lng"],
                 "passed": passed
             })
             print()

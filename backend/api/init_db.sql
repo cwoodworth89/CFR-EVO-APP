@@ -123,8 +123,6 @@ CREATE TABLE IF NOT EXISTS public.parcels (
     -- Operational (populated by firefighters / admin tools)
     front_lat DOUBLE PRECISION,                         -- Frontage point lat (Street View anchor)
     front_lng DOUBLE PRECISION,                         -- Frontage point lng
-    centroid_lat DOUBLE PRECISION,                      -- True geometric centroid lat
-    centroid_lng DOUBLE PRECISION,                      -- True geometric centroid lng
     entrance_lat DOUBLE PRECISION,                      -- Building entrance lat
     entrance_lng DOUBLE PRECISION,                      -- Building entrance lng
     streetview_heading DOUBLE PRECISION DEFAULT 0.0,    -- Street View camera heading (degrees)

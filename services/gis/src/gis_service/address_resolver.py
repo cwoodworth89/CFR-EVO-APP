@@ -260,7 +260,7 @@ class AddressResolver:
                 rows = conn.execute(text("""
                     SELECT id, address, house, street, streettype, lat, lng,
                            front_lat, front_lng, entrance_lat, entrance_lng,
-                           centroid_lat, centroid_lng, zone_id,
+                           zone_id,
                            ST_AsGeoJSON(geom) as geom_geojson
                     FROM public.parcels
                     WHERE house = :house

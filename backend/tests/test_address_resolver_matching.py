@@ -236,7 +236,7 @@ def _parcel(street, stype, zone, house="3000", pid=1):
         "street": street, "streettype": stype, "zone_id": zone,
         "lat": 49.28, "lng": -122.79, "front_lat": None, "front_lng": None,
         "entrance_lat": None, "entrance_lng": None,
-        "centroid_lat": None, "centroid_lng": None, "geom_geojson": None,
+        "geom_geojson": None,
     }
 
 

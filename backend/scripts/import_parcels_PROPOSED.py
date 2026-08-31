@@ -102,10 +102,38 @@ def create_parcels_table(engine, drop_existing: bool = False):
 
             geom geometry(Geometry, 4326),
 
+            -- THE THREE POSITIONS A PARCEL CAN RESOLVE TO -------------------------
+            -- address_resolver takes the first that is set:
+            --     entrance -> front -> lat/lng
+            --
+            -- entrance_*  OPERATOR-VERIFIED. Where a company officer says the way in
+            --             actually is -- the gate, the keypad, the side apparatus can
+            --             reach. Written ONLY by a human through the review UX, never
+            --             by this import (punch-list #50), and attributed by
+            --             entrance_set_by / _at / _note. Human knowledge has to
+            --             survive every re-import.
+            --
+            -- front_*     COMPUTED ARRIVAL POINT. The closest point on the road the
+            --             address NAMES, measured to the parcel POLYGON. This is what
+            --             a crew is sent to for an ordinary property, and it is
+            --             populated for all 65,401 parcels by
+            --             backfill_parcel_frontage.
+            --
+            -- lat/lng     PARCEL POLYGON CENTROID, computed by us from geom -- it is
+            --             not supplied by the City. Used for the zone point-in-polygon
+            --             join, for map centring, and for simple script work that just
+            --             needs one point per parcel. It is ALSO the last-resort
+            --             arrival position, and a poor one: on 177 parcels it falls
+            --             outside the parcel entirely, and on 2865 Glen Dr it sits
+            --             135.6 m from Glen Drive. Never copy it into front_* or
+            --             entrance_* -- that is exactly the defect #50 fixed.
+            --
+            -- There used to be a fourth pair, centroid_lat/centroid_lng. It was a
+            -- byte-identical duplicate of lat/lng on all 65,400 polygon rows, selected
+            -- by the resolver and never read. Dropped 2026-08-31.
+            ------------------------------------------------------------------------
             front_lat DOUBLE PRECISION,
             front_lng DOUBLE PRECISION,
-            centroid_lat DOUBLE PRECISION,
-            centroid_lng DOUBLE PRECISION,
             entrance_lat DOUBLE PRECISION,
             entrance_lng DOUBLE PRECISION,
             streetview_heading DOUBLE PRECISION DEFAULT 0.0,
@@ -790,8 +818,6 @@ def run_import(
                 "geom_wkt": geom_wkt,
                 "front_lat": lat,
                 "front_lng": lng,
-                "centroid_lat": lat,
-                "centroid_lng": lng,
                 # entrance_* is DELIBERATELY ABSENT from this dict, and from the INSERT
                 # column list below.
                 #
@@ -831,7 +857,7 @@ def run_import(
             block, plan, lot, legaldesc, plan_area, folio, zonetype1, zonetype2, zonetype3,
             status, units, sc_card, extract_dt, lat, lng, zone_id, address_normalized,
             geom,
-            front_lat, front_lng, centroid_lat, centroid_lng,
+            front_lat, front_lng,
             streetview_heading, streetview_pitch, streetview_fov, is_pa_page
         ) VALUES (
             :gis_id, :address, :house, :street, :streettype, :unit, :unittype, :postal,
@@ -842,7 +868,7 @@ def run_import(
                 THEN ST_GeomFromText(:geom_wkt, 4326) 
                 ELSE NULL 
             END,
-            :front_lat, :front_lng, :centroid_lat, :centroid_lng,
+            :front_lat, :front_lng,
             :streetview_heading, :streetview_pitch, :streetview_fov, :is_pa_page
         )
         ON CONFLICT (address) DO UPDATE SET
@@ -868,8 +894,6 @@ def run_import(
             extract_dt = EXCLUDED.extract_dt,
             lat = EXCLUDED.lat,
             lng = EXCLUDED.lng,
-            centroid_lat = EXCLUDED.centroid_lat,
-            centroid_lng = EXCLUDED.centroid_lng,
             zone_id = EXCLUDED.zone_id,
             address_normalized = EXCLUDED.address_normalized,
             geom = EXCLUDED.geom,

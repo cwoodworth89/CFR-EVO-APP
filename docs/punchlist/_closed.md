@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-33 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+34 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -39,3 +39,4 @@
 | **19b** | ⚪ hygiene | CLOSED | [Audio player loading inconsistency & Auto-play removal](19b-audio-player-loading-inconsistency-auto-play-removal.md) |
 | **26** | ⚪ hygiene | CLOSED | [The dispatch pipeline's INFO logging is discarded](26-the-dispatch-pipelines-info-logging-is-discarded.md) |
 | **36** | ⚪ hygiene | CLOSED | [Double-click-to-autofill removed from the review form](36-double-click-to-autofill-removed-from-the-review-form.md) |
+| **42** | 🔴 crew-visible | CLOSED | [The roads import silently discards 242 road segments, including 45 streets that 1,918 parcels are addressed on](42-the-roads-import-silently-discards-242-road-segments-in.md) |

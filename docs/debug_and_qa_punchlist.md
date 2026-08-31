@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**35 open** (22 crew-visible) · **33 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**34 open** (21 crew-visible) · **34 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 35
+## Open — 34
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -36,7 +36,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **34b** | 🔴 crew-visible | OPEN | [Live overdose call still showed the green ROUTINE (Code 1) badge](punchlist/34b-live-overdose-call-still-showed-the-green-routine-code.md) |
 | **35b** | 🔴 crew-visible | OPEN | ["Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`](punchlist/35b-near-roads-stopped-being-recorded-on-2026-08-21-phase-2.md) |
 | **38** | 🔴 crew-visible | OPEN | [`DISP-2026-ACCF6D` routed to the wrong street — the parcel front point is on Pinetree Way](punchlist/38-disp-2026-accf6d-routed-to-the-wrong-street-the-parcel.md) |
-| **42** | 🔴 crew-visible | OPEN | [The roads import silently discards 242 road segments, including 45 streets that 1,918 parcels are addressed on](punchlist/42-the-roads-import-silently-discards-242-road-segments-in.md) |
+
 | **43a** | 🔴 crew-visible | IN PROGRESS | [Call-type vocabulary carries locale variants as duplicate rows; HITL captures incident as free text](punchlist/43a-call-type-vocabulary-carries-locale-variants-as-duplica.md) |
 | **44a** | 🔴 crew-visible | OPEN | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](punchlist/44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **47a** | 🔴 crew-visible | EXTERNAL | [`Chartwell Rd` does not exist in municipal data — three sources give three street names](punchlist/47a-chartwell-rd-does-not-exist-in-municipal-data-three-sou.md) |

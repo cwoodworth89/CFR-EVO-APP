@@ -2,10 +2,10 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧾 Import Completeness Audit, 2026-08-23 |
-| **Blocks** | 1 |
+| **Blocks** | 2 |
 | **Origin** | `debug_and_qa_punchlist.md` L2679 |
 
 [← punch list index](../debug_and_qa_punchlist.md)
@@ -95,3 +95,50 @@ Requires a re-import and an `public.intersections` re-derivation. **Confirm with
 before running** — it changes the geocoder's street vocabulary.
 
 ---
+
+---
+
+## 42 (closed). Filter removed, re-imported, re-derived — verified against the live database
+
+> **Status**: ✅ **Closed 2026-08-30.** Verified by querying the running kiosk database, not
+> by reading the commit (§6.6).
+
+Fixed in `302af14` — *"import roads of every status, and repair the import script itself."*
+The filter is gone, `status` is preserved per row for consumers to act on, and the import now
+logs a per-status breakdown so an unexpectedly absent class is visible on every run.
+
+**The arithmetic reconciles exactly, which was this item's own standard:**
+
+| | |
+|:--|--:|
+| `road_centre_lines.geojson` features | 3,456 |
+| Dropped — no `FULLNAME` (all 5 are `PRIVATE`) | 5 |
+| **Expected** | 3,451 |
+| **Actual `public.roads` rows** | **3,451** ✅ |
+
+`public.roads` now holds four statuses: `OPERATING` 3,214 · `PRIVATE` 165 · `MOT` 71 ·
+`METRO` 1.
+
+**The operational damage is undone:**
+
+| | Before | After |
+|:--|--:|--:|
+| Streets in `public.parcels` with no matching road | 45 | **17** |
+| Parcels addressed on them | 1,918 | **69** |
+
+`public.intersections` was re-derived — 1,995 rows, with junctions now present on the
+recovered streets (Princess, Silver Springs, Riverbend, Whisper) and 33 on `Highway #1` /
+`Mary Hill By-Pass Road`, which previously had none because the roads did not exist.
+
+**The 69 remaining parcels are not a defect, and this is why.** Ten of the 17 names are not
+streets at all — `Power Line`, `N/O Quarry`, `S.E. Quarry`, `S.E./O Quarry`, `E/O Pipeline`,
+`Fraser River`, `Railroad`, `Munro Creek`, `Deboville Slough`, `Coquitlam` — survey notations
+and geographic features carried in an address field. The remainder (`Pinecone Burke` 28,
+`Deer's Leap` 15, `Coronation` 7, `Fremont` 6, `Taft` 1, `Addington` 1, `Trans Canada` 1) were
+each checked against every road sharing a name stem: **none exists in `public.roads` under any
+spelling.** The City does not publish centrelines for them. That is a municipal data gap, not
+an import defect — [`city_gis_data_register.md`](../city_gis_data_register.md) is where it
+belongs if it is ever worth raising.
+
+**Queries reproducible on the kiosk database**; the parcel/road cross-reference is
+`upper(trim(roads.roadname)) = upper(trim(parcels.street))`.

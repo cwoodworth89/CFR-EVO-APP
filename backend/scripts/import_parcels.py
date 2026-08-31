@@ -758,12 +758,31 @@ def run_import(
         zones = conn.execute(text("SELECT COUNT(DISTINCT zone_id) FROM public.parcels WHERE zone_id IS NOT NULL;")).scalar()
         high_rises = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE units > 50;")).scalar()
         multi_units = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE unit IS NOT NULL AND unit != '';")).scalar()
-        frontage_aligned = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE front_lat IS NOT NULL AND front_lat != lat;")).scalar()
+        # `lat` was renamed to `centroid_lat` on 2026-08-31, and this query was not updated.
+        # It threw UndefinedColumn on every import run from that point until 2026-08-31 --
+        # after all the data work, so the import appeared to fail while having succeeded.
+        # A verification step that crashes is worse than no verification step: it reports
+        # failure on a good run, which is the opposite of what it exists to do.
+        frontage_aligned = conn.execute(text(
+            "SELECT COUNT(*) FROM public.parcels "
+            " WHERE front_lat IS NOT NULL AND front_lat != centroid_lat;")).scalar()
+        base_sites = conn.execute(text(
+            "SELECT COUNT(*) FROM public.parcels WHERE is_base_site;")).scalar()
+        city_rows = conn.execute(text(
+            "SELECT COUNT(*) FROM public.parcels WHERE NOT is_base_site;")).scalar()
+        no_front = conn.execute(text(
+            "SELECT COUNT(*) FROM public.parcels WHERE front_lat IS NULL;")).scalar()
+        entrances = conn.execute(text(
+            "SELECT COUNT(*) FROM public.parcels WHERE entrance_lat IS NOT NULL;")).scalar()
 
         logging.info("Verification Summary:")
         logging.info(f"  Total Rows in DB:                 {count}")
+        logging.info(f"    City address rows:              {city_rows}")
+        logging.info(f"    base_site rows (#48):           {base_sites}")
         logging.info(f"  Polygons Populated (geom):        {poly_count}")
         logging.info(f"  Road-Aligned Frontage Points:     {frontage_aligned}")
+        logging.info(f"  No arrival point (street has no road): {no_front}")
+        logging.info(f"  Operator entrance points set:     {entrances}")
         logging.info(f"  Unique Emergency Zones Populated: {zones}")
         logging.info(f"  Multi-Unit / Condo Rows:          {multi_units}")
         logging.info(f"  High-Rise Buildings (>50 units):  {high_rises}")

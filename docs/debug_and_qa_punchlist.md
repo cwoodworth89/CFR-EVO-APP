@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**30 open** (17 crew-visible) · **39 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**29 open** (16 crew-visible) · **40 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
@@ -36,7 +36,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 
 | **44a** | 🔴 crew-visible | OPEN | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](punchlist/44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **47a** | 🔴 crew-visible | EXTERNAL | [`Chartwell Rd` does not exist in municipal data — three sources give three street names](punchlist/47a-chartwell-rd-does-not-exist-in-municipal-data-three-sou.md) |
-| **48** | 🔴 crew-visible | DESIGNED | [One civic address, many parcels — the import keeps whichever the shapefile lists first](punchlist/48-one-civic-address-many-parcels-the-import-keeps-whichev.md) |
 | **51b** | 🔴 crew-visible | OPEN | [The kiosk shows the junction field labelled "cross streets", and never reads the real one](punchlist/51b-the-kiosk-shows-the-junction-field-labelled-cross-stree.md) |
 | **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](punchlist/54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
 | **56** | 🔴 crew-visible | OPEN | [Bring XStreets onto the same resolution path as main addresses](punchlist/56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |

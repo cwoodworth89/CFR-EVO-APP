@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | DESIGNED |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧾 Import Completeness Audit, 2026-08-23 |
 | **Blocks** | 1 |
@@ -131,3 +131,46 @@ network. It is still valuable, as the access surface an arrival point should sna
 parcel geometry), and one open question — whether single-parcel addresses also get a
 `base_site`, since otherwise their operator data sits on a City row the import can no longer
 key on. Both in the briefing.
+
+---
+
+## 48 (closed). Applied to the kiosk — nothing is chosen between any more
+
+> **Status**: ✅ **Closed 2026-08-31.** Migrations and import applied to the running kiosk
+> database and verified by query, not inferred (§6.6). Backup taken and integrity-checked
+> first: `cfr-critical-20260831-115032.sql.gz` and `cfr-full-20260831-115032.sql.gz`, both
+> `GZIP_OK` and both ending in `-- PostgreSQL database dump complete`.
+
+| | Before | After |
+|:--|--:|--:|
+| Rows in `public.parcels` | 65,401 | **71,212** |
+| — City address rows | 65,401 | 69,541 |
+| — `base_site` rows | 0 | **1,671** |
+| Addresses shared by several City rows | 0 (collapsed) | **1,508** |
+| Front points not on their addressed street | 0 | **0** |
+| Base sites resolving to no zone | — | **0** |
+| Operator entrance points touched | — | **0** |
+
+**The arithmetic reconciles.** 69,708 source records − 167 with a blank address = 69,541 City
+rows. The 1,671 base sites match the figure derived from the source shapefile before any of
+this was built.
+
+**The 1,508 duplicate addresses are the point.** Those are the groups the import used to
+collapse by keeping whichever the shapefile listed first. Every one of them now keeps every
+member row, with its own `folio`, `legaldesc`, `gis_id` and geometry — 56,105 distinct folio
+values survive on City rows.
+
+**`2865 Glen Dr`, the worked example**: 84 City rows totalling 36,469 m², and one `base_site`
+row of **exactly 36,469 m²**. The union is the whole property — not one lot of eight as
+before, and not the 6,256 m² MASTER polygon, which is common property rather than the site.
+
+**159 parcels have no arrival point**, every one because the City publishes no road carrying
+their street name. That is up from 56 only because the orphan-street rows that used to be
+collapsed away now exist individually. Zero misplacements — the **#38** and **#58** invariants
+survived the reload.
+
+**One pre-existing defect found by doing this.** The import's final verification query still
+referenced `lat`, renamed to `centroid_lat` earlier the same day, so it threw
+`UndefinedColumn` *after* completing all the data work. The import reported failure on a
+successful run — worse than having no verification at all. Fixed, and the summary now also
+reports base sites, City rows, missing arrival points and entrance points.

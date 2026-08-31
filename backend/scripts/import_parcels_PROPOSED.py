@@ -792,8 +792,27 @@ def run_import(
                 "front_lng": lng,
                 "centroid_lat": lat,
                 "centroid_lng": lng,
-                "entrance_lat": lat,
-                "entrance_lng": lng,
+                # entrance_* is DELIBERATELY ABSENT from this dict, and from the INSERT
+                # column list below.
+                #
+                # It holds the OPERATOR-VERIFIED way in -- "gated, keypad at Glen Dr west
+                # end" -- recorded by a company officer, and it outranks everything else in
+                # address_resolver (entrance -> front -> centroid). Seeding it here set it
+                # to the CENTROID, which meant a new parcel resolved to the worst of the
+                # three positions while looking like a human had verified it: the good
+                # computed front point was skipped, and entrance_set_by/at/note were all
+                # NULL with nothing checking them.
+                #
+                # The centroid is not a safe stand-in. On 177 parcels it falls OUTSIDE the
+                # parcel entirely, and on 2865 Glen Dr it sits 135.6 m from Glen Drive.
+                #
+                # Leaving these unbound means a new row gets SQL NULL, so the resolver falls
+                # through to front_lat -- which is computed for every parcel. An unset
+                # entrance is a correct answer (CLAUDE.md 6.1); a fabricated one is not.
+                #
+                # A comment 200 lines above already claimed this invariant and did not hold
+                # it -- it was attached to backfill_parcel_frontage, which genuinely never
+                # writes entrance, while the INSERT here did. Punch-list #50.
                 "streetview_heading": 0.0,
                 "streetview_pitch": 5.0,
                 "streetview_fov": 80.0,
@@ -812,7 +831,7 @@ def run_import(
             block, plan, lot, legaldesc, plan_area, folio, zonetype1, zonetype2, zonetype3,
             status, units, sc_card, extract_dt, lat, lng, zone_id, address_normalized,
             geom,
-            front_lat, front_lng, centroid_lat, centroid_lng, entrance_lat, entrance_lng,
+            front_lat, front_lng, centroid_lat, centroid_lng,
             streetview_heading, streetview_pitch, streetview_fov, is_pa_page
         ) VALUES (
             :gis_id, :address, :house, :street, :streettype, :unit, :unittype, :postal,
@@ -823,7 +842,7 @@ def run_import(
                 THEN ST_GeomFromText(:geom_wkt, 4326) 
                 ELSE NULL 
             END,
-            :front_lat, :front_lng, :centroid_lat, :centroid_lng, :entrance_lat, :entrance_lng,
+            :front_lat, :front_lng, :centroid_lat, :centroid_lng,
             :streetview_heading, :streetview_pitch, :streetview_fov, :is_pa_page
         )
         ON CONFLICT (address) DO UPDATE SET

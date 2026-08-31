@@ -3631,7 +3631,38 @@ ships should cite this analysis (§6.3 tier 3) or a published PA tone spec if on
 ## 🧷 Parcel Import Integrity
 
 ### 50. The parcel import seeds `entrance_lat/lng` with the centroid on every INSERT
-> **Status**: 🔴 **Open — latent, not live. Confirmed by reading both import scripts and
+> **Status**: ✅ **Fixed 2026-08-31.** `entrance_lat` / `entrance_lng` are gone from the
+> INSERT column list, the bound values and the params dict in **both** `import_parcels.py`
+> and `import_parcels_PROPOSED.py`, so a new row now gets SQL NULL and the resolver falls
+> through to the computed `front_lat`.
+>
+> **Why it is written this way.** An unset entrance is a *correct* answer (§6.1). The
+> centroid is not a safe stand-in for one: on **177 parcels it falls outside the parcel
+> entirely**, and on `2865 Glen Dr` it sits 135.6 m from Glen Drive. Seeding it also made
+> the row *look* operator-verified, because that is what the field means — with
+> `entrance_set_by` / `_at` / `_note` all NULL and nothing checking them.
+>
+> **Guarded by a test, not a comment.** `backend/tests/test_parcel_import_entrance.py` —
+> 6 tests over both scripts, asserting entrance is absent from the columns, the binds, the
+> params and the `ON CONFLICT` list, while `front_lat` is still written and the column
+> still exists in the schema. Verified to actually fail when the column is put back.
+> This mattered: the invariant was previously held by a comment attached to the *wrong
+> function* — it sat above `backfill_parcel_frontage`, which genuinely never writes
+> entrance, while the INSERT 200 lines below did.
+>
+> **Trialled against the real table.** The exact INSERT the script now issues, run inside
+> a transaction and rolled back on the kiosk:
+>
+> ```
+> entrance_is_null | attribution_is_null | computed_front | centroid | resolver_would_use
+>        t         |          t          |     49.281     |  49.28   |      49.281
+> rows_left_behind: 0
+> ```
+>
+> The resolver takes the **front point**, not the centroid. Before the fix that last
+> column would have read 49.28.
+>
+> Original report follows. Latent, not live — confirmed by reading both import scripts and
 > measured against the kiosk database 2026-08-29.** Found while verifying the claims in
 > `docs/arrival_point_handoff.md`; not previously recorded.
 

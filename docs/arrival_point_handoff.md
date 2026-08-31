@@ -71,7 +71,15 @@ parcels citywide the centroid falls *outside* the parcel entirely.
 selected `front_lat IS NULL OR front_lat = lat` — backfill-only, therefore a no-op once
 populated, which is why nothing recomputed when the roads import gained 237 segments.
 
-**It must never write `entrance_*`.** The comment is in the code. Human knowledge has to
+**It must never write `entrance_*`.** ✅ **Enforced in code and tested, 2026-08-31
+(punch-list #50).** Until then this was held by a comment alone — and the comment was
+attached to `backfill_parcel_frontage`, which genuinely never writes entrance, while the
+INSERT 200 lines below seeded it from the **centroid** on every new row. Existing rows
+were always safe; new ones were not, which made the two actions already queued here — the
+`Addresses.shp` re-pull (#41) and any `--force-drop` — the things that would have sprung
+it. `entrance_*` is now absent from the INSERT in **both** `import_parcels.py` and
+`import_parcels_PROPOSED.py`, so a new row gets SQL NULL and falls through to `front_lat`.
+Guarded by `backend/tests/test_parcel_import_entrance.py`. Human knowledge has to
 survive the pipeline that regenerates computed values.
 
 ---

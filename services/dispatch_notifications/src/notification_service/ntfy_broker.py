@@ -160,13 +160,25 @@ def notify_pipeline_error(dispatch_id: str, stage: str, error: BaseException,
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
+
+        # HTTP headers are latin-1. The emoji in Title raises
+        # "'latin-1' codec can't encode characters in position 0-1" and requests never
+        # leaves the machine -- so the notifier written to stop errors going unread would
+        # itself have failed silently into the log, on every single error.
+        #
+        # Encode as utf-8 and reinterpret the bytes as latin-1 so the raw utf-8 reaches
+        # ntfy, which decodes it correctly. post_to_ntfy has done this since it was
+        # written; this function did not, and only a live send caught it.
+        safe_headers = {k: (v.encode("utf-8").decode("latin-1") if isinstance(v, str) else str(v))
+                        for k, v in headers.items()}
+
         body = (
             f"{type(error).__name__}: {error}\n\n"
             f"Dispatch: {dispatch_id or 'unknown'}\n"
             f"Stage:    {stage}\n\n"
             f"journalctl -u cfr-agent --since today | grep {dispatch_id or 'ERROR'}"
         )
-        res = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=5)
+        res = requests.post(url, data=body.encode("utf-8"), headers=safe_headers, timeout=5)
         return res.status_code == 200
     except Exception as e:
         # Log and swallow. The original error is what matters.

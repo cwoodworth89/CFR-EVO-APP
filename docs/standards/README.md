@@ -38,6 +38,13 @@ no WAN.
 > of the documents it cites**, exactly as this table records. It was retitled to *Design
 > Proposal (UNADOPTED)* on 2026-08-29 and annotated with its measured errors in its own §0.
 > Do not treat a clause number found there as provenance; every one of them is unverified.
+>
+> **Stripped 2026-08-30 from 126 KB to 60 KB.** Sections 1, 3 and 4 — routing-engine
+> evaluation, the NENA/NFPA/APCO compliance matrices, topographic physics with no elevation
+> data, and the implementation blueprint — were deleted outright. Only **Section 2** remains,
+> because live parcel-snapping code and tests cite it by section number, plus its **§0**,
+> which is the measured audit of what the document got wrong and is the most useful thing
+> in it. §0's findings about the deleted sections are deliberately retained.
 
 > [!CAUTION]
 > **`docs/evo_routing_engine.md` was deleted on 2026-08-30, and this is why.**

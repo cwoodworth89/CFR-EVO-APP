@@ -77,7 +77,7 @@ A seeded `entrance_lat` therefore **silently outranks the computed front point**
 crew the centroid — the exact value the addressed-street work replaced. It also presents as a
 recorded human override while `entrance_set_by`, `entrance_set_at` and `entrance_note` are all
 NULL, i.e. an unattributed override (§6.3). On the 177 parcels whose centroid falls outside the
-parcel entirely, the arrival point would sit off the property.
+parcel entirely, the front point would sit off the property.
 
 **Two triggers, both currently on the roadmap:**
 

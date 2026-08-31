@@ -326,7 +326,7 @@ imported contains one.** The proposal did not record where it expected the file 
 so the tier has never been reachable.
 
 This is worth asking about rather than assuming, because it is the one input that would
-materially reduce the review queue in punch-list #49. Our computed arrival point is the closest
+materially reduce the review queue in punch-list #49. Our computed front point is the closest
 point on the addressed street to the parcel polygon — correct for ordinary lots, and an
 approximation on the 1,395 large sites in `docs/complex_sites_for_review.csv`, each of which
 otherwise needs a human decision.

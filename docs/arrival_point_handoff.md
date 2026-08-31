@@ -1,4 +1,4 @@
-# Handoff: parcel arrival points, road data, and the review queue
+# Handoff: parcel front points, road data, and the review queue
 
 **Written 2026-08-29.** Read this if you are picking up the GIS/geocoder workstream.
 
@@ -11,9 +11,32 @@ Companion documents:
 
 ---
 
+## Terminology — one name per thing
+
+Standardised 2026-08-31. These are three different positions and they are not
+interchangeable. `address_resolver` takes the first that is set:
+
+| Term | Column | What it is |
+|:--|:--|:--|
+| **entrance point** | `entrance_lat` / `entrance_lng` | Where a company officer says the way in actually is. Written **only** by a human through the review UX, attributed by `entrance_set_by` / `_at` / `_note`. Never written by an import (punch-list #50). |
+| **front point** | `front_lat` / `front_lng` | The computed arrival position: closest point on the road the address **names**, measured to the parcel **polygon**. This is what a crew is sent to for an ordinary property. |
+| **centroid** | `centroid_lat` / `centroid_lng` | The parcel polygon's centre, computed by us from `geom` — not supplied by the City. Zone point-in-polygon input, map centring, simple per-parcel script work, and the last-resort position. Poor as an arrival point: outside the parcel on 177 rows. |
+
+**This document previously called the front point an "arrival point"**, and other
+documents used both terms for the same field. Normalised to **front point**, because
+that is what the column is called and therefore what a reader will grep for. The file
+name is left alone so existing links keep working.
+
+*If you would rather the field were called the arrival point everywhere — it is the
+better name, since it says what the position is **for** rather than where it sits — the
+honest fix is renaming the column, not the prose. That is ~122 sites and has not been
+done.*
+
+---
+
 ## The one-line summary
 
-Every parcel now has an arrival point on the street its address names, computed rather than
+Every parcel now has an front point on the street its address names, computed rather than
 guessed, reproducible from the import script. What remains is a review queue of ~1,400 large
 sites and the UI to work it.
 
@@ -38,7 +61,7 @@ sites and the UI to work it.
 | | |
 |:--|--:|
 | Parcels | 65,401 |
-| With a computed arrival point | 65,401 |
+| With a computed front point | 65,401 |
 | **Sitting off their addressed street** | **0** |
 | No road of that name exists (City gap) | 54 |
 | `public.roads` | 3,451 (was 3,214) |
@@ -50,7 +73,7 @@ sample), and citywide from 1,813 wrong-street to **0**.
 
 ---
 
-## How arrival points work now
+## How front points work now
 
 ```
 entrance_lat/lng   operator-verified access point   ← all NULL today, see #49
@@ -148,7 +171,7 @@ displays a `resolution_note` the pipeline was already computing and then discard
 
 ### On scope: it grew, but the chain was all defect-driven
 
-The session began as "review the punch list" and ended having rewritten how arrival points are
+The session began as "review the punch list" and ended having rewritten how front points are
 computed for all 65,401 parcels. Each step followed from the last: #19 exposed the wrong-street
 snapping, which exposed the frozen backfill, which exposed the roads filter, which exposed the
 complexes. Every link was a defect. Under a feature freeze that is
@@ -199,7 +222,7 @@ when that should be a conscious decision rather than a consequence.
 **Agreement is not correctness.** A metric that can only confirm its own assumption proves
 nothing. Three instances in two days: the other team's `avg_snap_dist_m` measured a snapped
 point's distance to the road it was snapped to (zero by construction); my "spread between unit
-arrival points" made every trailer park look healthy, because 265 pads sharing one footprint
+front points" made every trailer park look healthy, because 265 pads sharing one footprint
 agree perfectly; and their four headline tests read the database column they had just written.
 
 **Sample by `ORDER BY id LIMIT n` is not a random sample.** I extrapolated 524/5,000 to
@@ -227,7 +250,7 @@ wrong six times, in ways no query would have reached:
 
 | He said | What it corrected |
 |:--|:--|
-| Three trailer parks: 201 Cayer, 4200 Dewdney Trunk, 101 Schoolhouse | My detector scored all three as **perfectly healthy**. 265 pads sharing one footprint agree on one arrival point, so "agreement" hid a 12-hectare site. The metric was wrong. |
+| Three trailer parks: 201 Cayer, 4200 Dewdney Trunk, 101 Schoolhouse | My detector scored all three as **perfectly healthy**. 265 pads sharing one footprint agree on one front point, so "agreement" hid a 12-hectare site. The metric was wrong. |
 | "Booth is houses" | I had classified a cadastre resolution issue as a trailer park. |
 | "2865 Glen Dr isn't 8 lots, it's 77 units" | My framing was misleading; the 8 were duplicate features of the bare address. |
 | "Always use the addressed street unless overridden" | I tested every counterexample I could construct — corner lots, rear-lane access, campuses, flag lots — and could not break it. It became the core rule. |

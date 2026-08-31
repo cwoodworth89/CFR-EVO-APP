@@ -72,7 +72,7 @@ That is a strong result. The blockers are about evidence and process, not the id
    `parcels` columns and assert hardcoded coordinates — they pass whether or not the algorithm
    exists. Please add tests that call `fn_calculate_parcel_road_snap` with controlled geometry
    and a known correct answer.
-3. **Re-report the distance metric** as parcel → arrival point. The current
+3. **Re-report the distance metric** as parcel → front point. The current
    `avg_snap_dist_m` measures the snapped point's distance to the road it was snapped to, which
    is zero by construction (`0.0`, `9.3e-10`, `3.8e-4` in your own records).
 4. **Correct the ETA label** — the OSRM instance runs the stock driving profile, so

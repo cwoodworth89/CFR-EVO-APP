@@ -132,15 +132,15 @@ meters". The per-record values in the same file show what is being measured:
 "dist_to_road_m": 0.0
 ```
 
-These are floating-point zero. That is expected — the arrival point was *computed as a point on
+These are floating-point zero. That is expected — the front point was *computed as a point on
 the road*, so its distance to that road is zero by construction. The metric is tautological: it
 can only confirm that `ST_ClosestPoint` returned a point on the line it was given.
 
-The meaningful distance is **parcel → arrival point**, which is what tells you whether the crew
+The meaningful distance is **parcel → front point**, which is what tells you whether the crew
 stops at the property. Measured on the four cases, that is 7–13 m, and it is a genuinely good
 result — but it is not the number in the report.
 
-**Requested:** re-report as distance from the parcel polygon to the arrival point, and keep
+**Requested:** re-report as distance from the parcel polygon to the front point, and keep
 `street_name_aligned` (291/300) as the primary success metric, since that one is meaningful and
 independently corroborated.
 

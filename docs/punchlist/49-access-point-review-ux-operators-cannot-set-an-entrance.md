@@ -57,7 +57,7 @@ need one decision each.
 
 One screen per site, worked worst-first:
 
-1. Orthophoto at the site, parcel outline drawn, current computed arrival point pinned.
+1. Orthophoto at the site, parcel outline drawn, current computed front point pinned.
 2. Click to place the verified access point.
 3. A note in the officer's words — *"gated, keypad at Glen Dr west end"* — stored in
    `entrance_note` and shown to crews.

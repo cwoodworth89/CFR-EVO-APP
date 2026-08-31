@@ -25,7 +25,7 @@ We have created `backend/tests/test_boundary_snapping_PROPOSED.py`.
 ## 2. Benchmark Metrics & Labels Corrected
 We rewrote the benchmarking script (`backend/scripts/verify_snapping_corpus.py`) to address the measurement flaws:
 
-* **Corrected Distance Metric:** The script now calculates the Euclidean distance from the *parcel boundary polygon* to the arrival point, rather than the arrival point to the snapped road. The realistic average snap distance across the corpus is **7.18 meters**.
+* **Corrected Distance Metric:** The script now calculates the Euclidean distance from the *parcel boundary polygon* to the front point, rather than the front point to the snapped road. The realistic average snap distance across the corpus is **7.18 meters**.
 * **Corrected ETA Label:** The output metric has been renamed from "Emergency ETA" to `"avg_route_osrm_driving_eta_min"` to accurately reflect that OSRM is running the stock driving profile.
 
 ## 3. Intersection Match Bug Resolved

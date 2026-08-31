@@ -131,22 +131,30 @@ def same_location_text(a: Any, b: Any) -> bool:
     return normalize_location_text(a) == normalize_location_text(b)
 
 
-def _xstreet_key(candidate: Any) -> tuple:
-    """Cross streets as an unordered pair.
+def _x_street_key(candidate: Any) -> tuple:
+    """XStreets as an ORDERED pair.
 
-    Order is not operationally meaningful for XStreets -- they bound roughly where the
-    call is, and "near Anson and Lincoln" means what "near Lincoln and Anson" means. This
-    is the opposite of `responding_units`, where order IS the dispatch order.
+    Corrected 2026-08-30 on the operator's ruling. This previously sorted the pair and
+    called order "not operationally meaningful" -- that was an inference, and it was
+    wrong. Locution announces
+
+        [address] NEAR [x_street_1] AND [x_street_2]
+
+    so position is part of what was said, and either may be omitted. Sorting them hid
+    a real disagreement: two rounds naming the same pair in different positions read as
+    agreement when the parser had in fact assigned them differently.
+
+    Position is preserved on both sides, so an absent first XStreet stays absent rather
+    than being back-filled by the second.
     """
-    parts = [normalize_location_text(getattr(candidate, "cross_street_1", None)),
-             normalize_location_text(getattr(candidate, "cross_street_2", None))]
-    return tuple(sorted(p for p in parts if p))
+    return (normalize_location_text(getattr(candidate, "x_street_1", None)),
+            normalize_location_text(getattr(candidate, "x_street_2", None)))
 
 
 # (field name, how to read it from a candidate, how to compare two read values)
 _FIELDS: tuple = (
     ("address",        lambda c: getattr(c, "address", None) or getattr(c, "intersection", None), same_location_text),
-    ("cross_streets",  _xstreet_key,                                                              lambda a, b: a == b),
+    ("x_streets",      _x_street_key,                                                            lambda a, b: a == b),
     ("subaddress",     lambda c: getattr(c, "subaddress", None),                                  same_value),
     ("units",          lambda c: getattr(c, "units", None),                                       same_value),
     ("map_grid",       lambda c: getattr(c, "map_grid", None),                                    same_value),

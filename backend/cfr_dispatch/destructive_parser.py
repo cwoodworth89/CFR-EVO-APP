@@ -44,8 +44,8 @@ def parse_destructive(raw_text: str, units_vocab: List[str] = None) -> DispatchD
     radio_channel = None
     address = None
     intersection = None
-    cross_street_1 = None
-    cross_street_2 = None
+    x_street_1 = None
+    x_street_2 = None
     subaddress = None
 
     # Step 1: Match & Strip Agency (from left)
@@ -162,20 +162,20 @@ def parse_destructive(raw_text: str, units_vocab: List[str] = None) -> DispatchD
                 text = text.replace(sub_match.group(0), "").strip()
                 break
 
-        # Check for intersection / crossroads indicators ("and", "near", "&")
+        # Check for intersection / XStreet indicators ("and", "near", "&")
         near_match = re.search(r'\bnear\s+([\w\s&]+)$', text, re.IGNORECASE)
         if near_match:
             near_candidate = near_match.group(1).strip()
             parts = re.split(r'\s+and\s+|\s*&\s*', near_candidate, flags=re.IGNORECASE)
-            cross_street_1 = parts[0].strip() if len(parts) >= 1 and parts[0].strip() else None
-            cross_street_2 = parts[1].strip() if len(parts) >= 2 and parts[1].strip() else None
+            x_street_1 = parts[0].strip() if len(parts) >= 1 and parts[0].strip() else None
+            x_street_2 = parts[1].strip() if len(parts) >= 2 and parts[1].strip() else None
             text = text[:near_match.start()].strip()
         
         if re.search(r'\b(and|&)\b', text, re.IGNORECASE):
             parts = re.split(r'\s+and\s+|\s*&\s*', text, flags=re.IGNORECASE)
             intersection = " and ".join(parts)
-            cross_street_1 = parts[0].strip() if len(parts) >= 1 and parts[0].strip() else cross_street_1
-            cross_street_2 = parts[1].strip() if len(parts) >= 2 and parts[1].strip() else cross_street_2
+            x_street_1 = parts[0].strip() if len(parts) >= 1 and parts[0].strip() else x_street_1
+            x_street_2 = parts[1].strip() if len(parts) >= 2 and parts[1].strip() else x_street_2
             address = None
         else:
             address = text.strip()
@@ -200,8 +200,8 @@ def parse_destructive(raw_text: str, units_vocab: List[str] = None) -> DispatchD
         call_type=incident_type,
         address=title_case_location(address),
         intersection=title_case_location(intersection),
-        cross_street_1=title_case_location(cross_street_1),
-        cross_street_2=title_case_location(cross_street_2),
+        x_street_1=title_case_location(x_street_1),
+        x_street_2=title_case_location(x_street_2),
         radio_channel=radio_channel,
         map_grid=map_grid,
         subaddress=title_case_location(subaddress)

@@ -53,7 +53,24 @@ export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
     responding_units: resolveUnits(record),
 
     subaddress: target.subaddress || '',
+
+    // TERMINOLOGY. These are two different things and must never share a label.
+    //
+    //   intersection  -- the incident location IS a junction ("Gordon Ave and
+    //                    Christmas Way"). It is where the crew is going.
+    //   x_street_1/2  -- nearby roads. Locution announces
+    //                        [address] NEAR [x_street_1] AND [x_street_2]
+    //                    and either may be omitted. They are how a crew confirms it
+    //                    is on the right block. They CAN intersect the incident
+    //                    street but are not required to, and often run parallel.
+    //                    The run sheet and the CAD terminal label them XStreet1 /
+    //                    XStreet2, so that is the name used throughout.
+    //
+    // Two positional variables, never a list -- position IS the announced order,
+    // and collapsing them loses which one was omitted.
     intersection: target.intersection || '',
+    x_street_1: target.verified_x_street_1 || target.x_street_1 || '',
+    x_street_2: target.verified_x_street_2 || target.x_street_2 || '',
 
     // Coordinates propagate as null when unresolved. Do not add a fallback here.
     lat: target.lat ?? record.lat ?? null,
@@ -146,6 +163,8 @@ const OPERATOR_VISIBLE_FIELDS = [
   'responding_units',
   'subaddress',
   'intersection',
+  'x_street_1',
+  'x_street_2',
   'lat',
   'lng',
   'map_grid',

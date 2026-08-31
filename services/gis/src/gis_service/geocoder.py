@@ -105,7 +105,7 @@ class CoquitlamDataValidator:
         return index
 
     def get_coordinates(self, parsed_address: str, target_map_grid=None,
-                        cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+                        x_street_1: str = None, x_street_2: str = None) -> dict | None:
         """
         Primary geocoding entry point — cascading resolution chain.
         
@@ -138,7 +138,7 @@ class CoquitlamDataValidator:
         if parsed:
             # TERMINOLOGY -- XStreets. The printed run sheet labels this field
             # "XStreets:", so that is the canonical name across this codebase, and
-            # cross_street_1/2 are its parameters. Locution speaks them as
+            # x_street_1/2 are its parameters. Locution speaks them as
             # "near <road> and <road>".
             #
             # Despite "cross", they are NOT guaranteed to intersect the incident
@@ -146,15 +146,15 @@ class CoquitlamDataValidator:
             # that are not streets at all ("Turning Lane", "Mall Access", "Private
             # Driveway"), and may reference streets absent from public.roads. The name
             # is not the contract (CLAUDE.md §7.3a) -- treat them as proximity
-            # references only. See AddressResolver._verify_cross_streets.
+            # references only. See AddressResolver._verify_x_streets.
             #
             # Here they break ties between equally-matching streets, alongside the
             # announced map grid, rather than letting a similarity score decide alone.
             result = self.address.resolve_exact(
                 parsed.house, parsed.raw, parsed.street_type,
                 target_map_grid=target_map_grid,
-                cross_street_1=cross_street_1,
-                cross_street_2=cross_street_2,
+                x_street_1=x_street_1,
+                x_street_2=x_street_2,
             )
             if result:
                 return result
@@ -175,7 +175,7 @@ class CoquitlamDataValidator:
             if cands:
                 result = self.intersection.resolve_candidates(
                     cands, target_map_grid, requested_address=parsed_address,
-                    cross_streets=[s for s in (cross_street_1, cross_street_2) if s])
+                    x_streets=[s for s in (x_street_1, x_street_2) if s])
                 if result:
                     # Do NOT overwrite confidence for a suggested match: resolve_candidates
                     # already set it to the per-street match score, and stamping the
@@ -214,7 +214,7 @@ class CoquitlamDataValidator:
         if parsed and parsed.house:
             result = self.address.resolve_nearest_civic(
                 parsed.house, parsed.street, parsed.street_type,
-                cross_street_1=cross_street_1, cross_street_2=cross_street_2)
+                x_street_1=x_street_1, x_street_2=x_street_2)
             if result:
                 return result
 
@@ -222,11 +222,11 @@ class CoquitlamDataValidator:
         # Only once no real parcel can be offered. Positions the call along the street
         # using the announced "near" roads -- better than a whole-street average, but
         # still not an address.
-        if parsed and (cross_street_1 or cross_street_2):
-            result = self.address.resolve_crossroad_narrow(
+        if parsed and (x_street_1 or x_street_2):
+            result = self.address.resolve_x_street_narrow(
                 parsed.street, parsed.street_type,
-                cross_street_1=cross_street_1,
-                cross_street_2=cross_street_2
+                x_street_1=x_street_1,
+                x_street_2=x_street_2
             )
             if result:
                 return result
@@ -276,11 +276,11 @@ class CoquitlamDataValidator:
         return None
 
     def local_geocode(self, parsed_address: str, target_map_grid=None,
-                      cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+                      x_street_1: str = None, x_street_2: str = None) -> dict | None:
         """Geocodes address locally; alias for get_coordinates."""
         return self.get_coordinates(
             parsed_address, target_map_grid=target_map_grid,
-            cross_street_1=cross_street_1, cross_street_2=cross_street_2
+            x_street_1=x_street_1, x_street_2=x_street_2
         )
 
     def _street_section_if_self_paired(self, parsed_address: str,

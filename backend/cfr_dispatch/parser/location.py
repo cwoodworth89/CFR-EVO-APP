@@ -262,11 +262,11 @@ def fuzzy_correct_street(street_name: str, known_streets: List[str]) -> str:
         return normalize_street_suffix(best_match)
     return street_name
 
-def fuzzy_correct_cross_roads(cross_roads_text: str, known_streets: List[str]) -> str:
+def fuzzy_correct_x_streets(x_streets_text: str, known_streets: List[str]) -> str:
     """Corrects misspelled street names inside cross road intersections."""
-    if not cross_roads_text or not known_streets:
-        return cross_roads_text
-    parts = re.split(r'\s+(?:and|at|&)\s+', cross_roads_text, flags=re.IGNORECASE)
+    if not x_streets_text or not known_streets:
+        return x_streets_text
+    parts = re.split(r'\s+(?:and|at|&)\s+', x_streets_text, flags=re.IGNORECASE)
     corrected_parts = []
     for part in parts:
         corrected_parts.append(fuzzy_correct_street(part, known_streets))

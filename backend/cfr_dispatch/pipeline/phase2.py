@@ -70,7 +70,7 @@ def _coalesce_across_rounds(all_candidates, p1_candidate, p1_target):
     and round 2 as "Anson Ave, and Lincoln Ave" -- so a field one round drops the other
     often still carries.
 
-    Returns `(cross_street_1, cross_street_2, subaddress)`, falling back to the Phase 1
+    Returns `(x_street_1, x_street_2, subaddress)`, falling back to the Phase 1
     candidate and then the Phase 1 target, mirroring how `map_grid` and `radio_channel`
     are resolved.
 
@@ -86,8 +86,8 @@ def _coalesce_across_rounds(all_candidates, p1_candidate, p1_target):
     target = p1_target or {}
 
     return (
-        first("cross_street_1") or p1_get("cross_street_1"),
-        first("cross_street_2") or p1_get("cross_street_2"),
+        first("x_street_1") or p1_get("x_street_1"),
+        first("x_street_2") or p1_get("x_street_2"),
         first("subaddress") or p1_get("subaddress") or target.get("subaddress"),
     )
 
@@ -229,9 +229,9 @@ def process_phase_2_finalize(
                             # omitted from this copy they default to None, so the "near
                             # <road> and <road>" the dispatcher announced never reached
                             # the reconstructed transcript -- measured absent on live
-                            # calls that had them in `target.cross_streets`.
-                            cross_street_1=p2_cross_1,
-                            cross_street_2=p2_cross_2,
+                            # calls that had them in `target.x_streets`.
+                            x_street_1=p2_cross_1,
+                            x_street_2=p2_cross_2,
                             radio_channel=p2_channel,
                             map_grid=p2_grid,
                             subaddress=p2_subaddress
@@ -243,7 +243,7 @@ def process_phase_2_finalize(
                 p1_address = p1_target.get("address") or (p1_candidate.address or p1_candidate.intersection if p1_candidate else "")
                 # MERGE onto the Phase 1 target, never rebuild it. This PATCH replaces the
                 # whole `target` object, so any key not carried forward is destroyed.
-                # Rebuilding from a hand-picked allowlist silently dropped `cross_streets`
+                # Rebuilding from a hand-picked allowlist silently dropped `x_streets`
                 # from every dispatch -- the announced "near" roads, which crews use to
                 # confirm they are on the right block (punch-list #35). It went unnoticed
                 # for months because the near roads were also being written to
@@ -342,8 +342,8 @@ def process_phase_2_finalize(
                                     # See the note on the Phase 1 agreement path above:
                                     # omitting these dropped the announced XStreets from
                                     # the reconstructed transcript.
-                                    cross_street_1=p2_cross_1,
-                                    cross_street_2=p2_cross_2,
+                                    x_street_1=p2_cross_1,
+                                    x_street_2=p2_cross_2,
                                     radio_channel=p2_channel,
                                     map_grid=p2_grid,
                                     subaddress=p2_subaddress
@@ -356,7 +356,7 @@ def process_phase_2_finalize(
                         # above (punch-list #35). Phase 2 re-geocoded, so the location fields
                         # below override; everything else Phase 1 recorded survives.
                         #
-                        # `cross_streets` is parser-derived, not geocoder-derived: both phases
+                        # `x_streets` is parser-derived, not geocoder-derived: both phases
                         # read the same announcement, so it carries forward unchanged even
                         # though the address was corrected.
                         target_payload = {

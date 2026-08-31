@@ -18,11 +18,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    // z19: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
-    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // z18: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
+    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
     // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
   },
   DARK: {
@@ -31,19 +31,29 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    // z19: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
-    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // z18: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
+    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
     // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
   },
+  // Aerial imagery. Serves the City of Coquitlam 2025 7.5cm orthophotos ONLY
+  // (`ortho.mbtiles`, Open Government Licence), deliberately with no Esri
+  // fallback beneath it.
+  //
+  // Until 2026-08-30 this key pointed at `services/satellite`, which is Esri
+  // World Imagery end to end -- the orthos had never been ingested, despite this
+  // attribution string naming them. Blank outside the ortho footprint is the
+  // correct rendering (CLAUDE.md 6.1): it shows where imagery genuinely stops
+  // rather than silently substituting a coarser source.
   SATELLITE: {
     type: 'tile',
-    url: `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
+    url: `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)',
+    attribution: 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
+    // z20-native: 7.5cm ground sample is 9.7cm/px at z20 for this latitude.
     maxNativeZoom: 20,
     maxZoom: 22
   },
@@ -53,11 +63,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    // z19: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
-    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // z18: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
+    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
     // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22
   },
   VOYAGER: {
@@ -66,11 +76,11 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    // z19: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-26, punch-list #40). Leaflet upscales past this, so the
-    // map still zooms to maxZoom -- it just stops requesting new tiles. Must
+    // z18: the deepest zoom crawled for the Carto street styles (operator
+    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
+    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
     // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22
   },
   CADASTRAL: {

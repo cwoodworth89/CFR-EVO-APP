@@ -114,12 +114,14 @@ LAYER_CONFIGS = {
         "url_template": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
         "subdomains": ["a", "b", "c", "d"],
         "min_zoom": 12,
-        # z19, not z20. Operator decision 2026-08-26: start at 19 and raise it
-        # later if the detail is wanted. Carto's raster basemaps are vector-derived
-        # and gain little between 19 and 20, while z20 alone is ~4x the tiles of
-        # every other zoom combined. Leaflet upscales past maxNativeZoom, so the
-        # map still zooms further -- it just stops fetching new detail.
-        "max_zoom": 19,
+        # z18, not z19. Operator decision 2026-08-30: the street basemaps are
+        # specified as z12-18 and were never wanted deeper. The 2026-08-26 raise
+        # to z19 fetched 81,032 tiles per street layer AFTER Carto began stamping
+        # unauthenticated tiles "API KEY REQUIRED" -- every one of them is
+        # watermarked (punch-list #47). Leaflet upscales past maxNativeZoom, so
+        # the map still zooms to 22; it just stops fetching new detail.
+        # Do NOT raise this again while Carto is the source -- see #47.
+        "max_zoom": 18,
         # The only layer that extends past the city: an operator panning out
         # still needs named roads for context. See the coverage policy above.
         "regional_context": True,
@@ -130,12 +132,14 @@ LAYER_CONFIGS = {
         "url_template": "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
         "subdomains": ["a", "b", "c", "d"],
         "min_zoom": 12,
-        # z19, not z20. Operator decision 2026-08-26: start at 19 and raise it
-        # later if the detail is wanted. Carto's raster basemaps are vector-derived
-        # and gain little between 19 and 20, while z20 alone is ~4x the tiles of
-        # every other zoom combined. Leaflet upscales past maxNativeZoom, so the
-        # map still zooms further -- it just stops fetching new detail.
-        "max_zoom": 19,
+        # z18, not z19. Operator decision 2026-08-30: the street basemaps are
+        # specified as z12-18 and were never wanted deeper. The 2026-08-26 raise
+        # to z19 fetched 81,032 tiles per street layer AFTER Carto began stamping
+        # unauthenticated tiles "API KEY REQUIRED" -- every one of them is
+        # watermarked (punch-list #47). Leaflet upscales past maxNativeZoom, so
+        # the map still zooms to 22; it just stops fetching new detail.
+        # Do NOT raise this again while Carto is the source -- see #47.
+        "max_zoom": 18,
         # City only: this style exists to sit under the cadastral overlay, which
         # does not extend past the municipal boundary.
         "regional_context": False,

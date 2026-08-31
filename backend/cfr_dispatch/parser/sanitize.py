@@ -203,7 +203,7 @@ def sanitize_transcript(text: str) -> str:
     # the cross-street split to find, and clean_location_text then removes the second
     # street as trailing junk after a street type.
     # Measured on DISP-2026-AAFDB8 (2026-08-30): announced "Near, Anson, Avenue & Lincoln
-    # Ave", stored as cross_streets ["Anson Ave"] -- Lincoln Ave lost here.
+    # Ave", stored as x_streets ["Anson Ave"] -- Lincoln Ave lost here.
     text = re.sub(r'\s*&\s*', ' and ', text)
 
     # Strip punctuation except alphanumeric characters and spaces

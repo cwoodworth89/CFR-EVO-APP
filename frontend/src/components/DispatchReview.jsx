@@ -42,6 +42,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const [verifiedUnits, setVerifiedUnits] = useState('');
   const [qualityRating, setQualityRating] = useState('PENDING');
   const [verifiedSubaddress, setVerifiedSubaddress] = useState('');
+  // XStreets -- the run sheet's name for the announced "near <road> and <road>"
+  // block reference. Kept in announced order; index 0 is XStreet1.
+  const [verifiedXstreet1, setVerifiedXstreet1] = useState('');
+  const [verifiedXstreet2, setVerifiedXstreet2] = useState('');
   const [verifiedTalkgroup, setVerifiedTalkgroup] = useState('');
   const [verifiedMapGrid, setVerifiedMapGrid] = useState('');
   const [includeInTraining, setIncludeInTraining] = useState(true);
@@ -165,6 +169,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         setVerifiedAddress(selectedCall.verified_address || '');
         setVerifiedSubaddress(selectedCall.feedback_submitted ? toTitleCase(selectedCall.target?.subaddress || '') : '');
         setVerifiedMapGrid(selectedCall.target?.verified_map_grid || '');
+        setVerifiedXstreet1(selectedCall.target?.verified_x_street_1
+          ?? selectedCall.target?.x_street_1 ?? '');
+        setVerifiedXstreet2(selectedCall.target?.verified_x_street_2
+          ?? selectedCall.target?.x_street_2 ?? '');
         setVerifiedTalkgroup(selectedCall.target?.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         // Prefer the reviewer's own correction, then what the parser heard, then
@@ -261,6 +269,12 @@ export default function DispatchReview({ onClose, onReviewCall }) {
       case 'subaddress':
         setVerifiedSubaddress(toTitleCase(selectedCall.target?.subaddress || ''));
         break;
+      case 'xstreet1':
+        setVerifiedXstreet1(toTitleCase(selectedCall.target?.x_street_1 || ''));
+        break;
+      case 'xstreet2':
+        setVerifiedXstreet2(toTitleCase(selectedCall.target?.x_street_2 || ''));
+        break;
       case 'talkgroup':
         setVerifiedTalkgroup(selectedCall.target?.radio_channel || '');
         break;
@@ -350,6 +364,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         verified_talkgroup: verifiedTalkgroup || null,
         verified_response_type: verifiedResponseType,
         verified_map_grid: verifiedMapGrid || null,
+        // Null means "the dispatch announced none", which is a real answer and
+        // must not be written back as an empty string (CLAUDE.md 6.1).
+        verified_x_street_1: verifiedXstreet1 || null,
+        verified_x_street_2: verifiedXstreet2 || null,
         review_notes: reviewNotes || null
       };
 
@@ -645,6 +663,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
             verifiedUnits={verifiedUnits}
             setVerifiedUnits={setVerifiedUnits}
             verifiedSubaddress={verifiedSubaddress}
+            verifiedXstreet1={verifiedXstreet1}
+            setVerifiedXstreet1={setVerifiedXstreet1}
+            verifiedXstreet2={verifiedXstreet2}
+            setVerifiedXstreet2={setVerifiedXstreet2}
             setVerifiedSubaddress={setVerifiedSubaddress}
             verifiedTalkgroup={verifiedTalkgroup}
             setVerifiedTalkgroup={setVerifiedTalkgroup}

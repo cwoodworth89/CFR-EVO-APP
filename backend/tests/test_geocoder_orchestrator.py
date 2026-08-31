@@ -135,20 +135,20 @@ class TestGeocoderOrchestrator:
             "resolution_note": "3080 Gordon Ave is not in City of Coquitlam address records.",
             "is_ambiguous": False,
         })
-        mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value={
+        mock_validator.address.resolve_x_street_narrow = MagicMock(return_value={
             "address": "Gordon Ave (between Christmas Way & Westwood St)",
             "lat": 49.278, "lng": -122.791, "rings": [], "confidence": 75.0,
-            "is_crossroad_narrowed": True, "is_ambiguous": False,
+            "is_x_street_narrowed": True, "is_ambiguous": False,
         })
 
         res = mock_validator.get_coordinates(
-            "3080 Gordon Ave", cross_street_1="Christmas Way", cross_street_2="Westwood St")
+            "3080 Gordon Ave", x_street_1="Christmas Way", x_street_2="Westwood St")
 
         assert res is not None
         assert res["address"] == "3060 Gordon Ave"
         assert res.get("is_nearest_civic") is True
         mock_validator.address.resolve_nearest_civic.assert_called_once()
-        mock_validator.address.resolve_crossroad_narrow.assert_not_called()
+        mock_validator.address.resolve_x_street_narrow.assert_not_called()
 
     def test_step5_near_road_narrowing(self, mock_validator):
         # Reached only when no real parcel can be offered; nearest civic is mocked
@@ -156,24 +156,24 @@ class TestGeocoderOrchestrator:
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value=None)
         mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
-        mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value={
+        mock_validator.address.resolve_x_street_narrow = MagicMock(return_value={
             "address": "Gordon Ave (between Pinetree Way & Westwood St)", "lat": 49.278, "lng": -122.791,
-            "rings": [], "confidence": 75.0, "is_crossroad_narrowed": True, "is_ambiguous": False
+            "rings": [], "confidence": 75.0, "is_x_street_narrowed": True, "is_ambiguous": False
         })
-        res = mock_validator.get_coordinates("Gordon Ave", cross_street_1="Pinetree Way", cross_street_2="Westwood St")
+        res = mock_validator.get_coordinates("Gordon Ave", x_street_1="Pinetree Way", x_street_2="Westwood St")
         # Since 'Gordon Ave' has no house number, parse_house_and_street is None, so check if parsed
         # If input has house: '3000 Gordon Ave'
-        res = mock_validator.get_coordinates("3000 Gordon Ave", cross_street_1="Pinetree Way", cross_street_2="Westwood St")
+        res = mock_validator.get_coordinates("3000 Gordon Ave", x_street_1="Pinetree Way", x_street_2="Westwood St")
         assert res is not None
-        assert res["is_crossroad_narrowed"] is True
-        mock_validator.address.resolve_crossroad_narrow.assert_called_once()
+        assert res["is_x_street_narrowed"] is True
+        mock_validator.address.resolve_x_street_narrow.assert_called_once()
 
     def test_step5_street_centroid(self, mock_validator):
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value=None)
         # Step 4b (nearest civic address) sits ahead of these fallbacks
         mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
-        mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value=None)
+        mock_validator.address.resolve_x_street_narrow = MagicMock(return_value=None)
         mock_validator.address.resolve_street_centroid = MagicMock(return_value={
             "address": "Gordon Ave", "lat": 49.275, "lng": -122.792,
             "rings": [], "confidence": 50.0, "is_street_centroid": True, "is_ambiguous": False
@@ -196,7 +196,7 @@ class TestGeocoderOrchestrator:
         mock_validator.address.resolve_block = MagicMock(return_value=None)
         # Step 4b (nearest civic address) sits ahead of these fallbacks
         mock_validator.address.resolve_nearest_civic = MagicMock(return_value=None)
-        mock_validator.address.resolve_crossroad_narrow = MagicMock(return_value=None)
+        mock_validator.address.resolve_x_street_narrow = MagicMock(return_value=None)
         mock_validator.address.resolve_street_centroid = MagicMock(return_value=None)
         mock_validator.address.resolve_road_centroid = MagicMock(return_value={
             "address": "Gordon Ave", "lat": 49.275, "lng": -122.792,
@@ -260,8 +260,8 @@ class TestGeocoderOrchestrator:
         assert mock_validator.get_all_road_names() == ["GORDON AVE", "MARINER WAY", "LOUGHEED HWY"]
 
 
-class TestPayloadBuilderWithCrossStreets:
-    def test_payload_builder_passes_cross_streets(self):
+class TestPayloadBuilderWithXStreets:
+    def test_payload_builder_passes_x_streets(self):
         mock_validator = MagicMock()
         mock_validator.local_geocode.return_value = {
             "address": "3030 Gordon Ave", "lat": 49.278, "lng": -122.793,
@@ -271,8 +271,8 @@ class TestPayloadBuilderWithCrossStreets:
         candidate = DispatchData(
             raw_text="3030 Gordon Ave cross street Pinetree Way",
             address="3030 Gordon Ave",
-            cross_street_1="Pinetree Way",
-            cross_street_2="Westwood St",
+            x_street_1="Pinetree Way",
+            x_street_2="Westwood St",
             map_grid="62",
             radio_channel="TAC 1",
             units="E1"
@@ -286,12 +286,40 @@ class TestPayloadBuilderWithCrossStreets:
             validator=mock_validator
         )
 
-        # Verify local_geocode was called with cross_street_1 and cross_street_2
+        # Verify local_geocode was called with x_street_1 and x_street_2
         mock_validator.local_geocode.assert_called_once_with(
             "3030 Gordon Ave",
             target_map_grid="62",
-            cross_street_1="Pinetree Way",
-            cross_street_2="Westwood St"
+            x_street_1="Pinetree Way",
+            x_street_2="Westwood St"
         )
         assert payload["target"]["address"] == "3030 Gordon Ave"
-        assert payload["target"]["cross_streets"] == ["Pinetree Way", "Westwood St"]
+        # Two positional variables, never a list. The list form was `[s for s in [c1, c2] if s]`,
+        # whose filter destroyed position -- see the omission test below.
+        assert payload["target"]["x_street_1"] == "Pinetree Way"
+        assert payload["target"]["x_street_2"] == "Westwood St"
+        assert "x_streets" not in payload["target"]
+
+    def test_only_the_second_x_street_keeps_its_position(self):
+        """An omitted first XStreet must not be back-filled by the second.
+
+        Locution announces [address] NEAR [x_street_1] AND [x_street_2] and either may
+        be omitted. The payload used to build `[s for s in [c1, c2] if s]`, so a call
+        naming only the second street produced a one-element list whose single entry
+        every reader took for the first. Position is now preserved on both sides.
+        """
+        validator = MagicMock()
+        validator.local_geocode.return_value = {
+            "address": "3030 Gordon Ave", "lat": 49.278, "lng": -122.793,
+            "rings": [], "confidence": 100.0, "is_ambiguous": False}
+        validator.get_map_grid_for_point.return_value = "68"
+        candidate = DispatchData(
+            raw_text="Engine 1 respond medical 3030 Gordon Ave near Westwood St",
+            units="Engine 1", response_type="emergency", call_type="Medical Aid",
+            address="3030 Gordon Ave", x_street_2="Westwood St")
+        payload, _ = build_dispatch_payload(
+            dispatch_id="DISP-TEST-XS2", raw_transcript="r", sanitized_transcript="s",
+            all_candidates=[candidate], validator=validator,
+            units_vocabulary=["Engine 1"])
+        assert payload["target"]["x_street_1"] is None
+        assert payload["target"]["x_street_2"] == "Westwood St"

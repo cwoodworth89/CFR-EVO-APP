@@ -16,7 +16,7 @@ from .location import (
     extract_subaddress_info,
     split_street_base_suffix,
     fuzzy_correct_street,
-    fuzzy_correct_cross_roads,
+    fuzzy_correct_x_streets,
 )
 from .announcement import (
     parse_dispatch_announcement,
@@ -30,6 +30,6 @@ __all__ = [
     "get_unit_abbreviation", "abbreviate_units", "merge_units",
     "match_radio_channel", "clean_channel_name_for_output",
     "normalize_street_suffix", "clean_location_text", "extract_subaddress_info",
-    "split_street_base_suffix", "fuzzy_correct_street", "fuzzy_correct_cross_roads",
+    "split_street_base_suffix", "fuzzy_correct_street", "fuzzy_correct_x_streets",
     "parse_dispatch_announcement", "split_rounds", "reconstruct_template_transcript",
 ]

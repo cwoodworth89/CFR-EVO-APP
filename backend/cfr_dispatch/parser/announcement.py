@@ -24,7 +24,7 @@ from .location import (
     normalize_street_suffix,
     clean_location_text,
     extract_subaddress_info,
-    fuzzy_correct_cross_roads,
+    fuzzy_correct_x_streets,
 )
 
 def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) -> List[DispatchData]:
@@ -55,14 +55,14 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             remainder = text[respond_idx + respond_len:].strip()
             
             # Find boundary anchors
-            cross_roads_match = re.search(r'\b(cross\s+roads|near|cross\s+street|cross\s+of)\b', remainder, re.IGNORECASE)
+            x_streets_match = re.search(r'\b(cross\s+roads|near|cross\s+street|cross\s+of)\b', remainder, re.IGNORECASE)
             talk_group_match = re.search(r'\b(use\s+talk\s+group|talk\s+group)\b', remainder, re.IGNORECASE)
             map_grid_match = re.search(r'\bmap\s+grid\b', remainder, re.IGNORECASE)
             
             # Determine end of Call Type + Address segment
             address_end_idx = len(remainder)
-            if cross_roads_match:
-                address_end_idx = min(address_end_idx, cross_roads_match.start())
+            if x_streets_match:
+                address_end_idx = min(address_end_idx, x_streets_match.start())
             elif talk_group_match:
                 address_end_idx = min(address_end_idx, talk_group_match.start())
             elif map_grid_match:
@@ -106,21 +106,21 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             normalized_address = normalize_street_suffix(address_part)
             
             # Extract Cross Roads segment
-            cross_roads_str = None
-            if cross_roads_match:
-                cross_roads_start = cross_roads_match.start() + len(cross_roads_match.group(0))
-                cross_roads_end = len(remainder)
+            x_streets_str = None
+            if x_streets_match:
+                x_streets_start = x_streets_match.start() + len(x_streets_match.group(0))
+                x_streets_end = len(remainder)
                 if talk_group_match:
-                    cross_roads_end = min(cross_roads_end, talk_group_match.start())
+                    x_streets_end = min(x_streets_end, talk_group_match.start())
                 elif map_grid_match:
-                    cross_roads_end = min(cross_roads_end, map_grid_match.start())
-                cross_roads_raw = remainder[cross_roads_start:cross_roads_end].strip()
-                cross_roads_clean = clean_location_text(cross_roads_raw, CALL_TYPES, units_vocab)
-                cross_roads_str = normalize_street_suffix(cross_roads_clean)
+                    x_streets_end = min(x_streets_end, map_grid_match.start())
+                x_streets_raw = remainder[x_streets_start:x_streets_end].strip()
+                x_streets_clean = clean_location_text(x_streets_raw, CALL_TYPES, units_vocab)
+                x_streets_str = normalize_street_suffix(x_streets_clean)
                 try:
                     from cfr_dispatch.config.vocab import COQUITLAM_STREETS
                     if COQUITLAM_STREETS:
-                        cross_roads_str = fuzzy_correct_cross_roads(cross_roads_str, COQUITLAM_STREETS)
+                        x_streets_str = fuzzy_correct_x_streets(x_streets_str, COQUITLAM_STREETS)
                 except Exception as ex:
                     logging.warning(f"Failed to fuzzy correct cross roads: {ex}")
                 
@@ -154,8 +154,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             # Split cross streets into individual columns
             cross_1 = None
             cross_2 = None
-            if cross_roads_str:
-                cross_parts = re.split(r'\s+and\s+|\s*&\s*', cross_roads_str, flags=re.IGNORECASE)
+            if x_streets_str:
+                cross_parts = re.split(r'\s+and\s+|\s*&\s*', x_streets_str, flags=re.IGNORECASE)
                 cross_1 = cross_parts[0].strip() if len(cross_parts) >= 1 else None
                 cross_2 = cross_parts[1].strip() if len(cross_parts) >= 2 else None
 
@@ -172,8 +172,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 call_type=matched_call_type,
                 address=normalized_address if normalized_address and not is_intersection else None,
                 intersection=normalized_address if is_intersection else None,  # ONLY true intersections
-                cross_street_1=cross_1,
-                cross_street_2=cross_2,
+                x_street_1=cross_1,
+                x_street_2=cross_2,
                 radio_channel=talk_group_str,
                 map_grid=map_grid_str,
                 subaddress=extracted_subaddr
@@ -251,8 +251,8 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             found_dispatches.append(DispatchData(
                 raw_text=text,
                 intersection=intersection_str,
-                cross_street_1=normalized_leg1,
-                cross_street_2=normalized_leg2
+                x_street_1=normalized_leg1,
+                x_street_2=normalized_leg2
             ))
             
     if not found_dispatches:
@@ -395,10 +395,10 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
         if dispatch.subaddress:
             address_part = f"{address_part} {dispatch.subaddress}"
         cross_desc = None
-        if dispatch.cross_street_1 and dispatch.cross_street_2:
-            cross_desc = f"{dispatch.cross_street_1} and {dispatch.cross_street_2}"
-        elif dispatch.cross_street_1:
-            cross_desc = dispatch.cross_street_1
+        if dispatch.x_street_1 and dispatch.x_street_2:
+            cross_desc = f"{dispatch.x_street_1} and {dispatch.x_street_2}"
+        elif dispatch.x_street_1:
+            cross_desc = dispatch.x_street_1
         elif dispatch.intersection:
             cross_desc = dispatch.intersection
         elif " and " in dispatch.address.lower() or " & " in dispatch.address:

@@ -110,7 +110,7 @@ class AddressResolver:
         narrowed = [r for r in rows if str(r['zone_id'] or '').strip() == grid]
         return narrowed or rows
 
-    def _verify_cross_streets(self, conn, xstreet_names: list) -> list:
+    def _verify_x_streets(self, conn, xstreet_names: list) -> list:
         """Return the announced cross streets only if EVERY one is a real named road.
 
         Locution's "near <x> and <y>" does not promise that x and y are streets. Across
@@ -122,7 +122,7 @@ class AddressResolver:
         Partial matches are discarded rather than used, because a single road cannot
         position a call along a street -- it can only say "somewhere near this line",
         and the nearest candidate to one road is frequently the wrong one (see
-        _narrow_by_cross_streets for the measured Pinewood/Pinetree case).
+        _narrow_by_x_streets for the measured Pinewood/Pinetree case).
 
         Returns [] when the set is unusable, which callers treat as "no XStreets
         announced" and fall back to house-number proximity.
@@ -151,8 +151,8 @@ class AddressResolver:
             return []
         return xstreet_names
 
-    def _narrow_by_cross_streets(self, conn, rows: list,
-                                 cross_street_1: str, cross_street_2: str) -> list:
+    def _narrow_by_x_streets(self, conn, rows: list,
+                                 x_street_1: str, x_street_2: str) -> list:
         """Keep the candidate closest, on average, to the announced "near" roads.
 
         Locution announces "near <road> and <road>". Those roads are NOT necessarily
@@ -177,11 +177,11 @@ class AddressResolver:
         ("Ponderosa St"). Comparing full names silently matches nothing.
         """
         names = []
-        for road in (cross_street_1, cross_street_2):
+        for road in (x_street_1, x_street_2):
             tokens = street_name_tokens(normalize_street_name(road)) if road else []
             if tokens:
                 names.append(" ".join(tokens))
-        names = self._verify_cross_streets(conn, names)
+        names = self._verify_x_streets(conn, names)
         if not names or not rows:
             return rows
 
@@ -230,7 +230,7 @@ class AddressResolver:
 
     def resolve_exact(self, house: str, street_raw: str, street_type: str,
                       target_map_grid=None,
-                      cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+                      x_street_1: str = None, x_street_2: str = None) -> dict | None:
         """Step 1: Exact parcel match — house number + fuzzy street name.
 
         When several streets match the spoken name equally well, the announced map
@@ -292,8 +292,8 @@ class AddressResolver:
                     narrowed = self._narrow_by_map_grid(candidates, target_map_grid)
                     stage = "map grid"
                     if len({(r['street'], r['streettype']) for r in narrowed}) > 1:
-                        narrowed = self._narrow_by_cross_streets(
-                            conn, narrowed, cross_street_1, cross_street_2)
+                        narrowed = self._narrow_by_x_streets(
+                            conn, narrowed, x_street_1, x_street_2)
                         stage = "near roads"
 
                     remaining = {(r['street'], r['streettype']) for r in narrowed}
@@ -304,7 +304,7 @@ class AddressResolver:
                             "to one. Returning unresolved rather than picking one.",
                             house, parsed_street, len({n for _, n in scored}),
                             ", ".join(sorted(n for _, n in scored)),
-                            target_map_grid, cross_street_1, cross_street_2
+                            target_map_grid, x_street_1, x_street_2
                         )
                         return None
 
@@ -451,24 +451,24 @@ class AddressResolver:
             logging.error(f"Error in block interpolation: {e}", exc_info=True)
         return None
 
-    def resolve_crossroad_narrow(self, street: str, street_type: str,
-                                  cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+    def resolve_x_street_narrow(self, street: str, street_type: str,
+                                  x_street_1: str = None, x_street_2: str = None) -> dict | None:
         """Step 4: Narrow location using nearby cross streets.
         
         Finds intersection points where the primary street meets the cross streets,
         then returns the midpoint between them (or the single intersection point).
         """
-        if not cross_street_1:
+        if not x_street_1:
             return None
         
         fullname = normalize_street_name(f"{street} {street_type}".strip())
-        cross_1_norm = normalize_street_name(cross_street_1)
+        cross_1_norm = normalize_street_name(x_street_1)
         
         try:
             with self.engine.connect() as conn:
                 # Find intersection(s) of primary street with cross street(s)
                 points = []
-                for cross in [cross_1_norm, normalize_street_name(cross_street_2) if cross_street_2 else None]:
+                for cross in [cross_1_norm, normalize_street_name(x_street_2) if x_street_2 else None]:
                     if not cross:
                         continue
                     # Check both orderings of the intersection key
@@ -486,30 +486,30 @@ class AddressResolver:
                     mid_lat = (points[0][0] + points[1][0]) / 2
                     mid_lng = (points[0][1] + points[1][1]) / 2
                     return {
-                        "address": title_address(f"{street} {street_type} (between {cross_street_1} & {cross_street_2})".strip()),
+                        "address": title_address(f"{street} {street_type} (between {x_street_1} & {x_street_2})".strip()),
                         "lat": mid_lat,
                         "lng": mid_lng,
                         "rings": [],
                         "confidence": 75.0,
-                        "is_crossroad_narrowed": True,
+                        "is_x_street_narrowed": True,
                         "resolution_note": (
                             f"No parcel matched on {street} {street_type}. Showing the "
-                            f"midpoint between {cross_street_1} and {cross_street_2}, "
+                            f"midpoint between {x_street_1} and {x_street_2}, "
                             f"not a specific address. Verify on arrival."
                         ),
                         "is_ambiguous": False
                     }
                 elif len(points) == 1:
                     return {
-                        "address": title_address(f"{street} {street_type} (near {cross_street_1})".strip()),
+                        "address": title_address(f"{street} {street_type} (near {x_street_1})".strip()),
                         "lat": points[0][0],
                         "lng": points[0][1],
                         "rings": [],
                         "confidence": 72.0,
-                        "is_crossroad_narrowed": True,
+                        "is_x_street_narrowed": True,
                         "resolution_note": (
                             f"No parcel matched on {street} {street_type}. Showing where "
-                            f"it meets {cross_street_1}, not a specific address. "
+                            f"it meets {x_street_1}, not a specific address. "
                             f"Verify on arrival."
                         ),
                         "is_ambiguous": False
@@ -519,7 +519,7 @@ class AddressResolver:
         return None
 
     def resolve_nearest_civic(self, house: str, street: str, street_type: str,
-                              cross_street_1: str = None, cross_street_2: str = None) -> dict | None:
+                              x_street_1: str = None, x_street_2: str = None) -> dict | None:
         """Step 4b: Nearest civic address on the street, by house number.
 
         Used when a dispatched address is not in the municipal records and its house
@@ -546,7 +546,7 @@ class AddressResolver:
         # sit ~460 m from the real address. Where the roads are given they decide, and
         # the number gap only breaks ties.
         xstreet_names = []
-        for road in (cross_street_1, cross_street_2):
+        for road in (x_street_1, x_street_2):
             tokens = street_name_tokens(normalize_street_name(road)) if road else []
             if tokens:
                 xstreet_names.append(" ".join(tokens))
@@ -566,7 +566,7 @@ class AddressResolver:
                 # School Access" -- alongside plain mis-transcriptions. Both arrive here
                 # as a name that matches nothing, and neither is a reason to fall back to
                 # a single-road ranking that has no way to be right.
-                xstreet_names = self._verify_cross_streets(conn, xstreet_names)
+                xstreet_names = self._verify_x_streets(conn, xstreet_names)
 
                 row = conn.execute(text("""
                     WITH xstreets AS (

@@ -242,8 +242,8 @@ class IntersectionResolver:
         h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
         return 2 * R * math.asin(math.sqrt(h))
 
-    def _narrow_by_cross_streets(self, candidates: List[dict],
-                                 cross_streets: List[str]) -> Tuple[List[dict], str | None]:
+    def _narrow_by_x_streets(self, candidates: List[dict],
+                                 x_streets: List[str]) -> Tuple[List[dict], str | None]:
         """Narrow several junctions of one street pair using nearby bounding roads.
 
         Cross streets in a Locution announcement are NOT junctions -- they are nearby
@@ -260,11 +260,11 @@ class IntersectionResolver:
         as close to them, the candidates are returned unchanged with a note. An
         uninformative signal is not grounds for discarding a real junction.
         """
-        if not cross_streets or self._engine is None:
+        if not x_streets or self._engine is None:
             return candidates, None
 
         names = [normalize_intersection_key(c, c).split(' & ')[0]
-                 for c in cross_streets if c]
+                 for c in x_streets if c]
         if not names:
             return candidates, None
 
@@ -367,7 +367,7 @@ class IntersectionResolver:
 
     def resolve_candidates(self, candidates: List[dict], target_map_grid: str | int = None,
                            requested_address: str = None,
-                           cross_streets: List[str] = None) -> dict | None:
+                           x_streets: List[str] = None) -> dict | None:
         """Turn candidates into a coordinate payload.
 
         The narrowing cascade runs over whatever candidates exist -- exact or suggested
@@ -392,7 +392,7 @@ class IntersectionResolver:
             return None
 
         exact = all(c.get('match_type') != 'suggested' for c in candidates)
-        narrowed, cross_note = self._narrow_by_cross_streets(candidates, cross_streets or [])
+        narrowed, cross_note = self._narrow_by_x_streets(candidates, x_streets or [])
         narrowed, grid_conflict = self._narrow_by_grid(narrowed, target_map_grid)
 
         # Only a CONTRADICTION blocks automatic resolution. A grid that matches no

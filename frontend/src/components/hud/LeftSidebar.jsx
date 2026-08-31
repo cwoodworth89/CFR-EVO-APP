@@ -225,7 +225,7 @@ export function LeftSidebar({
                               }`}
                            >
                               <span>🛰️</span>
-                              <span>Satellite</span>
+                              <span>Aerial 7.5cm</span>
                            </button>
                         </div>
                      </div>

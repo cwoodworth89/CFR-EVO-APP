@@ -54,8 +54,8 @@ def build_dispatch_payload(
             unique_addresses.append(d.intersection)
             
     # Extract cross streets for geocoder narrowing
-    cross_street_1 = next((d.cross_street_1 for d in all_candidates if d.cross_street_1), None)
-    cross_street_2 = next((d.cross_street_2 for d in all_candidates if d.cross_street_2), None)
+    x_street_1 = next((d.x_street_1 for d in all_candidates if d.x_street_1), None)
+    x_street_2 = next((d.x_street_2 for d in all_candidates if d.x_street_2), None)
             
     incident_type = match_incident_type(sanitized_transcript, CALL_TYPES)
     if incident_type == "Unknown Incident" and all_candidates:
@@ -104,8 +104,8 @@ def build_dispatch_payload(
             res = validator.local_geocode(
                 candidate_address,
                 target_map_grid=next((d.map_grid for d in all_candidates if d.map_grid), None),
-                cross_street_1=cross_street_1,
-                cross_street_2=cross_street_2
+                x_street_1=x_street_1,
+                x_street_2=x_street_2
             ) if validator else None
             if res:
                 logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}'")
@@ -138,7 +138,12 @@ def build_dispatch_payload(
     lat = local_geocode_result["lat"]
     lng = local_geocode_result["lng"]
     rings = local_geocode_result["rings"]
-    target_cross_streets = [s for s in [cross_street_1, cross_street_2] if s]
+    # TWO VARIABLES, never a list. Locution announces
+    #   [address] NEAR [x_street_1] AND [x_street_2]
+    # and either may be omitted. This was `[s for s in [c1, c2] if s]`, and that
+    # filter destroyed position: an announcement carrying only the SECOND street
+    # landed it at index 0, where every reader took it for the first.
+    # Absent stays None -- an omitted XStreet is a real answer (CLAUDE.md 6.1).
     
     timestamp = datetime.datetime.now().astimezone().isoformat()
     
@@ -207,7 +212,8 @@ def build_dispatch_payload(
         "map_grid": map_grid,
         "radio_channel": radio_channel,
         "routing_metrics": routing_metrics,
-        "cross_streets": target_cross_streets,
+        "x_street_1": x_street_1,
+        "x_street_2": x_street_2,
         # Named reasons this dispatch may need a human look, and their count
         # (punch-list #45). These live in TARGET, not at the top level: there is no
         # review_flags column, and the API applies updates with
@@ -249,8 +255,8 @@ def build_dispatch_payload(
                 call_type=incident_type,
                 address=best_address,
                 intersection=all_candidates[0].intersection,
-                cross_street_1=cross_street_1,
-                cross_street_2=cross_street_2,
+                x_street_1=x_street_1,
+                x_street_2=x_street_2,
                 radio_channel=radio_channel,
                 map_grid=map_grid,
                 subaddress=subaddress

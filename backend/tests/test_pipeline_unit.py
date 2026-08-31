@@ -10,7 +10,7 @@ from cfr_dispatch.config.models import DispatchData
 class MockValidator:
     """Mock GIS validator for fast, offline unit testing."""
     def local_geocode(self, parsed_address: str, target_map_grid=None,
-                      cross_street_1: str = None, cross_street_2: str = None):
+                      x_street_1: str = None, x_street_2: str = None):
         # Signature must track gis_service.geocoder.CoquitlamDataValidator.local_geocode.
         # It gained target_map_grid in the geocoder 2.0 work and the cross_street_*
         # arguments with cross-road narrowing; this mock kept the old one-argument form
@@ -125,7 +125,7 @@ class TestAmpersandSurvivesSanitize(unittest.TestCase):
     """`&` separates two cross streets and must survive sanitisation as a word.
 
     Measured on DISP-2026-AAFDB8 (2026-08-30), announced
-    "Near, Anson, Avenue & Lincoln Ave" and stored as cross_streets ["Anson Ave"].
+    "Near, Anson, Avenue & Lincoln Ave" and stored as x_streets ["Anson Ave"].
     `sanitize_transcript` stripped the ampersand to nothing, leaving
     "near anson avenue lincoln ave" with no separator at all; clean_location_text
     then correctly removed "lincoln ave" as trailing junk after a street type.
@@ -141,7 +141,7 @@ class TestAmpersandSurvivesSanitize(unittest.TestCase):
         self.assertIn("anson avenue and lincoln ave", out)
         self.assertNotIn("avenue lincoln", out)
 
-    def test_both_cross_streets_reach_the_dataclass(self):
+    def test_both_x_streets_reach_the_dataclass(self):
         from cfr_dispatch.parser import parse_dispatch_announcement
         from cfr_dispatch.config.vocab import UNITS_VOCABULARY
         raw = ("Coquitlam Engine 1, Respond Emergency, Alarm Activated, High Risk, "
@@ -152,8 +152,8 @@ class TestAmpersandSurvivesSanitize(unittest.TestCase):
         # pinning a second bug: fuzzy_correct_street returned the expanded municipal name
         # while the untouched leg kept "Lincoln Ave", so one clause held both conventions.
         # Fixed with the suffix-doubling bug (punch-list #56).
-        self.assertEqual(d.cross_street_1, "Anson Ave")
-        self.assertEqual(d.cross_street_2, "Lincoln Ave")
+        self.assertEqual(d.x_street_1, "Anson Ave")
+        self.assertEqual(d.x_street_2, "Lincoln Ave")
 
 
 class TestCrossRoadCleaning(unittest.TestCase):
@@ -208,17 +208,17 @@ class TestCoalesceAcrossRounds(unittest.TestCase):
 
     def test_round_2_supplies_what_round_1_dropped(self):
         from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
-        r1 = self._cand(address="1123 Westwood St", cross_street_1="Anson Ave")
-        r2 = self._cand(address="1123 Westwood St", cross_street_1="Anson Ave",
-                        cross_street_2="Lincoln Ave")
+        r1 = self._cand(address="1123 Westwood St", x_street_1="Anson Ave")
+        r2 = self._cand(address="1123 Westwood St", x_street_1="Anson Ave",
+                        x_street_2="Lincoln Ave")
         x1, x2, sub = _coalesce_across_rounds([r1, r2], None, {})
         self.assertEqual(x1, "Anson Ave")
         self.assertEqual(x2, "Lincoln Ave")
 
     def test_round_1_still_wins_when_both_rounds_have_it(self):
         from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
-        r1 = self._cand(cross_street_1="Anson Avenue", cross_street_2="Lincoln Ave")
-        r2 = self._cand(cross_street_1="Anson Ave", cross_street_2="Lincoln Avenue")
+        r1 = self._cand(x_street_1="Anson Avenue", x_street_2="Lincoln Ave")
+        r2 = self._cand(x_street_1="Anson Ave", x_street_2="Lincoln Avenue")
         x1, x2, _ = _coalesce_across_rounds([r1, r2], None, {})
         self.assertEqual(x1, "Anson Avenue")
         self.assertEqual(x2, "Lincoln Ave")
@@ -232,7 +232,7 @@ class TestCoalesceAcrossRounds(unittest.TestCase):
 
     def test_falls_back_to_phase_1_candidate_then_target(self):
         from cfr_dispatch.pipeline.phase2 import _coalesce_across_rounds
-        p1 = self._cand(cross_street_1="Anson Ave")
+        p1 = self._cand(x_street_1="Anson Ave")
         x1, x2, sub = _coalesce_across_rounds(
             [self._cand(address="1123 Westwood St")], p1, {"subaddress": "Unit 5"})
         self.assertEqual(x1, "Anson Ave")
@@ -289,7 +289,7 @@ class TestStreetSuffixDoubling(unittest.TestCase):
         self.assertEqual(self._f("Nonexistent Boulevard"), "Nonexistent Boulevard")
 
     def test_cross_road_clause_round_trips(self):
-        from cfr_dispatch.parser.location import fuzzy_correct_cross_roads
+        from cfr_dispatch.parser.location import fuzzy_correct_x_streets
         self.assertEqual(
-            fuzzy_correct_cross_roads("Christmas Way and Gordon Ave", self.STREETS),
+            fuzzy_correct_x_streets("Christmas Way and Gordon Ave", self.STREETS),
             "Christmas Way and Gordon Ave")

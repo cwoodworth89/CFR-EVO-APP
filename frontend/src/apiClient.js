@@ -34,7 +34,8 @@ export const TILE_BASE_URL = getTileBaseUrl();
 export const getTileUrl = (style = 'SATELLITE', z = 12, x = 0, y = 0) => {
   const s = (style || 'SATELLITE').toUpperCase();
   if (s === 'SATELLITE') {
-    return `${TILE_BASE_URL}/services/satellite/tiles/${z}/${x}/${y}.jpg`;
+    // City of Coquitlam 7.5cm orthophotos only -- see BASE_LAYERS.SATELLITE.
+    return `${TILE_BASE_URL}/services/ortho/tiles/${z}/${x}/${y}.jpg`;
   }
   if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
     return `${TILE_BASE_URL}/services/street_nolabels/tiles/${z}/${x}/${y}.png`;
@@ -51,20 +52,20 @@ export const getTileLayerConfig = (style = 'SATELLITE') => {
   const s = (style || 'SATELLITE').toUpperCase();
   let url = `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`;
   // Deepest zoom actually crawled per layer -- must match "max_zoom" in
-  // compile_mbtiles.py LAYER_CONFIGS. Street styles stop at 19 (operator
-  // decision 2026-08-26, punch-list #40); satellite goes to 20 because the
-  // City's 7.5cm orthos are z20-native. Leaflet upscales beyond this, so the
-  // map still zooms to maxZoom -- it just stops requesting new tiles.
-  let maxNativeZoom = 19;
+  // compile_mbtiles.py LAYER_CONFIGS. Street styles stop at 18 (operator
+  // decision 2026-08-30, punch-list #47); aerial goes to 20 because the City's
+  // 7.5cm orthos are z20-native. Leaflet upscales beyond this, so the map still
+  // zooms to maxZoom -- it just stops requesting new tiles.
+  let maxNativeZoom = 18;
   let attribution = '© OpenStreetMap contributors (100% Offline Local Cache)';
   
   if (s === 'SATELLITE') {
-    url = `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`;
+    url = `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`;
     maxNativeZoom = 20;
-    attribution = 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)';
+    attribution = 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)';
   } else if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
     url = `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`;
-    maxNativeZoom = 19;
+    maxNativeZoom = 18;
     attribution = '© OpenStreetMap contributors & Carto (100% Offline Local Cache)';
   }
 

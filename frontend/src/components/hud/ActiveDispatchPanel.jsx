@@ -113,7 +113,7 @@ export default function ActiveDispatchPanel({ activeDispatch, setActiveDispatch,
         {/* TV Kiosk Satellite View */}
         <div className="flex flex-col gap-2 bg-slate-950 p-4 border border-slate-800 rounded-2xl flex-shrink-0 text-left">
           <span className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider flex justify-between items-center">
-            <span>🛰️ GOOGLE SATELLITE VIEW</span>
+            <span>🛰️ AERIAL 7.5cm — CITY OF COQUITLAM</span>
             <span className="text-emerald-500 text-[8px] font-black uppercase">ZOOM LEVEL 18</span>
           </span>
           <div className="mt-1">

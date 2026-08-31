@@ -27,6 +27,10 @@ export default function VerificationSidebar({
   setVerifiedUnits,
   verifiedSubaddress,
   setVerifiedSubaddress,
+  verifiedXstreet1 = '',
+  setVerifiedXstreet1 = () => {},
+  verifiedXstreet2 = '',
+  setVerifiedXstreet2 = () => {},
   verifiedTalkgroup,
   setVerifiedTalkgroup,
   verifiedMapGrid,
@@ -308,7 +312,10 @@ export default function VerificationSidebar({
 
                       {selectedCall.target?.intersection && (
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Cross Roads</span>
+                          {/* The incident location IS this junction. Not the XStreets --
+                              those are the "near <road> and <road>" block reference and
+                              have their own fields below. */}
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider font-mono">Intersection</span>
                           <span className="text-[10px] font-bold text-amber-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-lg">
                             🔀 {selectedCall.target.intersection}
                           </span>
@@ -605,6 +612,48 @@ export default function VerificationSidebar({
               className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
               placeholder={toTitleCase(selectedCall.target?.subaddress) || "None"}
             />
+          </div>
+
+          {/* XStreets (Side-by-Side, in announced order).
+              Named as the run sheet and the CAD terminal name them. These are the
+              "near <road> and <road>" block reference -- they CAN intersect the
+              incident street but are not required to, and often run parallel. The
+              Intersection field above is a different thing: the incident location
+              itself when the call is a junction. */}
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2].map((n) => {
+              const systemValue = selectedCall.target?.[`x_street_${n}`] || '';
+              const value = n === 1 ? verifiedXstreet1 : verifiedXstreet2;
+              const setValue = n === 1 ? setVerifiedXstreet1 : setVerifiedXstreet2;
+              const fieldKey = `xstreet${n}`;
+              return (
+                <div key={fieldKey} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
+                      XStreet{n}
+                    </label>
+                    <span
+                      onClick={() => onPrefillField(fieldKey)}
+                      className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[90px] truncate cursor-pointer transition-colors"
+                      title="Click, or press Ctrl+Space, to import the system value"
+                    >
+                      {toTitleCase(systemValue) || 'None'} 📥
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { onSubmitReview(e); return; }
+                      handleInputKeyDown(e, fieldKey);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
+                    placeholder={toTitleCase(systemValue) || 'None'}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Talk Group and Map Grid (Side-by-Side) */}

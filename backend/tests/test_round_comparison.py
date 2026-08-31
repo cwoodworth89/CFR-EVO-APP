@@ -100,21 +100,42 @@ class TestVerdicts(unittest.TestCase):
         c = compare_observations([("p2r1", cand(address="1123 Westwood St"))])
         self.assertFalse(c.has_second_observation)
 
-    def test_cross_streets_compare_unordered(self):
+    def test_x_streets_are_positional_not_a_set(self):
+        """Operator ruling 2026-08-30: the announcement is
+        [address] NEAR [x_street_1] AND [x_street_2], so position is part of what
+        was said. This asserted AGREE on a swapped pair when written -- sorting the
+        pair was my inference and it was wrong.
+        """
         c = compare_observations([
             ("p2r1", cand(address="1123 Westwood St",
-                          cross_street_1="Anson Ave", cross_street_2="Lincoln Ave")),
+                          x_street_1="Anson Ave", x_street_2="Lincoln Ave")),
             ("p2r2", cand(address="1123 Westwood St",
-                          cross_street_1="Lincoln Avenue", cross_street_2="Anson Avenue")),
+                          x_street_1="Lincoln Avenue", x_street_2="Anson Avenue")),
         ])
-        self.assertEqual(c.fields["cross_streets"].verdict, AGREE)
+        self.assertEqual(c.fields["x_streets"].verdict, DISAGREE)
+
+    def test_same_x_streets_in_the_same_order_agree(self):
+        c = compare_observations([
+            ("p2r1", cand(address="X", x_street_1="Anson Ave", x_street_2="Lincoln Ave")),
+            ("p2r2", cand(address="X", x_street_1="Anson Avenue", x_street_2="Lincoln Avenue")),
+        ])
+        self.assertEqual(c.fields["x_streets"].verdict, AGREE)
+
+    def test_an_omitted_first_x_street_is_not_back_filled(self):
+        """Either may be omitted. A round naming only the second must not read as
+        agreeing with a round naming only the first."""
+        c = compare_observations([
+            ("p2r1", cand(address="X", x_street_1="Anson Ave")),
+            ("p2r2", cand(address="X", x_street_2="Anson Ave")),
+        ])
+        self.assertEqual(c.fields["x_streets"].verdict, DISAGREE)
 
     def test_a_genuinely_different_cross_street_disagrees(self):
         c = compare_observations([
-            ("p2r1", cand(address="X", cross_street_1="Anson Ave", cross_street_2="Lincoln Ave")),
-            ("p2r2", cand(address="X", cross_street_1="Anson Ave", cross_street_2="Dawes Hill Rd")),
+            ("p2r1", cand(address="X", x_street_1="Anson Ave", x_street_2="Lincoln Ave")),
+            ("p2r2", cand(address="X", x_street_1="Anson Ave", x_street_2="Dawes Hill Rd")),
         ])
-        self.assertEqual(c.fields["cross_streets"].verdict, DISAGREE)
+        self.assertEqual(c.fields["x_streets"].verdict, DISAGREE)
 
     def test_empty_input_is_not_an_error(self):
         c = compare_observations([])

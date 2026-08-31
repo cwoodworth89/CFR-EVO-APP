@@ -9,7 +9,13 @@ const UPDATE_FIELD_LABELS = {
   incident_type: 'incident',
   responding_units: 'units',
   subaddress: 'unit #',
-  intersection: 'cross streets',
+  // "intersection" is the incident location when the call IS a junction. It is NOT
+  // the XStreets, and used to be labelled "cross streets" here -- which named the
+  // wrong field, since on 53 of the last 81 calls the XStreets were populated and
+  // the junction was not.
+  intersection: 'intersection',
+  x_street_1: 'xstreet 1',
+  x_street_2: 'xstreet 2',
   lat: 'location',
   lng: 'location',
   map_grid: 'map grid',
@@ -184,6 +190,18 @@ export default function ActiveAlertBanner({
             <span className="text-amber-400 font-mono ml-2.5">({formattedGrid})</span>
           )}
         </h1>
+
+        {/* XStreets -- the block-confirmation reference, as the run sheet labels it.
+            Rendered only when announced: absent is absent, never a placeholder (§6.1).
+            Deliberately quieter than the address, which stays the primary target. */}
+        {(activeCall.x_street_1 || activeCall.x_street_2) && (
+          <div className={`font-mono font-bold tracking-wide text-slate-300 mt-0.5 ${
+            isTvMode ? 'text-lg sm:text-xl' : 'text-sm sm:text-base'
+          }`}>
+            <span className="text-slate-500 uppercase mr-1.5">XStreets</span>
+            {[activeCall.x_street_1, activeCall.x_street_2].filter(Boolean).join(' & ')}
+          </div>
+        )}
 
         <div className={`font-black tracking-wider uppercase font-mono mt-1 ${
           activeCall.is_test ? 'text-orange-400' : 'text-amber-400'

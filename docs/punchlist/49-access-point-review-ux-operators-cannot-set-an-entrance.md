@@ -76,3 +76,31 @@ Roughly 30 seconds per site. The top 100 is an afternoon.
   is where it is rather than wondering if it is wrong.
 
 ---
+
+---
+
+## 49 (update). The review queue is 1,671 sites, not 65,401 parcels
+
+> **Status**: 🔴 **Open — HIGH PRIORITY, and now correctly sized (2026-08-31).**
+
+This item has read as "operators must set entrances on 65,401 parcels", which is why it has
+not moved. Under the `base_site` decision it is **1,671 multi-parcel sites**, ranked by
+parcel count, and the top fifty cover the complexes crews actually struggle with:
+
+| Site | Parcels |
+|:--|--:|
+| 523 Gatensbury St | 392 |
+| 567 Clarke Rd | 374 |
+| 1016 Howie Ave | 360 |
+| 657 Whiting Way | 335 |
+| 1188 Pinetree Way | 316 |
+
+One entrance set on the `base_site` serves every unit at that address — the resolution rule
+is that a unit row with no `entrance_lat` falls back to its `base_site` row.
+
+**Worth reconciling** against the "~1,400-site review queue" figure in
+[`arrival_point_handoff.md`](../arrival_point_handoff.md); they may be the same set.
+
+The UI is still the whole of this item — all 65,401 `entrance_lat` are NULL and there is no
+way to set one without direct SQL. See
+[`briefings/base_site_rows_decision.md`](../briefings/base_site_rows_decision.md).

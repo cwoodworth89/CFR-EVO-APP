@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | DESIGNED |
 | **Severity** | crew-visible |
 | **Area** | 🧾 Import Completeness Audit, 2026-08-23 |
 | **Blocks** | 1 |
@@ -100,3 +100,34 @@ measured against the corpus the way #42 was.
 across 8 legal parcels expected, and is there an attribute marking the primary parcel?
 
 ---
+
+---
+
+## 48 (direction agreed). `base_site` rows — City rows are left alone
+
+> **Status**: 📐 **Design agreed with the operator 2026-08-31, not implemented.**
+> Full reasoning, measurements and open questions:
+> [`briefings/base_site_rows_decision.md`](../briefings/base_site_rows_decision.md).
+
+**The tiebreak question is withdrawn — nothing is chosen between any more.** All 69,708
+City records are imported and kept, duplicates included, each keeping its own `folio`,
+`legaldesc`, `gis_id` and geometry. A CFR-owned **`base_site`** row is added for each of the
+**1,671 multi-parcel properties**, carries the operational context, and speaks for every City
+row at that address.
+
+`base_site` rather than `base_building`: the latter is fire-prevention vocabulary for a
+highrise or commercial structure and stops meaning anything for a trailer park or townhome
+complex, which is where this problem is worst.
+
+**The City's `MASTER` record was checked before being adopted, and is not what its name
+suggests.** Across 517 properties holding both a MASTER row and unit rows, MASTER averages
+**10.3% of the summed unit area** while its bounding box spans ~100% of the site, and 99.6%
+of unit parcels intersect it. 99% carry a strata `PLAN`, 1% a `LOT`, 12% a `FOLIO`. It is
+**strata common property** — driveways, walkways, perimeter — not the building and not the
+property envelope. Adopting it as "the property" would have had the kiosk outline a driveway
+network. It is still valuable, as the access surface an arrival point should snap to.
+
+**Blocked on**: the parcel-snapping workstream landing first (it is baselined against current
+parcel geometry), and one open question — whether single-parcel addresses also get a
+`base_site`, since otherwise their operator data sits on a City row the import can no longer
+key on. Both in the briefing.

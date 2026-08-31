@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { API_BASE_URL, TILE_BASE_URL } from '../../apiClient';
+import { API_BASE_URL } from '../../apiClient';
+import { BASE_LAYERS } from '../MapConstants';
 import { isWithinCoquitlam } from '../../utils/addressUtils';
 
 function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
@@ -124,16 +125,18 @@ export default function PropertySatellitePanel({ activeCall }) {
     <MapContainer
       center={[destLat, destLng]}
       zoom={16.5}
-      maxZoom={20}
+      maxZoom={BASE_LAYERS.SATELLITE.maxZoom}
       className="w-full h-full z-0"
       zoomControl={true}
       attributionControl={false}
     >
-      {/* High-Resolution 100% Local Self-Hosted Satellite Basemap (Z12–Z20) */}
+      {/* City of Coquitlam 7.5cm orthophoto, via the single BASE_LAYERS
+          definition. This panel is where crews read rooflines and driveways, so
+          it must not drift from the main map's imagery source. */}
       <TileLayer
-        url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
-        maxNativeZoom={20}
-        maxZoom={22}
+        url={BASE_LAYERS.SATELLITE.url}
+        maxNativeZoom={BASE_LAYERS.SATELLITE.maxNativeZoom}
+        maxZoom={BASE_LAYERS.SATELLITE.maxZoom}
       />
 
       {polygonPositions && (

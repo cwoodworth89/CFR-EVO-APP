@@ -1,7 +1,7 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
-import { TILE_BASE_URL } from '../../apiClient';
+import { BASE_LAYERS } from '../MapConstants';
 
 export default function SatelliteMiniMap({ lat, lng }) {
   if (!lat || !lng) return null;
@@ -36,10 +36,13 @@ export default function SatelliteMiniMap({ lat, lng }) {
         dragging={false}
         style={{ height: '100%', width: '100%' }}
       >
+        {/* Single source of truth -- BASE_LAYERS.SATELLITE is the City 7.5cm
+            ortho layer. Hardcoding the URL here is how this panel was left on
+            Esri when the main map moved to /services/ortho on 2026-08-30. */}
         <TileLayer
-          url={`${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`}
-          maxNativeZoom={20}
-          maxZoom={22}
+          url={BASE_LAYERS.SATELLITE.url}
+          maxNativeZoom={BASE_LAYERS.SATELLITE.maxNativeZoom}
+          maxZoom={BASE_LAYERS.SATELLITE.maxZoom}
         />
         <Marker position={position} icon={miniTargetIcon} />
       </MapContainer>

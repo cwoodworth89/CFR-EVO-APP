@@ -282,10 +282,24 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
         ) nearest
         WHERE p.id = nearest.parcel_id;
         """)
-        # NOTE: parcels whose addressed street has no matching road are deliberately left
-        # untouched rather than snapped to the nearest road of another name. There are 54 of
-        # them, every one tracked in docs/city_gis_data_register.md as a municipal data gap.
-        # They surface as an approximate location rather than a confident wrong one (§6.1).
+        # Parcels whose addressed street has no matching road get NO front point at all.
+        #
+        # They are not snapped to the nearest road of another name -- that is the defect this
+        # whole function was rewritten to remove. But "not snapped" is not sufficient on its
+        # own: leaving them untouched means they KEEP whatever the previous any-road
+        # algorithm wrote, which is a front point on someone else's street. Measured
+        # 2026-08-31: 56 parcels were carrying exactly that, silently, months after the
+        # any-road behaviour was removed (punch-list #58).
+        #
+        # So the unmatched set is explicitly nulled below. A missing arrival point surfaces
+        # as the Tier 1 amber card; a stale one routes a crew confidently to the wrong
+        # street, and nothing on the kiosk says so. An unknown reported as unknown is a
+        # correct answer (§6.1).
+        #
+        # Every one of these streets is a municipal data gap tracked in
+        # docs/city_gis_data_register.md, and they are the natural first entries in the
+        # operator entrance queue (punch-list #49), being precisely the properties where no
+        # automatic answer exists.
         #
         # NOTE: entrance_lat / entrance_lng are NEVER written here. Those hold the
         # operator-verified access point, and human knowledge must survive the pipeline that
@@ -307,8 +321,28 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
             pct = (min(i + batch_size, total_candidates) / total_candidates) * 100
             logging.info(f"  Frontage backfill progress: {min(i + batch_size, total_candidates)}/{total_candidates} parcels evaluated ({pct:.1f}%)...")
 
+        # Clear any front point left behind by an earlier run on a street that has no road.
+        with engine.begin() as tx_conn:
+            cleared = tx_conn.execute(text("""
+                UPDATE public.parcels p
+                   SET front_lat = NULL, front_lng = NULL, updated_at = now()
+                 WHERE (p.front_lat IS NOT NULL OR p.front_lng IS NOT NULL)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM public.roads r
+                        WHERE r.geom IS NOT NULL
+                          AND upper(replace(r.roadname, '''', ''))
+                              = upper(replace(p.street, '''', ''))
+                   );
+            """)).rowcount
+
         elapsed_s = time.time() - start_t
         logging.info(f"  ✓ Road frontage backfill completed for {total_updated} parcels in {elapsed_s:.2f}s.")
+        if cleared:
+            logging.warning(
+                f"  ⚠ Cleared {cleared} stale front point(s) on parcels whose addressed street "
+                f"has no road in public.roads. These now report an unknown arrival point "
+                f"rather than one on another street (punch-list #58)."
+            )
         return total_updated
     except Exception as e:
         logging.error(f"  ✗ Error calculating parcel frontage coordinates: {e}", exc_info=True)

@@ -165,3 +165,46 @@ when no operator saw them.
 **The proper route is HITL.** Thirteen of the fifteen were reviewed and rated OPERATIONAL or
 PERFECT *before* the `verified_x_street_1/2` columns existed (2026-08-30). Re-reviewing them
 gives both halves: the preserved system output and the confirmed truth.
+
+---
+
+## 56 (note). The 13 affected calls are flagged for re-review
+
+Flagged 2026-08-31 by setting `feedback_submitted = false`, which is what the review queue
+filters on (`DispatchReview.jsx:308`). **Nothing else was touched** — `quality_rating` and
+`verified_transcript` are preserved on all 13, verified by re-query. Reversible: set the flag
+back on these ids.
+
+```
+DISP-2026-BE54FA  DISP-2026-A1A8F8  DISP-2026-85972F  DISP-2026-D791F1
+DISP-2026-10340E  DISP-2026-000AAC  DISP-2026-589B10  DISP-2026-1DB14F
+DISP-2026-D107E5  DISP-2026-EC9CEF  DISP-2026-5DBAF8  DISP-2026-547885
+DISP-2026-47ACF6
+```
+
+Queue went from 23 to 36. Each was reviewed and rated **before** `verified_x_street_1/2`
+existed (2026-08-30), so the reviewer had nowhere to record the cross streets. Re-reviewing
+gives the corpus both halves: the preserved system output, doubled suffix and all, against
+the confirmed truth.
+
+### A UI defect found while checking that the field was usable
+
+`DispatchReview.jsx:173` filled the XStreet inputs from the **system value** when no verified
+value existed:
+
+```js
+setVerifiedXstreet1(selectedCall.verified_x_street_1
+  ?? selectedCall.target?.x_street_1 ?? '');   // system fallback
+```
+
+Its neighbours do not — `verified_address`, `verified_incident` and `verified_map_grid` all
+use `|| ''`. So opening an un-reviewed call put the parser's guess in the box as real text,
+the placeholder never showed, and **a reviewer submitting without editing recorded that guess
+as `verified_x_street_1`**. A machine value stored as human-confirmed: punch-list **#50** in
+the UI rather than in the import, polluting the corpus the parser is measured against.
+`Christmas Way Way` would have been confirmed thirteen times over by exactly this route.
+
+Fixed: the system value is now the placeholder — a suggestion behind the box, as
+units/incident/address already do it — and importing it is still one keystroke (click the
+`Sys:` value or `Ctrl+Space`). Deliberate acceptance, not a default. `verified_talkgroup` had
+the same fallback and was corrected with it.

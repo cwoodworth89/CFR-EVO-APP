@@ -637,7 +637,7 @@ export default function VerificationSidebar({
                       className="text-[8px] text-slate-500 hover:text-sky-400 font-bold max-w-[90px] truncate cursor-pointer transition-colors"
                       title="Click, or press Ctrl+Space, to import the system value"
                     >
-                      {toTitleCase(systemValue) || 'None'} 📥
+                      Sys: {toTitleCase(systemValue) || 'None'} 📥
                     </span>
                   </div>
                   <input

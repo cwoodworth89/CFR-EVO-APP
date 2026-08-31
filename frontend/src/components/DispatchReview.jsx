@@ -170,11 +170,22 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         setVerifiedSubaddress(selectedCall.feedback_submitted ? toTitleCase(selectedCall.target?.subaddress || '') : '');
         // Promoted to real columns 2026-08-31 -- read from the record, not target.
         setVerifiedMapGrid(selectedCall.verified_map_grid || '');
-        setVerifiedXstreet1(selectedCall.verified_x_street_1
-          ?? selectedCall.target?.x_street_1 ?? '');
-        setVerifiedXstreet2(selectedCall.verified_x_street_2
-          ?? selectedCall.target?.x_street_2 ?? '');
-        setVerifiedTalkgroup(selectedCall.verified_talkgroup || selectedCall.target?.radio_channel || '');
+        // The system value is a SUGGESTION, not a starting value. It belongs in the
+        // placeholder, behind the box, exactly as units / incident / address do it.
+        //
+        // These previously fell back to target.x_street_* when no verified value existed,
+        // so opening an un-reviewed call filled the boxes with the parser's guess as real
+        // text. A reviewer who submitted without editing then recorded that guess as
+        // verified_x_street_1 -- a machine value stored as human-confirmed, which is
+        // punch-list #50 in the UI rather than the import, and it pollutes the very corpus
+        // the parser is measured against. "Christmas Way Way" would have been confirmed
+        // fifteen times over.
+        //
+        // Import is still one keystroke: click the Sys value or press Ctrl+Space
+        // (handlePrefillField). Deliberate acceptance, not a default.
+        setVerifiedXstreet1(selectedCall.verified_x_street_1 || '');
+        setVerifiedXstreet2(selectedCall.verified_x_street_2 || '');
+        setVerifiedTalkgroup(selectedCall.verified_talkgroup || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         // Prefer the reviewer's own correction, then what the parser heard, then
         // null. Null is a real state here — "the dispatch did not announce one".

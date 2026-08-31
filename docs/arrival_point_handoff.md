@@ -194,7 +194,8 @@ This is the part that most deserves scrutiny:
 
 | Added | |
 |:--|:--|
-| Columns | `entrance_set_by`, `entrance_set_at`, `entrance_note`, `access_far_corner_m` |
+| Columns | `entrance_set_by`, `entrance_set_at`, `entrance_note` |
+| Dropped | `access_far_corner_m` — derived from the arrival point and never recomputed, so it went stale (2026-08-31). Now a report query; see that migration. |
 | Table | `parcels_frontpoint_snapshot_20260828` (temporary, drop after adoption settles) |
 | Vocabulary category | `xstreet_descriptor`, 9 rows |
 | Migrations | 5 |

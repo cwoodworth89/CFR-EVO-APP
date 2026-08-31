@@ -349,26 +349,15 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
                    );
             """)).rowcount
 
-        # access_far_corner_m is DERIVED from the arrival point, so it is recomputed here
-        # rather than left to the migration that introduced it -- whose own comment says
-        # "Recompute after backfill_parcel_frontage" and which nothing was doing. On
-        # 2026-08-31 the 56 parcels cleared above were still carrying a far-corner distance
-        # measured from the front point that had just been removed: the #58 defect one column
-        # further along. Nulling the source without nulling what depends on it is the same
-        # mistake in a new place.
-        with engine.begin() as tx_conn:
-            tx_conn.execute(text("""
-                UPDATE public.parcels p
-                   SET access_far_corner_m = CASE
-                           WHEN p.geom IS NULL
-                             OR COALESCE(p.entrance_lat, p.front_lat) IS NULL THEN NULL
-                           ELSE ST_Length(ST_LongestLine(
-                                    ST_SetSRID(ST_MakePoint(
-                                        COALESCE(p.entrance_lng, p.front_lng),
-                                        COALESCE(p.entrance_lat, p.front_lat)), 4326),
-                                    p.geom)::geography)
-                       END;
-            """))
+        # NOTE: nothing derived from the arrival point is stored alongside it. There was an
+        # access_far_corner_m column -- metres from the arrival point to the furthest corner
+        # of the parcel -- and it went stale the moment a front point moved, because keeping
+        # it correct depended on remembering to recompute it. Nobody did: when #58 cleared 56
+        # stale front points on 2026-08-31, those rows kept a distance measured from a point
+        # that no longer existed. It was dropped rather than maintained (operator decision:
+        # do not store values with no perpetual use). The measurement is still wanted
+        # occasionally and is a report, not an attribute -- the query lives in
+        # backend/migrations/2026-08-31_drop_access_far_corner.sql.
 
         elapsed_s = time.time() - start_t
         logging.info(f"  ✓ Road frontage backfill completed for {total_updated} parcels in {elapsed_s:.2f}s.")

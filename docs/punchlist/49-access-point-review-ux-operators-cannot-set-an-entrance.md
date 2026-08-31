@@ -31,8 +31,15 @@ interface is the exception path.
 * Resolution precedence is **entrance → front → centroid**
   (`services/gis/src/gis_service/address_resolver.py`). A recorded human answer outranks the
   calculation.
-* `public.parcels.access_far_corner_m` records how much property lies beyond the arrival
-  point, so the review queue is a query rather than a stale list.
+* **How much property lies beyond the arrival point** is what ranks the review queue — a
+  12-hectare trailer park matters more than a wide driveway. It was briefly a stored column,
+  `access_far_corner_m`, and was **dropped 2026-08-31**: it is derived from the arrival point,
+  so it was only true until that point moved, and nothing recomputed it. When **#58** cleared
+  56 stale front points, those rows kept a distance measured from a position that no longer
+  existed. Operator decision: do not store values with no perpetual use. It is a report, and
+  the query is in `backend/migrations/2026-08-31_drop_access_far_corner.sql` — run it against
+  `is_base_site` rows once **#48** is applied, so a property is measured once rather than once
+  per legal lot.
 
 **All 65,401 entrance points are NULL.** There is no way to set one except by hand-writing SQL
 against production, which is exactly the practice this workstream spent two days arguing

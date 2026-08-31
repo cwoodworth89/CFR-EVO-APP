@@ -108,8 +108,6 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 | :--- | :--- | :--- |
 | `docker compose up -d` | `./` | Start the local containerized stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI). |
 | `python main.py` | `backend/` | Launch the continuous audio listener background runner. |
-| `python tests/run_test_suite.py` | `backend/` | Execute the QA verification test suite (transcription accuracy and geocoder matching checks). |
-| `python scripts/feed_recorded_call.py <wav_path> [tone]` | `backend/` | Simulate an incoming radio dispatch feed by streaming a WAV file to the listener. |
 | `python scripts/backtest_parser.py` | `backend/` | Run comparative accuracy benchmarks between production and test parsers on database ground-truth calls. |
 | `python scripts/update_gis_data.py` | `backend/` | Execute the monthly GIS update and compare cache changes (runs automated via Windows Scheduler). |
 | `npm run dev` | `frontend/` | Run the React dashboard development server. |
@@ -127,14 +125,12 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
 | **Call Structure** | [docs/call_structure.md](./call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
 | **GIS Endpoints** | [docs/gis_endpoints.md](./gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
-| **Test Matrix** | [docs/test_procedures.md](./test_procedures.md) | Tone spot checks, database inserts, mic levels. | `e2e-dispatch-testing` |
 | **Hardware Spec** | [docs/hardware_specification.md](./hardware_specification.md) | Pi soundcards and laptop kiosk hardware. | None |
 | **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./laptop_kiosk_setup.md) | Kiosk displays and auto-updates. | `kiosk-remote-ops` |
 | **Milestones** | [docs/milestones.md](./milestones.md) | Development roadmap and releases. | None |
 | **Privacy Compliance** | [docs/privacy.md](./privacy.md) | Voice monitoring rules and local RAM buffer. | None |
 | **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | PostgreSQL index tuning and DSP calibration. | `performance-metrics-analytics` |
 | **Development Freeze Summary** | [docs/development_freeze_summary.md](./development_freeze_summary.md) | Current implementation status (Phase A–F): PostGIS migration, STT vocab biasing, API decomposition, geocoder 2.0. **Start here for current state.** | `gis-spatial-analysis` |
-| **Debug & QA Punch List** | [docs/debug_and_qa_punchlist.md](./debug_and_qa_punchlist.md) | Open bugs and edge cases (routing anomalies, geocoding fallbacks, UI refinements). | `e2e-dispatch-testing` |
 | **Dispatch Integration Options** | [docs/dispatch_integration_options.md](./dispatch_integration_options.md) | Radio/audio ingestion integration approaches. | `dispatch-pipeline-ops` |
 | **Project Purpose & History** | [docs/PROJECT_PURPOSE_AND_HISTORY.md](./PROJECT_PURPOSE_AND_HISTORY.md) | Origin story and evolution from training-game prototype to dispatch HUD. | None |
 | **Project Ideas / Future Features** | [docs/PROJECT_IDEAS.md](./PROJECT_IDEAS.md) | Backlog of future feature candidates (e.g. reimplemented driver training module). | None |
@@ -155,7 +151,6 @@ When spawning helper sub-agents, inherit from these type specifications:
 ### 📚 Domain Skills
 These markdown runbooks guide agents through complex developer workflows:
 * [**`dispatch-pipeline-ops`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/dispatch-pipeline-ops/SKILL.md): Architecture of the 2-phase real-time dispatch audio pipeline.
-* [**`e2e-dispatch-testing`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/e2e-dispatch-testing/SKILL.md): Running system tests, MQTT validation, and purging test entries.
 * [**`performance-metrics-analytics`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/performance-metrics-analytics/SKILL.md): Guidelines for measuring pipeline latencies and business intelligence metrics.
 * [**`gis-spatial-analysis`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-spatial-analysis/SKILL.md): Procedures for shapefile queries, coordinate reference transformations, and NFPA 291 hydrants.
 * [**`gis-pipeline-sync`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-pipeline-sync/SKILL.md): Pulling Coquitlam ESRI shapefiles and GIS caching updates.

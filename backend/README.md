@@ -48,9 +48,9 @@ To start the continuous listening loop:
 python main.py
 ```
 
-To run the local developer/QA test suite:
+To run the test suite:
 ```bash
-python tests/run_test_suite.py
+pytest backend/tests/
 ```
 
 ---

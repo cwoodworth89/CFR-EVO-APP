@@ -59,7 +59,7 @@ Claude Code's delegation model is `CLAUDE.md` §4. This section covers only Anti
    recommended action, confidence. A 50 KB report is a context cost paid twice — once to
    write it, once to read it.
 4. **Model tier allocation**:
-   * `flash_lite` — deterministic test runners (`feed_recorded_call.py`, `pytest`),
+   * `flash_lite` — deterministic test runners (`pytest`),
      mechanical renames, dead-code and import pruning, log parsing, linting.
    * `flash` — feature engineering, database migrations, shapefile ingestion, React
      component decomposition, tile pre-caching, API routes.

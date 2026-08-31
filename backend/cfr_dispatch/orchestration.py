@@ -9,8 +9,7 @@ from cfr_dispatch.worker import background_worker_loop, get_shared_validator
 from cfr_dispatch.worker_supervisor import WorkerSupervisor
 from cfr_dispatch.audio_listener import run_audio_listener_loop
 from cfr_dispatch.pipeline import (
-    build_dispatch_payload,
-    process_full_dispatch
+    build_dispatch_payload
 )
 
 # setup_logging moved to cfr_dispatch.logging_setup so the worker process can call it too.

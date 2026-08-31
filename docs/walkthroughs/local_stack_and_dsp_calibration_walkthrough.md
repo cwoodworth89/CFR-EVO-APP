@@ -58,8 +58,7 @@ curl -I http://localhost:8000/api/dispatches
 # 3. Execute empirical historical tone backtest
 python scripts/analyze_historical_tones.py
 
-# 4. Feed a verified WAV call to test pipeline
-python backend/scripts/feed_recorded_call.py backend/audio_files/recordings/DISP-2026-044D8A.wav "Engine Tone"
+# 4. (removed) The WAV feeder was retired 2026-08-31 -- real dispatches are the end-to-end test.
 
 # 5. Restart listener service
 sudo systemctl restart cfr-agent

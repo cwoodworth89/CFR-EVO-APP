@@ -13,8 +13,7 @@ from cfr_dispatch.pipeline.phase1 import (
 )
 from cfr_dispatch.pipeline.phase2 import (
     save_and_upload_audio,
-    process_phase_2_finalize,
-    process_full_dispatch
+    process_phase_2_finalize
 )
 
 __all__ = [
@@ -26,6 +25,5 @@ __all__ = [
     'is_round_1_complete_check',
     'process_phase_1_check',
     'save_and_upload_audio',
-    'process_phase_2_finalize',
-    'process_full_dispatch'
+    'process_phase_2_finalize'
 ]

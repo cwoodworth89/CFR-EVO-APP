@@ -72,7 +72,6 @@ Run when investigating the capture pipeline or calibrating hardware.
 | `live_monitor.py` | Live RMS monitor on the capture device. |
 | `fingerprint_source.py` | Extracts dominant tone frequencies with sub-Hz precision, for building tone profiles. |
 | `backfill_tone_spectra.py` | Reconstructs tone peak data from archived recordings. Re-runnable as the archive grows. |
-| `feed_recorded_call.py` | Replays a saved WAV through the pipeline. The main end-to-end test path. |
 
 ## QA harnesses and measurement
 

@@ -89,10 +89,10 @@ All pipeline logs are tagged with `[dispatch_id]` prefixes and structured metric
 .\.venv\Scripts\python.exe backend/tests/test_database_integration.py
 ```
 
-### Feed a Recorded WAV File End-to-End:
-```powershell
-.\.venv\Scripts\python.exe backend/scripts/feed_recorded_call.py backend/tests/test_dispatch.wav
-```
+### End-to-End Testing
+There is no WAV feeder. `feed_recorded_call.py` was retired 2026-08-31 along with the
+synthesised `test_calls/` corpus, which §6.5 forbids. Real dispatches -- about eleven a day --
+exercise the whole path, and the HITL review panel is where correctness is judged.
 
 ---
 

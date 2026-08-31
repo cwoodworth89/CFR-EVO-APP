@@ -208,7 +208,6 @@ temp_dispatch_full.wav
 agent/*.json
 backend/*.json
 agent/test_calls/
-backend/tests/test_calls/
 *.json.key
 backend/audio_files/
 frontend/public/recordings/

@@ -56,7 +56,9 @@ module-level cache, and roughly 80 lines of geometry code.
 
 Only three functions across 464 lines — `process_phase_2_finalize` and
 `process_full_dispatch` are each around 300 lines covering audio save, STT, parse,
-geocode, persist, MQTT and ntfy. Natural seams already exist as numbered comment
+geocode, persist, MQTT and ntfy. **Updated 2026-08-31**: `process_full_dispatch` was
+deleted with its only caller, taking the file to 480 lines and leaving
+`process_phase_2_finalize` as the single large function here. Natural seams already exist as numbered comment
 blocks. Review alongside `phase1.py` for duplicated broadcast logic.
 
 ### 1.3 `backend/cfr_dispatch/parser/` (1053 lines) — ✅ DONE
@@ -255,8 +257,9 @@ no code reading it — likely residue from the Whisper/LoRA training experiment.
 and its dispatch had no row in `public.dispatches`. The PA negative-control corpus will
 instead come from accidental captures tagged `[PA]` in the HITL review notes, whose audio
 is already in the canonical store (punch-list #14).
-`backend/tests/test_calls/` (8 `.wav` + paired `.txt` ground truth) is actively read by
-`run_test_suite.py` and stays.
+`backend/tests/test_calls/` and `run_test_suite.py` were both **deleted 2026-08-31**. The
+eight WAV/transcript pairs were synthesised scenarios, named by incident type rather than
+dispatch id, which §6.5 forbids as a test corpus.
 
 ### 4.3 Other scripts
 
@@ -346,3 +349,5 @@ Per-case judgement; changes runtime behaviour; must not be bulk-edited.
   `public.city_boundary` is queryable.
 
 <!-- audit-ok: backend/tests/audio_samples/ -- records that the directory was removed -->
+
+<!-- audit-ok: backend/tests/test_calls/ -- records that the synthesised corpus was deleted 2026-08-31 -->

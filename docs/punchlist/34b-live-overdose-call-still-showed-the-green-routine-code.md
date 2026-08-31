@@ -35,3 +35,19 @@ deciding *what counts as a change* before implementing, since "updated" is an op
 claim (§6.1: a badge asserting something that did not happen is fabricated state).
 
 ---
+
+---
+
+## 34b (update). Data side resolved; needs one operator look
+
+> **Status**: ⚠️ **Open — narrowed 2026-08-30. Backend confirmed fixed; the render is not.**
+
+This was recorded as a duplicate symptom of **#31**, and #31 is now closed: `response_type`
+persists and reaches the payload, verified in the database with a clean dated cutover.
+
+**What is not verified is the badge itself.** Whether a live emergency call now renders as
+something other than green ROUTINE needs one look at the kiosk during a real emergency
+dispatch — that cannot be established from here, and inferring it from the data would be
+exactly the reported-vs-confirmed conflation §6.6 warns about.
+
+**Closes on**: one operator screenshot of a live `emergency` call showing the badge.

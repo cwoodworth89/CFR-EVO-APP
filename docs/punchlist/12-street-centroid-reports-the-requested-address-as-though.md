@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧭 Geocoder Honesty Gaps |
 | **Blocks** | 1 |
@@ -32,3 +32,21 @@ does the same.
 The step 4b nearest-civic resolver added 2026-08-21 deliberately does **not** do this: it
 reports the parcel actually used, keeps the dispatched string in `requested_address`, and
 explains the substitution in `resolution_note`. Steps 5 and 6 should follow that pattern.
+
+---
+
+## 12 (closed). The centroid now says it is a centroid
+
+> **Status**: ✅ **Closed 2026-08-30.** Verified in the working tree.
+
+The defect was a street-centreline midpoint being returned as though it were the requested
+civic address. `services/gis/src/gis_service/geocoder.py` now sets an explicit
+`resolution_note` on that path:
+
+> *"<requested> could not be placed on this street. Showing the centreline midpoint of
+> <street>, not a specific address. Verify on arrival."*
+
+The field is carried through rather than dropped at the first boundary — it appears in
+`geocoder.py` (8 sites), `pipeline/payload_builder.py`, `pipeline/phase2.py` and
+`pipeline/review_flags.py`. That is §6.1 satisfied: the approximation is still returned,
+because a street midpoint is better than nothing, but it is labelled and the operator can see it.

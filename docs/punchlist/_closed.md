@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-34 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+37 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -40,3 +40,6 @@
 | **26** | ⚪ hygiene | CLOSED | [The dispatch pipeline's INFO logging is discarded](26-the-dispatch-pipelines-info-logging-is-discarded.md) |
 | **36** | ⚪ hygiene | CLOSED | [Double-click-to-autofill removed from the review form](36-double-click-to-autofill-removed-from-the-review-form.md) |
 | **42** | 🔴 crew-visible | CLOSED | [The roads import silently discards 242 road segments, including 45 streets that 1,918 parcels are addressed on](42-the-roads-import-silently-discards-242-road-segments-in.md) |
+| **12** | 🔴 crew-visible | CLOSED | [Street centroid reports the requested address as though exact](12-street-centroid-reports-the-requested-address-as-though.md) |
+| **31** | 🔴 crew-visible | CLOSED | [`response_type` never reaches the kiosk — every call renders as ROUTINE](31-response-type-never-reaches-the-kiosk-every-call-render.md) |
+| **43a** | 🔴 crew-visible | CLOSED | [Call-type vocabulary carries locale variants as duplicate rows; HITL captures incident as free text](43a-call-type-vocabulary-carries-locale-variants-as-duplica.md) |

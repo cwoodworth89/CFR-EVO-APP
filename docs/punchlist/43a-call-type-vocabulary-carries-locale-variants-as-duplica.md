@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | IN PROGRESS |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🏷️ Response Terminology & Status Colour |
 | **Blocks** | 1 |
@@ -179,3 +179,26 @@ A term's name tells you nothing about whether dispatch says it. The corpus does.
 `raw_transcript` before adding, retiring, or merging anything here.
 
 ---
+
+---
+
+## 43a (closed). Locale variants are aliases now, not duplicate rows
+
+> **Status**: ✅ **Closed 2026-08-30.** Verified by querying `public.vocabulary`.
+
+The defect was locale variants stored as separate `call_type` rows, which made the
+stored-vs-verified comparison measure history rather than accuracy.
+
+| | |
+|:--|--:|
+| Active `call_type` rows | 66 |
+| Distinct `term_normalized` | **66** |
+| Duplicate rows | **0** |
+| Rows carrying `metadata->'aliases'` | 1 |
+
+Zero duplicates, and recognition-only spellings now live in `metadata->'aliases'` exactly as
+the operator ruling in `docs/standards/README.md` specifies — never as a second row.
+
+Note for a future pass, out of scope here: `street_suffix` shows 14 rows colliding on
+`term_normalized` and `xstreet_descriptor` shows 3. Those may be intentional (`AVE`/`AVENUE`
+normalising together) and are a different category from this item.

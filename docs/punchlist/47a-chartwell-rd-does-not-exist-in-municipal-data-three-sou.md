@@ -85,3 +85,23 @@ the street vocabulary as a recognition alias, the same mechanism as the call-typ
 in #43.
 
 ---
+
+---
+
+## 47a (update). The road exists now; the naming divergence does not
+
+> **Status**: 📋 **Open — still a City GIS question, but the picture changed 2026-08-30.**
+
+The **#42** roads re-import brought Chartwell into `public.roads` — it was absent before
+because it carried a non-`OPERATING` status. Current state:
+
+| Source | Name | Rows |
+|:--|:--|--:|
+| `public.roads` | `Chartwell` (no suffix) | 2 |
+| `public.parcels` | `Chartwell Green` | 57 |
+| `public.parcels` | `Chartwell Lane` | 11 |
+
+So geocoding now has road geometry to work with, which it did not before. **The divergence
+this item is actually about remains**: the road layer says `Chartwell`, the address layer
+says `Chartwell Green` and `Chartwell Lane`, and they cannot both be the canonical name for
+68 addressed parcels. Still one for the City GIS team, not a code defect.

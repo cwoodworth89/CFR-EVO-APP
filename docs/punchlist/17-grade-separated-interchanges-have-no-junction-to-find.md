@@ -29,3 +29,19 @@ column says so. Needs review by whoever owns response geography.
 ---
 
 ## 🎙️ STT Vocabulary Biasing
+
+---
+
+## 17 (update). Materially changed by the #42 roads re-import
+
+> **Status**: ⚠️ **Open — but the ground moved 2026-08-30. Needs re-measurement, not the
+> original manual fix.**
+
+This item predates **#42**. At the time, 41 of 44 `Highway Ramp` segments were missing from
+`public.roads` because the import dropped everything that was not `STATUS = OPERATING`, so a
+grade-separated interchange genuinely had no junction to find.
+
+Now that every status is imported, the database holds **4 `Ramp` roads and 67 ramp
+junctions** in `public.intersections`. The original problem statement no longer describes the
+data. Re-measure against the actual interchanges before doing any manual work here — the
+manually added row referenced in the original entry may now be redundant or conflicting.

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🏷️ Response Terminology & Status Colour |
 | **Blocks** | 1 |
@@ -148,3 +148,28 @@ Accordingly:
 > the conflicting-defaults question that must be raised before implementing.
 
 ---
+
+---
+
+## 31 (closed). `response_type` reaches the kiosk — clean cutover verified in the database
+
+> **Status**: ✅ **Closed 2026-08-30.** Verified against the running kiosk database (§6.6).
+
+`response_type` now persists into `target`. The cutover is unambiguous — it is not a
+gradual improvement, it is a dated switch:
+
+| Day | Calls | With `response_type` | With `review_flags` |
+|:--|--:|--:|--:|
+| 2026-08-31 | 2 | **2** | 2 |
+| 2026-08-30 | 11 | 5 | 5 |
+| 2026-08-29 | 13 | 0 | 0 |
+| 2026-08-28 | 12 | 0 | 0 |
+| 2026-08-27 | 13 | 0 | 0 |
+
+Zero before the fix landed mid-day on the 30th, every call after it. `public.vocabulary`
+holds exactly two `response_type` terms, matching the operator ruling that the authoritative
+terms are `routine` and `emergency` with the numeric codes deleted rather than renamed.
+
+The frontend carries no live numeric-code logic — every remaining `priority_code` reference
+in `KioskView.jsx`, `useMqttListener.js` and `dispatchModel.js` is a comment recording that
+the field never existed.

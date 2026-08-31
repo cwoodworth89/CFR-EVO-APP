@@ -62,7 +62,7 @@ Ensure table `dispatches` and `evaluation_history` exist and index `idx_dispatch
 
 ## 4. Tile Server (cfr_tiles) Management
 
-For in-depth tile generation, SQLite WAL mode read-only permissions, and curl testing rules, consult [`.agents/skills/mbtiles-tile-server/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.agents/skills/mbtiles-tile-server/SKILL.md).
+For in-depth tile generation, SQLite WAL mode read-only permissions, and curl testing rules, consult [`.claude/skills/mbtiles-tile-server/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/mbtiles-tile-server/SKILL.md).
 
 Quick service list check:
 ```powershell

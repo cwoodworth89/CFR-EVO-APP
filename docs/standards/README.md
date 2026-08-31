@@ -39,6 +39,15 @@ no WAN.
 > Proposal (UNADOPTED)* on 2026-08-29 and annotated with its measured errors in its own §0.
 > Do not treat a clause number found there as provenance; every one of them is unverified.
 
+> [!CAUTION]
+> **The research drafts behind that document are archived, and carry the same warning.**
+> `explorer_standards_research_1`, `explorer_routing_engines_1` and `explorer_gis_parcels_1`
+> (137 KB of agent-generated research, 2026-08-28) cite NENA, NFPA and APCO clauses
+> throughout and hold none of them. They were moved to
+> `../CFR-EVO-APP-agent-archive/` on 2026-08-30. They are **leads for a future inventory
+> pass, not provenance** (§7.3) — a clause number found there is recollection until the
+> document itself is obtained and vendored here.
+
 ## Status
 
 | Subsystem | Governing standard (expected) | Status | Notes |

@@ -18,4 +18,4 @@ To maximize token economy and avoid burning coordinator reasoning credits on mec
    * **`Model: 'flash'`**: Feature engineering, database migrations, shapefile ingestion scripts, React JSX component decomposition, tile pre-caching scripts, API route development.
    * **`Model: 'pro'`**: Deep mathematical reasoning, DSP STFT/FFT harmonic filter calculations, OSRM Lua routing profile math, LoRA quantization analysis, and complex concurrency deadlock diagnosis.
 4. **Autonomous Background Execution**: Once a sub-agent is launched with clear instructions and acceptance criteria, the coordinator MUST provide a concise update to the user and immediately end the turn, letting the sub-agent run in the background.
-5. **Skill Lookup**: Check `.agents/skills/` (Antigravity's copy) before drafting implementation plans. Claude Code sessions use `.claude/skills/` instead — see `CLAUDE.md`.
+5. **Skill Lookup**: Check `.claude/skills/` before drafting implementation plans. It is the single canonical location — the Antigravity copy under `.agents/skills/` was archived out of the repository on 2026-08-30 and was 10 days stale when it went.

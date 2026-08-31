@@ -85,7 +85,7 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 
 ## 🤖 AI Agent Customizations (Custom Skills & Sub-agents)
 
-CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in [**`.claude/skills`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills) and [**`.claude/agents`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents) (Claude Code's native convention). These resources extend agent capabilities and document domain runbooks. The original Antigravity-authored copies remain in `.agents/skills` and `.agents/agents` for historical reference, but `.claude/` is the canonical, auto-loaded location going forward.
+CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in [**`.claude/skills`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills) and [**`.claude/agents`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents) (Claude Code's native convention). These resources extend agent capabilities and document domain runbooks. The original Antigravity-authored copies were archived out of the repository on 2026-08-30 (see `../CFR-EVO-APP-agent-archive/`); `.claude/` is the sole canonical, auto-loaded location.
 
 ### 🛠️ Specialized Sub-agents
 When spawning helper sub-agents, inherit from these type specifications:

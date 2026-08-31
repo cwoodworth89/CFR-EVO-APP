@@ -42,7 +42,7 @@
    * `end_of_dispatch_silence_s: float = 3.0`
 2. **Config Alignment**: Set `MIN_PHASE_1_DURATION_S = 15.0` in `backend/cfr_dispatch/config/dsp.py` with inline provenance comments citing Locution CAD automated timing.
 3. **Terminology Prune**: Purge outdated analog RF terminology ("squelch tails", "channel unkey", "radio carrier noise") across code comments and skill files, replacing with digital station PA feed descriptions.
-4. **Skill Runbooks**: Update `dispatch-pipeline-ops/SKILL.md` (both `.claude/skills/` and `.agents/skills/`) sequence diagrams and parameter tables.
+4. **Skill Runbooks**: Update `dispatch-pipeline-ops/SKILL.md` in `.claude/skills/` — sequence diagrams and parameter tables. (The `.agents/skills/` copy was archived 2026-08-30; there is only one now.)
 
 
 

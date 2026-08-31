@@ -516,9 +516,16 @@ https://tiles.arcgis.com/tiles/B6yKvIZqzuOr0jBR/arcgis/rest/services/Canada_Topo
   contributors         = NRCan, the provinces, and municipalities
 ```
 
-The City authored the colour theme, not the geometry. **Its `licenseInfo` reads "No
-restriction on use", which is a free-text field describing the City's own style item — the
-City cannot grant rights over Esri Canada's tiles.** Same shape as the Carto and Esri
+**It contains no City geometry at all.** Fetching the style directly settles it: one source
+named `esri` pointing at Esri's service, and 389 layers that are purely styling rules over
+Esri's own source-layers (`BuildingFootprint`, `Road Segment`, `Rail`, `Landuse`,
+`Landform_ESRI/label`). The item's entire contents are `styles/root.json` (23 KB) and a
+sprite sheet (~58 KB) — roughly 80 KB of colours and icons over a basemap spanning lon
+−173.6 to −19.0 and lat 37.1 to 84.2, the Aleutians to Greenland. "Coquitlam" names the
+palette, not the data.
+
+**Its `licenseInfo` reads "No restriction on use", which is a free-text field describing the
+City's own style item — the City cannot grant rights over Esri Canada's tiles.** Same shape as the Carto and Esri
 problem in #47: a City-branded thing that is actually a third-party basemap. It is also a
 hosted CDN dependency, which the offline architecture forbids regardless of licence.
 

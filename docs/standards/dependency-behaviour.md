@@ -39,10 +39,37 @@ covered, which is why they had nowhere to be recorded.
 | *"deliberately left untouched … surfaces as an approximate location rather than a confident wrong one"* (code comment) | those rows have no stale value | **they keep whatever the previous algorithm wrote.** "Skip the row" only yields that outcome if the row was empty. The comment described the author's intent, not the code — **#58** |
 | `test_import_parcels_production_script_unmodified` | asserts the script is unmodified | **asserts only that the file exists.** Its stated requirement had since been deliberately reversed, and it would have passed either way |
 | `GONE = re.compile(r"\b(delet\|remov)\b")` | matches words starting with "delet" | **matches neither.** The trailing `\b` requires a boundary between `delet` and `ed`, so the alternation was unreachable for every word it was written for. Written for this repository's own docs check, in `audit_skill_references.py`, and caught only by testing it against real sentences |
+| `--workers 8` alongside `rate_limit_sec` in `compile_mbtiles.py` | eight requests in flight, so eight times the throughput | **one request at a time.** `RateLimiter.wait()` serialises every worker behind a single lock, so the ceiling is `1 / rate_limit_sec` no matter how many workers there are. That is correct and deliberate — it is what makes the limit a real courtesy to a municipal server — but the two settings read as independent and are not. Cost 8.5 hours of unexplained wall-clock on the 2026-08-27 cadastral crawl |
 
 The last row is the cheapest lesson in the file: it was written **while documenting this very
 pattern**, by someone who had just spent a day finding instances of it, and it was still wrong
 until run against real input.
+
+### Tile crawls: work out the hours before starting, not during
+
+`compile_mbtiles.py` pairs a worker pool with an optional `RateLimiter`. Because the limiter
+serialises, **worker count does not affect throughput at all** once a rate limit is set — the
+only two numbers that decide the runtime are the tile count and `rate_limit_sec`.
+
+Tiles quadruple per zoom level, so the top level is roughly three-quarters of any crawl.
+Counting the City bounding box (§5) at each level:
+
+| Zoom | Tiles |
+|:--|--:|
+| 12–17 | 11,686 |
+| 18 | 34,293 |
+| 19 | 137,172 |
+| 20 | **545,700** |
+| **Total** | **728,851** |
+
+That is a bounding box; Coquitlam's actual polygon is smaller, so treat it as a ceiling. At
+the `ortho` layer's configured `rate_limit_sec = 0.05` (20 req/s) that is **about 10 hours**.
+At the 5 req/s used for the 2026-08-27 cadastral crawl it would be **40 hours**.
+
+Neither number is wrong — the pacing is a deliberate courtesy to municipal infrastructure
+(operator decision 2026-08-27), and the City's server is not a commercial CDN. The failure is
+starting one of these expecting minutes. Run the arithmetic first: **tiles × `rate_limit_sec`
+÷ 3600 = hours**, and raising `--workers` changes none of it.
 
 ### What generalises
 

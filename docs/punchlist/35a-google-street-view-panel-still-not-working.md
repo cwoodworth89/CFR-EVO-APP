@@ -111,3 +111,28 @@ mounted (`:283-285`), and the `<iframe>` fallback renders only when the key is *
 error state (§6.1).
 
 ---
+
+---
+
+## 35a (update). A real 500 found and fixed — but not declared the root cause
+
+> **Status**: ⚠️ **Still open on the blank panel. One contributing defect removed 2026-08-31.**
+
+`GET /api/streetview-overrides` was returning **500 on every request**, confirmed against the
+running kiosk before and after the fix. `backend/api/routers/streetview.py` read `r.lat` /
+`r.lng`; those columns were renamed to `centroid_lat` / `centroid_lng` earlier the same day
+and this call site was missed, so the endpoint raised `AttributeError` on every call. The
+frontend requests it from four sites in `apiClient.js`.
+
+Now returns **200 with 65,540 override entries**.
+
+**This is not being claimed as the cause of the blank panel**, and the distinction matters.
+This item's own history records that the API-key hypothesis was asserted and turned out to be
+wrong, and that all three prerequisites were verified on the kiosk with the panel still blank.
+A broken overrides endpoint would lose *camera orientation*, not the imagery itself. Whether
+it also blanks the panel needs one look at the kiosk browser console with a call active —
+which is what this item has needed all along.
+
+Found by running the full backend suite, not by investigating Street View. It is the second
+casualty of the `lat` → `centroid_lat` rename; the first was the parcel import's own
+verification query. Both were invisible because nothing exercised them.

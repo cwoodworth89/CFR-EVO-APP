@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**27 open** (15 crew-visible) · **42 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**26 open** (15 crew-visible) · **43 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
@@ -43,7 +43,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **44b** | 🟠 operational | OPEN | [Kiosk crashed on a live dispatch — stale chunk after a frontend deploy](punchlist/44b-kiosk-crashed-on-a-live-dispatch-stale-chunk-after-a-fr.md) |
 | **47b** | 🟠 operational | OPEN | [Basemap tile licensing has never been checked — Carto and Esri](punchlist/47b-basemap-tile-licensing-has-never-been-checked-carto-and.md) |
 | **49** | 🟠 operational | OPEN | [Access-point review UX — operators cannot set an entrance without direct SQL](punchlist/49-access-point-review-ux-operators-cannot-set-an-entrance.md) |
-| **51a** | 🟠 operational | OPEN | [Add cross_street_1 and cross_street_2 to the review panel for HITL verification](punchlist/51a-add-cross-street-1-and-cross-street-2-to-the-review-pan.md) |
 | **53** | 🟠 operational | OPEN | [The dispatch agent makes a WAN call to huggingface.co on every start](punchlist/53-the-dispatch-agent-makes-a-wan-call-to-huggingface-co-o.md) |
 | **55** | 🟠 operational | OPEN | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](punchlist/55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |

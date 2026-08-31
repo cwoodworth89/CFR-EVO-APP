@@ -127,3 +127,41 @@ and it is a straightforward normalisation bug rather than a judgement call.
 
 
 ---
+
+---
+
+## 56 (note). Street-suffix doubling: the cutover date, measured
+
+Recorded so historical records can be told from a live defect in one query rather than
+reconstructed.
+
+**Fixed 2026-08-30 14:43 local** — `fix(parser): stop re-appending a suffix the municipal
+street name already carries`.
+
+| | |
+|:--|--:|
+| Stored `x_street_1` values carrying a doubled type | **15** |
+| Date range | 2026-08-22 → 2026-08-30 |
+| Last occurrence | `DISP-2026-37180C`, 06:41 local on 08-30 |
+| Calls with an XStreet since the fix | 10 |
+| Doubled since the fix | **0** |
+
+The values are `Christmas Way Way`, `Guildford Way Way`, `Pinetree Way Way`,
+`Primrose Lane Lane`, `Honeysuckle Lane Lane`, `Burlington Drive Drive`. All genuine, none a
+regex false positive.
+
+**They are deliberately not corrected in place.** `target->>'x_street_1'` is the record of
+what the parser produced on a real call, and the corpus is *paired* — system output against
+`verified_*`. Overwriting it would erase a real example of a defect the parser had and make
+the parser look as though it never had it. All 15 also have `verified_x_street_1 = NULL`, so
+there is nothing to promote in its place: an overwrite would leave neither the wrong value nor
+a verified one.
+
+Filling `verified_x_street_1` programmatically is not an option either, even from a
+mechanically unambiguous fix. That column means *a human confirmed this*, and populating it
+from code is punch-list **#50** exactly — seeding a field so rows read as operator-verified
+when no operator saw them.
+
+**The proper route is HITL.** Thirteen of the fifteen were reviewed and rated OPERATIONAL or
+PERFECT *before* the `verified_x_street_1/2` columns existed (2026-08-30). Re-reviewing them
+gives both halves: the preserved system output and the confirmed truth.

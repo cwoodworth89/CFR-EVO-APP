@@ -53,8 +53,10 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
-    // z20-native: 7.5cm ground sample is 9.7cm/px at z20 for this latitude.
-    maxNativeZoom: 20,
+    // z21-native. The source is 7.5cm/px; z21 is 7.46cm/px at this latitude, a
+    // 1.005 ratio -- effectively pixel-for-pixel, with no downsample. z20 would
+    // be 9.7cm/px and visibly softer. Operator decision 2026-08-30.
+    maxNativeZoom: 21,
     maxZoom: 22
   },
   OSM: {

@@ -185,7 +185,8 @@ CFR EVO eliminates external map CDN dependencies (Mapbox, Carto, Google Maps, Ar
 
 ```
 backend/data/tiles/
-├── satellite.mbtiles         # City of Coquitlam 2025 7.5cm orthophotos (Z12–Z20, Slippy XYZ)
+├── ortho.mbtiles             # City of Coquitlam 2025 7.5cm orthophotos (z20-native, OGL)
+├── satellite.mbtiles         # Esri World Imagery -- NOT City data, NOT the orthos (#47)
 ├── street.mbtiles            # Full street & reference basemap with road labels
 └── street_nolabels.mbtiles   # Clean tactical basemap for high-contrast HUD overlays
 ```
@@ -199,12 +200,25 @@ backend/data/tiles/
   - `http://${window.location.hostname}:8081/services/street/tiles/{z}/{x}/{y}.png`
   - `http://${window.location.hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png`
 
-### 7.2 City of Coquitlam 7.5cm Aerial Orthophoto Pyramid (Z12–Z20)
-* **Resolution**: Sub-decimeter (7.5 cm / ~3 inches ground sampling distance per pixel).
-* **Zoom Depth Range**:
-  - **Z12–Z15**: Regional context across Coquitlam, Port Moody, Burnaby, and Pitt Meadows.
-  - **Z16–Z18**: Tactical approach view, street network, and property parcel boundaries.
-  - **Z19–Z20**: High-resolution structure level for identifying rooflines, building entrances, driveways, fence lines, and fire hydrant connections.
+### 7.2 City of Coquitlam 7.5cm Aerial Orthophoto Pyramid (`ortho.mbtiles`)
+
+> [!IMPORTANT]
+> **Two different imagery layers, two different licences.** `ortho.mbtiles` is City of
+> Coquitlam 7.5cm orthophotography under the Open Government Licence. `satellite.mbtiles` is
+> Esri World Imagery and is **not** City data — see punch-list #47. Until 2026-08-30 this
+> section described `satellite.mbtiles` as the orthos; it never was, and the orthos had not
+> been ingested at all. Verify with `backend/scripts/verify_ortho_provenance.py`.
+
+* **Resolution**: 7.5 cm ground sampling distance (measured: `.sdw` pixel size 0.075 m).
+* **Extent**: −122.8995, 49.2165 → −122.6110, 49.3628 (covers `public.city_boundary`).
+  **Blank outside that footprint is correct** — there is no fallback beneath it by design
+  (CLAUDE.md §6.1), so the edge of municipal imagery is visible rather than disguised.
+* **Native zoom**: z20. At this latitude z20 is 9.74 cm/px and z21 is 4.87 cm/px, so a 7.5 cm
+  source lands on z20; z21 would upsample for 4× the tiles and no added detail. Lower zooms
+  are `gdaladdo` overviews of the same source, not a separate crawl.
+* **Endpoint**: `http://${window.location.hostname}:8081/services/ortho/tiles/{z}/{x}/{y}.jpg`
+* **Ingest**: `gis-pipeline-sync` skill §4.1. Needs `klokantech/gdal` for the MrSID driver —
+  the official OSGeo GDAL image does not have one.
 * **$0 Subscription-Free Guarantee**: Stored 100% locally on NVMe SSD storage with `fallbackUrl: null`, ensuring 100% disaster resilience with zero recurring API or tile-serving costs.
 
 

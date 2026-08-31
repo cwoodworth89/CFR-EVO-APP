@@ -78,17 +78,121 @@ All offline base layers and property overlays are packaged into monolithic SQLit
 > **SQLite WAL Mode Read-Only Lock Constraint**:
 > Because `cfr_tiles` mounts `backend/data/tiles/` as **read-only (`:ro`)**, all scripts compiling `.mbtiles` archives must execute `PRAGMA wal_checkpoint(FULL)` and `PRAGMA journal_mode = DELETE` before closing the database to avoid `SQLITE_CANTOPEN` errors.
 
-### 4.1 Orthophoto Ingestion (7.5cm City of Coquitlam ECW / MrSID / GeoTIFF)
-Tiling pipeline generates standard **OpenStreetMap Slippy XYZ** tiles (`EPSG:3857`, top-left origin) across zoom levels **Z12 through Z20**:
-```powershell
-python backend/scripts/compile_mbtiles.py --layer satellite --workers 32
+### 4.1 Orthophoto Ingestion (7.5cm City of Coquitlam MrSID)
+
+> [!CAUTION]
+> **`compile_mbtiles.py --layer satellite` does NOT ingest the orthophotos.** It crawls
+> **Esri World Imagery** from `server.arcgisonline.com` into `satellite.mbtiles`. Until
+> 2026-08-30 this section said otherwise, and as a result the orthos were never ingested at
+> all while the UI attributed the layer to the City — every tile in `satellite.mbtiles` was
+> measured byte-identical to live Esri. The orthos build a **separate `ortho.mbtiles`**.
+
+**Source**: `/home/tcfire/data_staging/Coquitlam_2025_7.5cm.zip` (9.01 GB) → one MrSID file,
+`BCCOQU25-SID-7.5CM.sid` (9.04 GB).
+
+| Property | Value (measured 2026-08-30 via `gdalinfo`) |
+|:--|:--|
+| Raster size | 279,000 × 216,000 px (60.3 gigapixels) |
+| CRS | NAD83 / UTM Zone 10N (EPSG:26910) |
+| Pixel size | 0.075 m exactly |
+| Extent (WGS84) | −122.8995, 49.2165 → −122.6110, 49.3628 |
+| Encoding | MrSID/MG3, GeoExpress 9.5.5 |
+
+The extent fully covers `public.city_boundary` (−122.89343, 49.21987 → −122.62109, 49.35117).
+
+#### The GDAL image matters
+
+**MrSID is a proprietary format.** The official `ghcr.io/osgeo/gdal:ubuntu-full-latest`
+image has **no MrSID driver** — verified 2026-08-30, `gdalinfo --formats` returns only the
+unrelated NSIDC sea-ice driver. Use **`klokantech/gdal`** (GDAL 2.4.4), which carries the
+LizardTech DSDK and also has MBTiles read-write and `gdal2tiles.py`:
+
+```bash
+docker run --rm klokantech/gdal gdalinfo --formats | grep -i mrsid
+#   MrSID -raster- (rov): Multi-resolution Seamless Image Database (MrSID)
 ```
-* **Output Archive**: `backend/data/tiles/satellite.mbtiles`
-* **Tile Schema**: XYZ Mercator `EPSG:3857` (JPEG format for satellite raster compression).
-* **Zoom Depth**:
-  - `Z12–Z15`: Coquitlam regional response context
-  - `Z16–Z18`: Tactical approach, parcel footprints, street layout
-  - `Z19–Z20`: Sub-decimeter structure clarity (roof peaks, building frontages, hydrants)
+
+#### The pipeline
+
+Four steps, run from `/home/tcfire/data_staging` (see `backend/scripts/ingest_coquitlam_orthos.py`).
+Builds into staging and does **not** touch the live tiles directory until verified.
+
+```bash
+D=/home/tcfire/data_staging
+SID=/data/extracted/BCCOQU25-SID-7.5CM/BCCOQU25-SID-7.5CM.sid
+run() { docker run --rm -v $D:/data --memory=10g klokantech/gdal "$@"; }
+
+# 1. Unpack (9.04 GB SID)
+unzip -o $D/Coquitlam_2025_7.5cm.zip -d $D/extracted
+
+# 2. Warp UTM 10N -> EPSG:3857 at z21 resolution.
+#    -tr is 156543.03392804097 / 2^21; forcing it avoids a second resample in step 3.
+#    Output is 430,208 x 334,575 px (144 gigapixels), so COMPRESS=JPEG and BIGTIFF
+#    are not optional.
+run gdalwarp -t_srs EPSG:3857 -r bilinear     -tr 0.149291068854 0.149291068854     -of GTiff -co TILED=YES -co COMPRESS=JPEG -co PHOTOMETRIC=YCBCR -co BIGTIFF=YES     -multi -wo NUM_THREADS=8 --config GDAL_CACHEMAX 3072     $SID /data/ortho_3857.tif
+
+# 3. Write MBTiles directly -- no TMS directory, no y-flip, no separate compile step.
+run gdal_translate -of MBTILES /data/ortho_3857.tif /data/ortho.mbtiles     -co TILE_FORMAT=JPEG -co QUALITY=85 --config GDAL_CACHEMAX 3072
+
+# 4. Overviews ARE the lower zoom levels. Without this the archive is z20 only.
+run gdaladdo -r average /data/ortho.mbtiles 2 4 8 16 32 64 128 256 512
+```
+
+**Keep `-r bilinear`. Do not "improve" it to lanczos.** 7.5 cm down to z20's 9.7 cm is a
+downsample, so the resampling kernel matters. Bilinear and cubic were judged equivalent and
+both clearly better than lanczos by the operator on the kiosk display, 2026-08-30 — lanczos
+rings on the high-contrast edges that matter here (vehicle outlines, lane markings). An
+earlier note in this file recommending lanczos was wrong and is withdrawn.
+
+**Why z21 is the native zoom.** At Coquitlam's latitude z21 is **7.46 cm/px** against the
+source's 7.5 cm — a 1.005 ratio, so the warp is effectively pixel-for-pixel and no detail is
+resampled away. z20 is 9.74 cm/px, a 1.3× downsample that is visibly softer on vehicle edges
+and lane markings at the zoom crews actually use. Operator decision 2026-08-30, after
+comparing tiles side by side on the kiosk display.
+
+Cost of z21 over z20: roughly 4× the tiles at the deepest level (~1.4M, ~20 GB) and a
+markedly longer build. **Left at z20 the layer is soft; that was the whole reason for
+ingesting the orthos rather than staying on Esri, so the extra depth is the point.**
+
+Note this contradicts GDAL's own `ZOOM_LEVEL_STRATEGY=AUTO`, which picks z20 because 7.5 is
+numerically nearer 9.74 than 4.87 — that heuristic optimises for tile count, not for keeping
+every source pixel. Forcing `-tr` overrides it.
+
+#### Deploy
+
+`gdal_translate` leaves the archive in WAL mode, and `cfr_tiles` mounts
+`backend/data/tiles/` read-only, so it **must** be converted before it is moved in
+(§4 above, and the finalize step needs `cfr_tiles` stopped — see the tile re-crawl runbook):
+
+`finalize_mbtiles.py` takes **no arguments** — it finalizes every `.mbtiles` in
+`backend/data/tiles/`. So the archive must be moved in *first*, and the container must be
+stopped *before* both steps: `PRAGMA journal_mode = DELETE` needs an exclusive lock, and
+mbtileserver holds the files open. This is the step the 2026-08-27 re-crawl got wrong.
+
+```bash
+docker stop cfr_tiles
+mv $D/ortho.mbtiles /home/tcfire/CFR-EVO-APP/backend/data/tiles/
+/home/tcfire/CFR-EVO-APP/.venv/bin/python     /home/tcfire/CFR-EVO-APP/backend/scripts/finalize_mbtiles.py
+docker start cfr_tiles
+curl -s http://localhost:8081/services | python3 -m json.tool   # expect an "ortho" entry
+```
+
+Confirm every archive reports `Journal Mode: delete` and `Integrity: ok` before starting the
+container — a WAL-mode archive fails only later, under the read-only mount.
+
+`mbtileserver` picks up any `.mbtiles` in the mounted directory and names the service after
+the filename, so `ortho.mbtiles` is served at `/services/ortho/tiles/{z}/{x}/{y}.jpg` with
+no config change.
+
+#### Verifying it is actually the orthos
+
+The failure this whole section exists to prevent is *imagery that looks right but comes from
+somewhere else*. Compare a tile against live Esri — if they match byte for byte, you are
+looking at Esri, not the City:
+
+```bash
+python3 backend/scripts/verify_ortho_provenance.py
+```
 
 ### 4.2 Vector & Street Basemap MBTiles
 * **Street Layer**: `backend/data/tiles/street.mbtiles` (`/services/street/tiles/{z}/{x}/{y}.png`)

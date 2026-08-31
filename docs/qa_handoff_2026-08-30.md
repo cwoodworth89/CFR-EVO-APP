@@ -5,8 +5,8 @@
 architecture and environment; this covers what changed in the 2026-08-23 → 08-30 QA session
 and what is still open.
 
-The live work queue remains [`debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md), now at
-**47 items**.
+The live work queue remains [`debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md), now an
+index over [`docs/punchlist/`](./punchlist/) — **68 items, 35 open**.
 
 ---
 

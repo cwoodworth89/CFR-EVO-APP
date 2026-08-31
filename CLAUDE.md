@@ -14,7 +14,7 @@ This rule file defines domain constraints, runtime environments, and workflow st
     `ortho.mbtiles` and served at `/services/ortho` (sub-decimetre clarity for rooflines,
     hydrants and driveways; z20-native, Leaflet upscales above it). **The separate
     `satellite.mbtiles` is Esri World Imagery, not City data** — see §1 licensing note below
-    and `docs/debug_and_qa_punchlist.md` #47. Ingest procedure: `gis-pipeline-sync` skill §4.1.
+    and `docs/debug_and_qa_punchlist.md` #47b. Ingest procedure: `gis-pipeline-sync` skill §4.1.
   - NFPA 291 color-coded fire hydrants with GPM ratings (`hydrants.json`)
   - 3D building footprints with LiDAR-derived heights (`Buildings.shp`)
 * **Third-Party Basemap Sources Are Not Covered By The City's Licence**: The Open Government
@@ -24,7 +24,7 @@ This rule file defines domain constraints, runtime environments, and workflow st
   for the department does not inherit rights the department never held. Carto began stamping
   unauthenticated tiles `API KEY REQUIRED` between the original crawl and the 2026-08-27
   re-crawl, which is that licence answering for itself. Do not raise the street layers'
-  `max_zoom` while Carto is the source. Open item: `docs/debug_and_qa_punchlist.md` #47.
+  `max_zoom` while Carto is the source. Open item: `docs/debug_and_qa_punchlist.md` #47b.
 
 * **PostGIS Spatial Database**: PostgreSQL 16 runs with PostGIS 3.4 extension (`postgis/postgis:16-3.4-alpine`). All GIS data (parcels, roads, intersections, emergency zones, city boundary, road names, custom_places) is stored in PostgreSQL as the single source of truth. In-memory shapefile loading has been eliminated. Vocabulary (units, call types, radio channels) is stored in `public.vocabulary` table. Import scripts: `backend/scripts/import_parcels.py` (parcels), `backend/scripts/import_gis_data.py` (roads, intersections, zones, vocabulary).
 * **Centralized Offline Tile Architecture (`cfr_tiles` on Port 8081)**:

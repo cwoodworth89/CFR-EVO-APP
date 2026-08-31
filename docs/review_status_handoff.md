@@ -5,7 +5,8 @@
 Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
-* [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — **29 numbered items**, the live work queue
+* [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
+  **68 items, 35 open (22 crew-visible)**. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured

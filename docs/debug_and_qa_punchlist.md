@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**26 open** (15 crew-visible) · **43 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**26 open** (15 crew-visible) · **44 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 

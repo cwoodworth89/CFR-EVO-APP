@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-43 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+44 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -49,3 +49,4 @@
 | **10** | ⚪ hygiene | CLOSED | [Three test modules have never run in review](10-three-test-modules-have-never-run-in-review.md) |
 | **35b** | 🔴 crew-visible | CLOSED | ["Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`](35b-near-roads-stopped-being-recorded-on-2026-08-21-phase-2.md) |
 | **51a** | 🟠 operational | CLOSED | [Add cross_street_1 and cross_street_2 to the review panel for HITL verification](51a-add-cross-street-1-and-cross-street-2-to-the-review-pan.md) |
+| **59** | 🟠 operational | CLOSED | [Phase 2 crashed after saving audio, before recording its URL](59-phase-2-crashed-after-saving-audio-before-recording-its.md) |

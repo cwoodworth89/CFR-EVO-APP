@@ -270,7 +270,12 @@ def process_phase_2_finalize(
                 # the old "confidence_score": 100.0 here silently erased those.
                 p2_flags = compute_review_flags(
                     lat=target_payload.get("lat"), lng=target_payload.get("lng"),
-                    responding_units=responding_units, incident_type=p2_incident_type,
+                    # p2_responding_units, not responding_units. The latter is bound only
+                    # in the `if not p1_data` single-phase fallback above, so on this path
+                    # -- the normal one, where Phase 1 ran -- it raised UnboundLocalError
+                    # and killed process_phase_2_finalize after the audio had been written
+                    # to disk but before the record was updated with its audio_url.
+                    responding_units=p2_responding_units, incident_type=p2_incident_type,
                     map_grid=p2_grid, radio_channel=p2_channel,
                     response_type=(best_p2_candidate.response_type if best_p2_candidate else None),
                     resolution_note=target_payload.get("resolution_note"),
@@ -378,7 +383,9 @@ def process_phase_2_finalize(
                         # reported none (CLAUDE.md 6.1).
                         p2_flags = compute_review_flags(
                             lat=target_payload.get("lat"), lng=target_payload.get("lng"),
-                            responding_units=responding_units, incident_type=p2_incident_type,
+                            # See the note at the MATCH site above: responding_units is bound
+                            # only in the single-phase fallback. Same defect, correction path.
+                            responding_units=p2_responding_units, incident_type=p2_incident_type,
                             map_grid=target_payload.get("map_grid"),
                             radio_channel=target_payload.get("radio_channel"),
                             response_type=(best_p2_candidate.response_type if best_p2_candidate else None),

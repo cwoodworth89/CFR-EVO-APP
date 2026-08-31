@@ -14,7 +14,7 @@ from cfr_dispatch.stt import transcribe_audio_local
 from cfr_dispatch.pipeline.models import Phase1Result, PipelineTimer
 from cfr_dispatch.pipeline.payload_builder import build_dispatch_payload
 from audio_service import filter_known_tones
-from notification_service import save_dispatch_record, publish_mqtt_dispatch, post_to_ntfy
+from notification_service import save_dispatch_record, publish_mqtt_dispatch, post_to_ntfy, notify_pipeline_error
 
 def is_round_1_complete_check(dispatch_list: List[DispatchData], raw_transcript: str) -> bool:
     """Determines if the first round of the dispatch announcement is complete using map grid and unit repetition heuristics."""
@@ -185,4 +185,6 @@ def process_phase_1_check(
                 )
     except Exception as e:
         logging.error(f"[{dispatch_id}] Error in process_phase_1_check: {e}", exc_info=True)
+        # Log AND push. The log alone went unread for two days on #59.
+        notify_pipeline_error(dispatch_id, "Phase 1 check", e)
         return None

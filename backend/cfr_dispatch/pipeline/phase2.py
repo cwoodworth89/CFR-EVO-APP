@@ -29,7 +29,8 @@ from notification_service import (
     update_dispatch_record,
     save_audio_recording,
     publish_mqtt_dispatch,
-    post_to_ntfy
+    post_to_ntfy,
+    notify_pipeline_error
 )
 
 from cfr_dispatch.pipeline.review_flags import compute_review_flags
@@ -484,6 +485,8 @@ def process_phase_2_finalize(
         )
     except Exception as e:
         logging.error(f"[{dispatch_id}] Error in process_phase_2_finalize: {e}", exc_info=True)
+        # Log AND push. The log alone went unread for two days on #59.
+        notify_pipeline_error(dispatch_id, "Phase 2 finalize", e)
         return None
     finally:
         session_manager.cleanup_session(dispatch_id)

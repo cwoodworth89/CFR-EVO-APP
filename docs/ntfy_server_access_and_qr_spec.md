@@ -28,6 +28,31 @@ This document provides technical specifications for the local Ntfy push notifica
   - Lock-screen audio file attachments (`Attach: http://<host>:8000/api/audio/<id>.wav`).
   - Interactive lock-screen action buttons (`view, 🎧 Listen to Call Audio, <url>; view, 🗺️ Open Map Navigation, <url>`).
 
+### A2. Permanent Maintainer Topic (Errors)
+- **Topic Name**: `chief-errors`
+- **Expiry**: Permanent, unsalted — same class as `chief-master`, not rotated.
+- **Who subscribes**: the maintainer only. **Not crews.**
+- **Carries**: pipeline exceptions from `process_phase_1_check` and
+  `process_phase_2_finalize` — exception type, message, dispatch id, and the
+  `journalctl` line to run.
+- **Why separate from `chief-master`**: crews subscribe to the dispatch topic. A stack
+  trace is not a dispatch, and mixing them trains people to swipe past both. The salted
+  monthly rotation in §B exists for topics carrying incident detail to apparatus; this
+  carries none.
+- **Override**: `NTFY_ERROR_TOPIC` in the environment.
+- **Origin**: punch-list **#59** — two `UnboundLocalError`s aborted Phase 2 after the
+  audio was written but before the record was updated. Fifteen dispatches lost their
+  audio player. The error named the dispatch and the variable in
+  `journalctl -u cfr-agent` from the first occurrence, and went unread for two days.
+  Punch-list #26 restored that logging; nothing watched it. This is the watching.
+
+Subscribe the same way as any other topic:
+```
+ntfy://100.95.146.94:8080/chief-errors
+```
+
+---
+
 ### B. Monthly Secret Apparatus Topics
 - **Format**: `<apparatus_id>-<monthly_salt>` (e.g., `engine-1-aug2026-9f8a3b`, `rescue-2-aug2026-9f8a3b`).
 - **Rotation**: Automatically calculated monthly with a 3-day shift transition grace period.

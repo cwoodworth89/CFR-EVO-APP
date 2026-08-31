@@ -121,6 +121,60 @@ def post_to_ntfy(payload: dict, topic: str = None, token: str = None, title: str
         return False
 
 
+NTFY_ERROR_TOPIC = os.environ.get("NTFY_ERROR_TOPIC", "chief-errors")
+
+
+def notify_pipeline_error(dispatch_id: str, stage: str, error: BaseException,
+                          topic: str = None, token: str = None) -> bool:
+    """Pushes a pipeline exception to the maintainer's Ntfy topic.
+
+    Why this exists
+    ---------------
+    On 2026-08-31 two UnboundLocalErrors in `process_phase_2_finalize` had been
+    aborting Phase 2 after the audio was written but before the record was updated.
+    Fifteen dispatches lost their audio player. The error was in
+    `journalctl -u cfr-agent` from the first occurrence, naming the dispatch and the
+    variable, and went unread for two days -- punch-list #59.
+
+    Punch-list #26 restored that logging in August. Nothing watches it. This is the
+    watching.
+
+    Deliberately separate from `chief-master`
+    ----------------------------------------
+    Crews subscribe to the dispatch topic. A stack trace is not a dispatch, and mixing
+    the two trains people to swipe past both. `chief-errors` is permanent and unsalted,
+    matching `chief-master` in §2A of the ntfy spec; the salted monthly rotation in §2B
+    exists for topics that carry incident detail to apparatus, which this does not.
+
+    Never raises
+    ------------
+    A failing notifier must not add a second exception to the one being reported. Every
+    path returns a bool, and the caller is inside an `except` already.
+    """
+    try:
+        target_topic = topic or NTFY_ERROR_TOPIC
+        url = f"{NTFY_SERVER_URL}/{target_topic}"
+        headers = {
+            "Title": f"⚠️ Pipeline error: {stage}",
+            "Priority": "4",
+            "Tags": "rotating_light,bug",
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        body = (
+            f"{type(error).__name__}: {error}\n\n"
+            f"Dispatch: {dispatch_id or 'unknown'}\n"
+            f"Stage:    {stage}\n\n"
+            f"journalctl -u cfr-agent --since today | grep {dispatch_id or 'ERROR'}"
+        )
+        res = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=5)
+        return res.status_code == 200
+    except Exception as e:
+        # Log and swallow. The original error is what matters.
+        logging.warning(f"Could not send pipeline error alert to Ntfy: {e}")
+        return False
+
+
 def notify_it_alert(audit: dict, ntfy_topic: str = None, ntfy_token: str = None) -> bool:
     """Sends IT infrastructure health alert to administrative Ntfy channel."""
     target_topic = ntfy_topic or NTFY_TOPIC

@@ -96,6 +96,9 @@ services:
       # Must match NTFY_TOPIC in backend/.env, which the host agent reads --
       # a mismatch publishes agent and API notifications to different topics.
       NTFY_TOPIC: ${NTFY_TOPIC:-chief-master}
+      # Maintainer-only error topic (spec A2). Kept off chief-master so a stack
+      # trace never lands in the crews' dispatch feed -- punch-list #59.
+      NTFY_ERROR_TOPIC: ${NTFY_ERROR_TOPIC:-chief-errors}
       OSRM_BACKEND_URL: http://osrm:5000
       TILE_SERVER_URL: http://tiles:8080
       DISABLE_WAN_FALLBACK: ${DISABLE_WAN_FALLBACK:-false}

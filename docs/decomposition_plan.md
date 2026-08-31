@@ -31,7 +31,7 @@ Replaced by `backend/api/closure_spatial.py` using `ST_Intersects` / `ST_Contain
 against `public.city_boundary` and `public.zones`.
 
 Also added `zones.unit_id/station/hall_id` (backfilled by
-`backend/scripts/import_zone_units.py`, 134/134 zones) and
+`backend/scripts/oneshot/import_zone_units.py`, 134/134 zones) and
 `road_closures.geom` + `hall_id`, so hall grouping is resolved server-side instead of
 the kiosk fetching `zones.json`.
 
@@ -218,8 +218,8 @@ Every remaining script needs the same three questions asked:
 
 Scripts still to audit: `update_gis_data.py`, `import_parcels.py`, `download_gis_data.py`,
 `compile_mbtiles.py`, `crawl_cadastral_tiles.py`, `extract_all_intersections_from_gis.py`,
-`precache_satellite_tiles.py`, `ingest_coquitlam_orthos.py`, `backfill_routing_metrics.py`,
-`backfill_audio_urls.py`, `extract_training_data.py`.
+`precache_satellite_tiles.py`, `ingest_coquitlam_orthos.py`, `oneshot/backfill_routing_metrics.py`,
+`oneshot/backfill_audio_urls.py`, `extract_training_data.py`.
 
 Remaining JSON under `frontend/public/data/`: `zones.json`, `coquitlam_city_boundary.json`,
 `coquitlam_boundary_opt.json` — all three duplicate data already in PostGIS

@@ -28,8 +28,12 @@ def get_all_streetview_overrides(db: Session = Depends(get_db)):
     for r in records:
         if r.address:
             out[r.address.upper()] = {
-                "lat": r.front_lat or r.lat,
-                "lng": r.front_lng or r.lng,
+                # front point first, centroid as the fallback. `r.lat` / `r.lng` here until
+                # 2026-08-31: the columns were renamed to centroid_lat/centroid_lng and this
+                # call site was missed, so every request to this endpoint raised
+                # AttributeError and returned 500.
+                "lat": r.front_lat or r.centroid_lat,
+                "lng": r.front_lng or r.centroid_lng,
                 "heading": r.streetview_heading,
                 "pitch": r.streetview_pitch,
                 "fov": r.streetview_fov

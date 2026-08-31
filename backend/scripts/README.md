@@ -1,16 +1,109 @@
-# Developer & Preprocessing Scripts
+# `backend/scripts/`
 
-This directory contains utility scripts for system calibration, geographic preprocessing, manual test feed uploads, and tone analysis.
+Every script in this directory, grouped by **when you would run it** — which is the thing the
+old version of this file could not tell you. It documented 8 of 51 scripts, and one of the 8
+(`create_adaptation_resources.py`) had been deleted and described loading vocabulary into
+Google Cloud Speech-to-Text, a dependency CLAUDE.md §1 forbids.
 
-## Scripts Directory Map
+> [!IMPORTANT]
+> **This file is checked, not trusted.** `python backend/scripts/audit_skill_references.py
+> --scripts` fails if a script here has no row below, or if a row names a script that does not
+> exist. A folder tells you where a file is; only a check tells you the description is still
+> true. That is the same lesson as the archived skills copy and the routing standard.
 
-| Script Name | Purpose | Usage / Execution |
-| :--- | :--- | :--- |
-| `analyze_wav.py` | Analyzes volume levels and silence pauses in a WAV file at a fine 50ms block size. Useful to check RMS thresholds. | `python scripts/analyze_wav.py` |
-| `calibrate_audio_interactive.py` | Command-line utility to interactively select your input hardware and test/calibrate the ambient noise floor thresholds. | `python scripts/calibrate_audio_interactive.py` |
-| `create_adaptation_resources.py` | Pre-compiles and loads adaptation datasets (streets, unit vocabs, call types) into Google Cloud Speech-to-Text v2 recognizer resource models. | `python scripts/create_adaptation_resources.py` |
-| `debug_audio.py` | Lists all audio devices detected on the host system to find appropriate PortAudio device IDs. | `python scripts/debug_audio.py` |
-| `feed_recorded_call.py` | Simulates a live call by streaming a pre-recorded WAV file through the system's microphone loopback device. | `python scripts/feed_recorded_call.py` |
-| `fingerprint_source.py` | Analyzes raw dispatcher tones and outputs frequency peaks to build golden tone matching configuration templates. | `python scripts/fingerprint_source.py` |
-| `fix_shapefiles.py` | Checks spatial shapefile geometries for indexing errors and formats coordinate rings. | `python scripts/fix_shapefiles.py` |
-| `update_gis_data.py` | Automated CLI tool that downloads and updates raw shapefile datasets from Coquitlam's Open Data API. | `python scripts/update_gis_data.py` |
+**Already-run scripts live in [`oneshot/`](oneshot/).** They ran once against a specific
+problem and will not run again. They are kept for provenance, not for use.
+
+---
+
+## Scheduled and routine
+
+Run on a timer or as a standing procedure.
+
+| Script | Purpose |
+|:--|:--|
+| `backup_db.sh` | Scheduled PostgreSQL backup. **Pinned in the kiosk crontab at an absolute path (`15 3 * * *`) — moving or renaming it silently stops all backups.** Runbook: `docs/briefings/database_backup_runbook.md`. |
+| `pull_backups.ps1` | Copies backup archives from the kiosk to the laptop. Run on the developer machine. |
+| `pull_audio.ps1` | Copies the dispatch audio corpus from the kiosk to the laptop. The audio and the `verified_*` columns are one dataset in two stores. |
+| `update_gis_data.py` | Monthly municipal data refresh from Coquitlam Open Data. Checks a timestamp file so it will not re-run within the same week. |
+
+## Municipal data ingest
+
+Run when City data is refreshed. Order matters: roads before parcels, parcels before intersections.
+
+| Script | Purpose |
+|:--|:--|
+| `download_gis_data.py` | Downloads raw layers from the Coquitlam ArcGIS REST API. |
+| `fix_shapefiles.py` | Repairs geometry winding order after download. |
+| `read_dbf.py` | Streaming DBF reader — audits `Addresses.dbf` without GDAL or fiona. |
+| `import_gis_data.py` | Roads, intersections, zones, city boundary and vocabulary into PostGIS. |
+| `import_parcels.py` | All 69,708 `Addresses.shp` records, plus the derived `base_site` rows (#48) and road-facing front points. |
+| `sync_hydrants.py` | Municipal hydrant inventory into `public.hydrants`, NFPA 291 classified. |
+| `derive_intersections.py` | Rebuilds `public.intersections` from road centreline geometry. |
+
+## Tiles
+
+The offline basemap pipeline. See the `mbtiles-tile-server` skill before touching an archive.
+
+| Script | Purpose |
+|:--|:--|
+| `compile_mbtiles.py` | Builds the MBTiles archives served by `cfr_tiles`. |
+| `crawl_cadastral_tiles.py` | Pre-caches the City cadastral overlay. |
+| `precache_satellite_tiles.py` | Pre-caches satellite raster tiles for the response area. |
+| `ingest_coquitlam_orthos.py` | Ingests the City 2025 7.5cm orthophotos into `ortho.mbtiles`. |
+| `finalize_mbtiles.py` | Checkpoints WAL and sets `journal_mode = DELETE`. **Required** — the tile volume is mounted read-only and will not open a WAL archive. |
+| `calc_tile_counts.py` | Estimates tile counts for a bounding box and zoom range before a crawl. |
+| `export_tile_coverage.py` | Regenerates `coquitlam_tile_coverage.geojson`. |
+| `inspect_loose_tiles.py` | Inspects loose tile directories under `backend/data/tiles/`. |
+| `verify_mbtiles_endpoints.py` | Checks sample tile requests against `mbtileserver` on 8081. |
+| `verify_ortho_provenance.py` | Confirms `ortho.mbtiles` holds City orthophotography and not a third-party basemap. |
+| `test_mbtiles_setup.py` | Builds a minimal archive and verifies the server reads it. **Not a pytest test** despite the name. |
+| `test_tile_sources.py` | Probes tile source URLs for availability. **Not a pytest test** despite the name. |
+
+## Audio and DSP
+
+Run when investigating the capture pipeline or calibrating hardware.
+
+| Script | Purpose |
+|:--|:--|
+| `calibrate_audio_interactive.py` | Interactive input-device selection and noise-floor calibration. |
+| `debug_audio.py` | Lists PortAudio devices and properties, to find device IDs. |
+| `analyze_wav.py` | Frequency and level analysis of a WAV file at 50 ms blocks. |
+| `record_test.py` | Records a sample from the configured input for inspection. |
+| `live_monitor.py` | Live RMS monitor on the capture device. |
+| `fingerprint_source.py` | Extracts dominant tone frequencies with sub-Hz precision, for building tone profiles. |
+| `backfill_tone_spectra.py` | Reconstructs tone peak data from archived recordings. Re-runnable as the archive grows. |
+| `feed_recorded_call.py` | Replays a saved WAV through the pipeline. The main end-to-end test path. |
+
+## QA harnesses and measurement
+
+Produce numbers. None of them modify operational data.
+
+| Script | Purpose |
+|:--|:--|
+| `backtest_parser.py` | Production parser against the sequential destructive parser, on ground truth. |
+| `backtest_parser_corpus.py` | Replays verified dispatches through the current parser, scoring each field. |
+| `backtest_regression.py` | WER / Levenshtein regression for STT output. |
+| `backtest_round_comparison.py` | Scores cross-round disagreement as a warning signal. |
+| `trace_geocode_corpus.py` | Scores the geocoder against the human-verified corpus. |
+| `verify_snapping_corpus.py` | Parcel arrival-point benchmark: boundary-to-arrival distance and OSRM ETA. |
+| `audit_skill_references.py` | Finds identifiers a `SKILL.md` names that exist nowhere in the code. `--scripts` checks this README. |
+| `export_complex_sites_for_review.sql` | Sites where a crew arriving at the computed point still has property to search — the `#49` review queue. |
+
+## STT / MLOps
+
+| Script | Purpose |
+|:--|:--|
+| `extract_training_data.py` | Builds the training set from HITL-verified dispatches; adds verified incident types to `public.vocabulary`. |
+| `train_whisper_lora.py` | LoRA fine-tune of the local Whisper model. |
+
+## Ad-hoc inspection
+
+Reach for these while debugging something specific.
+
+| Script | Purpose |
+|:--|:--|
+| `inspect_dispatch.py` | Dumps one dispatch record by id. |
+| `clean_old_dispatches.py` | Lists old dispatches for review. **Deletion requires manual confirmation.** |
+| `update_streetview.py` | Refreshes Street View heading/pitch/fov for parcels. |
+| `test_dual_push.py` | Exercises the MQTT and Ntfy push paths. **Not a pytest test** despite the name. |

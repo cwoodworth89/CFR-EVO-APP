@@ -72,10 +72,65 @@ def code_corpus() -> str:
     return "\n".join(chunks)
 
 
+def audit_scripts(scripts_dir: str) -> int:
+    """Check backend/scripts/README.md against what is actually in the directory.
+
+    Why this exists
+    ---------------
+    The previous README documented 8 of 51 scripts, and one of those 8 --
+    `create_adaptation_resources.py` -- had been deleted. Its description explained how to
+    load vocabulary into Google Cloud Speech-to-Text, a dependency CLAUDE.md §1 forbids. So
+    the one artefact whose job was telling you what these scripts are covered 16% of them and
+    was actively wrong about part of that.
+
+    Grouping files into folders does not fix this: a folder records a guess about lifecycle
+    made once, and says nothing when the guess stops being true. A check does.
+
+    Two directions, both of which matter:
+      * a script with no row -- undocumented, so nobody knows whether it is live or spent
+      * a row naming no script -- documentation of something that no longer exists, which is
+        worse, because it reads as current
+
+    Subdirectories such as oneshot/ are deliberately NOT scanned. They are provenance.
+    """
+    readme = os.path.join(scripts_dir, "README.md")
+    if not os.path.isfile(readme):
+        print("no README.md in %s" % scripts_dir, file=sys.stderr)
+        return 2
+
+    text = io.open(readme, encoding="utf-8", errors="replace").read()
+    documented = set(re.findall(r"^\|\s`([^`]+)`\s\|", text, re.M))
+    on_disk = {f for f in os.listdir(scripts_dir)
+               if os.path.isfile(os.path.join(scripts_dir, f)) and f != "README.md"}
+
+    undocumented = sorted(on_disk - documented)
+    phantom = sorted(documented - on_disk)
+
+    for f in undocumented:
+        print("UNDOCUMENTED  %s" % f)
+    for f in phantom:
+        print("MISSING       %s  (README describes it; it is not there)" % f)
+
+    print()
+    print("%d scripts, %d documented, %d undocumented, %d described but absent."
+          % (len(on_disk), len(documented & on_disk), len(undocumented), len(phantom)))
+    if undocumented or phantom:
+        print("A row per script, and a script per row. Neither direction is optional.")
+        return 1
+    print("README and directory agree.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--skills-dir", default=".claude/skills")
+    ap.add_argument("--scripts", action="store_true",
+                    help="audit backend/scripts/README.md against the directory instead")
+    ap.add_argument("--scripts-dir", default="backend/scripts")
     args = ap.parse_args()
+
+    if args.scripts:
+        return audit_scripts(args.scripts_dir)
 
     if not os.path.isdir(args.skills_dir):
         print("no such directory: %s" % args.skills_dir, file=sys.stderr)

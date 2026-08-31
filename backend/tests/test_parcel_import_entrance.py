@@ -39,11 +39,30 @@ def source(name):
 
 
 def insert_statement(text):
-    """The INSERT INTO public.parcels (...) VALUES (...) block, columns and binds."""
-    m = re.search(r"INSERT INTO public\.parcels\s*\((.*?)\)\s*VALUES\s*\((.*?)\)\s*ON CONFLICT",
+    """The City address INSERT ... VALUES (...) block: columns and bound parameters.
+
+    Since #48 the import writes public.parcels through TWO statements -- this one, which
+    loads every City record verbatim, and the base_site derivation below, which INSERT ...
+    SELECTs one row per multi-parcel property. This one is identified by VALUES; the City
+    load no longer carries ON CONFLICT at all, because `address` stopped being unique among
+    City rows when the collapse was removed.
+    """
+    m = re.search(r"INSERT INTO public\.parcels\s*\((.*?)\)\s*VALUES\s*\((.*?)\);",
                   text, re.S | re.I)
-    assert m, "could not locate the parcels INSERT ... VALUES ... ON CONFLICT block"
+    assert m, "could not locate the City INSERT ... VALUES block"
     return m.group(1), m.group(2)
+
+
+def base_site_statement(text):
+    """The base_site derivation: its column list and its ON CONFLICT DO UPDATE set.
+
+    base_site rows are where operator context actually lives, so they need the same guard
+    as City rows and arguably more -- this is the row a human will attach an entrance to.
+    """
+    m = re.search(r"INSERT INTO public\.parcels\s*\((.*?)\)\s*SELECT(.*?)ON CONFLICT(.*?);",
+                  text, re.S | re.I)
+    assert m, "could not locate the base_site INSERT ... SELECT ... ON CONFLICT block"
+    return m.group(1), m.group(3)
 
 
 class TestImportNeverWritesEntrance(unittest.TestCase):
@@ -84,6 +103,29 @@ class TestImportNeverWritesEntrance(unittest.TestCase):
                 text = source(name)
                 self.assertIn("entrance_lat DOUBLE PRECISION", text)
                 self.assertIn("entrance_lng DOUBLE PRECISION", text)
+
+    def test_base_site_rows_never_carry_entrance_either(self):
+        """base_site is the row an operator attaches an entrance to (#48/#49), so the
+        derivation must not write or overwrite one. Same invariant, newer surface."""
+        for name in SCRIPTS:
+            with self.subTest(script=name):
+                columns, on_conflict = base_site_statement(source(name))
+                self.assertNotIn("entrance_lat", columns)
+                self.assertNotIn("entrance_lng", columns)
+                self.assertNotIn("entrance_lat", on_conflict)
+                self.assertNotIn("entrance_lng", on_conflict)
+
+    def test_base_site_derivation_preserves_all_operator_context(self):
+        """Not just entrance. A base site is the only home for lockbox, hazard and
+        pre-plan notes, and re-running the import must not clear any of them."""
+        for name in SCRIPTS:
+            with self.subTest(script=name):
+                _, on_conflict = base_site_statement(source(name))
+                for col in ("lock_box_notes", "hazard_notes", "pre_plan_pdf_url",
+                            "construction_type", "floor_count", "entrance_set_by",
+                            "entrance_set_at", "entrance_note"):
+                    self.assertNotIn(col, on_conflict,
+                                     f"{col} must not be overwritten when a base site is rebuilt")
 
     def test_front_point_is_still_written(self):
         """The fix must not take the computed arrival point with it -- front_lat

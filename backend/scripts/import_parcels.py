@@ -143,6 +143,13 @@ def create_parcels_table(engine, drop_existing: bool = False):
             floor_count INTEGER,
             is_pa_page BOOLEAN NOT NULL DEFAULT FALSE,
 
+            -- TRUE on CFR-derived rows standing for a whole multi-parcel property and
+            -- carrying its operator context; FALSE on rows imported verbatim from the City
+            -- address layer. One civic address can span many legal parcels -- 523 Gatensbury
+            -- St spans 392 -- and rather than choose between them the import keeps every
+            -- City row and adds one base site that speaks for them all (punch-list #48).
+            is_base_site BOOLEAN NOT NULL DEFAULT FALSE,
+
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
@@ -173,7 +180,14 @@ def create_parcels_table(engine, drop_existing: bool = False):
 
         # Ensure all indexes exist
         index_sql = text("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_parcels_address ON public.parcels (address);
+        -- address is UNIQUE only among base sites: there must be exactly one per address so
+        -- the upsert protecting operator columns has a key. City rows repeat freely, which is
+        -- the point -- each keeps its own folio, legaldesc, gis_id and geometry (#48).
+        CREATE UNIQUE INDEX IF NOT EXISTS parcels_base_site_address_uniq
+            ON public.parcels (address) WHERE is_base_site;
+        CREATE INDEX IF NOT EXISTS idx_parcels_address ON public.parcels (address);
+        CREATE INDEX IF NOT EXISTS idx_parcels_base_grouping
+            ON public.parcels (house, street, streettype) WHERE NOT is_base_site;
         CREATE INDEX IF NOT EXISTS idx_parcels_address_normalized ON public.parcels (address_normalized);
         CREATE INDEX IF NOT EXISTS idx_parcels_gis_id ON public.parcels (gis_id);
         CREATE INDEX IF NOT EXISTS idx_parcels_zone_id ON public.parcels (zone_id);
@@ -335,6 +349,27 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
                    );
             """)).rowcount
 
+        # access_far_corner_m is DERIVED from the arrival point, so it is recomputed here
+        # rather than left to the migration that introduced it -- whose own comment says
+        # "Recompute after backfill_parcel_frontage" and which nothing was doing. On
+        # 2026-08-31 the 56 parcels cleared above were still carrying a far-corner distance
+        # measured from the front point that had just been removed: the #58 defect one column
+        # further along. Nulling the source without nulling what depends on it is the same
+        # mistake in a new place.
+        with engine.begin() as tx_conn:
+            tx_conn.execute(text("""
+                UPDATE public.parcels p
+                   SET access_far_corner_m = CASE
+                           WHEN p.geom IS NULL
+                             OR COALESCE(p.entrance_lat, p.front_lat) IS NULL THEN NULL
+                           ELSE ST_Length(ST_LongestLine(
+                                    ST_SetSRID(ST_MakePoint(
+                                        COALESCE(p.entrance_lng, p.front_lng),
+                                        COALESCE(p.entrance_lat, p.front_lat)), 4326),
+                                    p.geom)::geography)
+                       END;
+            """))
+
         elapsed_s = time.time() - start_t
         logging.info(f"  ✓ Road frontage backfill completed for {total_updated} parcels in {elapsed_s:.2f}s.")
         if cleared:
@@ -346,6 +381,100 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
         return total_updated
     except Exception as e:
         logging.error(f"  ✗ Error calculating parcel frontage coordinates: {e}", exc_info=True)
+        return 0
+
+
+def build_base_site_rows(engine) -> int:
+    """
+    Derives one CFR-owned `base_site` row per multi-parcel property.
+
+    A civic address can span several legal parcels -- 1,508 do, and 523 Gatensbury St spans
+    392. The import used to collapse those to one row by keeping whichever the shapefile
+    listed first (punch-list #48). Every tiebreak rule considered was wrong in a different
+    way, so none is applied: all City rows are kept, and this row is added to speak for the
+    whole property.
+
+    The base site holds the CFR context -- entrance point, lockbox, hazard notes, pre-plans --
+    and applies to every City row at that address. One entrance set on `2865 Glen Dr` serves
+    all 76 of its units, so which City row a lookup happens to return stops mattering.
+
+    Deliberate choices, each with a reason:
+
+    * Grouped on (house, street, streettype), so units group with their base address.
+      `2865 Glen Dr 1..76` and `2865 Glen Dr` are one property.
+    * Records with no house number are EXCLUDED. Those are street-only right-of-way
+      entries -- `Harper Rd` appears 61 times spread over 3.9 km -- and a union of them is
+      a multipolygon whose centre means nothing. They resolve at street level anyway.
+    * Geometry is ST_Union of the members: the true property extent, which is also what
+      fixes the kiosk outlining one lot of eight.
+    * ST_PointOnSurface, not ST_Centroid: the point is guaranteed to lie inside the
+      polygon. On 177 parcels citywide a centroid falls outside its own parcel, which is
+      how zone lookups and frontage snapping went wrong before.
+    * The City's MASTER record is NOT used as the base site. Measured first: across 517
+      properties it averages 10.3% of the summed unit area while spanning the whole site,
+      because it is strata COMMON PROPERTY -- driveways and walkways between the units --
+      not the building and not the envelope. See docs/briefings/base_site_rows_decision.md.
+    * The ON CONFLICT list carries no operator column. entrance_*, lock_box_notes,
+      hazard_notes, pre_plan_pdf_url, construction_type and floor_count are protected by
+      omission, exactly as they are on City rows. Human knowledge must survive the pipeline
+      that regenerates computed values.
+
+    Front points are not set here -- backfill_parcel_frontage runs afterwards and treats a
+    base site like any other row, snapping it to the street its address names.
+    """
+    from sqlalchemy import text
+    logging.info("=" * 60)
+    logging.info("Step: Deriving base_site rows for multi-parcel properties...")
+
+    sql = text("""
+        INSERT INTO public.parcels (
+            address, house, street, streettype, address_normalized,
+            geom, centroid_lat, centroid_lng, zone_id, is_base_site
+        )
+        SELECT
+            btrim(concat_ws(' ', p.house, p.street, p.streettype)),
+            p.house, p.street, p.streettype,
+            lower(btrim(concat_ws(' ', p.house, p.street, p.streettype))),
+            ST_Multi(ST_Union(p.geom)),
+            ST_Y(ST_PointOnSurface(ST_Union(p.geom))),
+            ST_X(ST_PointOnSurface(ST_Union(p.geom))),
+            public.zone_for_point(ST_PointOnSurface(ST_Union(p.geom))),
+            TRUE
+        FROM public.parcels p
+        WHERE NOT p.is_base_site
+          AND p.house  IS NOT NULL AND btrim(p.house)  <> ''
+          AND p.street IS NOT NULL AND btrim(p.street) <> ''
+          AND p.geom   IS NOT NULL
+        GROUP BY p.house, p.street, p.streettype
+        HAVING count(*) > 1
+        ON CONFLICT (address) WHERE is_base_site DO UPDATE SET
+            house              = EXCLUDED.house,
+            street             = EXCLUDED.street,
+            streettype         = EXCLUDED.streettype,
+            address_normalized = EXCLUDED.address_normalized,
+            geom               = EXCLUDED.geom,
+            centroid_lat       = EXCLUDED.centroid_lat,
+            centroid_lng       = EXCLUDED.centroid_lng,
+            zone_id            = EXCLUDED.zone_id,
+            updated_at         = now();
+    """)
+
+    try:
+        with engine.begin() as conn:
+            written = conn.execute(sql).rowcount
+        with engine.connect() as conn:
+            total = conn.execute(text(
+                "SELECT count(*) FROM public.parcels WHERE is_base_site;")).scalar()
+            no_zone = conn.execute(text(
+                "SELECT count(*) FROM public.parcels WHERE is_base_site AND zone_id IS NULL;")).scalar()
+        logging.info(f"  ✓ {written} base_site rows written; {total} exist in total.")
+        if no_zone:
+            logging.warning(
+                f"  ⚠ {no_zone} base site(s) resolve to no emergency zone. A unioned property "
+                f"can straddle a zone boundary or fall in a gap; these need review.")
+        return total
+    except Exception as e:
+        logging.error(f"  ✗ Error deriving base_site rows: {e}", exc_info=True)
         return 0
 
 
@@ -418,6 +547,7 @@ def run_import(
     # 3. Clean & Format Data
     logging.info("Formatting records and normalizing addresses...")
     seen_addresses = set()
+    duplicate_addresses = 0
     records_to_insert = []
     zone_assigned_count = 0
     missing_zone_count = 0
@@ -435,9 +565,17 @@ def run_import(
         if not raw_addr:
             continue
 
-        # Deduplicate identical address strings if present in source
-        if raw_addr in seen_addresses:
-            continue
+        # EVERY City record is kept, duplicates included.
+        #
+        # This previously skipped any address string already seen, which collapsed 1,508
+        # groups and discarded 4,141 records -- keeping whichever the shapefile happened to
+        # list first, in file order, with no rule. 631 of those groups have members more than
+        # 25 m apart, so the survivor was frequently not the lot a crew arrives at, and the
+        # discarded rows took their own folio, legaldesc and geometry with them.
+        #
+        # Nothing chooses between them now. A CFR-owned base site row is derived afterwards
+        # and speaks for the whole property (build_base_site_rows below, punch-list #48).
+        duplicate_addresses += raw_addr in seen_addresses
         seen_addresses.add(raw_addr)
 
         gis_id = clean_str(row.get("GIS_ID"))
@@ -542,7 +680,8 @@ def run_import(
             "is_pa_page": False
         })
 
-    logging.info(f"Prepared {len(records_to_insert)} clean records for database ingestion.")
+    logging.info(f"Prepared {len(records_to_insert)} City records for ingestion "
+                 f"({duplicate_addresses} share an address with another record and are all kept).")
     logging.info(f"Emergency Zones assigned: {zone_assigned_count} | Unassigned (boundary edges): {missing_zone_count}")
 
     # 4. Connect to DB & Bulk UPSERT
@@ -552,8 +691,32 @@ def run_import(
 
     create_parcels_table(engine, drop_existing=drop_existing)
 
-    logging.info(f"Executing batch UPSERT ingestion (batch size: {batch_size})...")
-    upsert_sql = text("""
+    # City address rows are replaced wholesale rather than upserted.
+    #
+    # `address` is no longer unique among them -- 1,508 civic addresses legitimately span
+    # several legal parcels -- so ON CONFLICT (address) has nothing to key on, and if it did
+    # it would collapse precisely what #48 stopped collapsing.
+    #
+    # Replacing them is safe because City rows carry NO operator data. Every piece of CFR
+    # knowledge -- entrance point, lockbox, hazard notes, pre-plans -- lives on a base_site
+    # row, which is preserved here and upserted separately below. That separation is what
+    # makes the City half disposable, and it is the whole reason this design works.
+    #
+    # If single-parcel properties ever need notes of their own, the answer is to give that
+    # address a base_site row too, NOT to write context onto a City row (operator decision
+    # 2026-08-31, docs/briefings/base_site_rows_decision.md).
+    logging.info("Replacing City address rows (base sites are preserved)...")
+    with engine.begin() as conn:
+        removed = conn.execute(text(
+            "DELETE FROM public.parcels WHERE NOT is_base_site;"
+        )).rowcount
+        preserved = conn.execute(text(
+            "SELECT count(*) FROM public.parcels WHERE is_base_site;"
+        )).scalar()
+    logging.info(f"  Removed {removed} City rows; {preserved} base site rows preserved.")
+
+    logging.info(f"Executing batch ingestion (batch size: {batch_size})...")
+    insert_sql = text("""
     INSERT INTO public.parcels (
         gis_id, address, house, street, streettype, unit, unittype, postal,
         block, plan, lot, legaldesc, plan_area, folio, zonetype1, zonetype2, zonetype3,
@@ -572,46 +735,23 @@ def run_import(
         END,
         :front_lat, :front_lng,
         :streetview_heading, :streetview_pitch, :streetview_fov, :is_pa_page
-    )
-    ON CONFLICT (address) DO UPDATE SET
-        gis_id = EXCLUDED.gis_id,
-        house = EXCLUDED.house,
-        street = EXCLUDED.street,
-        streettype = EXCLUDED.streettype,
-        unit = EXCLUDED.unit,
-        unittype = EXCLUDED.unittype,
-        postal = EXCLUDED.postal,
-        block = EXCLUDED.block,
-        plan = EXCLUDED.plan,
-        lot = EXCLUDED.lot,
-        legaldesc = EXCLUDED.legaldesc,
-        plan_area = EXCLUDED.plan_area,
-        folio = EXCLUDED.folio,
-        zonetype1 = EXCLUDED.zonetype1,
-        zonetype2 = EXCLUDED.zonetype2,
-        zonetype3 = EXCLUDED.zonetype3,
-        status = EXCLUDED.status,
-        units = EXCLUDED.units,
-        sc_card = EXCLUDED.sc_card,
-        extract_dt = EXCLUDED.extract_dt,
-        centroid_lat = EXCLUDED.centroid_lat,
-        centroid_lng = EXCLUDED.centroid_lng,
-        zone_id = EXCLUDED.zone_id,
-        address_normalized = EXCLUDED.address_normalized,
-        geom = EXCLUDED.geom,
-        updated_at = CURRENT_TIMESTAMP;
+    );
     """)
 
     total_processed = 0
     with engine.begin() as conn:
         for i in range(0, len(records_to_insert), batch_size):
             batch = records_to_insert[i:i + batch_size]
-            conn.execute(upsert_sql, batch)
+            conn.execute(insert_sql, batch)
             total_processed += len(batch)
             pct = (total_processed / len(records_to_insert)) * 100
             logging.info(f"  Ingested {total_processed}/{len(records_to_insert)} parcels ({pct:.1f}%)...")
 
-    # 5. Compute Road-Facing Frontage Coordinates
+    # 5. Derive base_site rows -- must run before frontage, so each base site gets a front
+    #    point of its own from the street its address names.
+    build_base_site_rows(engine)
+
+    # 6. Compute Road-Facing Frontage Coordinates
     if not skip_frontage:
         backfill_parcel_frontage(engine, batch_size=batch_size)
     else:

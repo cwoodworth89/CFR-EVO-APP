@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**31 open** (18 crew-visible) · **37 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**31 open** (18 crew-visible) · **38 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
@@ -33,7 +33,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **34a** | 🔴 crew-visible | OPEN | [Apparatus names collide with call-type names, turning STT damage into a confident wrong answer](punchlist/34a-apparatus-names-collide-with-call-type-names-turning-st.md) |
 | **34b** | 🔴 crew-visible | OPEN | [Live overdose call still showed the green ROUTINE (Code 1) badge](punchlist/34b-live-overdose-call-still-showed-the-green-routine-code.md) |
 | **35b** | 🔴 crew-visible | OPEN | ["Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`](punchlist/35b-near-roads-stopped-being-recorded-on-2026-08-21-phase-2.md) |
-| **38** | 🔴 crew-visible | OPEN | [`DISP-2026-ACCF6D` routed to the wrong street — the parcel front point is on Pinetree Way](punchlist/38-disp-2026-accf6d-routed-to-the-wrong-street-the-parcel.md) |
 
 | **44a** | 🔴 crew-visible | OPEN | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](punchlist/44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **47a** | 🔴 crew-visible | EXTERNAL | [`Chartwell Rd` does not exist in municipal data — three sources give three street names](punchlist/47a-chartwell-rd-does-not-exist-in-municipal-data-three-sou.md) |
@@ -42,6 +41,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](punchlist/54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
 | **56** | 🔴 crew-visible | OPEN | [Bring XStreets onto the same resolution path as main addresses](punchlist/56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
 | **57** | 🔴 crew-visible | OPEN | [Candidate-level parse bleed — latent, not live](punchlist/57-candidate-level-parse-bleed-latent-not-live.md) |
+| **58** | 🔴 crew-visible | OPEN | [Parcels whose street has no road keep a stale front point on a different street](punchlist/58-parcels-whose-street-has-no-road-keep-a-stale-front-po.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
 | **44b** | 🟠 operational | OPEN | [Kiosk crashed on a live dispatch — stale chunk after a frontend deploy](punchlist/44b-kiosk-crashed-on-a-live-dispatch-stale-chunk-after-a-fr.md) |
 | **47b** | 🟠 operational | OPEN | [Basemap tile licensing has never been checked — Carto and Esri](punchlist/47b-basemap-tile-licensing-has-never-been-checked-carto-and.md) |

@@ -136,12 +136,11 @@ no UI to set one.
 
 ## Open, and needing a decision before implementation
 
-1. **Single-parcel addresses keep CFR data on a City row.** With `base_site` only for the
-   1,671 multi-parcel properties, the other 26,531 addresses hold operator context on a
-   City-owned row — which cannot then be freely reloaded, and whose address is no longer
-   globally unique, so the upsert has nothing to key on. Creating a `base_site` for every
-   main address (28,202) removes the branch entirely at the cost of ~26k thin rows. **This
-   is the one open question that blocks implementation.**
+1. ~~**Single-parcel addresses keep CFR data on a City row.**~~ **Settled 2026-08-31:**
+   single-unit parcels are not expected to carry notes, so no `base_site` is created for them
+   and every City row stays free of operator data. If that changes one day, the answer is to
+   **create a `base_site` row for that address** — CFR data always lives on a `base_site`,
+   whatever the property's size — rather than annotating a City row.
 2. **Geometry for a `base_site` row** — union of its members is the obvious answer, but the
    42 street-only groups spread over kilometres (`Harper Rd` ×61 across 3.9 km) would union
    to a multipolygon whose centroid means nothing. Those carry no house number and resolve
@@ -151,3 +150,50 @@ no UI to set one.
 4. **`streetview_heading/pitch/fov`** are in the INSERT but not the DO UPDATE, so they
    freeze against the geometry they were first computed from — the same defect already
    fixed for `front_lat`. Logged, not fixed.
+
+
+---
+
+## Addendum, 2026-08-31 — the snapping decision, and the gap reconciled
+
+**Snapping stays simple, and it is already built.** The multi-criteria frontage scoring in
+`import_parcels_PROPOSED.py` — parallelism, edge length, road classification, distance decay,
+with the addressed street as a 3x weight — is **not adopted**. The street name is not an
+estimate to be weighed against geometry; the address states it, and both sides are municipal
+data (§6.2).
+
+The production `backfill_parcel_frontage` in `import_parcels.py` already implements exactly
+that: the road search is constrained to `roads.roadname = parcels.street` (apostrophes
+stripped on both sides), and the point is `ST_ClosestPoint(road.geom, parcel.geom)` — measured
+to the **polygon**, not the centroid, which is why the 177 lots whose centroid falls outside
+themselves do not break it.
+
+**Measured against the running database 2026-08-31:**
+
+| | |
+|:--|--:|
+| Parcels whose front point is not on their named road | **56** |
+| — no road of that name exists at all | **56** |
+| — a matching road exists but the point is elsewhere | **0** |
+
+**Zero misplacements wherever a road of the right name exists.** That reconciles the
+331 / 277 / 54 figure in
+[`snapping_tests_review_response.md`](snapping_tests_review_response.md): 331 was the old
+any-road algorithm, and the filter has since landed. Punch-list **#38** is closed on the
+strength of it — `DISP-2026-ACCF6D` (`1178 Heffley Cres`) now resolves against Heffley rather
+than Pinetree Way.
+
+**Odd-shaped and large complexes are handled by flagging, not by cleverness.** Where the
+simple rule is weak the answer is an operator-set `ENTRANCE`, not a better score. That is
+**#49**, and its queue is the 1,671 `base_site` properties plus the 56 above.
+
+**Considered and not adopted:** taking the point on a strata MASTER polygon nearest the named
+road, on the theory that it marks where the strata road meets the public road. It is
+geometrically reasonable — MASTER *is* the access land — but it can as easily land on a
+sidewalk or a perimeter strip, and an arrival point that is confidently a few metres wrong is
+the failure mode this project treats most seriously. Worth revisiting only with measurement
+behind it.
+
+**New defect found while verifying this**: those 56 parcels keep the front point the old
+any-road algorithm gave them, because the constrained lookup returns no row and the `UPDATE`
+skips them. Logged as **#58**.

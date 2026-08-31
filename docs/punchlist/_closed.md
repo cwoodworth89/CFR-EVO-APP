@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-37 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+38 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -43,3 +43,4 @@
 | **12** | 🔴 crew-visible | CLOSED | [Street centroid reports the requested address as though exact](12-street-centroid-reports-the-requested-address-as-though.md) |
 | **31** | 🔴 crew-visible | CLOSED | [`response_type` never reaches the kiosk — every call renders as ROUTINE](31-response-type-never-reaches-the-kiosk-every-call-render.md) |
 | **43a** | 🔴 crew-visible | CLOSED | [Call-type vocabulary carries locale variants as duplicate rows; HITL captures incident as free text](43a-call-type-vocabulary-carries-locale-variants-as-duplica.md) |
+| **38** | 🔴 crew-visible | CLOSED | [`DISP-2026-ACCF6D` routed to the wrong street — the parcel front point is on Pinetree Way](38-disp-2026-accf6d-routed-to-the-wrong-street-the-parcel.md) |

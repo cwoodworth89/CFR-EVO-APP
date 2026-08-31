@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🖥️ Live Operation Batch, 2026-08-23 |
 | **Blocks** | 1 |
@@ -60,3 +60,33 @@ That is the same class of defect as the intersections rebuild: a plausible geome
 standing in for the real relationship (§6.2).
 
 ---
+
+---
+
+## 38 (closed). The street-name filter fixed it
+
+> **Status**: ✅ **Closed 2026-08-31.** Verified against the running kiosk database.
+
+`DISP-2026-ACCF6D` is `1178 Heffley Cres`. Its front point now resolves with **Heffley** as
+the nearest road, not Pinetree Way.
+
+The cause was never this parcel. `backfill_parcel_frontage` took the nearest road of **any**
+name, so geometry could beat the address — 1,813 parcels citywide landed on a street their
+address does not name, `2865 Glen Dr` on Guildford Way, 254 m from where a crew should stop.
+
+The fix was the department decision of 2026-08-29: the addressed street is a **filter**, not a
+weight. `import_parcels.py` now constrains the road search to
+`roads.roadname = parcels.street` (apostrophes stripped both sides, because the cadastre
+writes `Deer's Leap` and the road layer writes `Deers Leap`) and takes
+`ST_ClosestPoint(road.geom, parcel.geom)` — measured to the **polygon**, not the centroid,
+which is why the 177 lots whose centroid falls outside themselves no longer break it.
+
+**Measured citywide today:**
+
+| | |
+|:--|--:|
+| Parcels whose front point is not on their named road | **56** |
+| — because no road of that name exists at all | **56** |
+| — road exists but the point is elsewhere | **0** |
+
+Zero misplacements wherever a matching road exists. The residue is tracked as **#58**.

@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-40 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+41 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -46,3 +46,4 @@
 | **38** | 🔴 crew-visible | CLOSED | [`DISP-2026-ACCF6D` routed to the wrong street — the parcel front point is on Pinetree Way](38-disp-2026-accf6d-routed-to-the-wrong-street-the-parcel.md) |
 | **58** | 🔴 crew-visible | CLOSED | [Parcels whose street has no road keep a stale front point on a different street](58-parcels-whose-street-has-no-road-keep-a-stale-front-po.md) |
 | **48** | 🔴 crew-visible | CLOSED | [One civic address, many parcels — the import keeps whichever the shapefile lists first](48-one-civic-address-many-parcels-the-import-keeps-whichev.md) |
+| **10** | ⚪ hygiene | CLOSED | [Three test modules have never run in review](10-three-test-modules-have-never-run-in-review.md) |

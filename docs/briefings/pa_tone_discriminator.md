@@ -134,7 +134,9 @@ analysed, from how many calls, on what hardware and recorder. Searched the confi
 (`hardware_specification.md`, `test_procedures.md`), the calibration script and the git
 history: **there is no record of any of it.** The values simply appear.
 
-The nearest thing to a clue is `backend/tests/test_listener.py`, whose values are marked
+The nearest thing to a clue was `backend/tests/test_listener.py` (deleted 2026-08-31 — it
+held a stale duplicate of the fingerprints with no `PA Tone` entry; the evidence below is
+preserved here and the file is in git history). Its values were marked
 *"Source fingerprints, 16kHz"* and are spaced exactly **7.8125 Hz** apart — `16000 / 2048`,
 i.e. a 2048-point FFT at a 16 kHz sample rate. That is a fingerprint of the *analysis*, not a
 provenance record, but it is consistent with the current `AUDIO_SAMPLE_RATE = 16000`.
@@ -435,3 +437,5 @@ samples. Worth a look if Rescue calls ever start being missed.
 > whereas the listener analyses the trigger window. The offset data above is exactly why that
 > difference matters and why it is recorded in the script's docstring: a backfilled row finds
 > the best tone in the file, a live row finds the tone that fired the listener.
+
+<!-- audit-ok: backend/tests/test_listener.py -- the file is deleted; this passage records what its 7.8125 Hz spacing proved about the FFT parameters -->

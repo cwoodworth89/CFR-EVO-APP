@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**29 open** (16 crew-visible) · **40 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**28 open** (16 crew-visible) · **41 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
@@ -47,7 +47,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **51a** | 🟠 operational | OPEN | [Add cross_street_1 and cross_street_2 to the review panel for HITL verification](punchlist/51a-add-cross-street-1-and-cross-street-2-to-the-review-pan.md) |
 | **53** | 🟠 operational | OPEN | [The dispatch agent makes a WAN call to huggingface.co on every start](punchlist/53-the-dispatch-agent-makes-a-wan-call-to-huggingface-co-o.md) |
 | **55** | 🟠 operational | OPEN | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](punchlist/55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
-| **10** | ⚪ hygiene | OPEN | [Three test modules have never run in review](punchlist/10-three-test-modules-have-never-run-in-review.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |
 | **37** | ⚪ hygiene | OPEN | [Close button and timer timeout should not dismiss to the same place](punchlist/37-close-button-and-timer-timeout-should-not-dismiss-to-th.md) |
 | **45a** | ⚪ hygiene | OPEN | [Geocoder harness needs a review pass before its numbers are trusted again](punchlist/45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |

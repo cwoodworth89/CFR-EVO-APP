@@ -1,5 +1,23 @@
 # CFR EVO: GIS Endpoints & Offline Migration Notes
 
+> [!CAUTION]
+> **Superseded 2026-08-30. The datasets described below are no longer how the app reads GIS data.**
+> This file documents a `frontend/public/data/*.json` fetch path that has been replaced by
+> PostGIS as the single source of truth (CLAUDE.md §1), served through the API:
+>
+> * `data/hydrants.json` — the frontend now reads `public.hydrants` via the API.
+>   `MapBoard.jsx:138` and `MapLayers.jsx:251` both record the change, and punch-list
+>   **#24** (an invented hydrant shown on every dispatch) is why.
+> * `data/zones.json`, `data/blocks.json` — `public.zones` / `public.roads`.
+> * `data/intersections.json` — described here as feeding "driver training games";
+>   training mode was removed entirely at `d5fbdcc`. Intersections are now derived from
+>   road geometry into `public.intersections` (punch-list **#9**, **#13**).
+>
+> The "Dynamic Viewport API (Option A)" roadmap below is not the direction taken.
+> **Do not use this file to decide where GIS data comes from.** Read
+> [`docs/architecture/database_and_datastores.md`](architecture/database_and_datastores.md)
+> and CLAUDE.md §1 instead. Retained for history only.
+
 This document provides a guide to the local GIS datasets currently packaged with the app, their configuration, and the future roadmap for replacing the external municipal servers at `geodata.coquitlam.ca` with local hosting via the **Dynamic Viewport API (Option A)**.
 
 ---

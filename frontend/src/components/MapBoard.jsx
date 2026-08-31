@@ -1,5 +1,6 @@
 /* global __BUILD_DATE__ */
-// NOTE: For details on local GIS JSONs (hydrants.json, zones.json) and map layout config, see docs/gis_endpoints.md
+// NOTE: Map layout config is in docs/gis_endpoints.md, but its local-JSON sections are
+// SUPERSEDED -- hydrants/zones now come from PostGIS via the API, not public/data/*.json.
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';

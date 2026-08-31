@@ -1,5 +1,18 @@
 # CFR EVO: Database & Data Stores Architecture
 
+> [!WARNING]
+> **Partially stale 2026-08-30.** Two corrections, both verified:
+>
+> * **`parcels` is 65,401 rows, not 69,708.** 69,708 is the row count of the source
+>   `Addresses.shp`; deduplication by normalized address yields 65,401 unique properties
+>   (see `docs/development_freeze_summary.md` and `docs/city_gis_data_register.md`).
+>   The figure below labels the pre-deduplication shapefile count as the table count.
+> * **`hydrants.json` is no longer a frontend datastore.** The frontend reads
+>   `public.hydrants` through the API — see
+>   [`docs/gis_endpoints.md`](../gis_endpoints.md) for what changed and why.
+>
+> The overall store map is otherwise current.
+
 This document catalogs all primary databases, local spatial shapefile stores, and offline storage engines in the **CFR EVO** ecosystem, along with the **Zero Online Fallback** hardening protocol.
 
 ---

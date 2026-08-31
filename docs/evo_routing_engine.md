@@ -1,4 +1,21 @@
 # Coquitlam Fire Rescue EVO Routing Engine (`CFR-EVORoutingEngine`)
+
+> [!CAUTION]
+> **Describes staged data as though it were live. Superseded 2026-08-30.**
+> The apparatus "physics classes" below — vehicle weight, acceleration inertia, turn
+> deceleration, hill-climbing power — are **not applied anywhere in the routing path**, and
+> this file does not say so. `APPARATUS_TIERS` in
+> `frontend/src/utils/EVORoutingEngine.js` and
+> `services/gis/src/gis_service/routing_engine.py` is clearly-marked **staged seed data**
+> under CLAUDE.md §6.4, which forbids applying tuning values implicitly inside a
+> calculation path.
+>
+> None of the physics figures below carries provenance, and the register they are written in
+> is the one §6.3 names as *not* provenance. **OSRM's `distance` and `duration` are
+> authoritative** (§6.2); do not re-derive travel time from these.
+>
+> For the current design read the `emergency-routing-engine` skill in `.claude/skills/`.
+> Punch-list **#1** (arterial vs alleyway weighting) is open and unexamined.
 ## Comprehensive Technical & Operational Architecture Documentation
 
 ---

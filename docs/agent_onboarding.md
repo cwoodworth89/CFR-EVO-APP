@@ -76,7 +76,7 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Development Freeze Summary** | [docs/development_freeze_summary.md](./development_freeze_summary.md) | Current implementation status (Phase A–F): PostGIS migration, STT vocab biasing, API decomposition, geocoder 2.0. **Start here for current state.** | `gis-spatial-analysis` |
 | **Debug & QA Punch List** | [docs/debug_and_qa_punchlist.md](./debug_and_qa_punchlist.md) | Open bugs and edge cases (routing anomalies, geocoding fallbacks, UI refinements). | `e2e-dispatch-testing` |
 | **Data Contracts** | [docs/data_contracts.md](./data_contracts.md) | Shared payload/schema shapes between backend, GIS, and frontend. | None |
-| **Routing Engine Reference** | [docs/evo_routing_engine.md](./evo_routing_engine.md) | `EVORoutingEngine` design and apparatus routing logic. | `emergency-routing-engine` |
+| **Routing Engine Reference** | [docs/evo_routing_engine.md](./evo_routing_engine.md) | ⚠️ **Superseded** — presents staged, not-applied apparatus physics as live (§6.4). Use the skill; the doc is history. | `emergency-routing-engine` |
 | **Dispatch Integration Options** | [docs/dispatch_integration_options.md](./dispatch_integration_options.md) | Radio/audio ingestion integration approaches. | `dispatch-pipeline-ops` |
 | **Project Purpose & History** | [docs/PROJECT_PURPOSE_AND_HISTORY.md](./PROJECT_PURPOSE_AND_HISTORY.md) | Origin story and evolution from training-game prototype to dispatch HUD. | None |
 | **Project Ideas / Future Features** | [docs/PROJECT_IDEAS.md](./PROJECT_IDEAS.md) | Backlog of future feature candidates (e.g. reimplemented driver training module). | None |

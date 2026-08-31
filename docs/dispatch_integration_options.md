@@ -1,5 +1,15 @@
 # CFR EVO: Locution PrimeAlert® Passive Integration Guide
 
+> [!NOTE]
+> **Premise still correct; one option below is dead.** ECOMM owns the Locution PrimeAlert
+> hardware and station staff have no administrative, network or CAD-stream access — that
+> constraint is unchanged and is why the system captures audio at all.
+>
+> **Google STT is not an option and must not be reintroduced.** `STT_ENGINE` is locked to
+> `"whisper"` in `backend/cfr_dispatch/config/cloud.py`; a cloud STT dependency would break
+> both the offline requirement and the $0-cost requirement (CLAUDE.md §1). Read the
+> constraints and the chosen path; treat the option comparison as history.
+
 This document outlines options for interfacing with the station's **Locution PrimeAlert® Enclosure** and **Enclosure PC** to capture real-time dispatch data. 
 
 Because the hardware and software are owned/operated by **ECOMM**, municipal station staff have:

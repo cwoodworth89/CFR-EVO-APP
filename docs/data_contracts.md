@@ -1,5 +1,19 @@
 # Canonical Data Contracts & Payloads
 
+> [!CAUTION]
+> **Stale 2026-08-30. This file calls itself "the single source of truth" and is not.**
+> Last substantive update 2026-08-08. It still documents `confidence_score`, which was
+> **retired** and replaced with named review flags (punch-list **#45b**, closed 2026-08-30) —
+> the whole point of that change being that a single number conflated "the two STT passes
+> agreed" with "the location is right" (**#54**).
+>
+> Other fields have moved since: the operator-verified fields were promoted out of `target`
+> JSON into columns (`bfc6bd0`), and numeric response codes were deleted rather than renamed.
+>
+> **The schema is the contract.** Read the migrations under `backend/migrations/` and the
+> models in `backend/api/`. Treat every payload below as unverified until checked against
+> them.
+
 This document serves as the **single source of truth** for all dispatch data structures, database schemas, REST API contracts, and real-time MQTT message payloads across **CFR EVO**.
 
 ---

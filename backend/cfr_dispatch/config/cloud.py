@@ -1,6 +1,6 @@
 # NOTE: For integration options, payload fields, database setup, and GIS properties, see:
 #   - docs/dispatch_integration_options.md
-#   - docs/gis_endpoints.md
+#   - docs/gis_endpoints.md  (SUPERSEDED -- GIS now comes from PostGIS via the API)
 import os
 
 # Integration settings

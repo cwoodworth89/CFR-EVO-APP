@@ -1,5 +1,17 @@
 # 🌐 Public Domain & SSL/TLS Migration Blueprint
 
+> [!CAUTION]
+> **Not the architecture. Do not follow this.** This blueprint migrates CFR EVO from
+> Tailscale/LAN to a public web domain with Let's Encrypt certificates — which is
+> incompatible with CLAUDE.md §1: the system must function **100% offline** with no WAN
+> dependency and **$0 recurring cost**, and dispatch records must never reach a remote
+> (a constraint `.gitignore` also enforces for database dumps).
+>
+> Kept as a record of an option that was considered and not taken. If public exposure is
+> ever revisited it belongs in [`docs/PROJECT_IDEAS.md`](PROJECT_IDEAS.md) as a proposal,
+> with the privacy implications of dispatch data — addresses, call details, HITL
+> corrections — argued explicitly first.
+
 This guide documents the architecture, Nginx reverse proxy configuration, Let's Encrypt SSL/TLS certificates, and container routing required when migrating **CFR EVO** from Tailscale/LAN to a public web domain (e.g., `dispatch.woodworthelectric.ca`).
 
 ---

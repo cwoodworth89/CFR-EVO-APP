@@ -400,12 +400,24 @@ class AddressResolver:
 
                     # Interpolate point along the road centreline.
                     #
-                    # public.roads stores geom as MULTILINESTRING (all 3,214 rows), but
+                    # public.roads stores geom as MULTILINESTRING (every row), but
                     # ST_LineInterpolatePoint requires a LINESTRING and raises
                     # "1st arg isn't a line" otherwise -- this step previously threw on
-                    # every call. ST_LineMerge stitches 3,184 of 3,214 into a single
-                    # LINESTRING; the remaining 30 are genuinely disjoint, so fall back
-                    # to their longest component rather than failing the lookup.
+                    # every call. ST_LineMerge stitches most of them into a single
+                    # LINESTRING; the rest are genuinely disjoint, so fall back to their
+                    # longest component rather than failing the lookup.
+                    #
+                    # Measured 2026-08-31, after the #42 re-import brought the table from
+                    # 3,214 rows to 3,451: 3,416 merge to a single LINESTRING and 35 do
+                    # not. The earlier figures here were 3,184 and 30, taken before that
+                    # import, and are the reason these are dated -- a count in a comment
+                    # goes stale the moment the data behind it moves.
+                    #
+                    # For those 35 the arrival point lands on the longest component, which
+                    # may not be the piece carrying the requested house number. It is an
+                    # approximation, and it is preferred to failing the lookup outright --
+                    # but the resolution_note below is what tells the operator the point is
+                    # a street position rather than a property.
                     point = conn.execute(text("""
                         WITH merged AS (
                             SELECT ST_LineMerge(geom) AS g

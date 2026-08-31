@@ -124,9 +124,8 @@ narrow candidates.
 ## Sequencing — do not start yet
 
 **The parcel-snapping workstream must land first.** `verify_snapping_corpus.py` reads
-`p.geom` and `p.front_lat/front_lng`, `import_parcels_PROPOSED.py` is mid-flight with an
-unlanded decision, and `docs/dispatch_corpus_snapping_benchmark.json` is baselined against
-current geometry. Changing what a parcel row means would pull the ground out from under
+`p.geom` and `p.front_lat/front_lng`, and `docs/dispatch_corpus_snapping_benchmark.json` was baselined against
+current geometry *(benchmark deleted 2026-08-31 with the unadopted proposal)*. Changing what a parcel row means would pull the ground out from under
 work in progress — the same failure the snapping rollback briefing apologises for.
 
 **#49 gates the operator half regardless.** All 65,401 `entrance_lat` are NULL and there is
@@ -178,7 +177,7 @@ themselves do not break it.
 
 **Zero misplacements wherever a road of the right name exists.** That reconciles the
 331 / 277 / 54 figure in
-[`snapping_tests_review_response.md`](snapping_tests_review_response.md): 331 was the old
+`snapping_tests_review_response.md` *(deleted 2026-08-31; figure preserved here)*: 331 was the old
 any-road algorithm, and the filter has since landed. Punch-list **#38** is closed on the
 strength of it — `DISP-2026-ACCF6D` (`1178 Heffley Cres`) now resolves against Heffley rather
 than Pinetree Way.

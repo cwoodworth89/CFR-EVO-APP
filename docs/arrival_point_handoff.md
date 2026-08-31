@@ -106,7 +106,7 @@ INSERT 200 lines below seeded it from the **centroid** on every new row. Existin
 were always safe; new ones were not, which made the two actions already queued here — the
 `Addresses.shp` re-pull (#41) and any `--force-drop` — the things that would have sprung
 it. `entrance_*` is now absent from the INSERT in **both** `import_parcels.py` and
-`import_parcels_PROPOSED.py`, so a new row gets SQL NULL and falls through to `front_lat`.
+`import_parcels_PROPOSED.py` *(deleted 2026-08-31; the Boundary-Edge proposal was not adopted — see `briefings/addressed_street_snapping_decision.md`)*, so a new row gets SQL NULL and falls through to `front_lat`.
 Guarded by `backend/tests/test_parcel_import_entrance.py`. Human knowledge has to
 survive the pipeline that regenerates computed values.
 
@@ -120,7 +120,7 @@ only way to set one is hand-written SQL against production. Queue is
 `docs/complex_sites_for_review.csv` — 1,395 sites, 25,475 addresses; the top 100 by address
 count covers 65%. Constraints are written up in the punch-list entry.
 
-### 2. The other team's `import_parcels_PROPOSED.py` is unresolved.
+### 2. The other team's `import_parcels_PROPOSED.py` *(deleted 2026-08-31; the Boundary-Edge proposal was not adopted — see `briefings/addressed_street_snapping_decision.md`)* is unresolved.
 They built boundary-edge scoring with a **3× street-name prior** — a weight, not a filter,
 which is exactly what produced the original 1,813 wrong-street parcels. We asked for it to
 become a filter (`docs/briefings/addressed_street_snapping_decision.md`). Their 24 unit tests
@@ -214,7 +214,7 @@ when that should be a conscious decision rather than a consequence.
 
 ### What should happen before more work lands
 
-1. **Settle the other team's `import_parcels_PROPOSED.py`** so there is one parcel import, not
+1. **Settle the other team's `import_parcels_PROPOSED.py` *(deleted 2026-08-31; the Boundary-Edge proposal was not adopted — see `briefings/addressed_street_snapping_decision.md`)*** so there is one parcel import, not
    two candidates.
 2. **Drop `parcels_frontpoint_snapshot_20260828`** once that is settled.
 3. Treat **#49 as the first post-freeze feature**, not as continuing work — it is a UI that

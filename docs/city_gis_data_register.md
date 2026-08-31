@@ -316,7 +316,7 @@ per site, not a code fix.
 
 **Status:** open question, never asked.
 
-`docs/emergency_routing_gis_parcels_standard.md` §2.7 specifies a Tier 2 resolution step
+`docs/emergency_routing_gis_parcels_standard.md` §2.7 (deleted 2026-08-31 with the unadopted proposal) specified a Tier 2 resolution step
 sourced from a municipal *"Curb-Cut & Ingress Layer (`access_points.shp`)"* — a point per
 property marking where the driveway apron meets the street. That tier sits directly above our
 computed frontage point in its hierarchy.

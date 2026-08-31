@@ -15,7 +15,7 @@
 ## 50. The parcel import seeds `entrance_lat/lng` with the centroid on every INSERT
 > **Status**: ✅ **Fixed 2026-08-31.** `entrance_lat` / `entrance_lng` are gone from the
 > INSERT column list, the bound values and the params dict in **both** `import_parcels.py`
-> and `import_parcels_PROPOSED.py`, so a new row now gets SQL NULL and the resolver falls
+> and `import_parcels_PROPOSED.py` *(deleted 2026-08-31 — proposal not adopted)*, so a new row now gets SQL NULL and the resolver falls
 > through to the computed `front_lat`.
 >
 > **Why it is written this way.** An unset entrance is a *correct* answer (§6.1). The
@@ -101,7 +101,7 @@ parcel entirely, the front point would sit off the property.
 So this is a **trap laid for the next import**, not a live wrong answer. It is recorded now
 because the next two actions queued in this workstream are the two that spring it.
 
-**`import_parcels_PROPOSED.py` has the identical defect** (`:795`, with the same correct
+**`import_parcels_PROPOSED.py` *(deleted 2026-08-31 — proposal not adopted)* has the identical defect** (`:795`, with the same correct
 `ON CONFLICT` omission). It is not a reason to prefer one script over the other, but whichever is
 adopted needs the fix, and it should not be adopted while it carries this.
 

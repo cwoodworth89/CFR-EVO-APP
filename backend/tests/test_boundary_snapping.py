@@ -1,19 +1,25 @@
 """
 backend/tests/test_boundary_snapping.py
-Automated test suite verifying the Boundary-Edge Decomposition snapping algorithm
-(Section 2.2 of docs/emergency_routing_gis_parcels_standard.md).
+Regression tests for parcel front-point placement as it actually ships.
+
+The production rule (import_parcels.py, backfill_parcel_frontage) is deliberately simple:
+constrain the road search to the street the address names, then take
+ST_ClosestPoint(road.geom, parcel.geom) -- measured to the polygon, not the centroid.
+Department decision 2026-08-29; see docs/briefings/addressed_street_snapping_decision.md.
 
 Verifies:
-1. Four known failure cases from the routing standard:
-   - 2865 Glen Dr (must snap to Glen Drive ~13m instead of Guildford Way 254m)
-   - 210 Lebleu St (must snap to Lebleu Street ~9m)
-   - 3025 Anson Ave (must snap to Anson Avenue ~7m)
-   - 3030 Gordon Ave (must snap to Gordon Avenue ~9m)
-2. Mathematical properties of Boundary Edge Decomposition (parallelism cos^2, edge length, road class, distance decay).
-3. Constraint adherence:
-   - Zero modifications to backend/scripts/import_parcels.py.
-   - Presence of backend/scripts/import_parcels_PROPOSED.py.
-   - OSRM compatibility with existing left_begin / right_end columns (no phantom columns).
+1. Four known failure cases, against the live database:
+   - 2865 Glen Dr (Glen Drive ~13m, not Guildford Way 254m)
+   - 210 Lebleu St (Lebleu Street ~9m)
+   - 3025 Anson Ave (Anson Avenue ~7m)
+   - 3030 Gordon Ave (Gordon Avenue ~9m)
+2. OSRM routes to the resulting arrival point.
+3. No phantom z_level column; left_begin / right_end still present.
+
+The multi-criteria Boundary-Edge Decomposition proposal these cases were first written
+against was NOT adopted -- a scoring weight on the street name could be outvoted by
+geometry, which put 1,813 parcels on a street their address does not name. The four cases
+survive as regression tests because they describe correct outcomes regardless of method.
 """
 
 import os
@@ -199,21 +205,6 @@ class TestRoutingEngineOSRMIntegration:
 
 class TestArchitecturalConstraints:
     """Verifies that all project architectural constraints and guardrails are strictly respected."""
-
-    def test_import_parcels_production_script_unmodified(self):
-        """Requirement 1: Do NOT modify existing backend/scripts/import_parcels.py."""
-        prod_script = os.path.join(os.path.dirname(__file__), "..", "scripts", "import_parcels.py")
-        assert os.path.exists(prod_script), "backend/scripts/import_parcels.py must exist"
-
-    def test_proposed_replacement_script_exists(self):
-        """Requirement 1: Proposed replacement script must be saved as import_parcels_PROPOSED.py."""
-        proposed_script = os.path.join(os.path.dirname(__file__), "..", "scripts", "import_parcels_PROPOSED.py")
-        assert os.path.exists(proposed_script), "backend/scripts/import_parcels_PROPOSED.py must exist"
-        with open(proposed_script, "r", encoding="utf-8") as f:
-            content = f.read()
-            assert "Boundary-Edge Decomposition" in content
-            assert "candidate_roads" in content
-            assert "boundary_edges" in content
 
     def test_no_phantom_columns_or_valhalla_migration(self):
         """Requirement 3: No phantom Z_Level columns or altered routing infrastructure."""

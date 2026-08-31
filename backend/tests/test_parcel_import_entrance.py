@@ -29,9 +29,8 @@ import unittest
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SCRIPTS = {
     "production": os.path.join(REPO, "backend", "scripts", "import_parcels.py"),
-    # Unadopted (punch-list #56), and carried the identical defect. Fixed at the
-    # same time so adopting it later cannot reintroduce this.
-    "proposed": os.path.join(REPO, "backend", "scripts", "import_parcels_PROPOSED.py"),
+    # import_parcels_PROPOSED.py was deleted 2026-08-31 -- the Boundary-Edge
+    # Decomposition proposal was not adopted, so there is no second script to guard.
 }
 
 

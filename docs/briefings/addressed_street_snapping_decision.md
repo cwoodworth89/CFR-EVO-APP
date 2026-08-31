@@ -1,6 +1,6 @@
 # Decision: the addressed street is authoritative for snapping
 
-**Re:** `import_parcels_PROPOSED.py` street-name prior
+**Re:** `import_parcels_PROPOSED.py` street-name prior *(script deleted 2026-08-31; this decision shipped in `import_parcels.py::backfill_parcel_frontage` instead)*
 **Date:** 2026-08-29
 **From:** CFR EVO operations / GIS workstream
 

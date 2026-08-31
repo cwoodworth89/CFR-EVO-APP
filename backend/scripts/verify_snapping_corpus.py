@@ -4,7 +4,8 @@ backend/scripts/verify_snapping_corpus.py
 Dispatch Corpus Verification & Efficacy Benchmark for Boundary-Edge Decomposition Snapping.
 
 Evaluates:
-1. The 4 known reference cases specified in Section 2 of docs/emergency_routing_gis_parcels_standard.md:
+1. The 4 known reference cases, now executable in backend/tests/test_boundary_snapping.py
+   (Section 2 of the routing standard was deleted 2026-08-31 with the unadopted proposal):
    - 2865 Glen Dr (must snap to Glen Drive ~12.9m instead of Guildford Way 254m trap)
    - 210 Lebleu St (frontage on Lebleu St ~9.3m)
    - 3025 Anson Ave (frontage on Anson Ave ~9.5m)

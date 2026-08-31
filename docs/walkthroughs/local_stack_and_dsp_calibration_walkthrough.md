@@ -1,5 +1,11 @@
 # Local Stack Migration, Ntfy Push & DSP Tone Spotter Calibration Walkthrough
 
+> [!NOTE]
+> **Historical walkthrough; the DSP and stack content still applies.** One item is dead: the
+> `shapefile_loader.py` vectorisation described below is gone — in-memory shapefile loading
+> was eliminated in favour of PostGIS (CLAUDE.md §1). The `STT_ENGINE = "whisper"` lock is
+> still current and still binding.
+
 This document outlines the systematic diagnosis, container audits, tone spotter fixes, and STT optimizations executed following the cloud-to-local migration.
 
 ---

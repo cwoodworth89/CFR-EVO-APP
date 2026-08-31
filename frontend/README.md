@@ -1,38 +1,30 @@
-# React + Vite
+# CFR EVO — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite kiosk client for the CFR EVO dispatch system. Renders the apparatus-bay
+HUD, the Leaflet map surface, and the HITL review panel.
 
-Currently, two official plugins are available:
+## Running it
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-
-## Deploy to GitHub Pages
-
-This project is configured to deploy the built `dist` folder to GitHub Pages using the `gh-pages` package. The Vite `base` is already set to `/coquitlam-fire-trainer/` in `vite.config.js`.
-
-Steps to deploy:
-
-1. From the `client` folder, install the new dev dependency:
+The full stack runs on the **kiosk**, not locally (CLAUDE.md §3). The normal loop is edit
+locally, push, then pull and build on the kiosk:
 
 ```bash
-npm install --save-dev gh-pages
+git add . && git commit -m "..." && git push origin main
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend && npm run build"
 ```
 
-2. Build and deploy:
+## Before you change anything here
 
-```bash
-npm run deploy
-```
+| Topic | Read |
+|:--|:--|
+| Architecture and domain rules | [`CLAUDE.md`](../CLAUDE.md) — especially §5 (unresolved/out-of-bounds handling) and §6 (no fabricated data) |
+| API and tile base URLs | [`src/apiClient.js`](src/apiClient.js) — **never** use relative paths or hardcoded `localhost`; remote kiosks over Tailscale will 404 |
+| Display sizing and typography | `kiosk-responsive-ergonomics` skill in `.claude/skills/` |
+| Map surface | [`docs/architecture/unified_map_surface.md`](../docs/architecture/unified_map_surface.md) |
+| Open defects | [`docs/debug_and_qa_punchlist.md`](../docs/debug_and_qa_punchlist.md) |
 
-This will run `npm run build` then publish `dist` to the `gh-pages` branch.
+## Lint
 
-If your repository name is different, update `base` in `vite.config.js` accordingly.
+`npm run lint:crash` blocks commits touching `frontend/src/**` on the crash class only —
+`no-undef` and use-before-declaration. Those compile cleanly through Vite and throw only at
+runtime on the kiosk; `npm run build` does not catch them. `npm run lint` is advisory.

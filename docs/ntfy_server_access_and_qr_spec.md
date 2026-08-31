@@ -14,7 +14,7 @@ This document provides technical specifications for the local Ntfy push notifica
 | **Web Root Mode** | `--web-root app` | Serves the Ntfy Web UI at `http://<host>:8080/app` and `http://<host>:8080/<topic>`. |
 | **Tailscale IP** | `100.95.146.94` | Primary VPN access host for off-site mobile drivers. |
 | **Local Station IP** | Dynamic LAN IP (e.g. `10.0.1.x`) | Local station network IP. |
-| **Future Domain** | `dispatch.woodworthelectric.ca` | Target public domain (See [SSL Migration Guide](./public_domain_and_ssl_migration.md)). |
+| **Future Domain** | — | Not planned. Public-domain exposure was considered and rejected: it is incompatible with CLAUDE.md §1 (100% offline, $0) and would put dispatch records on a remote. |
 
 ---
 

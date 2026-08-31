@@ -40,6 +40,24 @@ no WAN.
 > Do not treat a clause number found there as provenance; every one of them is unverified.
 
 > [!CAUTION]
+> **`docs/evo_routing_engine.md` was deleted on 2026-08-30, and this is why.**
+> It described apparatus "physics classes" — vehicle weight, acceleration inertia, turn
+> deceleration, hill-climbing power — as the live routing architecture. The figures came
+> from AI-generated research commissioned during the design phase, which returned fluent,
+> precisely structured, authoritative-sounding material with **no sources behind it**. The
+> system was steered by it and went the wrong way.
+>
+> **Operator ruling 2026-08-30**: that line of work was a wild goose chase. The routing
+> engine was deliberately reset to a basic level and will be approached again from scratch.
+> The document was pruned rather than annotated because its only remaining function was to
+> make an abandoned, unsourced design look like a specification.
+>
+> This is the reference case for §6.3's rule that invented-sounding mechanical rationale is
+> not provenance. `APPARATUS_TIERS` remains **staged, not applied** (§6.4). OSRM's
+> `distance` and `duration` stay authoritative (§6.2). When routing restarts, it starts at
+> the *Apparatus routing profile* row below — which reads NOT HELD, the honest position.
+
+> [!CAUTION]
 > **The research drafts behind that document are archived, and carry the same warning.**
 > `explorer_standards_research_1`, `explorer_routing_engines_1` and `explorer_gis_parcels_1`
 > (137 KB of agent-generated research, 2026-08-28) cite NENA, NFPA and APCO clauses

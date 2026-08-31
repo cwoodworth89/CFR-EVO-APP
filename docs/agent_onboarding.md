@@ -60,9 +60,7 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | Document | Target Location | Scope | Active Agent Skill |
 | :--- | :--- | :--- | :--- |
 | **Project Overview** | [README.md](../README.md) | High-level system structure and two-phase pipelines. | `dispatch-pipeline-ops` |
-| **Local DB Setup** | [docs/local_database_setup.md](./local_database_setup.md) | Containerized PostgreSQL 16 schema, FastAPI routes. | `local-stack-orchestrator` |
 | **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./docs/ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
-| **Public Domain & SSL** | [docs/public_domain_and_ssl_migration.md](./docs/public_domain_and_ssl_migration.md) | Nginx reverse proxy and SSL certs. | None |
 | **Call Structure** | [docs/call_structure.md](./docs/call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
 | **GIS Endpoints** | [docs/gis_endpoints.md](./docs/gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
 | **Test Matrix** | [docs/test_procedures.md](./docs/test_procedures.md) | Tone spot checks, database inserts, mic levels. | `e2e-dispatch-testing` |
@@ -70,13 +68,9 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./docs/laptop_kiosk_setup.md) | Kiosk displays and auto-updates. | `kiosk-remote-ops` |
 | **Milestones** | [docs/milestones.md](./docs/milestones.md) | Development roadmap and releases. | None |
 | **Privacy Compliance** | [docs/privacy.md](./docs/privacy.md) | Voice monitoring rules and local RAM buffer. | None |
-| **Phase 2 Walkthrough** | [docs/walkthroughs/phase_2_micro_domain_service_split.md](./walkthroughs/phase_2_micro_domain_service_split.md) | Decoupling monolith into microservices. | None |
-| **Hydrant Walkthrough** | [docs/walkthroughs/hydrants_and_maintenance_walkthrough.md](./walkthroughs/hydrants_and_maintenance_walkthrough.md) | Turf.js nearest hydrant mapping. | `gis-pipeline-sync` |
 | **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | PostgreSQL index tuning and DSP calibration. | `performance-metrics-analytics` |
 | **Development Freeze Summary** | [docs/development_freeze_summary.md](./development_freeze_summary.md) | Current implementation status (Phase A–F): PostGIS migration, STT vocab biasing, API decomposition, geocoder 2.0. **Start here for current state.** | `gis-spatial-analysis` |
 | **Debug & QA Punch List** | [docs/debug_and_qa_punchlist.md](./debug_and_qa_punchlist.md) | Open bugs and edge cases (routing anomalies, geocoding fallbacks, UI refinements). | `e2e-dispatch-testing` |
-| **Data Contracts** | [docs/data_contracts.md](./data_contracts.md) | Shared payload/schema shapes between backend, GIS, and frontend. | None |
-| **Routing Engine Reference** | [docs/evo_routing_engine.md](./evo_routing_engine.md) | ⚠️ **Superseded** — presents staged, not-applied apparatus physics as live (§6.4). Use the skill; the doc is history. | `emergency-routing-engine` |
 | **Dispatch Integration Options** | [docs/dispatch_integration_options.md](./dispatch_integration_options.md) | Radio/audio ingestion integration approaches. | `dispatch-pipeline-ops` |
 | **Project Purpose & History** | [docs/PROJECT_PURPOSE_AND_HISTORY.md](./PROJECT_PURPOSE_AND_HISTORY.md) | Origin story and evolution from training-game prototype to dispatch HUD. | None |
 | **Project Ideas / Future Features** | [docs/PROJECT_IDEAS.md](./PROJECT_IDEAS.md) | Backlog of future feature candidates (e.g. reimplemented driver training module). | None |

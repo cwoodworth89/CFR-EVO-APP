@@ -39,6 +39,7 @@ covered, which is why they had nowhere to be recorded.
 | *"deliberately left untouched … surfaces as an approximate location rather than a confident wrong one"* (code comment) | those rows have no stale value | **they keep whatever the previous algorithm wrote.** "Skip the row" only yields that outcome if the row was empty. The comment described the author's intent, not the code — **#58** |
 | `test_import_parcels_production_script_unmodified` | asserts the script is unmodified | **asserts only that the file exists.** Its stated requirement had since been deliberately reversed, and it would have passed either way |
 | `GONE = re.compile(r"\b(delet\|remov)\b")` | matches words starting with "delet" | **matches neither.** The trailing `\b` requires a boundary between `delet` and `ed`, so the alternation was unreachable for every word it was written for. Written for this repository's own docs check, in `audit_skill_references.py`, and caught only by testing it against real sentences |
+| `ILIKE '% near %'` over `raw_transcript` | counts calls that said "near" | **undercounts badly.** Locution transcripts read `"…, Near, Pacific, Street…"` — the word is followed by a **comma**, so a pattern requiring a space after it misses most of them. Measured 2026-08-31: 5 matches where the true count was 9. It made a healthy 1:1 field look like a 9-vs-5 discrepancy and nearly had a working parser investigated as a fabrication bug. Use `~* '\ynear\y'` — Postgres word boundaries, punctuation-safe |
 | `--workers 8` alongside `rate_limit_sec` in `compile_mbtiles.py` | eight requests in flight, so eight times the throughput | **one request at a time.** `RateLimiter.wait()` serialises every worker behind a single lock, so the ceiling is `1 / rate_limit_sec` no matter how many workers there are. That is correct and deliberate — it is what makes the limit a real courtesy to a municipal server — but the two settings read as independent and are not. Cost 8.5 hours of unexplained wall-clock on the 2026-08-27 cadastral crawl |
 
 The last row is the cheapest lesson in the file: it was written **while documenting this very
@@ -85,6 +86,11 @@ starting one of these expecting minutes. Run the arithmetic first: **tiles × `r
   attached to the wrong function.
 * **Test names are claims and are not checked.** A test asserting less than its name says
   passes forever and protects nothing.
+* **Substring matching on transcripts is not word matching.** Locution punctuates heavily —
+  `"Coquitlam, Medic 1, Respond Emergency, …, Near, Pacific, Street, and The High St"`. Every
+  field name and keyword can be followed by a comma, so `ILIKE '% word %'` silently misses
+  them. Use `~* '\yword\y'`. A count that is quietly low reads as a defect in whatever
+  produced the other number, which is the expensive way to find out.
 
 ## Rule
 

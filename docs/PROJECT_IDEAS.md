@@ -501,6 +501,46 @@ Address labels stay on the **cadastral overlay** regardless. `public.parcels` ho
 authoritative civic addresses; OSM's `housenumber` layer is crowd-sourced and is the wrong
 authority for dispatch. This is why house numbers are dropped from the basemap.
 
+#### Cheaper path, if 3D is dropped (operator note 2026-08-31)
+
+**Tilt and 3D are the only reasons the renderer has to change.** Without them Leaflet stays,
+and the 15-file MapLibre migration above — the bulk of this item — disappears entirely. What
+remains is a build, not a migration:
+
+1. Planetiler builds vector tiles from an OSM extract (Geofabrik publishes British Columbia).
+2. Render them to raster once.
+3. Write them into `street.mbtiles` and `street_nolabels.mbtiles` — same filenames, same
+   `mbtileserver`, same URLs, **zero frontend change**.
+
+Roughly a day rather than a week. Note this is a **build, not a crawl**: there is no server
+to fetch from, which is the whole point of self-hosting.
+
+**The constraint that decides the shape:** pre-rendered raster cannot toggle at runtime.
+Every combination must be baked as its own archive.
+
+| Approach | Toggles available | Cost |
+|:--|:--|:--|
+| Raster, 2 variants | labels on/off — what the map does today at z15/16 | no frontend work |
+| Raster, 4 variants | roads and places independently | 4 archives, ~2x disk |
+| Vector + MapLibre | real runtime toggles, and 3D later | the full migration above |
+
+Undecided: whether independent roads/places switches are wanted, or whether the existing
+single labels on/off is enough. That answer picks the row.
+
+#### Watermarked tile residue
+
+**Cleared 2026-08-31:** the entire z19 level was deleted from both street archives —
+162,064 watermarked tiles, 536 MB reclaimed, and the metadata `maxzoom` corrected to 18 so
+it does not outlive its content (the lie that hid #40). No visual impact: the frontend stops
+requesting at z18.
+
+**Still present:** roughly **5,600 watermarked tiles per layer at z18** and **1,400 at z17**,
+in the western strip added by the 2026-08-27 re-crawl. These were deliberately left. Deleting
+them would blank the basemap over Austin Heights, Maillardville and Burquitlam at the zooms
+crews actually work in — reopening the #40 gap that re-crawl existed to close. **A visible
+hole over a third of the city is worse than the residual exposure**, so they stay until this
+item lands and replaces the layer wholesale.
+
 #### Investigated and rejected: "Coquitlam Light Grey" (2026-08-31)
 
 The operator found a **Coquitlam Light Grey** basemap while browsing QtheMap. It is **not

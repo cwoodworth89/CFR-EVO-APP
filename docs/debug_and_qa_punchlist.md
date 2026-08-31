@@ -15,7 +15,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**31 open** (18 crew-visible) · **38 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**30 open** (17 crew-visible) · **39 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
@@ -41,7 +41,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](punchlist/54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
 | **56** | 🔴 crew-visible | OPEN | [Bring XStreets onto the same resolution path as main addresses](punchlist/56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
 | **57** | 🔴 crew-visible | OPEN | [Candidate-level parse bleed — latent, not live](punchlist/57-candidate-level-parse-bleed-latent-not-live.md) |
-| **58** | 🔴 crew-visible | OPEN | [Parcels whose street has no road keep a stale front point on a different street](punchlist/58-parcels-whose-street-has-no-road-keep-a-stale-front-po.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
 | **44b** | 🟠 operational | OPEN | [Kiosk crashed on a live dispatch — stale chunk after a frontend deploy](punchlist/44b-kiosk-crashed-on-a-live-dispatch-stale-chunk-after-a-fr.md) |
 | **47b** | 🟠 operational | OPEN | [Basemap tile licensing has never been checked — Carto and Esri](punchlist/47b-basemap-tile-licensing-has-never-been-checked-carto-and.md) |

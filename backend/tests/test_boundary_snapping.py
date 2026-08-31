@@ -55,7 +55,7 @@ class TestFourKnownFailureCases:
         with self.engine.connect() as conn:
             # Query parcel record for 2865 Glen Dr (main complex parcel)
             row = conn.execute(text("""
-                SELECT p.id, p.address, p.front_lat, p.front_lng, p.lat, p.lng,
+                SELECT p.id, p.address, p.front_lat, p.front_lng, p.centroid_lat, p.centroid_lng,
                        r.fullname AS snapped_road,
                        ST_Distance(
                            ST_Transform(p.geom, 26910),

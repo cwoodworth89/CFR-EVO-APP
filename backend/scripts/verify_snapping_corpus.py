@@ -92,7 +92,7 @@ def verify_four_failure_cases(engine) -> list:
     with engine.connect() as conn:
         for addr, expected_road, max_dist_m, description in cases:
             row = conn.execute(text("""
-                SELECT p.id, p.address, p.street, p.house, p.lat, p.lng,
+                SELECT p.id, p.address, p.street, p.house, p.centroid_lat, p.centroid_lng,
                        p.front_lat, p.front_lng,
                        r.fullname AS snapped_road,
                        r.road_class,

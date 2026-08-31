@@ -586,12 +586,12 @@ def step9_backfill_parcel_frontage(engine) -> int:
             front_lng = ST_X(sub.closest_pt)
         FROM (
             SELECT DISTINCT ON (p2.id) p2.id,
-                   ST_ClosestPoint(r.geom, ST_SetSRID(ST_MakePoint(p2.lng, p2.lat), 4326)) AS closest_pt
+                   ST_ClosestPoint(r.geom, ST_SetSRID(ST_MakePoint(p2.centroid_lng, p2.centroid_lat), 4326)) AS closest_pt
             FROM public.parcels p2
             JOIN public.roads r ON UPPER(r.fullname) = UPPER(p2.street || ' ' || p2.streettype)
             WHERE p2.front_lat IS NULL
-              AND p2.lat IS NOT NULL
-            ORDER BY p2.id, ST_Distance(r.geom, ST_SetSRID(ST_MakePoint(p2.lng, p2.lat), 4326))
+              AND p2.centroid_lat IS NOT NULL
+            ORDER BY p2.id, ST_Distance(r.geom, ST_SetSRID(ST_MakePoint(p2.centroid_lng, p2.centroid_lat), 4326))
         ) sub
         WHERE p.id = sub.id;
         """)
@@ -628,8 +628,8 @@ def step10_add_parcel_geom(engine) -> int:
 
             result = conn.execute(text("""
                 UPDATE public.parcels
-                SET geom = ST_SetSRID(ST_MakePoint(lng, lat), 4326)
-                WHERE geom IS NULL AND lat IS NOT NULL AND lng IS NOT NULL;
+                SET geom = ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326)
+                WHERE geom IS NULL AND centroid_lat IS NOT NULL AND centroid_lng IS NOT NULL;
             """))
             updated = result.rowcount if hasattr(result, "rowcount") else 0
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_parcels_geom ON public.parcels USING GIST (geom);"))

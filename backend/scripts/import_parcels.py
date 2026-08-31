@@ -91,8 +91,8 @@ def create_parcels_table(engine, drop_existing: bool = False):
             sc_card VARCHAR(50),
             extract_dt DATE,
 
-            lat DOUBLE PRECISION,
-            lng DOUBLE PRECISION,
+            centroid_lat DOUBLE PRECISION,
+            centroid_lng DOUBLE PRECISION,
 
             zone_id VARCHAR(16),
             address_normalized VARCHAR(255),
@@ -101,7 +101,7 @@ def create_parcels_table(engine, drop_existing: bool = False):
 
             -- THE THREE POSITIONS A PARCEL CAN RESOLVE TO -------------------------
             -- address_resolver takes the first that is set:
-            --     entrance -> front -> lat/lng
+            --     entrance -> front -> centroid
             --
             -- entrance_*  OPERATOR-VERIFIED. Where a company officer says the way in
             --             actually is -- the gate, the keypad, the side apparatus can
@@ -116,7 +116,7 @@ def create_parcels_table(engine, drop_existing: bool = False):
             --             populated for all 65,401 parcels by
             --             backfill_parcel_frontage.
             --
-            -- lat/lng     PARCEL POLYGON CENTROID, computed by us from geom -- it is
+            -- centroid_*  PARCEL POLYGON CENTROID, computed by us from geom -- it is
             --             not supplied by the City. Used for the zone point-in-polygon
             --             join, for map centring, and for simple script work that just
             --             needs one point per parcel. It is ALSO the last-resort
@@ -126,7 +126,7 @@ def create_parcels_table(engine, drop_existing: bool = False):
             --             entrance_* -- that is exactly the defect #50 fixed.
             --
             -- There used to be a fourth pair, centroid_lat/centroid_lng. It was a
-            -- byte-identical duplicate of lat/lng on all 65,400 polygon rows, selected
+            -- byte-identical duplicate of these on all 65,400 polygon rows, selected
             -- by the resolver and never read. Dropped 2026-08-31.
             ------------------------------------------------------------------------
             front_lat DOUBLE PRECISION,
@@ -225,7 +225,7 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
             candidate_ids = [r[0] for r in conn.execute(text("""
                 SELECT id
                 FROM public.parcels
-                WHERE lat IS NOT NULL AND lng IS NOT NULL
+                WHERE centroid_lat IS NOT NULL AND centroid_lng IS NOT NULL
                   AND geom IS NOT NULL
                 ORDER BY id;
             """)).fetchall()]
@@ -276,7 +276,7 @@ def backfill_parcel_frontage(engine, batch_size: int = 5000) -> int:
                 LIMIT 1
             ) r
             WHERE p2.id >= :min_id AND p2.id <= :max_id
-              AND p2.lat IS NOT NULL AND p2.lng IS NOT NULL
+              AND p2.centroid_lat IS NOT NULL AND p2.centroid_lng IS NOT NULL
               AND p2.geom IS NOT NULL
               AND p2.street IS NOT NULL AND btrim(p2.street) <> ''
         ) nearest
@@ -474,8 +474,8 @@ def run_import(
             "units": units,
             "sc_card": sc_card,
             "extract_dt": extract_dt,
-            "lat": lat,
-            "lng": lng,
+            "centroid_lat": lat,
+            "centroid_lng": lng,
             "zone_id": zone_id,
             "address_normalized": addr_norm,
             "geom_wkt": geom_wkt,
@@ -523,14 +523,14 @@ def run_import(
     INSERT INTO public.parcels (
         gis_id, address, house, street, streettype, unit, unittype, postal,
         block, plan, lot, legaldesc, plan_area, folio, zonetype1, zonetype2, zonetype3,
-        status, units, sc_card, extract_dt, lat, lng, zone_id, address_normalized,
+        status, units, sc_card, extract_dt, centroid_lat, centroid_lng, zone_id, address_normalized,
         geom,
         front_lat, front_lng,
         streetview_heading, streetview_pitch, streetview_fov, is_pa_page
     ) VALUES (
         :gis_id, :address, :house, :street, :streettype, :unit, :unittype, :postal,
         :block, :plan, :lot, :legaldesc, :plan_area, :folio, :zonetype1, :zonetype2, :zonetype3,
-        :status, :units, :sc_card, CAST(:extract_dt AS DATE), :lat, :lng, :zone_id, :address_normalized,
+        :status, :units, :sc_card, CAST(:extract_dt AS DATE), :centroid_lat, :centroid_lng, :zone_id, :address_normalized,
         CASE 
             WHEN :geom_wkt IS NOT NULL AND :geom_wkt != '' 
             THEN ST_GeomFromText(:geom_wkt, 4326) 
@@ -560,8 +560,8 @@ def run_import(
         units = EXCLUDED.units,
         sc_card = EXCLUDED.sc_card,
         extract_dt = EXCLUDED.extract_dt,
-        lat = EXCLUDED.lat,
-        lng = EXCLUDED.lng,
+        centroid_lat = EXCLUDED.centroid_lat,
+        centroid_lng = EXCLUDED.centroid_lng,
         zone_id = EXCLUDED.zone_id,
         address_normalized = EXCLUDED.address_normalized,
         geom = EXCLUDED.geom,

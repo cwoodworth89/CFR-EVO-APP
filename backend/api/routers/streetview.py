@@ -65,8 +65,8 @@ def get_streetview_override(address: str, db: Session = Depends(get_db)):
         "heading": p.streetview_heading,
         "pitch": p.streetview_pitch,
         "fov": p.streetview_fov,
-        "lat": p.front_lat or p.lat or 0.0,
-        "lng": p.front_lng or p.lng or 0.0
+        "lat": p.front_lat or p.centroid_lat or 0.0,
+        "lng": p.front_lng or p.centroid_lng or 0.0
     }
 
 

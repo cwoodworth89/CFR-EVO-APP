@@ -258,7 +258,7 @@ class AddressResolver:
         try:
             with self.engine.connect() as conn:
                 rows = conn.execute(text("""
-                    SELECT id, address, house, street, streettype, lat, lng,
+                    SELECT id, address, house, street, streettype, centroid_lat, centroid_lng,
                            front_lat, front_lng, entrance_lat, entrance_lng,
                            zone_id,
                            ST_AsGeoJSON(geom) as geom_geojson
@@ -329,8 +329,8 @@ class AddressResolver:
                     # The centroid remains the last resort. It is a real position for the
                     # parcel, not a fabricated one, and only applies if a parcel somehow has
                     # no frontage point at all.
-                    dest_lat = best_row['entrance_lat'] or best_row['front_lat'] or best_row['lat']
-                    dest_lng = best_row['entrance_lng'] or best_row['front_lng'] or best_row['lng']
+                    dest_lat = best_row['entrance_lat'] or best_row['front_lat'] or best_row['centroid_lat']
+                    dest_lng = best_row['entrance_lng'] or best_row['front_lng'] or best_row['centroid_lng']
                     rings = self._extract_rings(best_row['geom_geojson'])
                     st_type = best_row['streettype'] or ''
                     clean_addr = title_address(f"{best_row['house']} {best_row['street']} {st_type}".strip())
@@ -575,7 +575,7 @@ class AddressResolver:
                         WHERE UPPER(roadname) = ANY(:names)
                         GROUP BY UPPER(roadname)
                     )
-                    SELECT p.address, p.house, p.lat, p.lng,
+                    SELECT p.address, p.house, p.centroid_lat, p.centroid_lng,
                            ABS((p.house)::int - (:house)::int) AS house_delta,
                            -- AVG over a CROSS JOIN, never ST_Distance to an ST_Union of
                            -- both roads: the union measures distance to the NEAREST of
@@ -587,7 +587,7 @@ class AddressResolver:
                       AND (UPPER(p.streettype) = UPPER(:stype) OR :stype = '')
                       AND p.house ~ '^[0-9]+$'
                       AND (p.unit IS NULL OR p.unit = '')
-                      AND p.lat IS NOT NULL AND p.lng IS NOT NULL
+                      AND p.centroid_lat IS NOT NULL AND p.centroid_lng IS NOT NULL
                       -- The hundred-block bound is applied HERE, before ranking. If the
                       -- near roads ranked across the whole street first, they could
                       -- select a parcel outside the dispatched block, which the bound

@@ -157,8 +157,14 @@ class ParcelModel(Base):
     extract_dt = Column(DateTime, nullable=True)
 
     # From Addresses.shp Geometry
-    lat = Column(Float, nullable=True)
-    lng = Column(Float, nullable=True)
+    # The PARCEL POLYGON CENTROID, computed by us from geom -- not supplied by the
+    # City. Zone point-in-polygon input, map centring, and simple per-parcel script
+    # work. Also the LAST-RESORT arrival position, and a poor one: outside the parcel
+    # on 177 rows. Never copy into front_* or entrance_* (punch-list #50).
+    # Renamed from lat/lng 2026-08-31 so the name says what it holds; the API still
+    # publishes it as "lat"/"lng".
+    centroid_lat = Column(Float, nullable=True)
+    centroid_lng = Column(Float, nullable=True)
 
     # Pre-computed at import
     zone_id = Column(String(16), index=True, nullable=True)

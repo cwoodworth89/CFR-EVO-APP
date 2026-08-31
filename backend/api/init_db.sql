@@ -109,9 +109,13 @@ CREATE TABLE IF NOT EXISTS public.parcels (
     sc_card VARCHAR(50),                                -- Safety card reference
     extract_dt DATE,                                    -- Shapefile extract date
 
-    -- From Addresses.shp geometry
-    lat DOUBLE PRECISION,                               -- Latitude from shapefile point geometry
-    lng DOUBLE PRECISION,                               -- Longitude from shapefile point geometry
+    -- PARCEL POLYGON CENTROID, computed by us from geom -- not supplied by the City.
+    -- Zone point-in-polygon input, map centring, simple per-parcel script work, and
+    -- the LAST-RESORT arrival position (entrance -> front -> centroid). A poor one:
+    -- outside the parcel on 177 rows. Never copy into front_* or entrance_* (#50).
+    -- Named lat/lng until 2026-08-31; the API still publishes it as "lat"/"lng".
+    centroid_lat DOUBLE PRECISION,
+    centroid_lng DOUBLE PRECISION,
     geom GEOMETRY(Point, 4326),
 
     -- Pre-computed at import (spatial intersection with Emergency_Response_Zones.shp)

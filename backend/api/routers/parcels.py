@@ -72,8 +72,8 @@ def serialize_parcel(p: ParcelModel) -> dict:
         "units": p.units,
         "status": p.status,
         "zone_id": p.zone_id,
-        "lat": p.lat,
-        "lng": p.lng,
+        "lat": p.centroid_lat,
+        "lng": p.centroid_lng,
         "front_lat": p.front_lat,
         "front_lng": p.front_lng,
         "streetview_heading": p.streetview_heading,
@@ -142,10 +142,10 @@ def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Sessi
                 "streettype": p.streettype,
                 "unit": p.unit,
                 "zone_id": p.zone_id,
-                "lat": p.lat,
-                "lng": p.lng,
-                "front_lat": p.front_lat or p.lat,
-                "front_lng": p.front_lng or p.lng,
+                "lat": p.centroid_lat,
+                "lng": p.centroid_lng,
+                "front_lat": p.front_lat or p.centroid_lat,
+                "front_lng": p.front_lng or p.centroid_lng,
             }
             for p in results
         ]
@@ -163,10 +163,10 @@ def get_parcels_in_bbox(
 ):
     """Retrieves parcels situated within a geographic bounding box."""
     parcels = db.query(ParcelModel).filter(
-        ParcelModel.lat >= min_lat,
-        ParcelModel.lat <= max_lat,
-        ParcelModel.lng >= min_lng,
-        ParcelModel.lng <= max_lng
+        ParcelModel.centroid_lat >= min_lat,
+        ParcelModel.centroid_lat <= max_lat,
+        ParcelModel.centroid_lng >= min_lng,
+        ParcelModel.centroid_lng <= max_lng
     ).limit(limit).all()
 
     return {

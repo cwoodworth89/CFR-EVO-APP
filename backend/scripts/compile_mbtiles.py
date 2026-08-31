@@ -144,15 +144,29 @@ LAYER_CONFIGS = {
         # does not extend past the municipal boundary.
         "regional_context": False,
     },
-    "satellite": {
+    "ortho": {
         "format": "jpg",
-        "description": "City of Coquitlam 2025 7.5cm Orthophoto & Regional Satellite Imagery",
-        "url_template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        "description": "City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence)",
+        # The City's own cached tile service -- a singleFusedMapCache in
+        # EPSG:3857 on the standard Web Mercator grid, so tiles are taken exactly
+        # as published with no resampling of ours. Verified 2026-08-31: LOD
+        # resolutions match the standard scheme at every level.
+        "url_template": "https://geodata.coquitlam.ca/arcgis/rest/services/CachedServices/Imagery_2025/MapServer/tile/{z}/{y}/{x}",
         "subdomains": [""],
         "min_zoom": 12,
-        # Stays at 20: the City's 7.5cm orthophotos are genuinely z20-native, and
-        # roofline/driveway detail is the operational reason this layer exists.
+        # z20 is where the City's cache ends. z21 returns HTTP 404 -- verified at
+        # Pinetree, Austin Heights and Burke Mountain 2026-08-31 -- even though
+        # the service metadata advertises LODs to 23. That matches the physics:
+        # the source is 7.5 cm/px and z20 is 9.74 cm/px at this latitude, while
+        # z21 would be 4.87 cm/px with nothing real to put in it.
         "max_zoom": 20,
+        # City only. The service renders nothing beyond the municipal extent.
+        "regional_context": False,
+        # Municipal infrastructure belonging to the department's data partner,
+        # not a commercial CDN. Same courtesy as crawl_cadastral_tiles.py
+        # (operator decision 2026-08-27): ~20 req/s, not the 110/s this script
+        # uses against Carto.
+        "rate_limit_sec": 0.05,
     }
 }
 
@@ -455,10 +469,36 @@ def ingest_tms_ortho_tiles(conn: sqlite3.Connection, tms_dir: str) -> int:
     return inserted
 
 
+class RateLimiter:
+    """Thread-safe pacing limiter, for sources that are not commercial CDNs.
+
+    Serialises every request behind one lock, so the ceiling is 1/min_interval
+    regardless of worker count -- worker count does NOT multiply it. That
+    property is the whole point here, and it is also what made the 2026-08-27
+    cadastral crawl take 8.5 hours at a pinned 5 req/s while the operator
+    believed 8 workers were running in parallel. Set the interval deliberately.
+    """
+
+    def __init__(self, min_interval_sec: float):
+        self.min_interval = max(0.0, min_interval_sec)
+        self.lock = threading.Lock()
+        self.last_request_time = 0.0
+
+    def wait(self):
+        if self.min_interval <= 0:
+            return
+        with self.lock:
+            elapsed = time.time() - self.last_request_time
+            if elapsed < self.min_interval:
+                time.sleep(self.min_interval - elapsed)
+            self.last_request_time = time.time()
+
+
 def download_tile(
     tile: Tuple[int, int, int],
     layer_config: Dict[str, Any],
-    max_retries: int = 3
+    max_retries: int = 3,
+    limiter: Optional["RateLimiter"] = None
 ) -> Optional[Tuple[int, int, int, bytes]]:
     """
     Download a single Slippy tile (z, x, y) from the configured source.
@@ -466,7 +506,7 @@ def download_tile(
     """
     z, x, y = tile
     y_tms = (1 << z) - 1 - y
-    
+
     url_template = layer_config["url_template"]
     subdomains = layer_config.get("subdomains", [""])
     subdomain = random.choice(subdomains) if subdomains else ""

@@ -121,9 +121,133 @@ def audit_scripts(scripts_dir: str) -> int:
     return 0
 
 
+LINK = re.compile(r"\]\((?!https?://|file://|mailto:|#)([^)\s]+?)\)")
+# A paragraph that says the path is gone. Matches how this project actually writes them.
+#
+# Stem-matched with a trailing \w*, NOT \b. The first version was `\b(delet|remov|...)\b`,
+# which cannot match "deleted": there is no word boundary between `delet` and `ed`, so the
+# alternation was unreachable for every word it was written to catch. It silently matched
+# nothing and every correctly-documented deletion was reported as rot. Same class of defect
+# as everything else in docs/standards/dependency-behaviour.md -- the pattern looked like it
+# said "words starting with delet" and did not.
+GONE = re.compile(
+    r"(?:\b(?:delet|remov|retir|dropp?|supersed|archiv|obsolet|replac|migrat|rename)\w*)"
+    r"|(?:\bno longer\b)|(?:\bnever (?:exist|was)\w*)|(?:\bdo(?:es)?\s+not\s+exist\b)"
+    r"|(?:\bdid not exist\b)|(?:\bused to\b)|(?:\bpreviously\b)|(?:\bgone\b)"
+    r"|(?:\bunadopted\b)|(?:\bnot adopted\b)|(?:\babsent\b)", re.I)
+_IGNORE_CACHE: dict[str, bool] = {}
+
+
+def _git_ignored(repo: str, target: str) -> bool:
+    """True if git ignores the path -- kiosk-only data dirs are absent here by design."""
+    if target in _IGNORE_CACHE:
+        return _IGNORE_CACHE[target]
+    # Both forms: a directory-only rule such as `frontend/public/recordings/` does not match
+    # the same path written without its trailing slash when the path is absent from disk.
+    candidates = [target, target.rstrip("/") + "/"]
+    ignored = False
+    try:
+        for c in candidates:
+            rc = subprocess.run(["git", "check-ignore", "-q", c], cwd=repo,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+            if rc == 0:
+                ignored = True
+                break
+    except Exception:
+        ignored = False
+    _IGNORE_CACHE[target] = ignored
+    return ignored
+
+BACKTICK_PATH = re.compile(r"`((?:backend|frontend|services|docs|scripts|\.claude|\.githooks)/[A-Za-z0-9_./-]+)`")
+FENCE = re.compile(r"```.*?```", re.S)
+
+
+def audit_docs(docs_dir: str) -> int:
+    """Check that documentation does not point at files which are not there.
+
+    Why this exists
+    ---------------
+    Two things rotted repeatedly and neither announced itself:
+
+      * **Relative links.** Splitting the punch list into `docs/punchlist/` moved every item
+        one directory deeper without rewriting the links inside them. 34 links were silently
+        broken for most of a day, and were found only because someone thought to look.
+      * **Paths named in prose.** Deleting a document or moving a script leaves every sentence
+        that mentions it reading as though it is still there.
+
+    Nothing catches either at commit time, and neither breaks a test. A reader discovers them
+    one at a time, by following a link into nothing.
+
+    Both checks skip fenced code blocks: an example command may legitimately name a path that
+    does not exist yet, and flagging those would train people to ignore the output.
+
+    Two more exclusions, for the same reason -- a check people learn to ignore is worse than
+    no check, because it costs attention and returns nothing:
+
+      * **Git-ignored paths.** `backend/data/`, model caches and audio corpora are real on the
+        kiosk and absent here by design (CLAUDE.md §3.6). Their absence proves nothing.
+      * **Paths the sentence itself says are gone.** A closed punch-list item describing the
+        file a defect used to live in is CORRECT documentation, not rot. `custom_places.json`
+        was deliberately deleted and item #7 exists to record that. The signal is a past-tense
+        or removal word in the same line -- which is how this project already writes them.
+    """
+    broken_links, broken_paths, scanned = [], [], 0
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo = os.path.dirname(repo)
+
+    for root, _dirs, files in os.walk(docs_dir):
+        for f in files:
+            if not f.endswith(".md"):
+                continue
+            p = os.path.join(root, f)
+            scanned += 1
+            text = io.open(p, encoding="utf-8", errors="replace").read()
+            prose = FENCE.sub("", text)
+
+            for m in LINK.finditer(prose):
+                target = m.group(1).split(":")[0].split("#")[0]
+                if not target:
+                    continue
+                if not os.path.exists(os.path.normpath(os.path.join(root, target))):
+                    broken_links.append((p, m.group(1)))
+
+            for m in BACKTICK_PATH.finditer(prose):
+                target = m.group(1)
+                if os.path.exists(os.path.join(repo, target)):
+                    continue
+                if _git_ignored(repo, target):
+                    continue
+                # Scope the removal marker to the enclosing PARAGRAPH, not the line. These
+                # documents wrap at about 95 characters, so "deleted 2026-08-31" routinely
+                # lands a line away from the path it describes. Line scope missed most of them.
+                para_start = prose.rfind("\n\n", 0, m.start()) + 2
+                para_end = prose.find("\n\n", m.end())
+                para = prose[para_start: para_end if para_end != -1 else len(prose)]
+                if GONE.search(para):
+                    continue
+                broken_paths.append((p, target))
+
+    for p, t in broken_links:
+        print("BROKEN LINK   %s -> %s" % (p, t))
+    for p, t in broken_paths:
+        print("MISSING PATH  %s names `%s`" % (p, t))
+
+    print()
+    print("%d markdown files scanned. %d broken links, %d prose paths naming nothing."
+          % (scanned, len(broken_links), len(broken_paths)))
+    if broken_links or broken_paths:
+        print("A link into nothing is discovered one reader at a time. Fix or delete it.")
+        return 1
+    print("Every link resolves and every path named in prose exists.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--skills-dir", default=".claude/skills")
+    ap.add_argument("--docs", action="store_true",
+                    help="audit documentation for broken links and paths naming nothing")
+    ap.add_argument("--docs-dir", default="docs")
     ap.add_argument("--scripts", action="store_true",
                     help="audit backend/scripts/README.md against the directory instead")
     ap.add_argument("--scripts-dir", default="backend/scripts")
@@ -131,6 +255,9 @@ def main() -> int:
 
     if args.scripts:
         return audit_scripts(args.scripts_dir)
+
+    if args.docs:
+        return audit_docs(args.docs_dir)
 
     if not os.path.isdir(args.skills_dir):
         print("no such directory: %s" % args.skills_dir, file=sys.stderr)

@@ -38,7 +38,7 @@
 
 **Original finding (2026-08-21, measured against `public.parcels`):**
 
-* **What it is**: `backend/data/vocabulary/custom_places.json` holds 152 named places
+* **What it was**: `backend/data/vocabulary/custom_places.json` held 152 named places (deleted — see the status above)
   (parks, schools, civic buildings) keyed by lowercase name. It seeds
   `public.custom_places`, which is **Step 7 of the 8-step geocoder cascade** — the
   fallback used when a dispatch names a place rather than an address.

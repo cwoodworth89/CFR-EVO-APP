@@ -9,13 +9,77 @@ Welcome! This onboarding document is designed to get future developers and AI co
 The project is decoupled into isolated domain directories to ensure modularity and zero cyclical imports:
 
 1. **`/frontend`** (React + Vite):
-   - The web app client interface. Manages rendering Leaflet map boards, nearest hydrant routing overlays, DriveBC traffic hazards, and recruits training games.
+   - The web app client interface. Manages Leaflet map boards, nearest-hydrant routing overlays, road closures, and the HITL review panel. **Training mode was removed at `d5fbdcc`** — if you find a reference to recruit training games, it is stale.
 2. **`/backend`** (Python 3.10+):
-   - The core orchestrator. Manages continuous audio capture streams, DSP tone-spotting checks, Whisper/GCP Speech-to-Text transcription, regex templates parsing, and database synchronization.
+   - The core orchestrator. Manages continuous audio capture, DSP tone-spotting, **local faster-whisper transcription**, parsing, and database synchronisation. **There is no cloud STT.** `STT_ENGINE` is locked to `"whisper"`; a cloud dependency would break both the offline and the $0-cost requirements (CLAUDE.md §1).
 3. **`/services`** (Decoupled Microservices):
    - **`/services/gis`**: Boundary spatial indexes and local geocoding validators.
    - **`/services/audio_analysis`**: DSP Butterworth filters and Hamming window peak calculators.
    - **`/services/dispatch_notifications`**: DB connection post/patch handlers and push notification brokers.
+
+---
+
+## 🔎 Before you believe anything: verify it
+
+**The punch list lags the code.** On 2026-08-31 a sweep of the 21 crew-visible open items found
+**five already fixed and simply unrecorded** — `#42`, `#31`, `#43a`, `#12`, `#38`. Reading the
+tracker and starting work would have meant re-fixing what was already done.
+
+So the first move on any item is a query, not a read:
+
+```bash
+# Is the defect still real? Ask the running system, not the document.
+python -c "import os;from sqlalchemy import create_engine,text;\
+print(create_engine(os.environ['DATABASE_URL']).connect().execute(text('SELECT ...')).fetchall())"
+```
+
+`DATABASE_URL` already points at the kiosk. The `cfr-postgres` MCP server is **read-only** —
+fine for checking, and writes must go through SQLAlchemy or `psql` on the kiosk.
+
+This is CLAUDE.md §6.6 pointed at our own records: *distinguish reported from confirmed.*
+A punch-list item is a **report**. The database is the system of record.
+
+---
+
+## 🧰 Environment gotchas that cost real time
+
+| | |
+|:--|:--|
+| **No `geopandas` / `shapely` locally** | The local `.venv` is minimal. Anything importing them runs on the kiosk: `ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && .venv/bin/python …"`. `dbfread` is available locally, and a `.shp` bounding box can be parsed directly from the binary if you only need extents. |
+| **`PYTHONIOENCODING=utf-8`** | Windows consoles default to cp1252. Any script printing an em-dash or emoji dies with `UnicodeEncodeError`. Prefix every `python` invocation that prints prose. |
+| **SSH can hang silently** | If the sandbox blocks the SSH binary it produces **zero output and never returns**, ignoring even `-o ConnectTimeout=10`. It is not a network problem. Confirm the host is alive by querying Postgres — that path is independent. |
+| **API changes need `--build`** | `docker compose up -d --build api`. A restart alone ships nothing. The compose service is `api`; the container is `cfr_api`. |
+| **Shapefiles are kiosk-only** | `backend/data/` is git-ignored (§3.6). Addresses live in `backend/data/Property_Information/`, zones in `backend/data/Emergency_Response_Zones/` — different directories, and the import's defaults already know both. |
+| **Run the full suite early** | `pytest backend/tests/` — three modules fail to collect on a dev laptop for missing `geopandas`, `pvporcupine`, `librosa` (punch-list #10); that is expected. On 2026-08-31 running it surfaced a live 500 in an endpoint nobody was working on. |
+
+---
+
+## 🗂️ Where things belong
+
+Follow the existing convention rather than inventing one.
+
+| Artifact | Goes in |
+|:--|:--|
+| Schema change | `backend/migrations/YYYY-MM-DD_short_name.sql` — with a `WHY` block; they are read far more than they are run |
+| A defect or open question | A file under `docs/punchlist/`, plus a row in `docs/debug_and_qa_punchlist.md` |
+| A decision, with its evidence | `docs/briefings/<topic>.md`, linked from the punch-list item it settles |
+| What governs an operational value | `docs/standards/README.md` — and if nothing covers it, **stop and ask** (§7.2) |
+| A library or field that does not behave like its name | [`docs/standards/dependency-behaviour.md`](standards/dependency-behaviour.md) |
+| A repeatable procedure | `.claude/skills/<name>/SKILL.md` — check there before writing a runbook |
+| A script | `backend/scripts/`, with a row in its README. Already-run ones go to `backend/scripts/oneshot/` |
+| Something found mid-task that is out of scope | `docs/post_freeze_backlog.md`, one line — unless it is crew-visible, which promotes immediately |
+
+**These are checked, not merely documented:**
+
+```bash
+python backend/scripts/audit_skill_references.py            # skills naming absent identifiers
+python backend/scripts/audit_skill_references.py --scripts  # a row per script, a script per row
+python backend/scripts/audit_skill_references.py --docs     # broken links, prose naming nothing
+```
+
+Run the last two before committing documentation. Everything that rotted badly enough to
+mislead — the scripts README, the routing standard, the `GEMINI.md` files, this file's own
+domain map — had nothing checking it. Everything that stayed true did.
 
 ---
 

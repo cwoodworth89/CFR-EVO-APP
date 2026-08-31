@@ -24,6 +24,41 @@ not the behaviour**, and the code was written against the name.
 None of these are bugs in the libraries. All are documented or evident in source. The
 defect was on our side: **we trusted the name.**
 
+## The same failure outside libraries
+
+**Libraries are where this was first noticed, not where it lives.** On 2026-08-31 the pattern
+appeared five times in one session and only one instance was a dependency. The others were
+municipal data, our own code, a comment, and a test — none of which this file originally
+covered, which is why they had nowhere to be recorded.
+
+| Named | The name implies | It actually is |
+|:--|:--|:--|
+| `public.roads.STATUS` | whether the road is in service | **who owns it.** The whole domain is `OPERATING` / `PRIVATE` / `MOT` / `METRO`; there is no `CLOSED` value. Filtering to `OPERATING` dropped 242 roads and left 1,918 homes with no street — punch-list **#42** |
+| `parcels.legaldesc = 'MASTER'` | the main building or the whole property | **strata common property.** Measured across 517 properties: 10.3% of the summed unit area, spanning the site — driveways and walkways between units. Adopting it as "the property" would have outlined a driveway network — **#48** |
+| `front_lat`, `access_far_corner_m` | current, because they are columns | **derived, and nothing recomputed them.** A stored value is only true until its source moves. 56 parcels held an arrival point on a street they were not on; the far-corner distance was then measured from a point already deleted — **#58** |
+| *"deliberately left untouched … surfaces as an approximate location rather than a confident wrong one"* (code comment) | those rows have no stale value | **they keep whatever the previous algorithm wrote.** "Skip the row" only yields that outcome if the row was empty. The comment described the author's intent, not the code — **#58** |
+| `test_import_parcels_production_script_unmodified` | asserts the script is unmodified | **asserts only that the file exists.** Its stated requirement had since been deliberately reversed, and it would have passed either way |
+| `GONE = re.compile(r"\b(delet\|remov)\b")` | matches words starting with "delet" | **matches neither.** The trailing `\b` requires a boundary between `delet` and `ed`, so the alternation was unreachable for every word it was written for. Written for this repository's own docs check, in `audit_skill_references.py`, and caught only by testing it against real sentences |
+
+The last row is the cheapest lesson in the file: it was written **while documenting this very
+pattern**, by someone who had just spent a day finding instances of it, and it was still wrong
+until run against real input.
+
+### What generalises
+
+* **A column name is not a contract either.** Municipal fields are named by the people who
+  publish them, for their purposes. `STATUS` and `MASTER` are both accurate in the City's
+  world and misleading in ours. Query the distinct values before filtering on a field
+  (`SELECT status, count(*) ... GROUP BY status` costs seconds).
+* **Every stored derived value needs a named recomputation.** If `X` is computed from `Y`,
+  write down what recomputes `X` when `Y` moves — or do not store `X`. `access_far_corner_m`
+  was dropped for exactly this reason: it was wanted occasionally, so it became a report.
+* **A comment states intent; only the code states behaviour.** Where an invariant matters,
+  assert it in a test — punch-list **#50** exists because an invariant was held by a comment
+  attached to the wrong function.
+* **Test names are claims and are not checked.** A test asserting less than its name says
+  passes forever and protects nothing.
+
 ## Rule
 
 Before an operational decision rests on a library function's behaviour, verify it against

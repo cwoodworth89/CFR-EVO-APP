@@ -144,7 +144,7 @@ provenance record, but it is consistent with the current `AUDIO_SAMPLE_RATE = 16
 | Source | Chief | Engine | Rescue |
 |:--|:--|:--|:--|
 | **`config/dsp.py`** (used by the pipeline) | 440.20, 660.34 | 600.00, 1350.00 | 727.09, 891.99 |
-| `scripts/calibrate_audio_interactive.py` | 437.50, 656.25 | 601.56, 1351.56 | 726.56, 890.62, **2179.69** |
+| `backend/scripts/calibrate_audio_interactive.py` | 437.50, 656.25 | 601.56, 1351.56 | 726.56, 890.62, **2179.69** |
 | `tests/test_listener.py` | 5-point spread | 5-point spread | 5-point spread |
 
 None imports from another. The calibration tool the docs tell operators to run for tone
@@ -368,7 +368,7 @@ first 3.5 s of each archived recording would reconstruct the same peak data the 
 have logged, taking Chief from 3 samples to as many as 20 — enough to actually judge the
 fingerprint.
 
-That is a contained offline script over `backend/data/audio/`, touching no live path. Worth
+That is a contained offline script over `backend/audio_files/`, touching no live path. Worth
 doing before any decision about the Chief fingerprint, and it would also let every apparatus
 tone be re-validated on the full 487-recording corpus rather than on whatever happened to be
 live since 2026-08-21.

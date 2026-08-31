@@ -59,7 +59,7 @@ Only three functions across 464 lines — `process_phase_2_finalize` and
 geocode, persist, MQTT and ntfy. Natural seams already exist as numbered comment
 blocks. Review alongside `phase1.py` for duplicated broadcast logic.
 
-### 1.3 `backend/cfr_dispatch/parser.py` (1053 lines) — ✅ DONE
+### 1.3 `backend/cfr_dispatch/parser/` (1053 lines) — ✅ DONE
 
 Converted to a package, module path unchanged:
 

@@ -187,6 +187,17 @@ against the running system or the working tree. Distinguish **reported** from
 **confirmed** in status documents (see `docs/debug_and_qa_punchlist.md`), and state
 plainly when something could not be verified and why.
 
+**This applies to our own records first.** The punch list lags the code: a 2026-08-31 sweep
+of the 21 crew-visible open items found **five already fixed and merely unrecorded**. Before
+working an item, query the database or read the code — a punch-list entry is a *report*, and
+the running system is the record. Closing something already done costs an afternoon; the
+query costs a minute. `DATABASE_URL` points at the kiosk and the `cfr-postgres` MCP server is
+read-only, so checking is always safe.
+
+The same distrust applies to a value stored beside the thing it was derived from. If `X` is
+computed from `Y`, name what recomputes `X` when `Y` moves — or do not store `X` (see
+`docs/standards/dependency-behaviour.md`, *The same failure outside libraries*).
+
 ---
 
 ---

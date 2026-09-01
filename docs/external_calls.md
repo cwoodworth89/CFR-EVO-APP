@@ -29,6 +29,7 @@ grep -rnoE "https?://[A-Za-z0-9._-]+" backend/ services/ frontend/src/ \
 
 | Host | Where | Resolution |
 |:--|:--|:--|
+| `raw.githubusercontent.com`, `cdnjs.cloudflare.com` | `BlockParcelPanel`, `PropertySatellitePanel`, `RouteOverviewPanel` | **Fixed 2026-08-31.** Six Leaflet marker fetches, including the gold *incident* pin. Vendored to local SVG in `frontend/src/assets/`, shared from `components/map/mapIcons.js`. Vite inlines both (419/431 B, under the 4096 B `assetsInlineLimit`) as data URIs, and the shadow now comes from the installed `leaflet` package — so the markers cost **no** request at all. See §3.1. |
 | `huggingface.co` | `backend/cfr_dispatch/stt/transcriber.py` | **Fixed 2026-08-31.** `WhisperModel(...)` took `local_files_only` at its `False` default, so every `cfr-agent` cold start called `huggingface.co/api/models/Systran/faster-whisper-base/revision/main` to check the model revision — observed live in `journalctl` at 18:35:09. The weights were already cached (142 MB). Now `local_files_only=True`; an absent cache raises with seeding instructions instead of downloading. |
 
 Verified against the installed `faster_whisper` **1.2.1** on the kiosk, not from memory (§7.3):
@@ -54,9 +55,9 @@ it is showing is two weeks old. Not actioned.
 
 ---
 
-## 3. Live, crew-visible, offline-breaking
+## 3. Was live, crew-visible, offline-breaking
 
-### 3.1 Leaflet marker icons — `raw.githubusercontent.com`, `cdnjs.cloudflare.com`
+### 3.1 Leaflet marker icons — ✅ RESOLVED 2026-08-31
 
 | File | Line | Asset |
 |:--|:--|:--|
@@ -74,8 +75,18 @@ its most literal form: the display looks fine and the critical element is missin
 
 It is also a third-party CDN dependency of exactly the kind the §1 Carto caution covers.
 
-**Fix is small** — Leaflet ships its own marker assets, and the coloured variants can be
-vendored into `frontend/public/`. Not applied: logged pending operator permission.
+**Resolved.** The two coloured pins are now local SVGs in `frontend/src/assets/`, and the
+shadow comes from the installed `leaflet` package. All three components import them from
+`frontend/src/components/map/mapIcons.js` — one definition where there were three copies.
+
+Vendored as SVG rather than copies of the upstream PNGs: no third-party asset licence to
+carry (the §1 Carto caution is the same problem), and vector holds up on a 10-foot display.
+Geometry is unchanged — 25×41, anchored at the point `[12, 41]` — so placement did not move.
+
+Imported rather than served from `public/` deliberately: a missing file now fails
+`npm run build` instead of 404-ing silently on the kiosk, which is the failure mode this
+change exists to remove. Verified in the built bundle: no external host, both pins present
+as inline data URIs.
 
 ---
 

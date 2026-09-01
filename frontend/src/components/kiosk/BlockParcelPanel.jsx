@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { targetPinIcon } from '../map/mapIcons';
 import { BaseMap, HydrantsLayer, CoquitlamOverlays } from '../MapLayers';
 import { BASE_LAYERS } from '../MapConstants';
 import { isWithinCoquitlam } from '../../utils/addressUtils';
@@ -28,15 +28,6 @@ function StableAutoCenterAndResize({ lat, lng, callKey }) {
 
   return null;
 }
-
-const targetIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
 
 export default function BlockParcelPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -120,7 +111,7 @@ export default function BlockParcelPanel({ activeCall }) {
         <Polygon positions={polygonPositions} pathOptions={{ color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.4, weight: 3 }} />
       )}
 
-      <Marker position={[destLat, destLng]} icon={targetIcon}>
+      <Marker position={[destLat, destLng]} icon={targetPinIcon}>
         <Popup>Target Destination: {activeCall?.address}</Popup>
       </Marker>
 

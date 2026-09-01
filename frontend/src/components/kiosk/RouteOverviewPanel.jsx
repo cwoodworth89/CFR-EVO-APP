@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
 import { RoutingOverlay } from '../RoutingOverlay';
 import MapSurface from '../map/MapSurface';
 import RoadClosuresLayer from '../map/RoadClosuresLayer';
@@ -60,26 +61,6 @@ function MapInteractivity({ onPan }) {
   });
   return null;
 }
-
-// Destination Target Icon (Gold)
-const destIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Alternate Candidate Target Icon (Sky Blue)
-const altCandidateIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
 
 export default function RouteOverviewPanel({ activeCall, stationHall }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
@@ -413,7 +394,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
                 <Marker
                   key={idx}
                   position={[cand.lat, cand.lng]}
-                  icon={isSelected ? destIcon : altCandidateIcon}
+                  icon={isSelected ? targetPinIcon : altCandidatePinIcon}
                   eventHandlers={{
                     click: () => {
                       setSelectedCandidateIdx(idx);
@@ -444,7 +425,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               );
             })
           ) : (
-            <Marker position={[destLat, destLng]} icon={destIcon}>
+            <Marker position={[destLat, destLng]} icon={targetPinIcon}>
               <Popup>Target Destination: {activeCall?.address || 'Incident Location'}</Popup>
             </Marker>
           )

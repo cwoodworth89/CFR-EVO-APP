@@ -69,7 +69,7 @@ The map-source review the operator asked for, with what was decided:
 |:--|:--|:--|
 | `street`, `street_nolabels` | Carto CDN | **Replace** — self-hosted OSM vector, `PROJECT_IDEAS.md` #11 |
 | `satellite` | Esri World Imagery | **Superseded inside the city** by the 7.5cm orthos |
-| `ortho` | City of Coquitlam MrSID | **Ingested 2026-08-30** — OGL, was never ingested before |
+| `ortho` | City of Coquitlam `Imagery_2025` service | **Crawled 2026-08-31** — OGL. The MrSID ingest of 2026-08-30 was replaced: the City's own tiles are sharper than anything built locally from the raw SID. |
 | `cadastral` | City ArcGIS | unchanged, OGL |
 
 The City hosts its own cached tile services at `geodata.coquitlam.ca` (`Imagery_1963`

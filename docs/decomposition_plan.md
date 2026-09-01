@@ -220,7 +220,7 @@ Every remaining script needs the same three questions asked:
 
 Scripts still to audit: `update_gis_data.py`, `import_parcels.py`, `download_gis_data.py`,
 `compile_mbtiles.py`, `crawl_cadastral_tiles.py`, `extract_all_intersections_from_gis.py`,
-`precache_satellite_tiles.py`, `ingest_coquitlam_orthos.py`, `oneshot/backfill_routing_metrics.py`,
+`oneshot/backfill_routing_metrics.py`,
 `oneshot/backfill_audio_urls.py`, `extract_training_data.py`.
 
 Remaining JSON under `frontend/public/data/`: `zones.json`, `coquitlam_city_boundary.json`,
@@ -264,8 +264,11 @@ dispatch id, which §6.5 forbids as a test corpus.
 ### 4.3 Other scripts
 
 `import_parcels.py` (566), `compile_mbtiles.py` (538), `crawl_cadastral_tiles.py` (491),
-`extract_all_intersections_from_gis.py` (462), `precache_satellite_tiles.py` (458),
-`backtest_regression.py` (446). Independent and individually reviewable; low urgency.
+`extract_all_intersections_from_gis.py` (462), `backtest_regression.py` (446).
+Independent and individually reviewable; low urgency.
+
+> `precache_satellite_tiles.py` and `ingest_coquitlam_orthos.py` were **deleted 2026-08-31**
+> with the Esri layer and the MrSID pipeline, so they no longer need auditing.
 
 ---
 

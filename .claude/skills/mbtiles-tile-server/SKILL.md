@@ -67,7 +67,7 @@ List all published services:
 ```bash
 curl -s http://localhost:8081/services
 ```
-Expected output: JSON array containing metadata for `satellite`, `street`, `street_nolabels`, and `cadastral`.
+Expected output: JSON array containing metadata for `ortho`, `street`, `street_nolabels`, and `cadastral`.
 
 Probe individual tile delivery (using `GET`):
 ```bash

@@ -46,7 +46,7 @@ Verify that all local ports are bound and responding:
 * **`1883`**: Mosquitto Native MQTT TCP Port
 * **`9001`**: Mosquitto MQTT over WebSockets Port (for React Kiosks)
 * **`8080`**: Ntfy Push Notification Server (`http://localhost:8080`)
-* **`8081`**: MBTiles Tile Server (`http://localhost:8081/services`) — serves `satellite`, `street`, `street_nolabels`, `cadastral`
+* **`8081`**: MBTiles Tile Server (`http://localhost:8081/services`) — serves `ortho`, `street`, `street_nolabels`, `cadastral`
 
 ---
 

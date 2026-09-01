@@ -2,22 +2,32 @@
 """
 verify_ortho_provenance.py
 ==========================
-Confirms that `ortho.mbtiles` actually holds City of Coquitlam 7.5cm orthophotography
-and not Esri World Imagery.
+Confirms `ortho.mbtiles` holds exactly what the City of Coquitlam publishes, by
+comparing sampled tiles byte-for-byte against the live `Imagery_2025` service.
 
-Why this exists
----------------
-Between the original build and 2026-08-30 the kiosk served a layer labelled "City of
-Coquitlam 7.5cm Orthophotos & Maxar" that was Esri World Imagery end to end -- the orthos
-had never been ingested. Nothing detected it, because imagery from the wrong source still
-looks like imagery. The only reliable check is to compare against the other source
-directly: an archive tile that is byte-identical to what Esri serves today IS an Esri tile.
+Why this test and not the previous one
+--------------------------------------
+The first version of this script asked the wrong question. It compared archive
+tiles against **Esri World Imagery** and passed when they differed, on the theory
+that "different from Esri" meant "genuinely City orthophotography."
 
-Requires WAN access to server.arcgisonline.com, so run it on the kiosk, not the sandboxed
-dev machine.
+That premise was disproved on 2026-08-31. Esri's World Imagery over Coquitlam IS
+the City's own 2025 capture, contributed through Esri's community programme --
+differenced at a car park, every vehicle cancelled out (mean absolute difference
+12.5/255, and not one car-shaped ghost). So "differs from Esri" only ever meant
+"processed differently", never "from a different source", and the script returned
+a confident PASS on a question it could not answer. That is the exact failure mode
+CLAUDE.md 6.1 exists to prevent, so it is recorded here rather than quietly fixed.
+
+The archive is now crawled directly from the City's cache, which makes a much
+stronger test available: the tiles should be **byte-identical** to what the City
+serves. That is a positive identity check rather than an exclusion, and it fails
+loudly if anything re-encodes, resamples or substitutes a tile in the pipeline.
+
+Requires WAN access to geodata.coquitlam.ca, so run it on the kiosk.
 
 Usage:
-    python3 backend/scripts/verify_ortho_provenance.py [--archive PATH] [--samples N]
+    python3 backend/scripts/verify_ortho_provenance.py [--archive PATH] [--zoom Z]
 """
 
 import argparse
@@ -27,36 +37,35 @@ import sqlite3
 import sys
 import urllib.request
 
-# Spread across the city so a partial ingest cannot pass by luck.
-SAMPLE_POINTS = {
-    "Town Centre":     (49.2790, -122.7990),
-    "Austin Heights":  (49.2545, -122.8760),
-    "Burke Mountain":  (49.3200, -122.7750),
-    "Maillardville":   (49.2420, -122.8620),
-    "Waddington Pl":   (49.29773, -122.78781),
-    "Como Lake":       (49.2610, -122.8480),
-}
-
-ESRI_URL = ("https://server.arcgisonline.com/ArcGIS/rest/services/"
-            "World_Imagery/MapServer/tile/{z}/{y}/{x}")
+CITY_TILE = ("https://geodata.coquitlam.ca/arcgis/rest/services/"
+             "CachedServices/Imagery_2025/MapServer/tile/{z}/{row}/{col}")
 USER_AGENT = "CFR-EVO/1.0 (ortho provenance verification)"
 
+# Spread across the city so a partial crawl cannot pass by luck.
+SAMPLE_POINTS = {
+    "Town Centre":    (49.2790, -122.7990),
+    "Austin Heights": (49.2545, -122.8760),
+    "Burke Mountain": (49.3200, -122.7750),
+    "Maillardville":  (49.2420, -122.8620),
+    "Waddington Pl":  (49.29773, -122.78781),
+    "Como Lake":      (49.2610, -122.8480),
+}
 
-def deg2num(lat_deg: float, lon_deg: float, zoom: int):
-    """WGS84 -> Slippy XYZ tile coordinates."""
+
+def deg2num(lat_deg, lon_deg, zoom):
     n = 1 << zoom
     x = int((lon_deg + 180.0) / 360.0 * n)
     y = int((1.0 - math.asinh(math.tan(math.radians(lat_deg))) / math.pi) / 2.0 * n)
     return x, y
 
 
-def fetch_esri(z: int, x: int, y: int):
-    url = ESRI_URL.format(z=z, x=x, y=y)
+def fetch_city(z, x, y):
+    url = CITY_TILE.format(z=z, row=y, col=x)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         return urllib.request.urlopen(req, timeout=25).read()
-    except Exception as exc:                      # noqa: BLE001 - reported, not raised
-        print(f"    ! Esri fetch failed ({exc}); cannot compare this tile")
+    except Exception as exc:                       # noqa: BLE001 - reported, not raised
+        print(f"    ! City fetch failed ({exc})")
         return None
 
 
@@ -64,61 +73,54 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--archive",
                     default="/home/tcfire/CFR-EVO-APP/backend/data/tiles/ortho.mbtiles")
-    ap.add_argument("--zoom", type=int, default=20, help="zoom to sample (default: 20)")
+    ap.add_argument("--zoom", type=int, default=20,
+                    help="zoom to sample (default 20 -- the City's deepest cached level)")
     args = ap.parse_args()
 
     conn = sqlite3.connect(f"file:{args.archive}?mode=ro", uri=True)
-
     zooms = conn.execute(
         "SELECT zoom_level, COUNT(*) FROM tiles GROUP BY zoom_level ORDER BY zoom_level"
     ).fetchall()
     print(f"Archive : {args.archive}")
-    print("Zooms   : " + ", ".join(f"z{z}={n:,}" for z, n in zooms))
-    print()
+    print("Zooms   : " + ", ".join(f"z{z}={n:,}" for z, n in zooms) + "\n")
 
-    matches_esri = 0
-    missing = 0
-    genuine = 0
-
-    print(f"{'location':<16} {'archive':>10} {'esri_live':>10}  verdict")
+    identical = differing = missing = 0
+    print(f"{'location':<16}{'archive':>10}{'city_live':>11}  verdict")
     for name, (lat, lng) in SAMPLE_POINTS.items():
         z = args.zoom
         x, y = deg2num(lat, lng, z)
-        n = 1 << z
         row = conn.execute(
             "SELECT tile_data FROM tiles WHERE zoom_level=? AND tile_column=? AND tile_row=?",
-            (z, x, n - 1 - y),          # MBTiles rows are TMS
+            (z, x, (1 << z) - 1 - y),              # MBTiles rows are TMS
         ).fetchone()
-
         if row is None:
-            print(f"{name:<16} {'MISSING':>10} {'-':>10}  no tile at this location")
+            print(f"{name:<16}{'MISSING':>10}{'-':>11}  no tile in the archive")
             missing += 1
             continue
 
-        arch = row[0]
-        live = fetch_esri(z, x, y)
+        live = fetch_city(z, x, y)
         if live is None:
             continue
 
-        same = hashlib.md5(arch).hexdigest() == hashlib.md5(live).hexdigest()
-        if same:
-            matches_esri += 1
-            verdict = "*** ESRI, NOT CITY ORTHO ***"
+        if hashlib.md5(row[0]).hexdigest() == hashlib.md5(live).hexdigest():
+            identical += 1
+            verdict = "identical to the City's tile"
         else:
-            genuine += 1
-            verdict = "ok - differs from Esri"
-        print(f"{name:<16} {len(arch):>10,} {len(live):>10,}  {verdict}")
+            differing += 1
+            verdict = "*** DIFFERS from the City's tile ***"
+        print(f"{name:<16}{len(row[0]):>10,}{len(live):>11,}  {verdict}")
 
+    conn.close()
     print()
-    if matches_esri:
-        print(f"FAIL: {matches_esri} sampled tile(s) are byte-identical to Esri World "
-              f"Imagery. This archive is not the City orthophotography.")
+    if differing:
+        print(f"FAIL: {differing} tile(s) differ from what the City serves. The crawl should "
+              f"store tiles verbatim -- something re-encoded or substituted them.")
         return 1
     if missing == len(SAMPLE_POINTS):
         print("FAIL: no tiles found at any sample point. Check the archive and zoom.")
         return 1
-    print(f"PASS: {genuine} tile(s) verified distinct from Esri"
-          + (f"; {missing} sample point(s) had no tile (check ortho footprint)." if missing else "."))
+    print(f"PASS: {identical} tile(s) byte-identical to the City's published imagery"
+          + (f"; {missing} sample point(s) had no tile." if missing else "."))
     return 0
 
 

@@ -5,6 +5,16 @@ description: Procedures and integration workflows for fetching, caching, orienti
 
 # Satellite Imagery & Street View Enrichment Runbook
 
+> [!IMPORTANT]
+> **The aerial basemap is not Google and not Esri.** Since 2026-08-31 the map's aerial layer
+> is `ortho.mbtiles` — City of Coquitlam 2025 7.5cm orthophotography crawled from the City's
+> own `Imagery_2025` service, under the Open Government Licence, served offline from
+> `/services/ortho`. The Esri `satellite` layer was retired; see `gis-pipeline-sync` §4.1.
+>
+> This skill covers **Street View** enrichment and the historical Google static-imagery
+> integration only. Do not use it as the reference for the aerial basemap.
+
+
 This skill outlines how to fetch, orient, cache, persist, and display high-resolution **Google Satellite aerial imagery** and **Street View 360° building facade views** for emergency dispatches in **CFR EVO**.
 
 ---

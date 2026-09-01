@@ -28,6 +28,20 @@ function resolveTileBaseUrl(envVar, hostname) {
   return `http://${host}:8081`;
 }
 
+// ---------------------------------------------------------------------------
+// WARNING: the two *Pure functions below are HAND-COPIES of getTileUrl and
+// getTileLayerConfig in src/apiClient.js -- they are not imported from it,
+// because apiClient.js is an ES module reading import.meta.env and will not
+// load under plain node.
+//
+// So this suite tests a duplicate, not the shipping code, and CANNOT catch
+// drift between the two. On 2026-08-31 the aerial layer moved from
+// /services/satellite to /services/ortho in three source files and every
+// assertion here still passed, green, against the old URL. If you change
+// apiClient.js, you must mirror it here by hand or these tests will quietly
+// certify the wrong behaviour.
+// ---------------------------------------------------------------------------
+
 function resolveApiBaseUrl(envVar, hostname) {
   if (envVar) {
     return envVar.replace(/\/$/, '');
@@ -39,7 +53,7 @@ function resolveApiBaseUrl(envVar, hostname) {
 function getTileUrlPure(tileBaseUrl, z = '{z}', x = '{x}', y = '{y}', style = 'SATELLITE', apiBaseUrl = 'http://localhost:8000') {
   const normalizedStyle = (style || 'SATELLITE').toUpperCase();
   if (normalizedStyle === 'SATELLITE') {
-    return `${tileBaseUrl}/services/satellite/tiles/${z}/${x}/${y}.jpg`;
+    return `${tileBaseUrl}/services/ortho/tiles/${z}/${x}/${y}.jpg`;
   }
   if (normalizedStyle === 'GREY' || normalizedStyle === 'DARK' || normalizedStyle === 'LIGHT') {
     return `${tileBaseUrl}/services/street_nolabels/tiles/${z}/${x}/${y}.png`;
@@ -80,9 +94,9 @@ function getTileLayerConfigPure(tileBaseUrl, style = 'SATELLITE', apiBaseUrl = '
       };
     case 'SATELLITE':
       return {
-        url: `${tileBaseUrl}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
+        url: `${tileBaseUrl}/services/ortho/tiles/{z}/{x}/{y}.jpg`,
         fallbackUrl: null,
-        attribution: 'City of Coquitlam 7.5cm Orthophotos & Maxar (100% Offline Local Cache)',
+        attribution: 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)',
         subdomains: ['a', 'b', 'c'],
         maxNativeZoom: 20,
         maxZoom: 22,
@@ -141,7 +155,7 @@ runTest('TILE_BASE_URL: strips trailing slash from env override', () => {
 // --- SUITE 2: getTileUrl Generation ---
 runTest('getTileUrl: default style (satellite) with template placeholders', () => {
   const url = getTileUrlPure('http://localhost:8081');
-  assert.strictEqual(url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
+  assert.strictEqual(url, 'http://localhost:8081/services/ortho/tiles/{z}/{x}/{y}.jpg');
 });
 
 runTest('getTileUrl: concrete coordinates for dark style', () => {
@@ -158,7 +172,7 @@ runTest('getTileUrl: grey/light style normalization', () => {
 
 runTest('getTileUrl: satellite style uses mbtileserver satellite endpoint', () => {
   const url = getTileUrlPure('http://localhost:8081', 16, 500, 600, 'satellite');
-  assert.strictEqual(url, 'http://localhost:8081/services/satellite/tiles/16/500/600.jpg');
+  assert.strictEqual(url, 'http://localhost:8081/services/ortho/tiles/16/500/600.jpg');
 });
 
 runTest('getTileUrl: fallback to street for unrecognized style', () => {
@@ -203,9 +217,9 @@ runTest('getTileLayerConfig: default fallback for null/undefined/empty string', 
   const configNull = getTileLayerConfigPure('http://localhost:8081', null);
   const configUndef = getTileLayerConfigPure('http://localhost:8081', undefined);
   const configEmpty = getTileLayerConfigPure('http://localhost:8081', '');
-  assert.strictEqual(configNull.url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
-  assert.strictEqual(configUndef.url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
-  assert.strictEqual(configEmpty.url, 'http://localhost:8081/services/satellite/tiles/{z}/{x}/{y}.jpg');
+  assert.strictEqual(configNull.url, 'http://localhost:8081/services/ortho/tiles/{z}/{x}/{y}.jpg');
+  assert.strictEqual(configUndef.url, 'http://localhost:8081/services/ortho/tiles/{z}/{x}/{y}.jpg');
+  assert.strictEqual(configEmpty.url, 'http://localhost:8081/services/ortho/tiles/{z}/{x}/{y}.jpg');
 });
 
 // --- SUITE 4: Fallback URL Construction & Subdomain Hashing ---

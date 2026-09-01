@@ -254,7 +254,8 @@ class TestAPIRouters(unittest.TestCase):
         status = get_listener_status()
         self.assertIn("status", status)
 
-        tile_resp = _serve_tile("satellite", 15, 5250, 11420, ext="jpg")
+        # "ortho" since 2026-08-31; the Esri "satellite" layer was retired.
+        tile_resp = _serve_tile("ortho", 15, 5250, 11420, ext="jpg")
         self.assertEqual(tile_resp.status_code, 200)
 
 

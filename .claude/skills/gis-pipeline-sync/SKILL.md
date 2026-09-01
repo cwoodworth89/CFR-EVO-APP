@@ -138,6 +138,29 @@ operator decision of 2026-08-27 for the cadastral crawl.
 serialises behind one lock. The 2026-08-27 cadastral crawl ran 8.5 hours pinned at exactly
 5 req/s while 8 workers appeared to be running in parallel.
 
+#### Maintenance: crawl the new year, do not diff
+
+The City publishes a **new service per year** — `Imagery_2021` … `Imagery_2025`. Verified
+2026-08-31 that these are genuinely distinct captures, not one image relabelled (mean absolute
+difference on the same tile: 2021→22 **51.8**, 22→23 **31.2**, 23→24 **37.8**, 24→25 **19.3**).
+
+So the refresh cycle is annual and trivial to detect:
+
+```bash
+curl -s 'https://geodata.coquitlam.ca/arcgis/rest/services/CachedServices?f=json'   | grep -o 'Imagery_[0-9]*' | sort -u | tail -3
+```
+
+When a new year appears, add it to `LAYER_CONFIGS["ortho"]["url_template"]` and run a fresh
+crawl into a staging directory, verify, then swap.
+
+**Do not build a diff step. It cannot save anything.** Detecting which of 430,845 tiles
+changed requires a request per tile, which is the entire cost of the crawl — the bytes are
+the cheap part, the 20 req/s courtesy ceiling is the expensive part. Conditional requests
+(`If-None-Match`) would still be 430,845 round trips and still ~6 hours. A full crawl once a
+year is the simpler thing and costs the same.
+
+Within a year, the tiles are static and need no attention at all.
+
 #### Deprecated 2026-08-31: the MrSID pipeline and the Esri layer
 
 Both are **retired**, not merely unused:
@@ -178,7 +201,7 @@ Expected response contains JSON array of available services (`ortho`, `street`, 
 
 Sample tile verification (using GET):
 ```powershell
-# Verify Z18 satellite tile for Town Centre Fire Hall (Hall 1)
+# Verify Z18 ortho tile for Town Centre Fire Hall (Hall 1)
 curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/ortho/tiles/18/41984/89445.jpg
 
 # Verify Z16 Cadastral overlay tile

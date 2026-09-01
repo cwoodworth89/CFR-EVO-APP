@@ -52,7 +52,7 @@ graph TD
         direction TB
         A1["backend/audio_files/recordings/ (Raw Dispatch WAV Recordings)"]
         A2["cfr_tiles / mbtileserver (Port 8081, mounted from backend/data/tiles/)"]
-        M1["satellite.mbtiles (Z12–Z20 7.5cm Aerial Orthophotos)"]
+        M1["ortho.mbtiles (Z12–Z20 City 7.5cm Aerial Orthophotos)"]
         M2["street.mbtiles (Z12–Z18 Carto Voyager Basemap)"]
         M3["street_nolabels.mbtiles (Z12–Z18 Tactical Grey Basemap)"]
         M4["cadastral.mbtiles (Z14–Z20 Municipal Parcel & Address Overlay)"]

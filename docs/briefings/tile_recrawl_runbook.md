@@ -1,5 +1,23 @@
 # Runbook: re-crawling the offline tile archives over a bad connection
 
+> [!CAUTION]
+> **SUPERSEDED 2026-08-31. Do not run the commands in this document.**
+>
+> Kept for the record — the rate-limiter finding in §0 is still the most useful thing
+> written about crawling municipal servers, and the corrections here are worth reading.
+> But the layer set and zoom depths below are wrong now:
+>
+> | This document says | Current reality |
+> |:--|:--|
+> | `satellite` layer (Esri World Imagery) | **retired** — `ortho`, crawled from the City |
+> | street styles to z19 | **z18** — z19 was entirely Carto-watermarked and has been deleted |
+> | 7.5 cm ortho ingested from MrSID | **crawled** from `CachedServices/Imagery_2025` |
+> | `compile_mbtiles.py --layer satellite` | `--layer ortho` |
+>
+> **The live procedure is the [`gis-pipeline-sync`](../../.claude/skills/gis-pipeline-sync/SKILL.md)
+> skill, §4.1.** Follow that instead.
+
+
 **Written 2026-08-26.** Punch-list **#40**. Every long job here is launched with `nohup` so it
 survives a dropped SSH session — the connection is only used to *start* and *check* work, never
 to hold it open.

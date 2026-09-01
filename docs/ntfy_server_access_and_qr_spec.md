@@ -61,9 +61,10 @@ ntfy://100.95.146.94:8080/dev-errors
 >
 > The cause is worth carrying into that redesign. `e81964f` renamed the topic to
 > `chief-master` on 2026-08-21 across the backend and config and missed this one file —
-> three of four places, with nothing failing on the fourth. `ntfy_broker.py` still carries
-> `cfr-dispatches` as its env default, harmless only because the environment always
-> overrides it. **The topic belongs in configuration read once**, not in three literals.
+> three of four places, with nothing failing on the fourth. `ntfy_broker.py`'s env default
+> was the fourth and **was corrected to `chief-master` on 2026-08-31**; the hardcoded
+> literal in `DriverStationSetup.jsx` is the last one left. **The topic belongs in
+> configuration read once**, not in separate literals.
 
 ---
 

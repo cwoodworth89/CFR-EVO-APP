@@ -8,7 +8,14 @@ NTFY_SERVER_URL = os.environ.get("NTFY_SERVER_URL", "http://localhost:8080").rst
 if NTFY_SERVER_URL.startswith("https://"):
     NTFY_SERVER_URL = NTFY_SERVER_URL.replace("https://", "http://", 1)
 
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "cfr-dispatches")
+# Default matches what actually runs. Both the host agent (backend/.env) and the API
+# container (docker-compose.yml) set NTFY_TOPIC=chief-master, so this fallback is only
+# reached when neither does -- but it read `cfr-dispatches` until 2026-08-31, left behind
+# by the 2026-08-21 rename (e81964f) that updated the backend and config and missed the
+# remaining literals. A stale default is worse than no default: it never fires during
+# normal operation, so it stays wrong, and the one time it does fire the notifications go
+# somewhere nobody is subscribed. See docs/ntfy_server_access_and_qr_spec.md §2.
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "chief-master")
 API_BASE_URL = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
 if API_BASE_URL.startswith("https://"):
     API_BASE_URL = API_BASE_URL.replace("https://", "http://", 1)

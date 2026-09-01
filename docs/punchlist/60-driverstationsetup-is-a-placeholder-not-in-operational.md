@@ -44,9 +44,9 @@ reason.
 #### When it is rebuilt
 
 **Do not fix by editing the literal.** The topic belongs in configuration, read once, so the
-next rename cannot half-apply. Three separate hardcoded copies —
-`DriverStationSetup.jsx`, `ntfy_broker.py`'s env default, and `docker-compose.yml` — is the
-condition that produced this.
+next rename cannot half-apply. Separate hardcoded copies are the condition that produced
+this: `ntfy_broker.py`'s env default was corrected to `chief-master` on 2026-08-31, leaving
+the literal in `DriverStationSetup.jsx` as the only stale one.
 
 Related: the ntfy topic architecture is now recorded accurately in
 [`ntfy_server_access_and_qr_spec.md`](../ntfy_server_access_and_qr_spec.md) §2, including the

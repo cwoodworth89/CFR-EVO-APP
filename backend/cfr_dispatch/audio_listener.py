@@ -33,7 +33,7 @@ from cfr_dispatch.config.dsp import (
     END_OF_DISPATCH_SILENCE_S
 )
 from cfr_dispatch.config.hardware import DEVICE_ID, AUDIO_SAMPLE_RATE
-from cfr_dispatch.config.cloud import STT_ENGINE, VERBOSITY_LEVEL
+from cfr_dispatch.config.runtime import VERBOSITY_LEVEL
 from cfr_dispatch.config.vocab import UNITS_VOCABULARY
 from audio_service import (
     get_rms,
@@ -57,7 +57,7 @@ def update_listener_heartbeat():
         payload = {
             "status": "online",
             "device": DEVICE_ID,
-            "stt_engine": STT_ENGINE,
+            "stt_engine": "whisper",   # the only engine; CLAUDE.md s1 forbids cloud STT
             "last_heartbeat": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "pid": os.getpid()
         }

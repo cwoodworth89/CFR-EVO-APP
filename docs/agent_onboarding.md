@@ -11,7 +11,7 @@ The project is decoupled into isolated domain directories to ensure modularity a
 1. **`/frontend`** (React + Vite):
    - The web app client interface. Manages Leaflet map boards, nearest-hydrant routing overlays, road closures, and the HITL review panel. **Training mode was removed at `d5fbdcc`** — if you find a reference to recruit training games, it is stale.
 2. **`/backend`** (Python 3.10+):
-   - The core orchestrator. Manages continuous audio capture, DSP tone-spotting, **local faster-whisper transcription**, parsing, and database synchronisation. **There is no cloud STT.** `STT_ENGINE` is locked to `"whisper"`; a cloud dependency would break both the offline and the $0-cost requirements (CLAUDE.md §1).
+   - The core orchestrator. Manages continuous audio capture, DSP tone-spotting, **local faster-whisper transcription**, parsing, and database synchronisation. **There is no cloud STT and no engine selector** — the `STT_ENGINE` setting was removed on 2026-08-31. A cloud dependency would break both the offline and the $0-cost requirements (CLAUDE.md §1).
 3. **`/services`** (Decoupled Microservices):
    - **`/services/gis`**: Boundary spatial indexes and local geocoding validators.
    - **`/services/audio_analysis`**: DSP Butterworth filters and Hamming window peak calculators.
@@ -309,12 +309,18 @@ token = {"access_token":"ya29.a0ARG...","token_type":"Bearer","refresh_token":"1
 !rclone copy gdrive: /content/dataset
 ```
 
-### 5. Toggling Speech-to-Text Engines
-To switch between Google Cloud STT V2 and Local Offline Whisper:
-* Edit `backend/.env` on the kiosk:
-  * For Google: `STT_ENGINE=google`
-  * For Whisper: `STT_ENGINE=whisper`
-* After changing the engine configuration, restart the daemon:
+### 5. Changing the Whisper Model
+**There is no engine selector.** STT is local faster-whisper, and nothing else — cloud STT
+would break both the offline and the $0-cost requirements (CLAUDE.md §1). The `STT_ENGINE`
+setting was removed on 2026-08-31; it had been a hardcoded constant that no code branched
+on, so editing it in `.env` had never done anything.
+
+The one knob is which local model loads:
+* Set `WHISPER_MODEL` in `backend/.env` on the kiosk — `tiny`, `base`, `small`, or a path
+  to a fine-tuned model. It is read by
+  [`backend/cfr_dispatch/config/runtime.py`](../backend/cfr_dispatch/config/runtime.py).
+* Then restart the daemon (**ask first** — it briefly drops the audio listener, so a real
+  call in that window is missed):
   ```bash
   ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
   ```

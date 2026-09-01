@@ -51,8 +51,7 @@ from .vocab import (
     INVALID_NEXT_WORDS
 )
 
-from .cloud import (
-    STT_ENGINE,
+from .runtime import (
     WHISPER_MODEL,
     INTEGRATION_PAYLOAD_OPTION,
     ENABLE_NTFY_PUSH,
@@ -100,7 +99,6 @@ __all__ = [
     'UNIT_PARSING_IGNORE_LIST',
     'INVALID_NEXT_WORDS',
     # Integration
-    'STT_ENGINE',
     'WHISPER_MODEL',
     'INTEGRATION_PAYLOAD_OPTION',
     'ENABLE_NTFY_PUSH',

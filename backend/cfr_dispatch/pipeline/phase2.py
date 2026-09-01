@@ -8,7 +8,7 @@ from typing import Any, Tuple
 from cfr_dispatch.config.dsp import GOLDEN_FINGERPRINTS
 from cfr_dispatch.config.hardware import AUDIO_SAMPLE_RATE
 from cfr_dispatch.config.vocab import UNITS_VOCABULARY
-from cfr_dispatch.config.cloud import INTEGRATION_PAYLOAD_OPTION, ENABLE_NTFY_PUSH
+from cfr_dispatch.config.runtime import INTEGRATION_PAYLOAD_OPTION, ENABLE_NTFY_PUSH
 from cfr_dispatch.config.models import DispatchData
 from cfr_dispatch.parser import (
     sanitize_transcript,

@@ -5,9 +5,10 @@
 > hardware and station staff have no administrative, network or CAD-stream access — that
 > constraint is unchanged and is why the system captures audio at all.
 >
-> **Google STT is not an option and must not be reintroduced.** `STT_ENGINE` is locked to
-> `"whisper"` in `backend/cfr_dispatch/config/cloud.py`; a cloud STT dependency would break
-> both the offline requirement and the $0-cost requirement (CLAUDE.md §1). Read the
+> **Google STT is not an option and must not be reintroduced.** There is no engine selector
+> at all — the `STT_ENGINE` setting was removed on 2026-08-31 — and STT is local
+> faster-whisper only; a cloud STT dependency would break both the offline requirement and
+> the $0-cost requirement (CLAUDE.md §1). Read the
 > constraints and the chosen path; treat the option comparison as history.
 
 This document outlines options for interfacing with the station's **Locution PrimeAlert® Enclosure** and **Enclosure PC** to capture real-time dispatch data. 

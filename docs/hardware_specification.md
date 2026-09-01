@@ -167,7 +167,7 @@ arecord -D hw:1,0 -d 5 -f S16_LE -r 16000 test.wav
 In your CFR EVO backend `.env` configuration file, set the device ID. You can use either the numerical index or a stable name query string (highly recommended for USB cards to survive reboot index shifts, e.g., `alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input`):
 ```env
 AUDIO_DEVICE_ID=alsa_input.usb-Burr-Brown_from_TI_USB_Audio_CODEC-00.analog-stereo-input
-STT_ENGINE=google  # Recommended for low CPU load on Pi
+WHISPER_MODEL=tiny  # "tiny" keeps CPU load workable on a Pi; the laptop kiosk uses "base"
 ```
 Run the interactive calibration script to align your amplitude triggers with the background noise of the station:
 ```bash
@@ -359,7 +359,7 @@ flowchart LR
 ```
 
 1.  **Local Speech-to-Text**:
-    *   Swap `STT_ENGINE=google` to `STT_ENGINE=whisper` in `.env`.
+    *   Already the only mode — STT is local faster-whisper and there is no cloud engine to swap away from.
     *   Install **`whisper.cpp`** with Python bindings (`whisper-cpp-python`). Running quantized GGUF models (e.g., `base-q5_1` or `small-q5_1`) on a Raspberry Pi 5 takes less than 3–5 seconds to transcribe a 30-second dispatch, using only a fraction of the Pi's CPU.
 2.  **Local Database / Broker**:
     *   Replace Supabase with a local **PostgreSQL** instance with the **PostGIS** extension (for shapefiles and hydrant geocoding).

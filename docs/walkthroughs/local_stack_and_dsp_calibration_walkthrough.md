@@ -3,8 +3,9 @@
 > [!NOTE]
 > **Historical walkthrough; the DSP and stack content still applies.** One item is dead: the
 > `shapefile_loader.py` vectorisation described below is gone — in-memory shapefile loading
-> was eliminated in favour of PostGIS (CLAUDE.md §1). The `STT_ENGINE = "whisper"` lock is
-> still current and still binding.
+> was eliminated in favour of PostGIS (CLAUDE.md §1). The whisper-only rule is
+> still current and still binding, though the `STT_ENGINE` constant that expressed it was
+> removed on 2026-08-31 — nothing branched on it.
 
 This document outlines the systematic diagnosis, container audits, tone spotter fixes, and STT optimizations executed following the cloud-to-local migration.
 
@@ -31,7 +32,7 @@ This document outlines the systematic diagnosis, container audits, tone spotter 
 - **PA Exclusion Precedence**: Updated [`backend/cfr_dispatch/orchestration.py`](../../backend/cfr_dispatch/orchestration.py) so station PA announcements reset the listener cleanly without capturing false call recordings.
 
 ### 3. Speech-to-Text & MLOps Streamlining
-- **Local Faster-Whisper Lock**: Locked `STT_ENGINE = "whisper"` in [`backend/cfr_dispatch/config/cloud.py`](../../backend/cfr_dispatch/config/cloud.py), removing Google STT v2 dependencies.
+- **Local Faster-Whisper Lock**: Removed Google STT v2 dependencies. The `STT_ENGINE` selector that pinned this was itself removed on 2026-08-31 — nothing branched on it — and `config/cloud.py` became [`config/runtime.py`](../../backend/cfr_dispatch/config/runtime.py), since nothing in it was cloud-related.
 - **Whisper Hotwords & VAD**: Injected `units_vocabulary` into prompt boosting & enabled Silero VAD (`vad_filter=True`, `condition_on_previous_text=False`).
 - **GIS Vector Indexing (10x Faster Startup)**: Replaced `iterrows()` in ``services/gis/src/gis_service/shapefile_loader.py`` *(deleted — in-memory shapefile loading was eliminated)* with vector dict mapping (`to_dict('records')`), cutting service boot-up indexing time by 10x and lowering memory usage by >80%. Compact JSON output (`separators=(',', ':')`) in [`backend/scripts/update_gis_data.py`](../../backend/scripts/update_gis_data.py) cuts `hydrants.json` payload size from ~2.5 MB to ~1.0 MB.
 

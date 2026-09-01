@@ -27,7 +27,7 @@ import logging
 import datetime
 from logging.handlers import TimedRotatingFileHandler
 
-from cfr_dispatch.config.cloud import VERBOSITY_LEVEL
+from cfr_dispatch.config.runtime import VERBOSITY_LEVEL
 
 
 def _level_for_verbosity() -> int:

@@ -3,7 +3,7 @@ import datetime
 import logging
 from typing import List, Tuple, Any
 
-from cfr_dispatch.config.cloud import INTEGRATION_PAYLOAD_OPTION
+from cfr_dispatch.config.runtime import INTEGRATION_PAYLOAD_OPTION
 from cfr_dispatch.config.models import DispatchData
 from cfr_dispatch.parser import (
     match_incident_type,

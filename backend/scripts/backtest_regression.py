@@ -16,7 +16,7 @@ if backend_dir not in sys.path:
 
 import cfr_dispatch
 from cfr_dispatch.orchestration import transcribe_audio_file, get_shared_validator
-from cfr_dispatch.config import STT_ENGINE, UNITS_VOCABULARY, DispatchData, CALL_TYPES
+from cfr_dispatch.config import UNITS_VOCABULARY, DispatchData, CALL_TYPES
 from cfr_dispatch.parser import (
     sanitize_transcript, 
     split_rounds, 
@@ -111,7 +111,7 @@ def main():
     print("==================================================")
     print("        REGRESSION BACKTESTING & EVALUATION       ")
     print("==================================================")
-    print(f"STT Engine: {STT_ENGINE.upper()}")
+    print("STT Engine: WHISPER")
     print("Transcribing and evaluating test cases...")
     print("--------------------------------------------------")
     
@@ -387,7 +387,7 @@ def main():
     # 5. Log history
     evaluation_run = {
         "timestamp": datetime.datetime.now().isoformat(),
-        "model_version": f"{STT_ENGINE}-boost-classes",
+        "model_version": "whisper-boost-classes",
         "total_evaluation_samples": total,
         "old_average_wer": float(old_avg_wer),
         "new_average_wer": float(new_avg_wer),
@@ -423,7 +423,7 @@ def main():
     local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
     endpoint = f"{local_api_url}/api/evaluations"
     db_payload = {
-        "model_version": f"{STT_ENGINE}-boost-classes",
+        "model_version": "whisper-boost-classes",
         "total_samples": int(total),
         "wer": float(round(new_avg_wer * 100, 2)),
         "cer": float(round(new_avg_cer * 100, 2)),

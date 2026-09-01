@@ -5,7 +5,7 @@ import multiprocessing
 from collections import deque
 from typing import Any, Dict
 
-from cfr_dispatch.config.cloud import (
+from cfr_dispatch.config.runtime import (
     WHISPER_MODEL
 )
 from cfr_dispatch.stt import get_whisper_model

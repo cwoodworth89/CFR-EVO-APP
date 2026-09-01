@@ -2,7 +2,7 @@ import os
 import threading
 import logging
 import numpy as np
-from cfr_dispatch.config.cloud import WHISPER_MODEL
+from cfr_dispatch.config.runtime import WHISPER_MODEL
 from cfr_dispatch.config.vocab import UNITS_VOCABULARY
 from cfr_dispatch.stt.bias_prompt import build_stt_bias_words
 

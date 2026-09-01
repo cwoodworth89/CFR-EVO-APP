@@ -104,3 +104,40 @@ re-auth, so kiosk-side checks in this batch were done over HTTP to the tile serv
 * **Punch-list numbers are colliding across concurrent sessions.** There are two **#51**s, and a
   #55 written in this session had to be renumbered to **#56**. Agree a convention before
   several agents append here.
+
+---
+
+## Session batch, 2026-08-31 — basemap licensing, imagery provenance, and a day of my own corrections
+
+Full narrative: [`qa_handoff_2026-08-31.md`](../qa_handoff_2026-08-31.md).
+
+| Commit | Change | Verification |
+|:--|:--|:--|
+| `158c1c4` | **The 7.5cm orthos had never been ingested.** Every tile in `satellite.mbtiles` measured byte-identical to live Esri at five locations, z19 and z20, while `MapConstants` attributed the layer to the City. The runbook was the cause: `gis-pipeline-sync` §4.1 said to run `compile_mbtiles.py --layer satellite` to ingest them, and that command crawls Esri. | MD5 vs live Esri, 5 sites |
+| `158c1c4` | **Carto watermarks every unauthenticated tile.** z14–z20 verified live from the kiosk. The 2026-08-27 re-crawl fetched 81,032 z19 tiles per street layer after the change. | live probe, all zooms |
+| `ae26ec1` | **`SatelliteMiniMap` and `PropertySatellitePanel` were still on Esri** after the aerial layer moved — each hardcoded its own URL and zoom. The property panel is where crews read rooflines. Both now read `BASE_LAYERS.SATELLITE`. | bundle grep |
+| `d4a04fc` | **Pivot to crawling the City's own imagery service.** Measured at z20: City 1344, best local MrSID build 954, Esri 664, the MrSID archive we shipped 540. Esri layer and the whole MrSID/GDAL path retired; `RateLimiter` added for municipal sources. | edge-energy, same ground |
+| `465dd3c` | **Deep sweep of the retired processes.** Found two live defects: `verify_ortho_provenance.py` passed on a premise that had become false, and `test_tile_layer_adversarial.js` hand-copied the code it tested and stayed green through a real URL change. | both re-run |
+| `9017e6a` | Both deleted. Also records that the City source is **self-limiting** — it 404s outside the boundary, so the crawl cannot over-reach, where Carto and Esri are global and the coverage polygon was the only guard. | 13,699 failures = 14,061 predicted |
+| `60fe7d8` | **Reverted to Esri on operator judgement.** The City's cache is sharper but reads harsh on the bay display; the raw MrSID is blocky at native for the same reason. Attribution corrected to name both parties: City photographs, Esri rendering. | operator, bay display |
+| `0552c11` | **#47 closed as accepted risk.** Not resolved — the terms were never read. The gap is stated in the item: City provenance says nothing about Esri's redistribution rights. | — |
+
+### Corrections to my own claims, recorded rather than overwritten
+
+* **z21 is 4.87 cm/px, not 7.46.** I omitted `cos(latitude)` and built a 22 GB archive on the
+  wrong number. Then over-corrected to "z21 adds nothing", which was also wrong.
+* **`satellite.mbtiles` is not "Esri, not City data".** The photographs are the City's, proven
+  by a difference test where every vehicle cancelled out. Wrong on provenance, right on licence.
+* **lanczos was the wrong recommendation.** The operator's eye was right; my test had been a
+  downsample and the pipeline was upsampling.
+* **A monitor raised a false crawl-failure alarm** — `grep -c` prints `0` and exits non-zero,
+  so the fallback duplicated a line and shifted every field.
+
+### Also recorded, no separate entry
+
+* **The City's `export` endpoint renders from source, not the cache** — 113× the high-frequency
+  content of an upscaled z20 tile. Explains why QtheMap looks good at deep zoom. Unexplored.
+* **"Coquitlam Light Grey" is not City data** — Esri Canada's `Canada_Topographic` under an
+  ~80 KB City colour theme. Recorded in `PROJECT_IDEAS.md` #11.
+* **Two `cfr_tiles` outages, ~6 minutes each, both mine** — long jobs held on an SSH session
+  that timed out. Detached, the same operation took 47 seconds.

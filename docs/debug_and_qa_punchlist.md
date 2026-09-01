@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**25 open** (15 crew-visible) · **46 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**24 open** (15 crew-visible) · **47 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 25
+## Open — 24
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -40,7 +40,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **57** | 🔴 crew-visible | OPEN | [Candidate-level parse bleed — latent, not live](punchlist/57-candidate-level-parse-bleed-latent-not-live.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
-| **47b** | 🟠 operational | OPEN | [Basemap tile licensing has never been checked — Carto and Esri](punchlist/47b-basemap-tile-licensing-has-never-been-checked-carto-and.md) |
 | **49** | 🟠 operational | OPEN | [Access-point review UX — operators cannot set an entrance without direct SQL](punchlist/49-access-point-review-ux-operators-cannot-set-an-entrance.md) |
 | **55** | 🟠 operational | OPEN | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](punchlist/55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |

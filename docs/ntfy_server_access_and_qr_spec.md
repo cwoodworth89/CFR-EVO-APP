@@ -53,12 +53,17 @@ an MD5 formula. **That was never built and has been removed** — verified 2026-
 ntfy://100.95.146.94:8080/dev-errors
 ```
 
-> [!WARNING]
-> **`DriverStationSetup.jsx` hardcodes `cfr-dispatches`** (line 23), which is not what
-> anything publishes to. A driver scanning that QR subscribes to a topic that receives
-> nothing. `ntfy_broker.py` carries the same string as its env default. Both should read
-> `chief-master`, or the topic should come from configuration rather than three separate
-> literals.
+> [!NOTE]
+> **`DriverStationSetup.jsx` hardcodes `cfr-dispatches`**, which nothing publishes to — but
+> that screen is **not in operational use**: nobody is onboarded through it and nothing
+> depends on it, so the defect is latent. Deferred as punch-list **#60** rather than fixed,
+> because the screen is expected to be redesigned.
+>
+> The cause is worth carrying into that redesign. `e81964f` renamed the topic to
+> `chief-master` on 2026-08-21 across the backend and config and missed this one file —
+> three of four places, with nothing failing on the fourth. `ntfy_broker.py` still carries
+> `cfr-dispatches` as its env default, harmless only because the environment always
+> overrides it. **The topic belongs in configuration read once**, not in three literals.
 
 ---
 

@@ -1,3 +1,30 @@
+/**
+ * PLACEHOLDER — not finished, and not to be trusted as-is.
+ *
+ * Operator ruling 2026-08-31: this screen needs substantial work and is expected to be
+ * redesigned. It is annotated rather than corrected, because fixing details now would
+ * almost certainly be undone. Tracked as punch-list #60.
+ *
+ * NOT IN OPERATIONAL USE. No driver or officer is onboarded through this screen and nothing
+ * depends on it. It is wired into MapBoard on `appMode === "DRIVER_SETUP"`, so it renders if
+ * someone opens it, but that is a code fact rather than a workflow — which is why the defect
+ * below is latent rather than live, and why it is being recorded instead of fixed.
+ *
+ * Known wrong: the topic below is hardcoded `cfr-dispatches`, and nothing publishes there.
+ * Both the host agent (`backend/.env`) and the API container (`docker-compose.yml`) publish
+ * to `chief-master`. A driver who scans this QR subscribes to a topic that receives nothing,
+ * and the screen shows them that wrong name three times.
+ *
+ * How it drifted, because the shape matters more than the value:
+ *   2026-08-15  6d7866e  removed ntfy.sh and salting, set the topic to `cfr-dispatches`
+ *                        across backend, config and this component.
+ *   2026-08-21  e81964f  "align dispatch topic with the documented chief-master master
+ *                        topic" — updated the backend and config, and missed this file.
+ *
+ * A rename applied to three of four places, with nothing failing on the fourth. Do not fix
+ * by editing the literal: the topic should come from configuration, so the next rename
+ * cannot half-apply.
+ */
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 

@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **68 items, 35 open (22 crew-visible)**. The live work queue
+  **71 items, 27 open (15 crew-visible)**. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -16,6 +16,99 @@ Companion documents:
 * [`docs/standards/dependency-behaviour.md`](./standards/dependency-behaviour.md) — **verified library semantics; read this before trusting any API name**
 * [`docs/architecture/unified_map_surface.md`](./architecture/unified_map_surface.md) — frontend architecture, implemented
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
+
+---
+
+## Update, 2026-08-31 — a long session; read this before touching anything
+
+**Punch list: 71 items, 27 open, 15 crew-visible, 44 closed.** Seventeen items closed in one
+day, and that number is misleading in a way that matters more than the number.
+
+### Six of them were already fixed and nobody knew
+
+`#42`, `#31`, `#43a`, `#12`, `#38`, `#51a`. Each had been fixed days earlier and left open.
+Reading the tracker and starting work would have meant re-fixing finished work.
+
+**So the first move on any item is a query, not a read.** `DATABASE_URL` points at the kiosk
+and the `cfr-postgres` MCP server is read-only, so checking costs a minute and is always safe.
+This is now CLAUDE.md §6.6: a punch-list entry is a *report*; the running system is the record.
+
+### Execution beat inspection, three times, decisively
+
+Nothing static found any of these:
+
+* `pytest backend/tests/` surfaced a **live 500** on `/api/streetview-overrides` — `r.lat`
+  after the column was renamed. Valid Python; it fails only when the line runs.
+* Running the parcel import found **its own verification query broken** the same way, so the
+  import reported failure after succeeding completely.
+* Sending **one real ntfy notification** found that the new error-notifier could not encode
+  its own emoji title — it would have failed silently into the log forever, which is exactly
+  what it was built to stop.
+
+`pyflakes` is clean on all three. `pylint` cannot run here — an Application Control policy
+blocks isort's DLL. **Run the thing.**
+
+### A fix can unmask a latent bug — check what was downstream
+
+`responding_units` was unbound and aborted Phase 2 on 15 dispatches. Fixing it exposed
+`final_flags`, unbound in the same function, on the **common return path** — it had fired
+once in fourteen days only because the first crash aborted before reaching it. The fix would
+have failed *every* dispatch, and only an explicit log check caught it within the hour.
+
+After fixing an exception that aborts early, look at what it was shielding.
+
+### A rename will miss one place and nothing will fail
+
+Twice, ten days apart, from the same shape:
+
+| Rename | Missed |
+|:--|:--|
+| `parcels.lat` → `centroid_lat` (2026-08-31) | `streetview.py` (live 500) and the import's own verifier |
+| ntfy topic → `chief-master` (2026-08-21) | `DriverStationSetup.jsx` and `ntfy_broker.py`'s env default |
+
+Grep the whole tree for the old name, including a **stale default that is normally shadowed** —
+that one never fires in normal operation, which is precisely why it stays wrong.
+
+### Errors now reach a phone
+
+Pipeline exceptions push to the ntfy topic **`dev-errors`** (`ntfy://100.95.146.94:8080/dev-errors`).
+Before this, the `responding_units` error sat in `journalctl -u cfr-agent` for two days with
+the dispatch id and the variable name in it. Punch-list #26 restored that logging in August;
+nothing watched it.
+
+**`backend/cfr_dispatch/health_watchdog.py` still does not run.** It implements disk, network
+and audio-device checks and calls `notify_it_alert`; its only reference outside itself is a
+test. Second piece of monitoring machinery that exists and is not wired in.
+
+### Three checks now run on commit
+
+```bash
+python backend/scripts/audit_skill_references.py            # skills naming absent identifiers
+python backend/scripts/audit_skill_references.py --scripts  # a row per script, a script per row
+python backend/scripts/audit_skill_references.py --docs     # broken links, prose naming nothing
+```
+
+The last two fire from `.githooks/pre-commit` when `docs/` or `backend/scripts/` is touched.
+The `--scripts` check blocked its own first commit — a parallel session had added a script
+with no README row. Exempt a deliberate record of a deletion with
+`<!-- audit-ok: path -- why -->`; there are nine, each naming what it excuses.
+
+### What was deleted, so you do not go looking
+
+`feed_recorded_call.py`, `process_full_dispatch`, `backend/tests/test_calls/`,
+`run_test_suite.py`, the `e2e-dispatch-testing` skill, `evo_routing_engine.md`, Section 2 of
+the routing standard, three `GEMINI.md` files, and eight stale documents. **There is no
+end-to-end test harness.** Real dispatches — about eleven a day — are the end-to-end test, and
+the HITL review panel is where correctness is judged. That is deliberate (§6.5 forbids
+synthesised calls) and the operator accepts the trade while the system is developer-only.
+
+### Parcels changed shape
+
+`public.parcels` went 65,401 → 71,212 rows. Every City record is now kept — nothing is
+collapsed — plus **1,671 `base_site` rows**, one per multi-parcel property, carrying the
+operator context. See [`briefings/base_site_rows_decision.md`](briefings/base_site_rows_decision.md).
+The City's `MASTER` legaldesc is **strata common property, not the building**: 10.3% of site
+area across 517 measured properties. Do not treat it as the property envelope.
 
 ---
 
@@ -235,3 +328,5 @@ compare the function to itself and pass unconditionally.
 
 That pattern — freeze the old behaviour, run both over the real corpus, diff — is the one
 that gave real confidence. Reuse it for anything touching the dispatch path.
+
+<!-- audit-ok: backend/tests/test_calls/ -- named in the list of what was deleted 2026-08-31 -->

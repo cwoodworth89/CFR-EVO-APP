@@ -415,9 +415,13 @@ export default function VerificationSidebar({
               response type is mutually exclusive. Copying the tone code literally
               would allow a call to be both routine and emergency.
 
-              UNKNOWN is a first-class answer, not an empty state. A reviewer
-              confirming the dispatch never announced a response type is the ground
-              truth the RESPONSE_TYPE_UNKNOWN flag needs to be validated against. */}
+              The UNKNOWN button was removed 2026-08-31 (operator decision): it was
+              being offered as a third choice and is not one a reviewer wants to make.
+              Nothing downstream needed it -- RESPONSE_TYPE_UNKNOWN is computed backend
+              side in review_flags.py from the PARSED value being absent, not from the
+              reviewer selecting anything. Leaving both buttons unselected still submits
+              null, so "not announced" remains expressible; it is simply no longer a
+              button competing with the two real answers. */}
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
               <label className="text-[10px] text-slate-400 font-extrabold uppercase font-mono">
@@ -431,11 +435,10 @@ export default function VerificationSidebar({
                 Sys: {selectedCall.target?.response_type || 'Unknown'} 📥
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { value: 'routine', label: '🟢 Routine', on: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]' },
                 { value: 'emergency', label: '🔴 Emergency', on: 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.2)]' },
-                { value: null, label: '⬜ Unknown', on: 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)]' },
               ].map(opt => (
                 <button
                   key={String(opt.value)}

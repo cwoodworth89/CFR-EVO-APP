@@ -51,9 +51,11 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const [includeInTraining, setIncludeInTraining] = useState(true);
   const [reviewNotes, setReviewNotes] = useState('');
   const [verifiedTones, setVerifiedTones] = useState([]);
-  // 'routine' | 'emergency' | null. Null is a real answer, not 'unset':
-  // the reviewer confirming the dispatch never announced one is exactly the
-  // ground truth RESPONSE_TYPE_UNKNOWN needs (punch-list #31, #45).
+  // 'routine' | 'emergency' | null. Null means neither button is selected, which
+  // still submits null -- so "never announced" stays expressible without offering
+  // it as a third button (removed 2026-08-31, operator decision). The backend flag
+  // RESPONSE_TYPE_UNKNOWN is derived from the PARSED value in review_flags.py and
+  // never depended on this control.
   const [verifiedResponseType, setVerifiedResponseType] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -185,7 +187,24 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         // (handlePrefillField). Deliberate acceptance, not a default.
         setVerifiedXstreet1(selectedCall.verified_x_street_1 || '');
         setVerifiedXstreet2(selectedCall.verified_x_street_2 || '');
-        setVerifiedTalkgroup(selectedCall.verified_talkgroup || '');
+
+        // TALK GROUP IS PRESELECTED, and must stay that way.
+        //
+        // The dropdown opens already set to the talk group the system heard. Operator
+        // decision 2026-08-31: it is rarely wrong and is an easy eyes-on confirmation,
+        // so making the reviewer re-enter it on every call is friction for no gain.
+        // An already-reviewed call shows the reviewer's own saved answer instead, so
+        // reopening a call never replaces a human correction with the parser's value.
+        //
+        // TALK GROUP IS DELIBERATELY UNLIKE THE XSTREET BOXES ABOVE. ce1b409 removed
+        // the preselect from this line along with those, which was collateral: the rule
+        // it enforced is about FREE-TEXT boxes, where a prefilled guess submitted
+        // unedited becomes a machine value recorded as human-verified ("Christmas Way
+        // Way", fifteen times over). Talk group is a <select> over a closed vocabulary
+        // (TALK_GROUPS) -- a wrong value cannot be typed here, only chosen from a fixed
+        // list, and it reads as a selection rather than hiding as text the eye slides
+        // over. The Sys badge still shows what was parsed, so disagreement stays visible.
+        setVerifiedTalkgroup(selectedCall.verified_talkgroup || selectedCall.target?.radio_channel || '');
         setVerifiedIncident(selectedCall.verified_incident || '');
         // Prefer the reviewer's own correction, then what the parser heard, then
         // null. Null is a real state here — "the dispatch did not announce one".

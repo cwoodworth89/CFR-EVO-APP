@@ -50,8 +50,9 @@ export const BASE_LAYERS = {
   // measurably sharper. It was crawled, deployed and then rejected: its
   // sharpening reads as harsh on the bay display and adds no detail a crew can
   // use (operator decision 2026-08-31). Esri's gentler processing was preferred
-  // on the display that matters. That archive is parked on the kiosk at
-  // data_staging/ortho_CITY_crawl_2026-08-31.mbtiles if the call is revisited.
+  // on the display that matters. That archive has been deleted; it is
+  // reproducible in ~6 h with `compile_mbtiles.py --layer ortho`, which still
+  // points at the City service -- see gis-pipeline-sync 4.1.
   //
   // Licensing is NOT settled: Esri's terms govern Esri's redistribution and have
   // not been read. Accepted as a known risk, not resolved -- punch-list #47.

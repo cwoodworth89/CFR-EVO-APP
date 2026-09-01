@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED — accepted risk, 2026-08-31 |
 | **Severity** | operational |
 | **Area** | 🧷 Parcel Import Integrity |
 | **Blocks** | 1 |
@@ -13,7 +13,9 @@
 ---
 
 ## 47. Basemap tile licensing has never been checked — Carto and Esri
-> **Status**: ⚠️ **Open — operator decision required. No code defect; this is a terms question.**
+> **Status**: ✅ **CLOSED 2026-08-31 as ACCEPTED RISK — operator decision.**
+> Not resolved. The terms were never read; the exposure was weighed and accepted.
+> See *Closure* at the foot of this item for what was accepted and what would reopen it.
 
 Raised by the operator asking whether pre-crawled tiles need API keys and whether anything was
 watermarked. **Neither.** Checked against `compile_mbtiles.py`:
@@ -92,3 +94,63 @@ from how OGL works and from Carto's own enforcement behaviour, not from the lice
 
 Recorded so the fixes below are findable by symptom, not only by commit. Every one was
 measured against the live kiosk or the corpus before and after (§6.6).
+
+---
+
+## Closure — accepted risk, operator decision 2026-08-31
+
+**This item is closed as an accepted risk, not as a resolved question.** Neither Carto's nor
+Esri's terms of service were ever read. What changed is that the exposure was measured,
+reduced where it was cheap to reduce, and then knowingly accepted where it was not.
+
+### What was actually resolved
+
+**Carto is gone from the deep zooms, and that part is genuinely fixed.** Carto now stamps
+every unauthenticated tile `API KEY REQUIRED` — verified live from the kiosk across z14–z20.
+The 2026-08-27 re-crawl had pulled 81,032 z19 tiles per street layer after that policy change.
+**All 162,064 were deleted 2026-08-31**, `max_zoom` was returned to 18, and each archive's
+metadata `maxzoom` was corrected so it no longer describes content that is absent.
+
+Residual: roughly **5,600 watermarked tiles per layer at z18** and **1,400 at z17**, in the
+western strip added by that re-crawl. Deliberately retained — deleting them would blank the
+basemap over Austin Heights, Maillardville and Burquitlam at working zoom, reopening the #40
+gap. A visible hole over a third of the city is worse than the residue, and
+`PROJECT_IDEAS.md` #11 replaces the layer wholesale.
+
+### What is being accepted
+
+The aerial layer (`ortho.mbtiles`, 511,118 tiles) is **Esri World Imagery, crawled and stored
+offline on municipal hardware.** Esri's terms govern that redistribution and have not been
+read.
+
+The reasoning the operator accepted it on, stated so it can be re-examined:
+
+* **The photographs are the City's own.** Proven 2026-08-31 by differencing a car park against
+  the City's `Imagery_2025` service: every vehicle cancelled out, mean absolute difference
+  12.5/255, not one car-shaped ghost. Esri's World Imagery over Coquitlam is the City's 2025
+  7.5cm capture, contributed through Esri's community programme — not an independent survey.
+* The City participates in that programme, and its data is published under the Open Government
+  Licence.
+* Esri serves these tiles **unauthenticated and unwatermarked**, which is a materially
+  different posture from Carto's active enforcement.
+* Bleed beyond the municipal polygon (this archive was crawled to the bounding box, so it
+  covers Port Moody, Belcarra and Anmore) is accepted on the same reasoning and is useful for
+  mutual aid.
+
+**The gap in that reasoning, recorded honestly:** the City producing the source does not speak
+to Esri's rights over *their* redistribution of it. That is the unread part, and it is what is
+being accepted rather than answered.
+
+### What would reopen this
+
+* Esri beginning to watermark, key-gate or rate-limit the imagery — the signal Carto gave.
+* A licence review that reaches a different conclusion.
+* `PROJECT_IDEAS.md` #11 landing, which removes Carto entirely and would make revisiting the
+  aerial layer cheap.
+* The City publishing `Imagery_2026`, since a fresh crawl is a fresh decision.
+
+**A cleaner alternative exists and was rejected on visual grounds, not licensing.** The City's
+own `Imagery_2025` cache is unambiguously OGL, self-limiting at the municipal boundary, and
+measurably sharper (1344 vs 664 edge energy at z20). It was crawled, deployed, and rejected
+because its sharpening reads as harsh on the bay display and adds no detail a crew can act on.
+`compile_mbtiles.py --layer ortho` still points at it; the archive is ~6 hours to rebuild.

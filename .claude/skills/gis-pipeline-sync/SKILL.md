@@ -138,6 +138,29 @@ operator decision of 2026-08-27 for the cadastral crawl.
 serialises behind one lock. The 2026-08-27 cadastral crawl ran 8.5 hours pinned at exactly
 5 req/s while 8 workers appeared to be running in parallel.
 
+#### The City source is self-limiting, and that is a feature
+
+**The City renders nothing outside its own boundary — requests beyond it return HTTP 404.**
+So the ortho layer physically cannot ingest Port Moody, Coquitlam's watershed, Belcarra or
+Anmore. The municipal extent is enforced *by the source*, not by our configuration.
+
+That is a real change in where the guarantee lives. Carto and Esri are global: with those,
+`filter_tiles_to_city()` and the coverage polygon were the **only** thing stopping the crawl
+walking into neighbouring municipalities, and a bug in that filter would have silently pulled
+data the department has no claim to. With the City's service, a filter bug just wastes
+requests — it cannot over-reach.
+
+Practical consequence, observed on the 2026-08-31 crawl: our coverage polygon carries a ~1 km
+mutual-aid buffer, and **13,699 of 430,845 requests 404'd** because that buffer overhangs the
+City's imagery. Predicted 14,061 from the service's published `fullExtent`, so the failures
+are the self-limiting behaving exactly as designed, not a fault.
+
+The buffer is still correct for `street` (regional context genuinely helps an operator panning
+out) but is dead weight for `ortho`. Clipping the ortho tile list to the service `fullExtent`
+would remove those wasted requests and about 13 minutes of crawl. Left as-is for now: a
+predictable 404 is cheaper than another bespoke bounds constant, and #40 was caused by exactly
+that kind of hand-tuned box.
+
 #### Maintenance: crawl the new year, do not diff
 
 The City publishes a **new service per year** — `Imagery_2021` … `Imagery_2025`. Verified

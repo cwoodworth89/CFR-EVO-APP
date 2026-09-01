@@ -28,7 +28,10 @@ def main():
     # recording with a label for all of it, while the feature extractor kept only the
     # first 30s -- see docs/briefings/whisper_training_round1_labelling.md. Built by
     # backend/scripts/prepare_training_clips.py.
-    meta_csv = os.path.join(training_dir, "metadata_round1.csv")
+    # The train split only. metadata_round1_holdout.csv is scored by
+    # eval_round1_holdout.py on calls the model never saw; training on everything would
+    # leave train-on-test as the only available number.
+    meta_csv = os.path.join(training_dir, "metadata_round1_train.csv")
     audio_dir = os.path.join(training_dir, "round1_clips")
     
     if not os.path.exists(meta_csv):

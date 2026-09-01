@@ -170,11 +170,25 @@ def main():
         if claimed:
             ratios.append(float(heard) / claimed)
 
+    def write_csv(path, rows_out):
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["file_name", "verified_transcript"])
+            writer.writeheader()
+            writer.writerows(rows_out)
+
     meta = os.path.join(training_dir, "metadata_round1.csv")
-    with open(meta, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["file_name", "verified_transcript"])
-        writer.writeheader()
-        writer.writerows(kept)
+    write_csv(meta, kept)
+
+    # A held-out split, so the resulting model can be scored on calls it never saw.
+    # Without this the only available number is train-on-test, which is what makes the
+    # 2026-07-17 "22.6% -> 3.5% WER" untrustworthy (CLAUDE.md s6.6: an unknown reported as
+    # a number is a defect). Deterministic -- every 10th call by sorted dispatch_id -- so
+    # a re-run scores against the same holdout and the comparison stays honest.
+    holdout = kept[::10]
+    train = [r for r in kept if r not in holdout]
+    write_csv(os.path.join(training_dir, "metadata_round1_train.csv"), train)
+    write_csv(os.path.join(training_dir, "metadata_round1_holdout.csv"), holdout)
+    logging.info("split: %d train / %d holdout" % (len(train), len(holdout)))
 
     logging.info("=" * 70)
     logging.info("KEPT %d of %d flagged calls -> %s" % (len(kept), len(rows), meta))

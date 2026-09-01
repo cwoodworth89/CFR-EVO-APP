@@ -464,7 +464,7 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
               maxBounds={OPERATIONAL_BOUNDS}
               maxBoundsViscosity={1.0}
               mapRef={setMap}
-              baseStyle={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels && currentZoom >= 16) ? "GREY" : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER" : "GREY"}
+              baseStyle={(appMode === "EXPLORE" && (mapStyle === "SATELLITE" || mapStyle === "SATELLITE_ESRI")) ? mapStyle : (showLabels && currentZoom >= 16) ? "GREY" : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER" : "GREY"}
               showCadastral={showLabels && !cadastralError}
               onCadastralError={() => setCadastralError(true)}
               showFireHalls={showFireHalls}

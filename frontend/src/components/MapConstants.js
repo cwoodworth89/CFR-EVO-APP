@@ -61,6 +61,24 @@ export const BASE_LAYERS = {
     maxNativeZoom: 20,
     maxZoom: 22
   },
+  // ---------------------------------------------------------------------
+  // TEMPORARY -- added 2026-08-31 so the operator can A/B the City crawl
+  // against the retired Esri scrape on the bay display. `satellite.mbtiles`
+  // is kept on the kiosk only for this comparison.
+  //
+  // REMOVE THIS, its button in LeftSidebar, and its branch in MapBoard's
+  // baseStyle once the comparison is done -- then delete satellite.mbtiles.
+  // Both layers are the same photographs; only the processing differs.
+  // ---------------------------------------------------------------------
+  SATELLITE_ESRI: {
+    type: 'tile',
+    url: `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
+    fallbackUrl: null,
+    attribution: 'Esri World Imagery scrape (RETIRED -- comparison only)',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 20,
+    maxZoom: 22
+  },
   OSM: {
     type: 'tile',
     url: `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`,

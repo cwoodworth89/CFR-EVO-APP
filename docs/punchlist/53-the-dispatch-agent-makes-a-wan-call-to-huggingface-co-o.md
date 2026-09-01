@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | FIXED 2026-08-31 |
 | **Severity** | operational |
 | **Area** | 🧷 Parcel Import Integrity |
 | **Blocks** | 1 |
@@ -13,8 +13,9 @@
 ---
 
 ## 53. The dispatch agent makes a WAN call to huggingface.co on every start
-> **Status**: ⚠️ **Open — not reproduced under WAN failure.** Observed 2026-08-29 in
-> `cfr-agent` startup logs while deploying.
+> **Status**: ✅ **Fixed 2026-08-31** at `b6bd5d8` — `local_files_only=True`.
+> Verified by before/after on the running kiosk; see the closing note. Originally observed
+> 2026-08-29 in `cfr-agent` startup logs while deploying.
 
 ```
 Aug 29 20:26:12 cfr-mapping-tcfh cfr-agent[3321015]: INFO - Loading local faster-whisper
@@ -50,5 +51,32 @@ Dispatch Worker process initialized and ready."* Compare against the ~2 s it tak
 is a real measurement of the offline guarantee rather than an assumption about it, and it is the
 only way to know whether this is a latent outage or a harmless log line.
 
-
 ---
+
+## Fixed and verified, 2026-08-31
+
+`b6bd5d8` passes `local_files_only=True` to `WhisperModel` in
+[`transcriber.py`](../../backend/cfr_dispatch/stt/transcriber.py). The parameter defaults
+to `False` and `faster_whisper` hands it straight to `huggingface_hub.snapshot_download`,
+so every cold start hit the network to check the model revision — while the weights were
+already cached locally, so the request bought nothing and put a WAN dependency on the boot
+path of a system whose first architectural rule is that it survives without one.
+
+An absent cache now raises with seeding instructions rather than quietly downloading, which
+is the right failure: a new machine is seeded deliberately, not over the network at first
+boot (§6.1).
+
+**The open question in this item — "what happens when WAN is gone?" — is now moot**: the
+call is not made at all, so there is nothing to fail. That is a better answer than
+reproducing the outage would have been.
+
+### Before and after, same machine, same journal
+
+| | |
+|:--|:--|
+| Before, **18:35:09** | `HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-base/revision/main "HTTP/1.1 200 OK"` |
+| After the 20:12 restart | **0** occurrences of `huggingface` / `hf.co` / `snapshot_download` |
+| Model still loads | `20:12:42,644 Loading local faster-whisper model 'base'` → worker ready at `20:12:42,961` (317 ms) |
+| Running code carries the fix | `local_files_only=True` present in the deployed `transcriber.py` |
+
+Closed on the running system rather than on the commit message (§6.6).

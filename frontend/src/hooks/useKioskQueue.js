@@ -1,8 +1,55 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatchListener } from './useDispatchListener';
-import { isSameDispatch, getVisibleChanges } from '../utils/dispatchModel';
+import { isSameDispatch, getVisibleChanges, toActiveCall } from '../utils/dispatchModel';
+import { API_BASE_URL } from '../apiClient';
 
 const DEFAULT_TIMEOUT_SECONDS = 300; // 5 minutes
+
+// ---------------------------------------------------------------------------
+// Rehydration after a reload -- punch list #44b follow-up.
+//
+// The kiosk learned about calls from MQTT and nothing else, and MQTT publishes
+// WITHOUT the retain flag (mqtt_broker.py / api/mqtt.py both publish qos=1, no
+// retain), so a freshly loaded page has no way to hear about a call that has
+// already been announced. Any reload during an incident -- the stale-chunk
+// failsafe, a browser restart, a power cycle -- left the crew looking at a
+// working map with no call on it.
+//
+// The dispatch was never lost: public.dispatches is the system of record
+// (CLAUDE.md 6.2). So on boot we ask the database what is live rather than
+// waiting for a broadcast that has already been and gone.
+// ---------------------------------------------------------------------------
+
+const DISMISSED_STORAGE_KEY = 'cfr-evo:dismissed-dispatches';
+
+// localStorage throws outright in some privacy modes; absence must degrade to
+// "nothing dismissed" rather than taking the kiosk down.
+function readDismissedIds() {
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_STORAGE_KEY);
+    if (!raw) return new Map();
+    const cutoff = Date.now() - DEFAULT_TIMEOUT_SECONDS * 1000;
+    // Entries older than the window can never suppress anything, so drop them.
+    return new Map(
+      Object.entries(JSON.parse(raw)).filter(([, at]) => Number(at) >= cutoff)
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function rememberDismissedId(dispatchId) {
+  if (!dispatchId) return;
+  try {
+    const entries = readDismissedIds();
+    entries.set(dispatchId, Date.now());
+    window.localStorage.setItem(
+      DISMISSED_STORAGE_KEY,
+      JSON.stringify(Object.fromEntries(entries))
+    );
+  } catch { /* storage unavailable -- rehydration may re-show it once, which is
+                the safe direction to fail: a call shown twice beats one lost. */ }
+}
 
 export function useKioskQueue() {
   const [activeCall, setActiveCall] = useState(null);
@@ -153,6 +200,79 @@ export function useKioskQueue() {
     enabled: true,
   });
 
+  // Mirrors activeCall so the dismiss handlers can record which call was dismissed
+  // without reading state inside a setState updater.
+  const activeCallRef = useRef(null);
+  useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
+
+  // Restore an in-progress call after a reload. Runs once, on mount.
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // limit=5 rather than 1: two calls inside one five-minute window is
+        // uncommon at ~11 dispatches a day but entirely real, and restoring only
+        // the newest would silently drop the one the crew is actually on.
+        const res = await fetch(`${API_BASE_URL}/api/dispatches?limit=5`, { signal: controller.signal });
+        if (!res.ok || cancelled) return;
+        const records = await res.json();
+        if (cancelled || !Array.isArray(records)) return;
+
+        const dismissed = readDismissedIds();
+        const now = Date.now();
+
+        const stillLive = records
+          .map((record) => ({ record, ageSeconds: (now - Date.parse(record.timestamp)) / 1000 }))
+          // Date.parse is safe here: the API emits an offset-bearing ISO string
+          // ("...+00:00", verified against the running API 2026-08-31). A naive
+          // timestamp would be read as local time and be hours out.
+          .filter(({ record, ageSeconds }) =>
+            Number.isFinite(ageSeconds) &&
+            ageSeconds >= 0 &&
+            ageSeconds < DEFAULT_TIMEOUT_SECONDS &&
+            !dismissed.has(record.dispatch_id))
+          // Oldest first, reproducing what the screen held before the reload: the
+          // earlier call is the active one and later arrivals were queued behind it.
+          .sort((a, b) => b.ageSeconds - a.ageSeconds);
+
+        if (cancelled || stillLive.length === 0) return;
+
+        const [oldest, ...rest] = stillLive;
+        const restored = toActiveCall(oldest.record, { apiBaseUrl: API_BASE_URL });
+        const age = Math.round(oldest.ageSeconds);
+
+        setActiveCall((current) => {
+          // MQTT may have beaten the fetch, and a live broadcast is fresher than
+          // anything we just read. Never overwrite it.
+          if (current) return current;
+
+          // Seed the clocks from the dispatch's real age rather than restarting
+          // them. A fresh 5:00 would silently extend the display window, and an
+          // elapsed clock reset to 00:00 would misreport how long the crew has
+          // been on the call -- a number that reads as real and is not
+          // (CLAUDE.md 6.1).
+          setElapsedSeconds(age);
+          setTimeoutSecondsLeft(Math.max(1, DEFAULT_TIMEOUT_SECONDS - age));
+          setIsTimerPaused(false);
+          return restored;
+        });
+
+        if (rest.length > 0) {
+          setQueuedCalls((prev) => (prev.length > 0
+            ? prev
+            : rest.map(({ record }) => toActiveCall(record, { apiBaseUrl: API_BASE_URL }))));
+        }
+      } catch {
+        // Offline or the API is down: MQTT remains the primary path and a later
+        // broadcast still populates the screen. Nothing is invented here.
+      }
+    })();
+
+    return () => { cancelled = true; controller.abort(); };
+  }, []);
+
   // Reset the elapsed counter the moment the active call clears, during render.
   // Doing it inside the effect below left the previous call's elapsed time on
   // screen for one frame after dismissal.
@@ -177,6 +297,10 @@ export function useKioskQueue() {
 
   // Advance to next call in queue
   const advanceToNextCall = useCallback(() => {
+    // Moving on is a dismissal of the call being left behind -- same reasoning.
+    const leaving = activeCallRef.current;
+    if (leaving && !leaving.isReview) rememberDismissedId(leaving.dispatch_id);
+
     setQueuedCalls((prev) => {
       if (prev.length === 0) {
         setActiveCall(null);
@@ -190,6 +314,12 @@ export function useKioskQueue() {
 
   // Dismiss current active call
   const dismissActiveCall = useCallback(() => {
+    // Record it, or the rehydration on the next reload would put a call the
+    // operator has deliberately cleared straight back on the screen. Review
+    // replays are excluded -- they are not live incidents.
+    const dismissing = activeCallRef.current;
+    if (dismissing && !dismissing.isReview) rememberDismissedId(dismissing.dispatch_id);
+
     setQueuedCalls((prev) => {
       if (prev.length > 0) {
         const [next, ...rest] = prev;

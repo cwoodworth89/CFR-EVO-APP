@@ -17,4 +17,4 @@ reason the severity column exists.
 
 | Date | Found while | One line |
 |:--|:--|:--|
-| | | |
+| 2026-08-31 | Reading `agent_onboarding.md` during onboarding | `agent_onboarding.md` §5 "Toggling Speech-to-Text Engines" tells you to set `STT_ENGINE=google` in `backend/.env` and restart. That does nothing — `STT_ENGINE` is a hardcoded constant in `backend/cfr_dispatch/config/cloud.py:7`, never read from env. The procedure is inert, and it contradicts both the same file's own domain map and CLAUDE.md §1 (no cloud STT). `backend/.env.example:9` and `:14` imply the same env-configurability. |

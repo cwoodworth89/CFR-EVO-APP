@@ -17,7 +17,37 @@ def get_whisper_model():
             if _whisper_model_singleton is None:
                 from faster_whisper import WhisperModel
                 logging.info(f"Loading local faster-whisper model '{WHISPER_MODEL}' (device=cpu, compute_type=int8)...")
-                _whisper_model_singleton = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+                # local_files_only=True -- CLAUDE.md s1 requires the whole stack to run
+                # with no WAN. Verified against the installed faster_whisper 1.2.1 on the
+                # kiosk 2026-08-31: the parameter defaults to False and WhisperModel hands
+                # it straight to huggingface_hub.snapshot_download, so every cold start
+                # called huggingface.co to check the model revision -- observed live in
+                # journalctl at 18:35:09. The weights were already cached locally (142 MB
+                # at ~/.cache/huggingface/hub/models--Systran--faster-whisper-base), so the
+                # request bought nothing and put a WAN dependency on the boot path of an
+                # offline dispatch system.
+                #
+                # With this set, an absent cache raises instead of quietly downloading.
+                # That is the intended behaviour (s6.1): a new machine is seeded
+                # deliberately, not over the network at first boot. See
+                # docs/external_calls.md.
+                try:
+                    _whisper_model_singleton = WhisperModel(
+                        WHISPER_MODEL,
+                        device="cpu",
+                        compute_type="int8",
+                        local_files_only=True,
+                    )
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Whisper model '{WHISPER_MODEL}' is not in the local Hugging Face "
+                        f"cache, and this system does not download models at runtime "
+                        f"(CLAUDE.md s1, offline-only). Seed it once from a networked "
+                        f"machine -- for a bare size name the repo is "
+                        f"'Systran/faster-whisper-{WHISPER_MODEL}' -- or copy the matching "
+                        f"~/.cache/huggingface/hub/models--* directory from a working host. "
+                        f"Underlying error: {e}"
+                    ) from e
     return _whisper_model_singleton
 
 def transcribe_audio_local(audio_data, model=None, validator=None) -> str | None:

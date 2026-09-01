@@ -202,18 +202,18 @@ export function LeftSidebar({
                            <span>BASEMAP VIEW</span>
                            <span className="text-[8px] text-slate-400 font-mono">EXPLORE</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
+                        <div className="grid grid-cols-2 gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
                            <button
                               type="button"
                               onClick={() => setMapStyle && setMapStyle("GREY")}
                               className={`py-1.5 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                                 mapStyle !== "SATELLITE" && mapStyle !== "SATELLITE_ESRI"
+                                 mapStyle !== "SATELLITE"
                                     ? "bg-slate-800 text-sky-400 shadow-sm border border-slate-700 font-black"
                                     : "text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent"
                               }`}
                            >
                               <span>🗺️</span>
-                              <span>Street</span>
+                              <span>Street Map</span>
                            </button>
                            <button
                               type="button"
@@ -225,22 +225,7 @@ export function LeftSidebar({
                               }`}
                            >
                               <span>🛰️</span>
-                              <span>City</span>
-                           </button>
-                           {/* TEMPORARY 2026-08-31 -- A/B against the retired Esri scrape.
-                               Remove this button, BASE_LAYERS.SATELLITE_ESRI and the
-                               MapBoard baseStyle branch once the comparison is done. */}
-                           <button
-                              type="button"
-                              onClick={() => setMapStyle && setMapStyle("SATELLITE_ESRI")}
-                              className={`py-1.5 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                                 mapStyle === "SATELLITE_ESRI"
-                                    ? "bg-amber-950/80 text-amber-300 shadow-sm border border-amber-700/80 font-black"
-                                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent"
-                              }`}
-                           >
-                              <span>🗄️</span>
-                              <span>Esri</span>
+                              <span>Aerial 7.5cm</span>
                            </button>
                         </div>
                      </div>

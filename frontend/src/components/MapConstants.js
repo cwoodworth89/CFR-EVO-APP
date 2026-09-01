@@ -38,44 +38,30 @@ export const BASE_LAYERS = {
     maxNativeZoom: 18,
     maxZoom: 22,
   },
-  // Aerial imagery. Serves the City of Coquitlam 2025 7.5cm orthophotos ONLY
-  // (`ortho.mbtiles`, Open Government Licence), crawled from the City's own
-  // imagery service, with no Esri fallback beneath it.
+  // Aerial imagery, served from `ortho.mbtiles` at /services/ortho.
   //
-  // Until 2026-08-30 this key pointed at `services/satellite`, which is Esri
-  // World Imagery end to end -- the orthos had never been ingested, despite this
-  // attribution string naming them. Blank outside the ortho footprint is the
-  // correct rendering (CLAUDE.md 6.1): it shows where imagery genuinely stops
-  // rather than silently substituting a coarser source.
+  // The PHOTOGRAPHS are the City of Coquitlam's 2025 7.5cm orthophotography.
+  // The RENDERING is Esri's. Proven 2026-08-31 by differencing a car park: every
+  // vehicle cancelled out, mean absolute difference 12.5/255, so Esri's World
+  // Imagery over Coquitlam is the City's own capture contributed through Esri's
+  // community programme -- not an independent survey.
+  //
+  // The City also publishes its own tile cache of the same capture, and it is
+  // measurably sharper. It was crawled, deployed and then rejected: its
+  // sharpening reads as harsh on the bay display and adds no detail a crew can
+  // use (operator decision 2026-08-31). Esri's gentler processing was preferred
+  // on the display that matters. That archive is parked on the kiosk at
+  // data_staging/ortho_CITY_crawl_2026-08-31.mbtiles if the call is revisited.
+  //
+  // Licensing is NOT settled: Esri's terms govern Esri's redistribution and have
+  // not been read. Accepted as a known risk, not resolved -- punch-list #47.
   SATELLITE: {
     type: 'tile',
     url: `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: 'City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence, Offline Local Cache)',
+    attribution: 'Imagery © City of Coquitlam 2025 (7.5cm ortho), served via Esri World Imagery — Offline Local Cache',
     subdomains: ['a', 'b', 'c'],
-    // z20. That is where the City's own imagery cache ends -- z21 returns 404,
-    // verified at three locations 2026-08-31 -- and it is the honest limit for a
-    // 7.5cm source: z20 is 9.74 cm/px here, z21 would be 4.87 cm/px with nothing
-    // real to fill it. Leaflet upscales past this, so the map still reaches
-    // maxZoom 22; it just stops requesting tiles that do not exist.
-    maxNativeZoom: 20,
-    maxZoom: 22
-  },
-  // ---------------------------------------------------------------------
-  // TEMPORARY -- added 2026-08-31 so the operator can A/B the City crawl
-  // against the retired Esri scrape on the bay display. `satellite.mbtiles`
-  // is kept on the kiosk only for this comparison.
-  //
-  // REMOVE THIS, its button in LeftSidebar, and its branch in MapBoard's
-  // baseStyle once the comparison is done -- then delete satellite.mbtiles.
-  // Both layers are the same photographs; only the processing differs.
-  // ---------------------------------------------------------------------
-  SATELLITE_ESRI: {
-    type: 'tile',
-    url: `${TILE_BASE_URL}/services/satellite/tiles/{z}/{x}/{y}.jpg`,
-    fallbackUrl: null,
-    attribution: 'Esri World Imagery scrape (RETIRED -- comparison only)',
-    subdomains: ['a', 'b', 'c'],
+    // z20 is the deepest level held. Leaflet upscales past it to maxZoom 22.
     maxNativeZoom: 20,
     maxZoom: 22
   },

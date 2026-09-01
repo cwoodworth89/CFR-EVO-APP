@@ -21,6 +21,7 @@ not the behaviour**, and the code was written against the name.
 | `multiprocessing.Process` | the child continues where the parent left off | on Python 3.14 it does not inherit logging config -- the default start method became `forkserver` |
 | MQTT `qos=1` | delivered once, reliably | delivered **at least** once -- duplicates are guaranteed possible and the receiver must be idempotent |
 | `requestAnimationFrame` | runs after the next paint | runs before the next repaint **only while the document is visible**. On a hidden tab or a blanked kiosk display it never fires |
+| `feature_extractor(speech, sampling_rate=16000)` | encodes the clip you gave it | **keeps the first 30 seconds and silently drops the rest.** `__call__` defaults to `truncation=True`, `padding="max_length"`, `max_length=n_samples` (`chunk_length` 30 x 16 kHz = 480,000 samples) |
 
 None of these are bugs in the libraries. All are documented or evident in source. The
 defect was on our side: **we trusted the name.**
@@ -290,6 +291,38 @@ correction produce the *same visible symptom*. Only the broadcast log distinguis
 which is why punch-list #26 (the pipeline's discarded logging) had to be fixed first —
 the first attempt at this investigation concluded "phase 2 re-broadcast" from the symptom
 alone, and the logs later showed phase 2 published UPDATE exactly as designed.
+
+### transformers 5.14.1 — `WhisperFeatureExtractor` truncates to 30 seconds, silently
+
+Verified against the installed source on the kiosk,
+`.venv/lib/python3.14/site-packages/transformers/models/whisper/feature_extraction_whisper.py`,
+2026-08-31:
+
+```
+chunk_length = 30                      # __init__ default
+n_samples    = chunk_length * sampling_rate      # 480,000 = 30.0 s
+truncation   = True                    # __call__ default
+padding      = "max_length"            # __call__ default
+max_length   = max_length if max_length else self.n_samples
+```
+
+Confirmed live: `WhisperFeatureExtractor().n_samples` returns `480000`.
+
+Whisper's encoder takes a fixed 30-second window, so this is correct behaviour for the
+model — but it is invisible at the call site. `feature_extractor(speech, sampling_rate=16000)`
+with no `max_length` returns the same shaped tensor for a 12-second clip and a 75-second
+one. Nothing warns, and the discarded audio does not appear in any log.
+
+**Where this bites us**: [`train_whisper_lora.py`](../../backend/scripts/train_whisper_lora.py)
+pairs that call with a label covering the **whole** recording. CFR dispatches are
+double-round broadcasts averaging ~48 s — 486 of the 490 training-eligible calls run longer
+than 30 s, the longest 74.9 s — and
+[`extract_training_data.py`](../../backend/scripts/extract_training_data.py) deliberately
+duplicates the transcript for calls over 25 s so the label spans both rounds. The input is
+therefore the first 30 seconds and the target is roughly twice that much speech.
+
+Note this is a **training-only** skew. Inference goes through faster-whisper, which does
+long-form sequential decoding over successive 30-second windows and reads the whole file.
 
 ## Unverified — assumptions still resting on names
 

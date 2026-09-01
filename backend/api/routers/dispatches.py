@@ -14,12 +14,14 @@ from sqlalchemy import desc, func
 try:
     from backend.api.database import get_db
     from backend.api.models import LiveCallModel
-    from backend.api.schemas import DispatchCreateSchema, DispatchUpdateSchema, FeedbackSchema
+    from backend.api.schemas import (DispatchCreateSchema, DispatchUpdateSchema, FeedbackSchema,
+                                     BulkModelUpdatedSchema)
     from backend.api.mqtt import publish_mqtt_event
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import LiveCallModel
-    from api.schemas import DispatchCreateSchema, DispatchUpdateSchema, FeedbackSchema
+    from api.schemas import (DispatchCreateSchema, DispatchUpdateSchema, FeedbackSchema,
+                             BulkModelUpdatedSchema)
     from api.mqtt import publish_mqtt_event
 
 router = APIRouter(prefix="/api/dispatches", tags=["dispatches"])
@@ -177,6 +179,40 @@ def update_dispatch(dispatch_id: str, payload: DispatchUpdateSchema, db: Session
     serialized = serialize_call(call)
     publish_mqtt_event("UPDATE", serialized)
     return serialized
+
+
+@router.post("/model-updated")
+def mark_model_updated(payload: BulkModelUpdatedSchema, db: Session = Depends(get_db)):
+    """Bulk-sets model_updated on the given dispatch_ids in one transaction, without MQTT.
+
+    `model_updated` is training-dataset bookkeeping: it records that a call's audio and
+    verified transcript were pulled into the Whisper training cache. Nothing on the kiosk
+    display reads it.
+
+    It gets its own endpoint because update_dispatch() ends in publish_mqtt_event("UPDATE"),
+    and extract_training_data.py set this flag with one PATCH per record -- so a single
+    extraction run fired ~470 UPDATE events at the apparatus bay display, one React state
+    update each, plus an update flash on whichever call happened to be on screen. A
+    bookkeeping write should not reach the kiosk as a dispatch change.
+    """
+    if not payload.dispatch_ids:
+        return {"status": "success", "updated": 0, "not_found": []}
+
+    matched = db.query(LiveCallModel).filter(
+        LiveCallModel.dispatch_id.in_(payload.dispatch_ids)
+    ).all()
+
+    for call in matched:
+        call.model_updated = payload.model_updated
+    db.commit()
+
+    found = {c.dispatch_id for c in matched}
+    missing = [d for d in payload.dispatch_ids if d not in found]
+    if missing:
+        logging.warning(
+            f"mark_model_updated: {len(missing)} dispatch_id(s) not found, e.g. {missing[:5]}"
+        )
+    return {"status": "success", "updated": len(matched), "not_found": missing}
 
 
 @router.put("/{dispatch_id}")

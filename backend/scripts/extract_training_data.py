@@ -104,20 +104,55 @@ def main():
     audio_dir = os.path.join(training_dir, "audio")
     os.makedirs(audio_dir, exist_ok=True)
     
-    # 3. Query verified dispatches from local database API
-    endpoint = f"{local_api_url}/api/dispatches?limit=500"
-    logging.info(f"Querying verified calls from local API gateway: {endpoint}")
-    
+    # 3. Query verified dispatches from the local database API.
+    #
+    # Paged, not one capped request. GET /api/dispatches takes limit (le=5000) and
+    # offset and returns newest-first, so the previous single limit=500 call silently
+    # dropped the oldest rows once the table passed 500. public.dispatches held 530 on
+    # 2026-08-31 -- the 30 oldest verified calls were already invisible to this script
+    # and the blind spot grew with every dispatch. Page until the server returns short.
+    PAGE_SIZE = 500          # the endpoint's own default; its ceiling is le=5000
+    MAX_PAGES = 100          # 50,000 records -- a stop in case offset is ever ignored
+    all_records = []
+    seen_ids = set()
+
     try:
-        response = requests.get(endpoint, timeout=15)
-        response.raise_for_status()
-        all_records = response.json()
+        for page in range(MAX_PAGES):
+            offset = page * PAGE_SIZE
+            endpoint = f"{local_api_url}/api/dispatches?limit={PAGE_SIZE}&offset={offset}"
+            logging.info(f"Querying local API gateway: {endpoint}")
+            response = requests.get(endpoint, timeout=15)
+            response.raise_for_status()
+            batch = response.json()
+
+            # Newest-first ordering means a dispatch arriving mid-pagination shifts every
+            # later row down one, which can hand back a record already seen. De-dup here
+            # rather than downstream, where it would write the same WAV row twice.
+            for r in batch:
+                did = r.get("dispatch_id")
+                if did and did in seen_ids:
+                    continue
+                if did:
+                    seen_ids.add(did)
+                all_records.append(r)
+
+            if len(batch) < PAGE_SIZE:
+                break
+        else:
+            logging.warning(
+                f"Stopped paging at {MAX_PAGES} pages ({MAX_PAGES * PAGE_SIZE} records); "
+                f"the dataset may be incomplete."
+            )
+
         records = [r for r in all_records if r.get("feedback_submitted") and r.get("verified_transcript")]
     except Exception as e:
         logging.error(f"Failed to fetch records: {e}")
         sys.exit(1)
-        
-    logging.info(f"Found {len(records)} verified records in local database.")
+
+    logging.info(
+        f"Fetched {len(all_records)} dispatch records; {len(records)} are human-verified "
+        f"and eligible for extraction."
+    )
 
     
     # 3b. Learn and append any new verified incident types
@@ -129,6 +164,7 @@ def main():
         
     # 4. Process and download audios
     csv_rows = []
+    extracted_ids = []       # only the calls that actually reached the dataset
     downloaded_count = 0
     
     for r in records:
@@ -190,6 +226,7 @@ def main():
             "verified_transcript": normalized_text,
             "raw_transcript": raw_text
         })
+        extracted_ids.append(dispatch_id)
         
     # 5. Write metadata.csv
     metadata_csv_path = os.path.join(training_dir, "metadata.csv")
@@ -204,17 +241,40 @@ def main():
         logging.error(f"Failed to write metadata.csv: {e}")
         sys.exit(1)
         
-    # 6. Update database model_updated flag for successfully synced dispatches
-    synced_ids = [r.get("dispatch_id") for r in records if r.get("dispatch_id")]
-    if synced_ids:
-        logging.info(f"Updating model_updated status for {len(synced_ids)} calls in database...")
-        for id_val in synced_ids:
-            patch_url = f"{local_api_url}/api/dispatches/{id_val}"
-            try:
-                patch_response = requests.patch(patch_url, json={"model_updated": True}, timeout=10)
-                patch_response.raise_for_status()
-            except Exception as e:
-                logging.warning(f"  Failed to update model_updated flag for dispatch {id_val}: {e}")
+    # 6. Flag the calls that actually reached the dataset.
+    #
+    # extracted_ids, not every verified record. This previously patched all of `records`,
+    # which still includes calls skipped for include_in_training=False and calls whose audio
+    # download failed -- so the dashboard showed a green YES for calls that were never in the
+    # training cache, and our own record of the corpus was wrong (CLAUDE.md s6.6).
+    #
+    # One bulk call, not one PATCH per record: PATCH /api/dispatches/{id} ends in
+    # publish_mqtt_event("UPDATE", ...), so ~470 of those reached the live kiosk display for
+    # what is only bookkeeping. /api/dispatches/model-updated writes the column silently.
+    skipped = len(records) - len(extracted_ids)
+    if skipped > 0:
+        logging.info(
+            f"{skipped} verified call(s) were not extracted (opted out, or audio missing) "
+            f"and are correctly left unflagged."
+        )
+
+    if extracted_ids:
+        logging.info(f"Flagging {len(extracted_ids)} extracted calls as model_updated...")
+        try:
+            resp = requests.post(
+                f"{local_api_url}/api/dispatches/model-updated",
+                json={"dispatch_ids": extracted_ids, "model_updated": True},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            logging.info(f"  model_updated set on {result.get('updated')} record(s).")
+            if result.get("not_found"):
+                logging.warning(
+                    f"  {len(result['not_found'])} dispatch_id(s) were not found by the API."
+                )
+        except Exception as e:
+            logging.warning(f"Failed to bulk-set model_updated: {e}")
 
     logging.info(f"SUCCESS: Dataset sync complete. {len(csv_rows)} rows cached. {downloaded_count} new WAV files downloaded.")
 

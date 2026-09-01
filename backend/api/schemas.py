@@ -47,6 +47,12 @@ class DispatchCreateSchema(BaseModel):
     feedback_submitted: Optional[bool] = False
 
 
+class BulkModelUpdatedSchema(BaseModel):
+    """Payload for the bulk training-dataset bookkeeping flag."""
+    dispatch_ids: List[str]
+    model_updated: bool = True
+
+
 class DispatchUpdateSchema(BaseModel):
     incident_type: Optional[str] = None
     responding_units: Optional[List[str]] = None

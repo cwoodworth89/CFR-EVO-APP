@@ -33,8 +33,24 @@ python -c "import os;from sqlalchemy import create_engine,text;\
 print(create_engine(os.environ['DATABASE_URL']).connect().execute(text('SELECT ...')).fetchall())"
 ```
 
-`DATABASE_URL` already points at the kiosk. The `cfr-postgres` MCP server is **read-only** —
-fine for checking, and writes must go through SQLAlchemy or `psql` on the kiosk.
+**`DATABASE_URL` is per-machine — check which side you are on.** On the dev laptop it is set
+in your shell and points across Tailscale at the kiosk, which is what makes the one-liner above
+work locally. On the **kiosk itself** it lives in `backend/.env` (git-ignored, so it is not
+synced — it had drifted from `backend/.env.example` and was missing entirely until 2026-08-31).
+
+Its absence there is close to invisible, because the codebase handles it three different ways:
+
+| Code path | With `DATABASE_URL` unset |
+|:--|:--|
+| `config/vocab.py` (×3), `session_store.py`, `worker.py` | falls back to a hardcoded `postgresql://cfr_user:...@localhost:5432/cfr_dispatch` — works, so nothing looks wrong |
+| `extract_training_data.py` → `learn_new_incident_types()` | no fallback: logs an error and returns. It had never once written; `public.vocabulary` held **0** rows with `source='hitl_learned'` |
+| `backtest_parser_corpus.py`, `backtest_round_comparison.py` | deliberate `sys.exit` with a message |
+
+So "is it set?" has no single answer, and the live pipeline running fine is not evidence that
+it is. Read `backend/.env` on the machine you are actually targeting.
+
+The `cfr-postgres` MCP server is **read-only** — fine for checking, and writes must go through
+SQLAlchemy or `psql` on the kiosk.
 
 This is CLAUDE.md §6.6 pointed at our own records: *distinguish reported from confirmed.*
 A punch-list item is a **report**. The database is the system of record.

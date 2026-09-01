@@ -17,4 +17,4 @@ reason the severity column exists.
 
 | Date | Found while | One line |
 |:--|:--|:--|
-| 2026-08-31 | Verifying the kiosk was in sync after the session's deploys | `backend/dispatch.log.2026-06-11` and `.2026-06-19` are **tracked in git** — 1.2 MB of rotated dispatch logs. `.gitignore` already carries `*.log` and `*.log*`, but those rules do not apply to files already tracked, so the pattern looks like it covers them and does not. `git rm --cached` both. They also make `git grep` return hits from June for identifiers that no longer exist, which is how they surfaced. |
+| | | |

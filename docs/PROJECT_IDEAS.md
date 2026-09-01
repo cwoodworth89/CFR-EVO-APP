@@ -355,6 +355,11 @@ is currently nothing between that keystroke and total loss of the HITL corpus.
 ---
 
 ### 10. ♻️ Auto-Recover From a Stale Chunk After a Frontend Deploy
+> ✅ **Implemented 2026-08-31**, after this recurred on a second live call
+> (`DISP-2026-F7D588`, overdose, 18:29). See punch list
+> [#44b](punchlist/44b-kiosk-crashed-on-a-live-dispatch-stale-chunk-after-a-fr.md)
+> for the fix and how it was verified. The interim mitigation below — "remember to
+> hard-reload" — is what failed twice; it is no longer the mitigation.
 
 **Prompted by a real incident, 2026-08-29.** A live dispatch arrived
 (`DISP-2026-AAFDB8`, Alarm Activated - High Risk, 1123 Westwood St) and the kiosk
@@ -401,7 +406,7 @@ window.addEventListener('vite:preloadError', () => { window.location.reload(); }
 stale chunk), a naive handler reloads forever. Use a `sessionStorage` marker so it retries
 once and then falls through to the existing error boundary.
 
-#### Interim mitigation (operator, 2026-08-29)
+#### Interim mitigation (operator, 2026-08-29) — superseded, kept for the record
 
 Deferred; **be deliberate about hard-reloading the kiosk tab (`Ctrl+Shift+R`) after any
 frontend deploy.** That is the whole fix, it just depends on remembering. Worth noting the

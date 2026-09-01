@@ -1,10 +1,27 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { useKioskQueue } from './hooks/useKioskQueue';
 import { toActiveCall } from './utils/dispatchModel';
+// KioskView is imported EAGERLY and must stay that way. See punch list #44b.
+//
+// It was lazy, and because the kiosk sits in STANDBY on MapBoard, its chunk was
+// fetched for the first time at the exact moment a dispatch arrived. A deploy
+// deletes the old content-hashed chunks, so any tab open across a rebuild asked
+// for a file that no longer existed -- and only ever discovered that during a
+// live emergency. It cost two real calls: an alarm activation on 2026-08-29 and
+// an overdose on 2026-08-31.
+//
+// Measured cost of making it eager, 2026-08-31: index went 17 KB -> 99 KB, because
+// KioskView also pulls in EVORoutingEngine (44 KB), which was likewise a deferred
+// chunk. Eager payload 1,304 KB -> 1,386 KB, +6.3%, against 1.29 MB of vendor
+// chunks already loading eagerly, over a LAN. That is the real number and it is
+// worth paying: it buys the removal of a failure that only ever fires during an
+// emergency. Loading it up front means a stale build fails at page load -- where
+// the failsafe in main.jsx reloads it -- instead of mid-call.
+import KioskView from './components/kiosk/KioskView';
 
-// Code-split primary views to optimize kiosk initial bundle size and memory profile
+// MapBoard stays lazy: it is the STANDBY view, so its chunk is fetched at boot
+// rather than deferred to an incident, and a stale reference surfaces immediately.
 const MapBoard = lazy(() => import('./components/MapBoard'));
-const KioskView = lazy(() => import('./components/kiosk/KioskView'));
 
 const ViewLoadingFallback = () => (
   <div className="w-screen h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm select-none">

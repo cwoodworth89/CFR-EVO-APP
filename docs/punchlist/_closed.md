@@ -2,10 +2,11 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-44 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+45 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **44b** | 🟠 operational | CLOSED | [Kiosk crashed on a live dispatch — stale chunk after a frontend deploy](44b-kiosk-crashed-on-a-live-dispatch-stale-chunk-after-a-fr.md) |
 | **2** | 🔴 crew-visible | CLOSED | [Intersection Geocoding & Hardcoded Port Moody Fallback (`DISP-2026-F1F345`)](02-intersection-geocoding-hardcoded-port-moody-fallback-di.md) |
 | **7** | 🔴 crew-visible | CLOSED | [`custom_places.json` coordinates are hand-entered and some are badly wrong](07-custom-places-json-coordinates-are-hand-entered-and-som.md) |
 | **9** | 🔴 crew-visible | CLOSED | [False intersection: DAVID AVE & PANORAMA DR](09-false-intersection-david-ave-panorama-dr.md) |

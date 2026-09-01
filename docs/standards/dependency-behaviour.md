@@ -20,6 +20,7 @@ not the behaviour**, and the code was written against the name.
 | `ST_Contains` | the point is in the polygon | excludes the boundary, so a point on a zone edge is *not* contained |
 | `multiprocessing.Process` | the child continues where the parent left off | on Python 3.14 it does not inherit logging config -- the default start method became `forkserver` |
 | MQTT `qos=1` | delivered once, reliably | delivered **at least** once -- duplicates are guaranteed possible and the receiver must be idempotent |
+| `requestAnimationFrame` | runs after the next paint | runs before the next repaint **only while the document is visible**. On a hidden tab or a blanked kiosk display it never fires |
 
 None of these are bugs in the libraries. All are documented or evident in source. The
 defect was on our side: **we trusted the name.**
@@ -226,6 +227,33 @@ Two further forkserver consequences worth knowing:
 
 Configure logging *inside* each process rather than relying on inheritance; that is correct
 under every start method.
+
+### Browser — `requestAnimationFrame` does not fire while the document is hidden
+
+```
+document.hidden            -> true
+requestAnimationFrame(cb)  -> cb NOT called within 700 ms
+setTimeout(cb, n)          -> cb called
+```
+
+Measured in the browser 2026-08-31 against the kiosk bundle. `requestAnimationFrame` is
+specified to run *before the next repaint*; a hidden document never repaints, so the
+callback is not throttled but **indefinitely deferred**. Timers keep firing when hidden
+(throttled, but they fire).
+
+**Consequence when unverified**: the punch-list #44b failsafe hands its one-shot reload
+budget back by clearing a `sessionStorage` marker once a boot has proved healthy. Written
+first as `requestAnimationFrame(() => requestAnimationFrame(clearReloadMarker))`, the
+cleanup would never run on a kiosk whose display had blanked or whose tab was backgrounded.
+The marker would stay set and the failsafe would silently degrade to **single-use for the
+life of the tab** — so the *second* deploy would drop a live call onto the error card
+exactly as before the fix.
+
+The failure is invisible: the failsafe still works the first time, and nothing reports that
+it has stopped working. Caught only by running the recovery twice with the pane hidden.
+
+Use a timer for anything that must run regardless of visibility. Reserve
+`requestAnimationFrame` for work that is genuinely about painting.
 
 ### MQTT QoS 1 — "at least once" means duplicates are part of the contract
 

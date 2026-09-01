@@ -24,8 +24,12 @@ def main():
     # 1. Setup paths
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     training_dir = os.path.join(base_dir, "data", "training")
-    meta_csv = os.path.join(training_dir, "metadata.csv")
-    audio_dir = os.path.join(training_dir, "audio")
+    # Round-1 clips, not whole calls. The previous dataset paired a ~48s double-round
+    # recording with a label for all of it, while the feature extractor kept only the
+    # first 30s -- see docs/briefings/whisper_training_round1_labelling.md. Built by
+    # backend/scripts/prepare_training_clips.py.
+    meta_csv = os.path.join(training_dir, "metadata_round1.csv")
+    audio_dir = os.path.join(training_dir, "round1_clips")
     
     if not os.path.exists(meta_csv):
         logging.error(f"Metadata file not found at: {meta_csv}")
@@ -41,6 +45,25 @@ def main():
     if len(df) == 0:
         logging.error(f"No audio files found in: {audio_dir}")
         sys.exit(1)
+
+    # Refuse to train on anything the encoder would truncate. WhisperFeatureExtractor
+    # silently keeps only the first 30s (chunk_length 30 * 16kHz = 480,000 samples,
+    # verified against installed transformers 5.14.1 on the kiosk 2026-08-31), and audio
+    # cut short beneath a label describing the whole utterance is precisely the defect
+    # this dataset was rebuilt to remove. It must fail loudly, not silently recur.
+    import soundfile as _sf
+    _over = []
+    for _p in df['audio']:
+        _info = _sf.info(_p)
+        _secs = _info.frames / float(_info.samplerate)
+        if _secs > 30.0:
+            _over.append((os.path.basename(_p), _secs))
+    if _over:
+        logging.error(f"{len(_over)} clip(s) exceed Whisper's 30s window. Refusing to train.")
+        for _name, _secs in _over[:10]:
+            logging.error(f"    {_name}  {_secs:.1f}s")
+        sys.exit(1)
+    logging.info(f"All {len(df)} clips fit the 30s encoder window.")
         
     from datasets import Features, Value
     logging.info(f"Loaded {len(df)} training samples.")

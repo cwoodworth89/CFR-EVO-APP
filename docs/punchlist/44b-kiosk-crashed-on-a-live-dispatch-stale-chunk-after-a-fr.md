@@ -111,3 +111,49 @@ marker would never clear and the failsafe would silently become single-use for t
 the tab, dropping the *next* deploy's call onto the error card exactly as before. Replaced
 with a timer and recorded in
 [`dependency-behaviour.md`](../standards/dependency-behaviour.md).
+
+---
+
+## The reload was only half the fix — operator follow-up, 2026-08-31
+
+> *"If a call comes in, the kiosk crashes, and we reload it, the dispatch doesn't
+> appear. It's gone forever."*
+
+Correct, and it applied to **every** reload during an incident, not just this one:
+a browser restart, a power cycle, a crash. `activeCall` started `null` and was only
+ever populated by an MQTT broadcast, and neither publisher sets the **retain** flag
+(`api/mqtt.py` and `mqtt_broker.py` both publish `qos=1`, no retain). A freshly
+loaded page therefore had no way to hear an announcement already made — it would
+have sat on a working map with no call on it until the *next* dispatch.
+
+**The dispatch was never lost.** `public.dispatches` is the system of record, so the
+kiosk now asks the database what is still live on mount rather than waiting for a
+broadcast that has already been and gone (CLAUDE.md §6.2).
+
+| Decision | Why |
+|:--|:--|
+| Restore with the call's **real age** | A fresh 5:00 would silently extend the display window, and an elapsed clock restarted at 00:00 would misreport how long the crew has been on the call — a number that reads as real and is not (§6.1) |
+| Bounded by the same 300 s window | A kiosk booted hours later shows nothing rather than resurrecting an old incident |
+| Dismissals persisted to `localStorage` | Otherwise a call the operator had deliberately cleared comes straight back on the next reload |
+| Storage unavailable → may re-show once | The safe direction to fail: a call shown twice beats a call lost |
+| Live MQTT always wins over the restored copy | A broadcast is fresher than anything just read |
+| Fetch five records, not one | Two calls inside one window is uncommon at ~11 dispatches a day but real; restoring only the newest would drop the one the crew is on |
+
+### Verified against real records, by moving the clock
+
+No dispatch was synthesised (§6.5) — the five real records from the running API were
+selected against a varied observation time:
+
+| Case | Result |
+|:--|:--|
+| Reload 20 s after the overdose | Restores, age 20 s, **280 s remaining** |
+| Reload 4 m 59 s after | Restores, **1 s remaining** |
+| Reload 5 m 01 s after | Nothing restored |
+| Reload hours later | Nothing restored |
+| Operator had dismissed it | Nothing restored |
+| Two calls inside one window | Older one becomes active |
+| Clock skew, record dated in the future | Rejected, no negative age |
+
+Confirmed on the kiosk after deploy: `GET /api/dispatches?limit=5` fires on boot
+(`http://100.95.146.94:8000/api/dispatches?limit=5` in the resource timing), and
+correctly restores nothing while the newest dispatch is outside the window.

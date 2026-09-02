@@ -178,6 +178,13 @@ def main():
         "--model", merged_dir,
         "--output_dir", ct2_output,
         "--quantization", "int8",
+        # Without tokenizer.json in the output directory, faster-whisper silently falls
+        # back to downloading one from huggingface.co (observed: a HEAD for
+        # openai/whisper-tiny/tokenizer.json at model load, 2026-09-01) -- and
+        # local_files_only=True does NOT cover that fallback path. On a kiosk with no WAN
+        # the model then fails to load at all, breaking CLAUDE.md s1. The merge step
+        # already writes this file; the converter just does not carry it across.
+        "--copy_files", "tokenizer.json",
         "--force"
     ]
     subprocess.run(cmd, check=True)

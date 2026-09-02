@@ -22,6 +22,7 @@ not the behaviour**, and the code was written against the name.
 | MQTT `qos=1` | delivered once, reliably | delivered **at least** once -- duplicates are guaranteed possible and the receiver must be idempotent |
 | `requestAnimationFrame` | runs after the next paint | runs before the next repaint **only while the document is visible**. On a hidden tab or a blanked kiosk display it never fires |
 | `feature_extractor(speech, sampling_rate=16000)` | encodes the clip you gave it | **keeps the first 30 seconds and silently drops the rest.** `__call__` defaults to `truncation=True`, `padding="max_length"`, `max_length=n_samples` (`chunk_length` 30 x 16 kHz = 480,000 samples) |
+| `WhisperModel(dir, local_files_only=True)` | nothing is fetched from the network | **still downloads `tokenizer.json`** from huggingface.co when the model directory lacks one -- the flag does not cover that fallback |
 
 None of these are bugs in the libraries. All are documented or evident in source. The
 defect was on our side: **we trusted the name.**
@@ -323,6 +324,36 @@ therefore the first 30 seconds and the target is roughly twice that much speech.
 
 Note this is a **training-only** skew. Inference goes through faster-whisper, which does
 long-form sequential decoding over successive 30-second windows and reads the whole file.
+
+### faster-whisper 1.2.1 -- `local_files_only=True` does not cover the tokenizer
+
+Observed on the kiosk 2026-09-01, loading a freshly converted fine-tuned model:
+
+```
+Loading .../whisper-base-cfr-ct2 ...
+HTTP Request: HEAD https://huggingface.co/openai/whisper-tiny/resolve/main/tokenizer.json
+```
+
+`local_files_only=True` was passed. It governs the *model weights* lookup. When the model
+directory has no `tokenizer.json`, faster-whisper separately fetches one from the Hub --
+and hardcodes `openai/whisper-tiny` as the source regardless of the model's actual size.
+
+Two things make this dangerous rather than merely untidy:
+
+* It is a WAN call on the boot path of an offline dispatch system (CLAUDE.md s1). With no
+  internet the model does not load at all -- it is not a degraded mode, it is a failure.
+* It is silent on the happy path. The model loads, transcribes correctly, and scores
+  normally, so nothing reveals the dependency until the network is gone.
+
+`ctranslate2.converters.transformers` does not copy the file, even though the preceding
+`processor.save_pretrained(merged_dir)` writes it. The converter takes `--copy_files`;
+[`train_whisper_lora.py`](../../backend/scripts/train_whisper_lora.py) now passes
+`--copy_files tokenizer.json`.
+
+Verified after the fix: the model loads under `HF_HUB_OFFLINE=1` + `TRANSFORMERS_OFFLINE=1`
+with `local_files_only=True`, and holdout WER is unchanged at 2.76% -- the downloaded
+tiny tokenizer and the model's own were equivalent, so this was a live outage risk rather
+than a correctness bug. It would not have stayed that way for a differently-sized model.
 
 ## Unverified — assumptions still resting on names
 

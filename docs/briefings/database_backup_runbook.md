@@ -37,7 +37,26 @@ retention depth, never data.
   This is the other half of the ground-truth corpus — the recordings and the `verified_*`
   columns are one dataset in two stores, and losing either half destroys the pair.
   Tracked as PROJECT_IDEAS #9 step 4. **Still outstanding.**
-* **Fine-tuned Whisper model** (`backend/models/whisper-base-cfr-ct2/`).
+* **Dispatch audio** is still uncovered (above).
+
+**Now covered, but only semi-automatically — the fine-tuned Whisper model**
+(`backend/models/whisper-base-cfr-ct2/`). `backup_db.sh` does not touch it: it changes
+only when a fine-tune is run, so a daily 62 MB re-tar would buy nothing. Archive it by
+hand after training, into the same directory the dumps live in:
+
+```bash
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend/models && tar czf /home/tcfire/cfr-backups/cfr-model-whisper-base-cfr-ct2-\$(date +%Y%m%d-%H%M%S).tar.gz whisper-base-cfr-ct2"
+```
+
+Then `sha256sum` it alongside, and `pull_backups.ps1` carries both off the kiosk with the
+dumps (it keeps `-KeepModels`, default 3, so a bad fine-tune can be rolled back).
+
+**Archive the whole directory, never just `model.bin`.** The 2026-07-17 model was lost
+exactly this way: the weights survived as a headless `backend/models/model.bin` while
+`config.json`, `vocabulary.json` and `tokenizer.json` did not, leaving a 76 MB file that
+faster-whisper cannot load. A CTranslate2 model is four files or it is nothing — and
+`tokenizer.json` in particular is what keeps it loading without reaching the internet
+(see [`dependency-behaviour.md`](../standards/dependency-behaviour.md)).
 * **`backend/.env`** — deliberately never in any repository or dump.
 * **MBTiles archives** — re-crawlable, slowly.
 

@@ -38,7 +38,8 @@ param(
     [string]$RemoteHost = 'tcfire@100.95.146.94',
     [string]$RemoteDir  = '/home/tcfire/cfr-backups',
     [string]$Destination = "$HOME\Nextcloud\Documents\Projects\Coding\CFR-EVO-Backups",
-    [int]$KeepFull = 4
+    [int]$KeepFull = 4,
+    [int]$KeepModels = 3
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,7 +57,7 @@ if (-not (Test-Path $Destination)) {
 }
 
 # Ask the kiosk what it holds: "<bytes> <filename>" per archive.
-$listing = & ssh $RemoteHost "ls -1 $RemoteDir/*.sql.gz 2>/dev/null | while read f; do echo \`"`$(stat -c%s `"`$f`") `$(basename `"`$f`")\`"; done"
+$listing = & ssh $RemoteHost "ls -1 $RemoteDir/*.sql.gz $RemoteDir/*.tar.gz $RemoteDir/*.sha256 2>/dev/null | while read f; do echo \`"`$(stat -c%s `"`$f`") `$(basename `"`$f`")\`"; done"
 if ($LASTEXITCODE -ne 0) {
     throw "could not reach $RemoteHost -- is the kiosk up and Tailscale connected?"
 }
@@ -67,7 +68,7 @@ if ([string]::IsNullOrWhiteSpace($listing)) {
 $remote = @()
 foreach ($line in ($listing -split "`n")) {
     $t = $line.Trim()
-    if ($t -match '^(\d+)\s+(.+\.sql\.gz)$') {
+    if ($t -match '^(\d+)\s+(.+\.(?:sql\.gz|tar\.gz|sha256))$') {
         $remote += [pscustomobject]@{ Size = [int64]$Matches[1]; Name = $Matches[2] }
     }
 }
@@ -114,12 +115,33 @@ if ($full.Count -gt $KeepFull) {
     Write-Log "rotated $($drop.Count) old full dump(s), keeping $KeepFull"
 }
 
+# Rotate fine-tuned model archives. Retrainable, but only while the audio and the
+# verified_* corpus both survive -- and the 2026-07-17 model was lost precisely because
+# backend/models/ is git-ignored and nothing copied it anywhere. Keep a few generations so
+# a bad fine-tune can be rolled back to a known-good one.
+$models = Get-ChildItem $Destination -Filter 'cfr-model-*.tar.gz' | Sort-Object Name -Descending
+if ($models.Count -gt $KeepModels) {
+    $drop = $models | Select-Object -Skip $KeepModels
+    $drop | ForEach-Object {
+        Remove-Item $_.FullName -Force
+        Remove-Item "$($_.FullName).sha256" -Force -ErrorAction SilentlyContinue
+    }
+    Write-Log "rotated $($drop.Count) old model archive(s), keeping $KeepModels"
+}
+
 $crit = @(Get-ChildItem $Destination -Filter 'cfr-critical-*.sql.gz')
-$total = (Get-ChildItem $Destination -Filter '*.sql.gz' | Measure-Object Length -Sum).Sum
+$total = (Get-ChildItem "$Destination\*" -Include '*.sql.gz', '*.tar.gz' | Measure-Object Length -Sum).Sum
 
 if ($crit.Count -eq 0) {
     Write-Warning "no critical archives held locally -- the irreplaceable data is NOT backed up here"
 } else {
     Write-Log ("newest critical archive: {0}" -f ($crit | Sort-Object Name -Descending)[0].Name)
 }
-Write-Log ("holding {0} archive(s), {1:N1} MB total" -f (Get-ChildItem $Destination -Filter '*.sql.gz').Count, ($total / 1MB))
+$archives = @(Get-ChildItem "$Destination\*" -Include '*.sql.gz', '*.tar.gz')
+Write-Log ("holding {0} archive(s), {1:N1} MB total" -f $archives.Count, ($total / 1MB))
+$modelsHeld = @(Get-ChildItem $Destination -Filter 'cfr-model-*.tar.gz')
+if ($modelsHeld.Count -eq 0) {
+    Write-Warning "no fine-tuned model archive held locally -- backend/models/ is git-ignored and exists only on the kiosk"
+} else {
+    Write-Log ("newest model archive: {0}" -f ($modelsHeld | Sort-Object Name -Descending)[0].Name)
+}

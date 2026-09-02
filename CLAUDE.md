@@ -278,6 +278,44 @@ When a standard *should* exist for something and the project does not have it, i
 in `docs/standards/README.md` as an open gap. An unknown source is tracked the same way an
 unknown value is (§6.1): visibly.
 
+### 7.6 State What Would Falsify It, Before Building On It
+Before implementing anything that produces an **operational value**, state two things:
+
+1. the assumption it rests on, and
+2. the cheapest measurement that would prove that assumption wrong.
+
+If no such measurement exists, that is itself the finding — raise it (§7.2).
+
+**A domain assumption goes to the operator before implementation, not after a measurement
+comes back wrong.** He is a 15-year firefighter; the fire-ground and the city are his, and a
+question costs a minute. Every correction on 2026-09-01 arrived *after* work had been built
+on the assumption, and every one of them would have been a one-line answer beforehand:
+
+| Assumed | Actually |
+|:--|:--|
+| The round boundary can be found from the audible pause | `split_rounds` is text regex on keywords and yields no timestamp |
+| The recording is bandlimited radio audio | It is not — and that guess was offered to explain away a failed measurement |
+| Speech onset must be detected acoustically | **"Coquitlam" is always the first spoken word**, which solved it outright |
+| The broadcast is exactly two rounds | Some calls append `contact dispatch via radio for location information` |
+
+The asymmetry that makes this necessary: the operator cannot see the reasoning, only the
+output. A confident wrong plan reads exactly like a correct one until it produces a bad
+number. Stating the assumption is what makes it checkable.
+
+### 7.7 A Failed Check Is A Result
+Report it and stop. **Do not supply a reason the check failed unless that reason is itself
+verified.** An explanation invented for a bad result is not analysis — it converts a dead end
+into two more steps down it, and it reads like progress.
+
+Spectral flatness was measured across 8 recordings on 2026-09-01 to separate alert tones from
+speech. It did not discriminate. The reason offered — "bandlimited radio audio" — was never
+checked and was wrong. The correct output was one sentence: *the measurement failed, here is
+the number, I do not know why.*
+
+Corollary: **two consecutive failed attempts to measure the same thing means stop and report**,
+not try a third approach. The operator can say `budget: three calls, then report` at any point
+to set a tighter one; a stated budget is respected, and an unstated one is not invented.
+
 
 **Picking up debugging work?** Start at
 [`docs/review_status_handoff.md`](docs/review_status_handoff.md) — system state, what

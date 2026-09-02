@@ -271,74 +271,61 @@ As an AI agent, you can propose and execute remote commands over SSH. Since the 
 
 ## 📈 Speech-to-Text Training & MLOps Feedback Pipeline
 
-To optimize transcription quality and test new grammar sets or model parameters without breaking historic dispatches, the project includes an automated evaluation, feedback, and training pipeline.
+The full runbook is the **`stt-mlops-backtest`** skill
+([`.claude/skills/stt-mlops-backtest/SKILL.md`](../.claude/skills/stt-mlops-backtest/SKILL.md)).
+This section is the shape of it; the skill has the commands and the traps.
 
 ### 🔄 HITL Dispatch Verification & Corrections Workflow
 When reviewing dispatches in the admin interface:
-- **HITL Ratings**: The **Perfect**, **Operational**, and **Failed** rating badges purely tag dispatch quality without overwriting manual corrections.
-- **Prefilling System Data**: Use the **"📋 Prefill Defaults"** button to copy Stage 3 template text, geocoded address, incident type, and responding units into the text input boxes.
-- **Whisper Training Dataset Opt-in**: Automatically defaults to unchecked (`false`) for calls under 35 seconds (cut-off calls) and checked (`true`) for full calls. This is editable at any time.
+- **HITL Ratings**: the **Perfect**, **Operational**, and **Failed** badges tag dispatch quality
+  without overwriting manual corrections. `FAILED` means crews would not have reached the address.
+- **Prefilling System Data**: **"📋 Prefill Defaults"** copies the Stage 3 template text,
+  geocoded address, incident type, and responding units into the inputs.
+- **Whisper Training Dataset Opt-in** (`target.include_in_training`): defaults to unchecked
+  for calls under 35 seconds and checked for full calls. **This flag is the authoritative
+  selection for training** -- the operator un-flags PA pages (`[PA]` in the review note),
+  cut-offs, and the post-round-addendum calls by hand.
+- **Review notes live in `target->>'review_notes'`.** The `review_notes` column is a stale
+  partial mirror (60 of 276 notes) and holds none of the `[PA]` tags. Read
+  `COALESCE(target->>'review_notes', review_notes)`.
 
-### 1. Extract Training Ground-Truth Data
-Pull verified user corrections (ground truth reference transcripts) and their raw `.wav` recordings from local PostgreSQL DB to your local cache:
+### The pipeline, in order
+
+| Step | Script | What it does |
+|:--|:--|:--|
+| 0 | `check_verified_transcripts.py` | Spell- and street-checks every flagged verified transcript against `public.roads` / `public.vocabulary` / `public.parcels` / the corpus. **Blocks** training on a main-address street the city does not have. |
+| 1 | `prepare_training_clips.py --force` | One clip per call: round 1 only, cut at measured word timestamps (onset = first "Coquitlam", boundary = start of round 2 via `split_rounds`). Writes a deterministic 10% holdout. Runs step 0 first. |
+| 2 | `train_whisper_lora.py` | LoRA fine-tune, merge, CTranslate2 int8. **Set `WHISPER_CT2_OUT` to a fresh directory**; never over the deployed one. |
+| 3 | `eval_round1_holdout.py` | WER on the clips training never saw, several models side by side. |
+| 4 | `backtest_regression.py` | Round-aligned SMMR against the stored production transcripts; writes `public.evaluation_history`. |
+| 5 | `.env` + `systemctl restart cfr-agent` | Deploy. Ask first -- the restart drops the listener. |
+| 6 | `tar` to `cfr-backups/`, then `pull_backups.ps1` | Archive the whole model directory off the kiosk. |
+
+All of it runs **on the kiosk** with `XDG_RUNTIME_DIR=/run/user/1000` -- importing
+`cfr_dispatch` initialises PortAudio. The Colab notebook
+(`docs/cfr_whisper_colab_fine_tuning.ipynb`) is an untested alternative for step 2; every
+real training run to date has been on the kiosk under `nice -n 15`.
+
+### Why the labels are round 1 and not the whole call
+`WhisperFeatureExtractor` keeps the first 30 s of audio and says nothing (verified against
+installed transformers 5.14.1). Dispatch broadcasts run ~48 s. The 2026-07-17 dataset paired
+30 s of audio with a label for the whole call and trained the model to keep talking after the
+audio stopped; its "3.5% WER" was train-on-test. Full account:
+[`docs/briefings/whisper_training_round1_labelling.md`](./briefings/whisper_training_round1_labelling.md).
+
+### Changing the Whisper model
+**There is no engine selector.** STT is local faster-whisper only (CLAUDE.md §1). The one knob
+is `WHISPER_MODEL` in `backend/.env` on the kiosk -- `tiny`, `base`, `small`, or a path to a
+fine-tuned model directory (which must contain `config.json`, `model.bin`, `vocabulary.json`
+**and `tokenizer.json`**, or it loads over the WAN or not at all). Read by
+[`backend/cfr_dispatch/config/runtime.py`](../backend/cfr_dispatch/config/runtime.py).
+`backend/.env` **overrides** the shell environment on import, so `WHISPER_MODEL=x python ...`
+does nothing; to run a script against a different model, patch
+`cfr_dispatch.stt.transcriber.WHISPER_MODEL` after import.
+
+Then restart the daemon (**ask first** -- a real call in the restart window is missed):
 ```bash
-ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/extract_training_data.py"
+ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
 ```
-* **Output**: Audio files cached at `backend/data/training/audio/` and metadata mappings saved to `backend/data/training/metadata.csv`.
-* **Standardization**: Text is converted to all-lowercase, and standard punctuation (periods, commas, semicolons) is stripped.
-* **Double-Round Duplication**: If the call represents a double-round template dispatch (duration > 25s), the clean transcript is duplicated to match the double-round audio timeline (e.g. `[clean_transcript] [clean_transcript]`). This teaches the model to align both rounds without deletion hallucinations.
-* **Dataset Opt-Out Filter**: The script automatically skips any records where `target.include_in_training` is set to `false` (e.g. cut-off or noisy calls opted out via the dashboard checkbox).
-* **Database Action**: Automatically patches the database, setting `model_updated = true` for the cached records, shifting their status in the React Dashboard column from `🟡 QUEUED` to `🟢 YES` to verify the sync.
-
-### 2. Run Backtest & Regression Evaluation
-Evaluate the current model's accuracy (Word Error Rate & Character Error Rate) against the historical ground-truth dataset to verify improvements and prevent regressions:
-```bash
-ssh tcfire@100.95.146.94 "XDG_RUNTIME_DIR=/run/user/1000 /home/tcfire/CFR-EVO-APP/.venv/bin/python /home/tcfire/CFR-EVO-APP/backend/scripts/backtest_regression.py"
-```
-* **Output**: Renders a side-by-side comparison (Human Reference, Old Hypothesis, New Hypothesis), logs results locally, and inserts a run summary into the local `evaluation_history` table to feed the dashboard chart.
-* **Template-Normalized WER**: The backtest parses and reconstructs the Human Reference text before calculating WER, providing a true 0-to-100% structured accuracy check (SMMR - Structured Metadata Match Rate).
-
-### 3. Sync Dataset to Google Drive (rclone)
-Sync your local training cache to Google Drive's private AppData folder:
-```bash
-ssh tcfire@100.95.146.94 "rclone sync /home/tcfire/CFR-EVO-APP/backend/data/training gdrive: --progress"
-```
-
-### 4. Load Dataset in Google Colab (Free T4 GPU)
-Mount `rclone` directly inside Google Colab using your kiosk config to download the training files:
-```python
-# Install rclone on Colab
-!apt-get update && apt-get install -y rclone
-
-# Write credentials (copied from /home/tcfire/.config/rclone/rclone.conf)
-import os
-os.makedirs("/root/.config/rclone/", exist_ok=True)
-with open("/root/.config/rclone/rclone.conf", "w") as f:
-    f.write("""[gdrive]
-type = drive
-scope = drive.appfolder
-root_folder_id = appDataFolder
-token = {"access_token":"ya29.a0ARG...","token_type":"Bearer","refresh_token":"1//065...","expiry":"..."}
-""")
-
-# Download files
-!rclone copy gdrive: /content/dataset
-```
-
-### 5. Changing the Whisper Model
-**There is no engine selector.** STT is local faster-whisper, and nothing else — cloud STT
-would break both the offline and the $0-cost requirements (CLAUDE.md §1). The `STT_ENGINE`
-setting was removed on 2026-08-31; it had been a hardcoded constant that no code branched
-on, so editing it in `.env` had never done anything.
-
-The one knob is which local model loads:
-* Set `WHISPER_MODEL` in `backend/.env` on the kiosk — `tiny`, `base`, `small`, or a path
-  to a fine-tuned model. It is read by
-  [`backend/cfr_dispatch/config/runtime.py`](../backend/cfr_dispatch/config/runtime.py).
-* Then restart the daemon (**ask first** — it briefly drops the audio listener, so a real
-  call in that window is missed):
-  ```bash
-  ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
-  ```
 
 <!-- audit-ok: backend/migrations/YYYY-MM-DD_short_name.sql -- a naming template, not a real file -->

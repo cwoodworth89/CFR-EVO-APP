@@ -81,15 +81,18 @@ already taken by the roadmap below.
     (`chunk_length` 30 x 16 kHz, verified against installed transformers 5.14.1). Labels
     covered the whole ~48 s double-round call, so ~18 s of every answer key had no audio
     behind it — training the model to keep talking after the audio stops.
-*   **The replacement**: pair each clip with the round it actually contains.
-    `onset` = timestamp of the first spoken word, always "Coquitlam" (operator, SME;
-    40 of 40 sampled). `cut` = `onset + (duration - 3.0 - onset) / 2`, the 3.0 s being the
-    recorder's silence rule. Label = round 1 via `split_rounds`. Onset is measured per call
-    because tone length is bimodal (2–4 s and a distinct 6–8 s cluster).
+*   **The replacement**: pair each clip with the round it actually contains. Both edges
+    measured per call: `onset` = timestamp of the first spoken word, always "Coquitlam"
+    (operator, SME; 40 of 40 sampled); `boundary` = start of round 2, from `split_rounds`
+    run over the timestamped words. Label = round 1 via `split_rounds`. A midpoint formula
+    was tried first and retired: median error +0.22 s, but a range of -9.6 s to +20.3 s on
+    recordings that were not two clean rounds.
 *   **Dataset**: 457 of 497 operator-flagged calls. 34 dropped for exceeding the 30 s
     window — dropped, never truncated — and 6 for not opening with "Coquitlam".
     Split 411 train / 46 held out.
-*   **Scored on the 46 held-out calls, never trained on**: WER **39.7% → 4.9%**,
+*   **v2 (measured boundary, 2026-09-01) on 44 held-out calls**: WER 23.2% → **5.28%**,
+    exact 20/44, against v1's 6.24% on the same set. v1 (midpoint cut) on its own
+    46-call holdout: WER **39.7% → 4.9%**,
     CER 34.8% → 3.9%, overall SMMR **93.5%** (units 100%, incident 97.8%, channel 93.5%,
     map grid 91.3%, address 82.6%). 41 improvements, 4 regressions. Gains concentrate in
     street names — `Yieldford Quay` → `guildford way`, `Lowheed` → `Lougheed`.

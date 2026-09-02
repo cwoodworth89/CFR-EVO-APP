@@ -115,6 +115,8 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="process at most N calls (0 = all)")
     ap.add_argument("--force", action="store_true", help="rewrite clips that already exist")
     ap.add_argument("--model", default="base", help="model used only to locate the onset")
+    ap.add_argument("--skip-label-check", action="store_true",
+                    help="build the dataset even if check_verified_transcripts reports blocking issues")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -134,7 +136,25 @@ def main():
     recordings_dir = os.path.join(backend_dir, "audio_files", "recordings")
     os.makedirs(clips_dir, exist_ok=True)
 
-    rows = create_engine(db_url).connect().execute(text(
+    engine = create_engine(db_url)
+
+    # Labels are checked before they are used. A verified transcript is both the training
+    # label and the scoring reference, so a typo in it is trained in and then scored as
+    # correct -- two of six holdout address failures on 2026-09-02 were the label, not the
+    # model ("Norbur Pl" for Norbury; "driveuse"). Operator ruling 2026-09-02: spell- and
+    # street-check before every training pass. Enforced here rather than documented as a
+    # step, because a documented step is the kind that gets skipped.
+    if not args.skip_label_check:
+        from check_verified_transcripts import run_check
+        with engine.connect() as conn:
+            blocking, advisory, report = run_check(conn)
+        for line in report:
+            logging.info(line)
+        if blocking:
+            sys.exit("%d blocking label issue(s). Fix them in the review panel, un-flag the "
+                     "call, or pass --skip-label-check to proceed anyway." % blocking)
+
+    rows = engine.connect().execute(text(
         "SELECT dispatch_id, audio_duration, verified_transcript FROM public.dispatches "
         "WHERE feedback_submitted AND verified_transcript IS NOT NULL "
         "AND btrim(verified_transcript) <> :empty "

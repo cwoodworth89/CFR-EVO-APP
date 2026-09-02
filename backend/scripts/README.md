@@ -92,6 +92,7 @@ Produce numbers. None of them modify operational data.
 | Script | Purpose |
 |:--|:--|
 | `extract_training_data.py` | Builds the training set from HITL-verified dispatches; adds verified incident types to `public.vocabulary`. |
+| `check_verified_transcripts.py` | Spell- and street-checks the operator's verified transcripts against `public.roads`, `public.vocabulary`, `public.parcels` and the corpus before they become training labels; exits 1 on blocking issues. Run by `prepare_training_clips.py`. |
 | `prepare_training_clips.py` | Builds the round-1 clip dataset for fine-tuning: measures speech onset per call, cuts at the round boundary, drops rounds over Whisper's 30s window. |
 | `train_whisper_lora.py` | LoRA fine-tune of the local Whisper model, on the round-1 clips. |
 | `eval_round1_holdout.py` | Scores models on the held-out round-1 clips the fine-tune never saw; prints stock `base` against the fine-tuned model. |

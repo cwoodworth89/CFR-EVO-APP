@@ -12,22 +12,22 @@ model: the verified transcript said "Norbur Pl" where the authoritative street i
 driveuse" ran two words together. A verified transcript is simultaneously the training label
 and the scoring reference, so a typo in it is trained in and then scored as correct.
 
-WHAT IT CHECKS, AND AGAINST WHAT
---------------------------------
-Every source is authoritative or the corpus itself -- no hand-written word list:
+WHAT BLOCKS, AND WHAT ONLY ADVISES
+----------------------------------
+Blocking is reserved for the one thing crews drive to:
 
-  1. Unknown tokens. Each word of a flagged transcript is checked against
-       public.roads (road names and types), public.vocabulary (every active term), the
-       street-suffix table, and the corpus: any token attested in >= ATTESTED_MIN distinct
-       verified transcripts is accepted (typos are rare; real words recur). Anything left is
-       reported with the nearest known token when one is close enough to be a likely typo.
-  2. Streets and house numbers. The production parser is run on the verified text, exactly
-       as it will be on the hypothesis, and the parsed street is checked against
-       public.roads and the (house, street) pair against public.parcels. A street the city
-       does not have is blocking; a missing parcel is advisory (new builds exist).
-  3. Curation slips. A call whose note carries [PA] or mentions a cut-off recording but
-       which is still flagged for training. The operator's flag is authoritative; this only
-       reports the contradiction.
+  BLOCK   the main address street is not a street the city has (public.roads), or a call
+          tagged [PA] is still flagged for training.
+  ADVISE  everything else -- a probable typo elsewhere in the text, a cross street the city
+          does not have (schools, "Turning Lane", mall access roads are legitimate cross
+          streets and are not roads), a house number with no parcel (new builds exist), a
+          note mentioning a cut-off recording.
+
+The first version of this script blocked on all of it and reported 216 issues across 186
+calls, most of them "Turning Lane is not a road". A gate that fires on a third of the corpus
+is a gate that gets bypassed. Every source here is authoritative or the corpus itself:
+public.roads, public.vocabulary, public.parcels, and phrases attested in >= ATTESTED_MIN
+distinct verified transcripts (typos recur rarely; real words and places recur constantly).
 
 Read-only. Exit status 1 when blocking issues exist, so a runner stops before training.
 """
@@ -47,14 +47,19 @@ import cfr_dispatch                      # _load_env() on import sets DATABASE_U
 from cfr_dispatch.parser import parse_dispatch_announcement, sanitize_transcript
 from cfr_dispatch.config import UNITS_VOCABULARY
 
-# A token seen in this many distinct verified transcripts is treated as a real word.
-# Typos recur rarely; template words, unit names and common streets recur constantly.
-# Chosen from the corpus shape 2026-09-02 (typos observed appeared once each), not tuned.
+# A token or cross-street phrase seen in this many distinct verified transcripts is treated
+# as real. Typos observed 2026-09-02 each appeared once; descriptors like "Turning Lane"
+# appear in dozens. Chosen from that corpus shape, not tuned.
 ATTESTED_MIN = 3
 
-# difflib ratio at or above which an unknown token is reported as a probable typo of the
-# suggestion. Observed typos: norbur/norbury 0.92, probelm/problem 0.86, driveuse/drive 0.77.
-TYPO_RATIO = 0.75
+# difflib ratio at or above which an unknown token is reported as a probable typo. Observed
+# typos: norbur/norbury 0.92, shepard/shepherd 0.93, kencal/kensal 0.91, probelm/problem
+# 0.86, erxine/erskine 0.86. Business words that are NOT typos sat lower: hortons/morton
+# 0.77, aquatic/traumatic 0.71. 0.80 keeps the first group and drops the second.
+TYPO_RATIO = 0.80
+
+# Spoken after round 2 on calls with no addressable location; not part of the call text.
+ADDENDUM = re.compile(r"contact\s+dispatch\s+via\s+radio\s+for\s+location\s+information", re.I)
 
 WORD = re.compile(r"[a-z][a-z'\-]*")
 
@@ -63,25 +68,43 @@ def _tokens(text):
     return WORD.findall((text or "").lower())
 
 
-def load_known_vocabulary(conn):
-    """Every token the city, the vocabulary table, or the corpus vouches for."""
-    from sqlalchemy import text as sql
-    known = set()
-    for (name, rtype) in conn.execute(sql("SELECT roadname, roadtype FROM public.roads")):
-        known.update(_tokens(name)); known.update(_tokens(rtype))
-    for (term,) in conn.execute(sql("SELECT term FROM public.vocabulary WHERE is_active")):
-        known.update(_tokens(term))
-    return known
+class Authority:
+    """Everything the city and the vocabulary table vouch for."""
 
+    def __init__(self, conn):
+        from sqlalchemy import text as sql
+        self.roads = set()
+        self.suffixes = set()
+        self.tokens = set()
+        for (name, rtype) in conn.execute(sql("SELECT roadname, roadtype FROM public.roads")):
+            if name:
+                self.roads.add(name.strip().lower())
+                self.tokens.update(_tokens(name))
+            if rtype:
+                self.suffixes.add(rtype.strip().lower())
+                self.tokens.update(_tokens(rtype))
+        self.descriptors = set()
+        for (cat, term) in conn.execute(sql("SELECT category, term FROM public.vocabulary WHERE is_active")):
+            t = (term or "").strip().lower()
+            self.tokens.update(_tokens(t))
+            if cat == "street_suffix":
+                self.suffixes.add(t)
+            elif cat == "xstreet_descriptor":
+                self.descriptors.add(t)
+        self.parcels = set()
+        for (h, s) in conn.execute(sql("SELECT house, street FROM public.parcels "
+                                       "WHERE house IS NOT NULL AND street IS NOT NULL")):
+            self.parcels.add((str(h).strip(), s.strip().lower()))
+        self.parcel_streets = {s for (_, s) in self.parcels}
+        self.road_list = sorted(self.roads)
+        self.token_list = sorted(self.tokens)
 
-def load_streets(conn):
-    """Road names -> set, and (house, street) pairs from parcels -> set."""
-    from sqlalchemy import text as sql
-    roads = {r[0].strip().lower() for r in conn.execute(sql("SELECT DISTINCT roadname FROM public.roads")) if r[0]}
-    parcels = {(str(h).strip(), s.strip().lower())
-               for (h, s) in conn.execute(sql("SELECT house, street FROM public.parcels WHERE house IS NOT NULL AND street IS NOT NULL"))}
-    parcel_streets = {s for (_, s) in parcels}
-    return roads, parcels, parcel_streets
+    def strip_suffix(self, name):
+        """'como lake ave' -> 'como lake'; leaves 'the high' alone if 'high' is not a suffix."""
+        words = (name or "").strip().lower().split()
+        if len(words) > 1 and words[-1] in self.suffixes:
+            words = words[:-1]
+        return " ".join(words)
 
 
 def flagged_calls(conn):
@@ -96,85 +119,95 @@ def flagged_calls(conn):
         {"e": "", "k": "include_in_training"}).fetchall()
 
 
-ADDR = re.compile(r"^(\d+)\s+(.+?)(?:\s+([A-Za-z]+))?$")
+HOUSE_ADDR = re.compile(r"^(\d+)\s+(.+)$")
 
 
-def parsed_streets(verified):
-    """(house, street_name, kind) triples the production parser extracts from the text."""
-    out = []
+def parsed_location(auth, verified):
+    """(house, main_street) and [cross_street, ...] as the production parser sees them."""
     try:
         cands = parse_dispatch_announcement(sanitize_transcript(verified), UNITS_VOCABULARY)
     except Exception:
-        return out
+        return None, None, []
     c = cands[0] if cands else None
     if not c:
-        return out
-    addr = (c.address or "").strip()
-    m = ADDR.match(addr)
+        return None, None, []
+    house = street = None
+    m = HOUSE_ADDR.match((c.address or "").strip())
     if m:
-        house, name = m.group(1), m.group(2).strip().lower()
-        # the parser keeps the suffix on the name in some shapes; strip a trailing type word
-        parts = name.split()
-        if len(parts) > 1 and len(parts[-1]) <= 6:
-            name = " ".join(parts[:-1])
-        out.append((house, name, "address"))
-    for xs in (getattr(c, "x_street_1", None), getattr(c, "x_street_2", None)):
-        if xs:
-            parts = xs.strip().lower().split()
-            if len(parts) > 1 and len(parts[-1]) <= 6:
-                parts = parts[:-1]
-            out.append((None, " ".join(parts), "cross street"))
-    return out
+        house, street = m.group(1), auth.strip_suffix(m.group(2))
+    xs = []
+    for raw in (getattr(c, "x_street_1", None), getattr(c, "x_street_2", None)):
+        if raw and raw.strip():
+            xs.append(raw.strip().lower())
+    return house, street, xs
 
 
 def run_check(conn):
     """Returns (blocking_count, advisory_count, report_lines)."""
     rows = flagged_calls(conn)
-    known = load_known_vocabulary(conn)
-    roads, parcels, parcel_streets = load_streets(conn)
-    known_list = sorted(known)
-    road_list = sorted(roads)
+    auth = Authority(conn)
 
-    doc_freq = Counter()
-    for _, verified, _ in rows:
-        doc_freq.update(set(_tokens(verified)))
-    attested = {t for t, n in doc_freq.items() if n >= ATTESTED_MIN}
-    accept = known | attested
+    # One parse per transcript, reused for both the frequency pass and the checks.
+    parsed = {}
+    doc_freq, xs_freq = Counter(), Counter()
+    for did, verified, _ in rows:
+        clean = ADDENDUM.sub("", verified or "")
+        parsed[did] = (clean,) + parsed_location(auth, clean)
+        doc_freq.update(set(_tokens(clean)))
+        xs_freq.update(set(auth.strip_suffix(x) for x in parsed[did][3]))
+    attested_tokens = {t for t, n in doc_freq.items() if n >= ATTESTED_MIN}
+    attested_xs = {p for p, n in xs_freq.items() if n >= ATTESTED_MIN}
+    accept = auth.tokens | attested_tokens
 
-    blocking, advisory = 0, 0
-    lines = []
+    blocking = advisory = 0
     per_call = defaultdict(list)
 
-    for did, verified, notes in rows:
-        # 3. curation slips
+    def block(did, msg):
+        nonlocal blocking; blocking += 1; per_call[did].append(("BLOCK", msg))
+
+    def advise(did, msg):
+        nonlocal advisory; advisory += 1; per_call[did].append(("ADVISE", msg))
+
+    for did, _, notes in rows:
+        clean, house, street, xs = parsed[did]
         n = notes or ""
+
+        # Curation slips. The operator's flag is authoritative; this reports a contradiction.
         if re.search(r"\[PA\]", n, re.I):
-            per_call[did].append(("BLOCK", "tagged [PA] in review notes but still flagged for training")); blocking += 1
+            block(did, "tagged [PA] in review notes but still flagged for training")
         elif re.search(r"cut ?off|truncat", n, re.I):
-            per_call[did].append(("ADVISE", "review note mentions a cut-off recording")); advisory += 1
+            advise(did, "review note mentions a cut-off recording")
 
-        # 1. unknown tokens
-        for tok in sorted(set(_tokens(verified)) - accept):
-            if tok.isdigit():
-                continue
-            near = difflib.get_close_matches(tok, known_list, n=1, cutoff=TYPO_RATIO)
-            if near:
-                per_call[did].append(("BLOCK", "'%s' is not a known word -- probable typo of '%s'" % (tok, near[0]))); blocking += 1
-            else:
-                per_call[did].append(("ADVISE", "'%s' is not a known word (business or place name?)" % tok)); advisory += 1
-
-        # 2. streets and parcels, via the production parser
-        for house, name, kind in parsed_streets(verified):
-            if not name:
-                continue
-            if name not in roads:
-                near = difflib.get_close_matches(name, road_list, n=1, cutoff=0.7)
+        # Main address street -- the one blocking check. Crews drive to this.
+        if street:
+            if street not in auth.roads:
+                near = difflib.get_close_matches(street, auth.road_list, n=1, cutoff=0.75)
                 hint = (" -- did you mean '%s'?" % near[0]) if near else ""
-                per_call[did].append(("BLOCK", "%s street '%s' is not in public.roads%s" % (kind, name, hint))); blocking += 1
-            elif house and name in parcel_streets and (house, name) not in parcels:
-                per_call[did].append(("ADVISE", "no parcel %s on %s (new build, or a wrong number?)" % (house, name))); advisory += 1
+                block(did, "address street '%s' is not in public.roads%s" % (street, hint))
+            elif house and street in auth.parcel_streets and (house, street) not in auth.parcels:
+                advise(did, "no parcel %s on %s (new build, or a wrong number?)" % (house, street))
 
-    for did in sorted(per_call):
+        # Cross streets: roads, descriptors ("Mall Access"), schools and anything the corpus
+        # repeats are all legitimate. Only a rare one the city does not have is worth a look.
+        for raw in xs:
+            phrase = auth.strip_suffix(raw)
+            if (phrase in auth.roads or raw in auth.descriptors or phrase in attested_xs
+                    or "school" in phrase):
+                continue
+            near = difflib.get_close_matches(phrase, auth.road_list, n=1, cutoff=0.8)
+            hint = (" -- did you mean '%s'?" % near[0]) if near else ""
+            advise(did, "cross street '%s' is not in public.roads%s" % (raw, hint))
+
+        # Probable typos anywhere in the text. Advisory: business and place names live here.
+        for tok in sorted(set(_tokens(clean)) - accept):
+            if len(tok) <= 2:
+                continue
+            near = difflib.get_close_matches(tok, auth.token_list, n=1, cutoff=TYPO_RATIO)
+            if near:
+                advise(did, "'%s' -- probable typo of '%s'" % (tok, near[0]))
+
+    lines = []
+    for did in sorted(per_call, key=lambda d: (not any(l == "BLOCK" for l, _ in per_call[d]), d)):
         lines.append(did)
         for level, msg in per_call[did]:
             lines.append("    %-6s %s" % (level, msg))
@@ -187,6 +220,7 @@ def run_check(conn):
 def main():
     ap = argparse.ArgumentParser(description="Spell- and street-check verified transcripts before training.")
     ap.add_argument("--quiet", action="store_true", help="summary line only")
+    ap.add_argument("--blocking-only", action="store_true", help="omit advisory lines")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
 
@@ -197,7 +231,11 @@ def main():
 
     with create_engine(db_url).connect() as conn:
         blocking, advisory, lines = run_check(conn)
-    print("\n".join(lines if not args.quiet else lines[-1:]))
+    if args.quiet:
+        lines = lines[-1:]
+    elif args.blocking_only:
+        lines = [l for l in lines if not l.startswith("    ADVISE")]
+    print("\n".join(lines))
     sys.exit(1 if blocking else 0)
 
 

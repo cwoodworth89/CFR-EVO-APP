@@ -35,10 +35,16 @@ def normalize_street_suffix(text: str) -> str:
         
     return " ".join(words)
 
-def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]) -> str:
+def clean_location_text(text: str, call_types: List[str], units_vocab: List[str],
+                        known_streets: Optional[List[str]] = None) -> str:
     """
     Cleans a location candidate string by recursively stripping leading prepositions,
     action/dispatch keywords, unit vocabulary terms, and incident call types.
+
+    With `known_streets`, a house number followed by a municipal street name is returned
+    as exactly that, before the trailing-junk strip below can cut it at its first suffix
+    word -- which turned "1234 st laurence street" into "1234 st" even after
+    extract_subaddress_info had split it correctly (measured on the kiosk, 2026-09-02).
     """
     text = ' '.join(text.split()).strip()
     if not text:
@@ -93,6 +99,14 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
             text = text[len(first_word):].strip()
             changed = True
             continue
+
+    # A house number followed by a municipal street name is the whole answer. Return it
+    # before the suffix-word strip below, which cannot tell "St" the street type from
+    # "St" the first word of St Laurence Street.
+    if known_streets:
+        hit = _split_on_known_street(text, known_streets)
+        if hit:
+            return hit[0]
 
     # Strip trailing numbers, suite numbers, or building details after street type (unless followed by "and" / "near")
     # e.g., "Burlington Drive 105" -> "Burlington Drive", "Lougheed Highway Superstore" -> "Lougheed Highway"

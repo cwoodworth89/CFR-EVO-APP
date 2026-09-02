@@ -106,7 +106,7 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
             # operator's "crt" was not in the old suffix list at all (2026-09-02).
             from cfr_dispatch.config.vocab import COQUITLAM_STREETS
             address_part, extracted_subaddr = extract_subaddress_info(address_part, COQUITLAM_STREETS)
-            address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
+            address_part = clean_location_text(address_part, CALL_TYPES, units_vocab, COQUITLAM_STREETS)
             normalized_address = normalize_street_suffix(address_part)
             
             # Extract Cross Roads segment

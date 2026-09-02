@@ -23,6 +23,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from cfr_dispatch.parser.location import (  # noqa: E402
+    clean_location_text,
     extract_subaddress_info,
     split_street_base_suffix,
 )
@@ -84,6 +85,15 @@ def test_without_known_streets_st_laurence_is_still_wrong_and_that_is_documented
     # Documented here so a future "simplification" that drops known_streets fails loudly.
     addr, _ = extract_subaddress_info("1234 st laurence street unit 5")
     assert addr == "1234 st"
+
+
+def test_clean_location_text_does_not_recut_a_known_street_at_its_first_suffix_word():
+    # Found on the kiosk after the extractor fix: the subaddress came back right ("Unit 5")
+    # but the address was still "1234 st", because this function's trailing-junk strip
+    # has its own first-suffix regex. The pipeline calls the two back to back.
+    assert clean_location_text("1234 st laurence street", [], [], KNOWN) == "1234 st laurence street"
+    # The strip still applies when no municipal name matches.
+    assert clean_location_text("burlington drive 105", [], [], KNOWN) == "burlington drive"
 
 
 def test_split_street_base_suffix_knows_crt():

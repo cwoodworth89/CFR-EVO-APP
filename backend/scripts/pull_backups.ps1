@@ -74,6 +74,29 @@ foreach ($line in ($listing -split "`n")) {
 }
 Write-Log "kiosk holds $($remote.Count) archive(s)"
 
+# Do not download what rotation deletes on the way out. The kiosk retains full dumps 7
+# deep while this copy keeps only -KeepFull, so pulling everything and rotating afterwards
+# re-downloaded the same three archives on every single run -- roughly 36 MB per
+# invocation, indefinitely, with nothing to show for it. Choose the newest N up front.
+# Critical dumps are never filtered: keeping every one is the entire point of this copy.
+$wantedFull   = @($remote | Where-Object { $_.Name -like 'cfr-full-*.sql.gz'   } | Sort-Object Name -Descending | Select-Object -First $KeepFull)
+$wantedModels = @($remote | Where-Object { $_.Name -like 'cfr-model-*.tar.gz'  } | Sort-Object Name -Descending | Select-Object -First $KeepModels)
+$wantedOther  = @($remote | Where-Object {
+    $_.Name -notlike 'cfr-full-*.sql.gz' -and $_.Name -notlike 'cfr-model-*.tar.gz' -and $_.Name -notlike '*.sha256'
+})
+# A checksum is only worth carrying if the archive it describes is being carried too.
+$keptNames  = @(($wantedFull + $wantedModels + $wantedOther) | ForEach-Object { $_.Name })
+$wantedSums = @($remote | Where-Object {
+    $_.Name -like '*.sha256' -and $keptNames -contains ($_.Name -replace '\.sha256$', '')
+})
+
+$wanted = @($wantedFull + $wantedModels + $wantedOther + $wantedSums)
+$beyondRetention = $remote.Count - $wanted.Count
+if ($beyondRetention -gt 0) {
+    Write-Log "$beyondRetention archive(s) left on the kiosk -- older than local retention"
+}
+$remote = $wanted
+
 $pulled = 0; $skipped = 0
 foreach ($r in $remote) {
     $localPath = Join-Path $Destination $r.Name

@@ -51,7 +51,7 @@ This document outlines the key milestones achieved during the development of CFR
 *   **DSP PA System Page Interception**: Configured `PA Tone` (`595 Hz` / `647 Hz`) in `GOLDEN_FINGERPRINTS` to intercept station PA pages at the hardware DSP stage, immediately resetting the audio listener without saving or recording non-call pages.
 *   **Rapid Review & Keyboard Shortcuts**: Enhanced the dispatch verification panel with `Ctrl` + `Space` and `Alt` + `Enter` hotkeys, double-click input prefilling, and clickable `Sys: [val] 📥` badges to import system-parsed metadata instantly.
 *   **Sequential Dispatch Alignment**: Reordered input fields to match verbal dispatch announcements (Units $\rightarrow$ Tone $\rightarrow$ Incident $\rightarrow$ Address $\rightarrow$ Subaddress $\rightarrow$ Talk Group & Map Grid).
-*   **Whisper LoRA Fine-Tuning & Local Quantization**: Trained `openai/whisper-base` on local CPUs using the 51-sample station dataset, reducing Word Error Rate (WER) from **22.6% to 3.5%** with **93.3% SMMR overall accuracy**. Merged LoRA adapters and quantized to `int8` (CTranslate2) for high-performance offline CPU execution on the kiosk.
+*   **Whisper LoRA Fine-Tuning & Local Quantization** — ⚠️ **corrected 2026-09-01.** This entry reported WER falling from 22.6% to 3.5% at 93.3% SMMR on a 51-sample dataset. That figure does not stand and the model it describes never ran: `WHISPER_MODEL` was `base` for all 37 `cfr-agent` starts in the journal, which reaches back to 2026-06-19, a month before the 2026-07-17 training run. The score was measured train-on-test with no held-out split, and under a labelling defect that paired the first 30 s of audio (where `WhisperFeatureExtractor` silently truncates) with a label covering the whole ~48 s double-round call. The converted model was later found as a headless `backend/models/model.bin`, its config and tokenizer gone, and could not have been loaded. Superseded by the round-1 fine-tune below.
 *   **Phonetic Homophone Sanitizer**: Configured fallback corrections mapping `won`, `Juan`, `run`, `Agent 1` to `Engine 1` to prevent apparatus drops.
 
 ### 🎨 Milestone 8: HUD Streamlining, City Boundary & Map Grid Optimization
@@ -71,6 +71,34 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Project Rule Architecture**: Established `.agents/rules/local_stack_and_dsp_rules.md` documenting DSP tone parameters, STT pipeline controls, WER symmetric evaluation, Tailscale SSH workflows, and server git-ignored file management for cross-agent collaboration.
 
 ---
+
+### 🎙️ Whisper Round-1 Fine-Tune — deployed 2026-09-01
+
+Numbered by date rather than sequence: it is the newest completed work, and 11–14 are
+already taken by the roadmap below.
+
+*   **The defect it fixes**: `WhisperFeatureExtractor` truncates to 30.0 s in silence
+    (`chunk_length` 30 x 16 kHz, verified against installed transformers 5.14.1). Labels
+    covered the whole ~48 s double-round call, so ~18 s of every answer key had no audio
+    behind it — training the model to keep talking after the audio stops.
+*   **The replacement**: pair each clip with the round it actually contains.
+    `onset` = timestamp of the first spoken word, always "Coquitlam" (operator, SME;
+    40 of 40 sampled). `cut` = `onset + (duration - 3.0 - onset) / 2`, the 3.0 s being the
+    recorder's silence rule. Label = round 1 via `split_rounds`. Onset is measured per call
+    because tone length is bimodal (2–4 s and a distinct 6–8 s cluster).
+*   **Dataset**: 457 of 497 operator-flagged calls. 34 dropped for exceeding the 30 s
+    window — dropped, never truncated — and 6 for not opening with "Coquitlam".
+    Split 411 train / 46 held out.
+*   **Scored on the 46 held-out calls, never trained on**: WER **39.7% → 4.9%**,
+    CER 34.8% → 3.9%, overall SMMR **93.5%** (units 100%, incident 97.8%, channel 93.5%,
+    map grid 91.3%, address 82.6%). 41 improvements, 4 regressions. Gains concentrate in
+    street names — `Yieldford Quay` → `guildford way`, `Lowheed` → `Lougheed`.
+*   **Deployed**: `WHISPER_MODEL` points at `backend/models/whisper-base-cfr-ct2`;
+    `cfr-agent` restarted 2026-09-01 20:46. Loads with the Hugging Face Hub disabled
+    entirely, which the first conversion did not — it silently fetched a tokenizer over
+    the WAN. Archived off the kiosk with the database dumps.
+*   **Design, measurements and rejected alternatives**:
+    [`docs/briefings/whisper_training_round1_labelling.md`](./briefings/whisper_training_round1_labelling.md).
 
 ## 🗓️ Future Milestones
 

@@ -92,10 +92,36 @@ class Authority:
             elif cat == "xstreet_descriptor":
                 self.descriptors.add(t)
         self.parcels = set()
-        for (h, s) in conn.execute(sql("SELECT house, street FROM public.parcels "
-                                       "WHERE house IS NOT NULL AND street IS NOT NULL")):
-            self.parcels.add((str(h).strip(), s.strip().lower()))
+        self.parcels_by_house = defaultdict(list)     # house -> [(street, type, zone)]
+        for (h, s, t, z) in conn.execute(sql(
+                "SELECT house, street, streettype, zone_id FROM public.parcels "
+                "WHERE house IS NOT NULL AND street IS NOT NULL")):
+            house, street = str(h).strip(), s.strip().lower()
+            self.parcels.add((house, street))
+            self.parcels_by_house[house].append((street, (t or "").strip(), str(z or "").strip()))
         self.parcel_streets = {s for (_, s) in self.parcels}
+
+    def parcel_candidates(self, house, street, grid):
+        """Parcels with this house number whose street starts like the misspelt one.
+
+        The road-name fuzzy match could not resolve 'beaty' (2026-09-02); house 1883 on a
+        'be...' street had exactly one parcel, 1883 Beedie Pl, and it sat in the call's map
+        grid. House number plus prefix plus zone is a far stronger key than spelling alone.
+        Candidates in the verified grid's zone are listed first.
+        """
+        if not house or not street:
+            return []
+        prefix = street[:2]
+        found = [(s, t, z) for (s, t, z) in self.parcels_by_house.get(house, [])
+                 if s.startswith(prefix)]
+        found.sort(key=lambda p: (p[2] != grid, p[0]))
+        seen, out = set(), []
+        for s, t, z in found:
+            if (s, t) in seen:
+                continue
+            seen.add((s, t))
+            out.append("%s %s %s%s" % (house, s.title(), t, (" (zone %s)" % z) if z else ""))
+        return out
         self.road_list = sorted(self.roads)
         self.token_list = sorted(self.tokens)
 
@@ -111,7 +137,8 @@ def flagged_calls(conn):
     from sqlalchemy import text as sql
     return conn.execute(sql(
         "SELECT dispatch_id, verified_transcript, "
-        "       COALESCE(target->>'review_notes', review_notes) AS notes "
+        "       COALESCE(target->>'review_notes', review_notes) AS notes, "
+        "       btrim(coalesce(verified_map_grid, '')) AS verified_grid "
         "FROM public.dispatches "
         "WHERE feedback_submitted AND verified_transcript IS NOT NULL "
         "AND btrim(verified_transcript) <> :e "
@@ -123,14 +150,14 @@ HOUSE_ADDR = re.compile(r"^(\d+)\s+(.+)$")
 
 
 def parsed_location(auth, verified):
-    """(house, main_street) and [cross_street, ...] as the production parser sees them."""
+    """(house, main_street, [cross_street, ...], spoken_grid) as the production parser sees them."""
     try:
         cands = parse_dispatch_announcement(sanitize_transcript(verified), UNITS_VOCABULARY)
     except Exception:
-        return None, None, []
+        return None, None, [], ""
     c = cands[0] if cands else None
     if not c:
-        return None, None, []
+        return None, None, [], ""
     house = street = None
     m = HOUSE_ADDR.match((c.address or "").strip())
     if m:
@@ -139,7 +166,10 @@ def parsed_location(auth, verified):
     for raw in (getattr(c, "x_street_1", None), getattr(c, "x_street_2", None)):
         if raw and raw.strip():
             xs.append(raw.strip().lower())
-    return house, street, xs
+    # The grid as spoken in the verified text, via the parser's own extraction (it also
+    # rejects values outside MAP_GRIDS, so an unparseable grid comes back empty).
+    grid = str(getattr(c, "map_grid", "") or "").strip()
+    return house, street, xs, grid
 
 
 def run_check(conn):
@@ -150,7 +180,7 @@ def run_check(conn):
     # One parse per transcript, reused for both the frequency pass and the checks.
     parsed = {}
     doc_freq, xs_freq = Counter(), Counter()
-    for did, verified, _ in rows:
+    for did, verified, _, _ in rows:
         clean = ADDENDUM.sub("", verified or "")
         parsed[did] = (clean,) + parsed_location(auth, clean)
         doc_freq.update(set(_tokens(clean)))
@@ -168,8 +198,8 @@ def run_check(conn):
     def advise(did, msg):
         nonlocal advisory; advisory += 1; per_call[did].append(("ADVISE", msg))
 
-    for did, _, notes in rows:
-        clean, house, street, xs = parsed[did]
+    for did, _, notes, verified_grid in rows:
+        clean, house, street, xs, spoken_grid = parsed[did]
         n = notes or ""
 
         # Curation slips -- checked first, because they are what the operator checks first.
@@ -186,10 +216,25 @@ def run_check(conn):
         if street:
             if street not in auth.roads:
                 near = difflib.get_close_matches(street, auth.road_list, n=1, cutoff=0.75)
-                hint = (" -- did you mean '%s'?" % near[0]) if near else ""
+                hints = []
+                if near:
+                    hints.append("did you mean '%s'?" % near[0])
+                cands = auth.parcel_candidates(house, street, verified_grid or spoken_grid)
+                if cands:
+                    hints.append("parcel(s) with this number: " + "; ".join(cands[:3]))
+                hint = (" -- " + " ".join(hints)) if hints else ""
                 block(did, "address street '%s' is not in public.roads%s" % (street, hint))
             elif house and street in auth.parcel_streets and (house, street) not in auth.parcels:
                 advise(did, "no parcel %s on %s (new build, or a wrong number?)" % (house, street))
+
+        # Grid consistency: the grid spoken in the verified text against the verified grid
+        # field. On DISP-2026-D00EC5 the transcript said 101 (right -- Beedie Pl is in 101)
+        # while verified_map_grid said 10; the backtest scores map-grid SMMR against the
+        # field, so a wrong field is a wrong reference. Advisory: the audio label is not
+        # affected, and either side could be the one in error.
+        if spoken_grid and verified_grid and spoken_grid != verified_grid:
+            advise(did, "GRID: transcript says map grid %s, verified_map_grid says %s"
+                        % (spoken_grid, verified_grid))
 
         # Cross streets: roads, descriptors ("Mall Access"), schools and anything the corpus
         # repeats are all legitimate. Only a rare one the city does not have is worth a look.
@@ -229,9 +274,10 @@ def run_check(conn):
         for level, msg in per_call[did]:
             lines.append("    %-6s %s" % (level, msg))
     lines.append("")
+    grids = sum(1 for d in per_call for _, m in per_call[d] if m.startswith("GRID:"))
     lines.append("checked %d flagged transcripts: %d call(s) to UN-FLAG (PA / cut-off), "
-                 "%d transcript(s) to FIX (main street not in the city), %d advisory line(s)"
-                 % (len(rows), unflag, fix, advisory))
+                 "%d transcript(s) to FIX (main street not in the city), %d grid mismatch(es), "
+                 "%d advisory line(s)" % (len(rows), unflag, fix, grids, advisory))
     return blocking, advisory, lines
 
 

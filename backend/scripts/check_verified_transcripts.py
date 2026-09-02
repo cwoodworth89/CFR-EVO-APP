@@ -100,6 +100,8 @@ class Authority:
             self.parcels.add((house, street))
             self.parcels_by_house[house].append((street, (t or "").strip(), str(z or "").strip()))
         self.parcel_streets = {s for (_, s) in self.parcels}
+        self.road_list = sorted(self.roads)
+        self.token_list = sorted(self.tokens)
 
     def parcel_candidates(self, house, street, grid):
         """Parcels with this house number whose street starts like the misspelt one.
@@ -122,8 +124,6 @@ class Authority:
             seen.add((s, t))
             out.append("%s %s %s%s" % (house, s.title(), t, (" (zone %s)" % z) if z else ""))
         return out
-        self.road_list = sorted(self.roads)
-        self.token_list = sorted(self.tokens)
 
     def strip_suffix(self, name):
         """'como lake ave' -> 'como lake'; leaves 'the high' alone if 'high' is not a suffix."""

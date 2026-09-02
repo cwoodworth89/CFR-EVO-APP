@@ -42,6 +42,11 @@ PA pages and cut-off recordings. The check runs in that order:
 * **UN-FLAG** (blocks) — a call whose note says `[PA]` or cut-off, still flagged. Un-check it
   in the review panel; nothing else about that call matters.
 * **FIX** (blocks) — the main-address street is not a street the city has. Fix the transcript.
+  The hint lists the nearest road name *and* every parcel carrying that house number, those in
+  the call's map grid first — house + prefix + zone resolved "beaty" to Beedie Pl when
+  spelling alone could not.
+* **GRID** (advises) — the grid spoken in the verified text disagrees with `verified_map_grid`.
+  Either side may be wrong; the backtest scores against the field.
 * **ADVISE** — probable typos elsewhere, rare cross streets, missing parcels. Worth fixing;
   not worth stopping for.
 

@@ -13,6 +13,7 @@ NOT the audio/ + metadata.csv that extract_training_data.py writes, so a whole-c
 and a round-1 dataset can never be confused for one another by the trainer.
 """
 import os
+import re
 import csv
 import sys
 import time
@@ -52,6 +53,17 @@ MIN_ROUND_S = 8.0
 # was observed and is the same word.
 WAKE_WORD = "coquitlam"
 WAKE_WORD_MIN_RATIO = 0.7
+
+# "Contact dispatch via radio for location information" is spoken AFTER the second round,
+# on calls with no addressable location (both instances found were Eagle Mountain Park).
+# It is the only addendum dispatch appends (operator, 2026-09-01), and it breaks the
+# geometry below: the cut halves total speech assuming exactly two rounds, so a ~5 s tail
+# pushes the midpoint into round 2 and the clip ends up holding words its label does not.
+# Operator ruling 2026-09-01: exclude these rather than special-case the formula.
+# Matched against verified_transcript, which is operator-written and so free of STT noise --
+# all 3 corpus instances carry the phrase verbatim. \s+ because the operator's punctuation
+# varies (docs/standards/dependency-behaviour.md: a space-separated pattern undercounts).
+ADDENDUM_PATTERN = r"contact\s+dispatch"
 
 SAMPLE_RATE = 16000
 
@@ -122,6 +134,10 @@ def main():
         out = os.path.join(clips_dir, "%s.wav" % did)
         if not os.path.exists(wav):
             drop("no audio file", did)
+            continue
+
+        if re.search(ADDENDUM_PATTERN, verified or "", re.IGNORECASE):
+            drop("has a post-round addendum", did)
             continue
 
         # The label is round 1 of what the operator verified. split_rounds is text-only and

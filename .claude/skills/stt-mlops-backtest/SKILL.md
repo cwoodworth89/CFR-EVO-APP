@@ -36,10 +36,14 @@ is trained in and then scored as correct — two of six holdout address failures
 2026-09-02 were the label ("Norbur Pl" for Norbury). The check validates every flagged
 transcript against `public.roads`, `public.vocabulary`, `public.parcels` and the corpus.
 
-* **BLOCK** — the main-address street is not a street the city has, or a `[PA]`-tagged call
-  is still flagged for training. Fix the transcript in the review panel or un-flag the call.
-* **ADVISE** — probable typos elsewhere, rare cross streets, missing parcels, cut-off notes.
-  Worth fixing; not worth stopping for.
+The operator's `include_in_training` flag is the exclusion mechanism — un-checked by hand for
+PA pages and cut-off recordings. The check runs in that order:
+
+* **UN-FLAG** (blocks) — a call whose note says `[PA]` or cut-off, still flagged. Un-check it
+  in the review panel; nothing else about that call matters.
+* **FIX** (blocks) — the main-address street is not a street the city has. Fix the transcript.
+* **ADVISE** — probable typos elsewhere, rare cross streets, missing parcels. Worth fixing;
+  not worth stopping for.
 
 `prepare_training_clips.py` runs this itself and refuses to build while anything blocks
 (`--skip-label-check` overrides). Operator ruling 2026-09-02.

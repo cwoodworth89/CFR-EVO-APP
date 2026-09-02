@@ -172,11 +172,15 @@ def run_check(conn):
         clean, house, street, xs = parsed[did]
         n = notes or ""
 
-        # Curation slips. The operator's flag is authoritative; this reports a contradiction.
+        # Curation slips -- checked first, because they are what the operator checks first.
+        # The include_in_training flag is the exclusion mechanism: the operator un-checks it
+        # by hand for PA pages ([PA] in the note) and for cut-off recordings (operator,
+        # 2026-09-02). A call carrying either signal but still flagged is a slip, and it is
+        # reported ahead of any spelling issue because un-flagging it makes the spelling moot.
         if re.search(r"\[PA\]", n, re.I):
-            block(did, "tagged [PA] in review notes but still flagged for training")
+            block(did, "UN-FLAG: tagged [PA] in review notes but still flagged for training")
         elif re.search(r"cut ?off|truncat", n, re.I):
-            advise(did, "review note mentions a cut-off recording")
+            block(did, "UN-FLAG: review note says the recording was cut off, still flagged for training")
 
         # Main address street -- the one blocking check. Crews drive to this.
         if street:
@@ -206,14 +210,28 @@ def run_check(conn):
             if near:
                 advise(did, "'%s' -- probable typo of '%s'" % (tok, near[0]))
 
+    def rank(did):
+        levels = [l for l, _ in per_call[did]]
+        msgs = [m for _, m in per_call[did]]
+        if any(m.startswith("UN-FLAG") for m in msgs):
+            return (0, did)          # curation slips first
+        if "BLOCK" in levels:
+            return (1, did)          # then transcripts that need fixing
+        return (2, did)              # then advisories
+
+    unflag = sum(1 for d in per_call if any(m.startswith("UN-FLAG") for _, m in per_call[d]))
+    fix = sum(1 for d in per_call
+              if any(l == "BLOCK" and not m.startswith("UN-FLAG") for l, m in per_call[d]))
+
     lines = []
-    for did in sorted(per_call, key=lambda d: (not any(l == "BLOCK" for l, _ in per_call[d]), d)):
+    for did in sorted(per_call, key=rank):
         lines.append(did)
         for level, msg in per_call[did]:
             lines.append("    %-6s %s" % (level, msg))
     lines.append("")
-    lines.append("checked %d flagged transcripts: %d blocking, %d advisory, across %d call(s)"
-                 % (len(rows), blocking, advisory, len(per_call)))
+    lines.append("checked %d flagged transcripts: %d call(s) to UN-FLAG (PA / cut-off), "
+                 "%d transcript(s) to FIX (main street not in the city), %d advisory line(s)"
+                 % (len(rows), unflag, fix, advisory))
     return blocking, advisory, lines
 
 

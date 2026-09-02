@@ -11,9 +11,11 @@ from sqlalchemy import desc, func
 try:
     from backend.api.database import get_db
     from backend.api.models import LiveCallModel, EvaluationHistoryModel
+    from backend.api.schemas import EvaluationCreateSchema
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import LiveCallModel, EvaluationHistoryModel
+    from api.schemas import EvaluationCreateSchema
 
 router = APIRouter(tags=["evaluations"])
 
@@ -37,6 +39,34 @@ def get_evaluations(db: Session = Depends(get_db)):
         }
         for h in history
     ]
+
+
+@router.post("/api/evaluations")
+def create_evaluation(payload: EvaluationCreateSchema, db: Session = Depends(get_db)):
+    """Records one backtest run in public.evaluation_history.
+
+    backtest_regression.py has posted here since it was written, but only GET was ever
+    defined, so every run got 405 and logged it as a warning it then swallowed. Combined
+    with the script's own import being broken, the table has taken no rows since
+    2026-08-05 while appearing merely idle.
+    """
+    row = EvaluationHistoryModel(
+        model_version=payload.model_version,
+        total_samples=payload.total_samples,
+        wer=payload.wer,
+        cer=payload.cer,
+        perfect_percent=payload.perfect_percent,
+        operational_percent=payload.operational_percent,
+        failed_percent=payload.failed_percent,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    logging.info(
+        f"Recorded evaluation run: {payload.model_version} "
+        f"n={payload.total_samples} WER={payload.wer}%"
+    )
+    return {"status": "success", "id": str(row.id)}
 
 
 @router.get("/api/metrics/summary")

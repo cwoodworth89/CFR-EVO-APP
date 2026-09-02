@@ -47,6 +47,17 @@ class DispatchCreateSchema(BaseModel):
     feedback_submitted: Optional[bool] = False
 
 
+class EvaluationCreateSchema(BaseModel):
+    """One backtest run's summary, written to public.evaluation_history."""
+    model_version: str
+    total_samples: int
+    wer: float
+    cer: float
+    perfect_percent: float
+    operational_percent: float
+    failed_percent: float
+
+
 class BulkModelUpdatedSchema(BaseModel):
     """Payload for the bulk training-dataset bookkeeping flag."""
     dispatch_ids: List[str]

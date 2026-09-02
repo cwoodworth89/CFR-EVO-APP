@@ -15,7 +15,12 @@ if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
 import cfr_dispatch
-from cfr_dispatch.orchestration import transcribe_audio_file, get_shared_validator
+from cfr_dispatch.orchestration import get_shared_validator
+# `transcribe_audio_file` never existed on orchestration -- this script had been unrunnable
+# since the STT decomposition moved transcription into cfr_dispatch.stt, which is why
+# public.evaluation_history has no rows after 2026-08-05. Aliased rather than renamed at
+# every call site, to keep this fix to the import that was actually wrong.
+from cfr_dispatch.stt import transcribe_audio_file_local as transcribe_audio_file
 from cfr_dispatch.config import UNITS_VOCABULARY, DispatchData, CALL_TYPES
 from cfr_dispatch.parser import (
     sanitize_transcript, 
@@ -143,7 +148,10 @@ def main():
         
         # Run active STT model
         try:
-            new_hyp = transcribe_audio_file(local_path)
+            # Pass the validator. Production transcribes with street/unit hotword biasing,
+            # and the stored raw_transcript this is compared against was produced with it,
+            # so omitting it here would score the new model on a harder task than the old.
+            new_hyp = transcribe_audio_file(local_path, validator=validator)
             if new_hyp is None:
                 new_hyp = ""
             new_hyp = new_hyp.strip()

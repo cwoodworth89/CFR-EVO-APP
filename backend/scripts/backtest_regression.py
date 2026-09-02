@@ -392,10 +392,20 @@ def main():
     print(f"  - OVERALL PIPELINE ACCURACY:   {overall_smmr:.1%}")
     print("==================================================")
     
+    # The model actually evaluated, not a fixed string. Every row in
+    # public.evaluation_history read "whisper-boost-classes" whatever had run, so the table
+    # could not attribute a WER change to a model version -- a value stored beside the thing
+    # it was derived from, with nothing keeping the two in step
+    # (docs/standards/dependency-behaviour.md). Read from the transcriber module rather than
+    # config, so an in-process override is reflected too.
+    from cfr_dispatch.stt import transcriber as _transcriber
+    model_label = (os.path.basename(str(_transcriber.WHISPER_MODEL).rstrip("/"))
+                   or str(_transcriber.WHISPER_MODEL))
+
     # 5. Log history
     evaluation_run = {
         "timestamp": datetime.datetime.now().isoformat(),
-        "model_version": "whisper-boost-classes",
+        "model_version": model_label,
         "total_evaluation_samples": total,
         "old_average_wer": float(old_avg_wer),
         "new_average_wer": float(new_avg_wer),
@@ -431,7 +441,7 @@ def main():
     local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
     endpoint = f"{local_api_url}/api/evaluations"
     db_payload = {
-        "model_version": "whisper-boost-classes",
+        "model_version": model_label,
         "total_samples": int(total),
         "wer": float(round(new_avg_wer * 100, 2)),
         "cer": float(round(new_avg_cer * 100, 2)),

@@ -134,8 +134,8 @@ def main():
         gt_units = parse_units_to_set(call.get("verified_units") or call.get("responding_units"))
         
         target = call.get("target") or {}
-        gt_grid = d.get("verified_map_grid") or target.get("map_grid") or ""
-        gt_channel = d.get("verified_talkgroup") or target.get("radio_channel") or ""
+        gt_grid = call.get("verified_map_grid") or target.get("map_grid") or ""
+        gt_channel = call.get("verified_talkgroup") or target.get("radio_channel") or ""
 
         # 1. Run Production Parser
         prod_candidates = parse_dispatch_announcement(first_round_text, UNITS_VOCABULARY)

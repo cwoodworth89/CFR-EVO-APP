@@ -96,7 +96,8 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
 
     # Strip trailing numbers, suite numbers, or building details after street type (unless followed by "and" / "near")
     # e.g., "Burlington Drive 105" -> "Burlington Drive", "Lougheed Highway Superstore" -> "Lougheed Highway"
-    street_types = r"street|avenue|drive|way|road|crescent|boulevard|place|court|highway|lane|st|ave|rd|dr|ln|ct|blvd|hwy|wy"
+    # From the one suffix list. The hand-typed copy this replaces lacked "crt" and "cres".
+    street_types = "|".join(sorted(_SUFFIX_EQUIV, key=len, reverse=True))
     # `&` is in the lookahead for the same reason `and` is: it separates two cross
     # streets, and without it the second one is stripped as trailing junk.
     #
@@ -111,16 +112,82 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
 
     return text
 
-def extract_subaddress_info(address_text: str) -> Tuple[str, Optional[str]]:
+def _street_key(name: str) -> str:
+    """Comparison form of a street name: lowercase, suffix folded to its canonical form,
+    so 'glen pine crt' and 'Glen Pine Court' compare equal."""
+    words = (name or "").strip().lower().split()
+    if len(words) >= 2 and words[-1] in _SUFFIX_EQUIV:
+        words[-1] = _SUFFIX_EQUIV[words[-1]]
+    return " ".join(words)
+
+
+_KNOWN_STREET_CACHE: dict = {}
+
+
+def _known_street_keys(known_streets: List[str]):
+    """(set of comparison keys, longest name in words) for a vocabulary list, cached."""
+    hit = _KNOWN_STREET_CACHE.get(id(known_streets))
+    if hit is None or hit[0] is not known_streets:
+        keys = {_street_key(s) for s in known_streets if s}
+        longest = max((len(k.split()) for k in keys), default=0)
+        hit = (known_streets, keys, longest)
+        _KNOWN_STREET_CACHE[id(known_streets)] = hit
+    return hit[1], hit[2]
+
+
+def _split_on_known_street(address_text: str, known_streets: List[str]):
+    """'1200 glen pine crt glen pine pavilion' -> ('1200 glen pine crt', 'glen pine pavilion')
+    using the LONGEST municipal street name that follows the house number. None if no
+    municipal name matches -- a mis-heard street falls through to the suffix scan."""
+    m = re.match(r'^\s*(\d+)\s+(.+)$', address_text.strip())
+    if not m:
+        return None
+    house, rest = m.group(1), m.group(2)
+    words = rest.split()
+    keys, longest = _known_street_keys(known_streets)
+    for n in range(min(len(words), longest), 0, -1):
+        if _street_key(" ".join(words[:n])) in keys:
+            return "%s %s" % (house, " ".join(words[:n])), " ".join(words[n:])
+    return None
+
+
+def extract_subaddress_info(address_text: str,
+                            known_streets: Optional[List[str]] = None) -> Tuple[str, Optional[str]]:
     """
-    Given an address string, extracts trailing subaddress indicators (like unit, apartment, 
+    Given an address string, extracts trailing subaddress indicators (like unit, apartment,
     suite, room, or business names) that always follow the main address.
+
+    Two ways to find where the street ends, in order:
+
+    1. The longest municipal street name after the house number (`known_streets`, i.e.
+       COQUITLAM_STREETS). Authoritative (CLAUDE.md s6.2), and the only way to get
+       "1234 St Laurence Street Unit 5" right -- a suffix scan sees "St" first and returns
+       address "1234 St", subaddress "Laurence Street Unit 5". Measured 2026-09-02.
+    2. The first suffix word, as before, when no municipal name matches (a mis-heard
+       street). The suffix list is now _SUFFIX_EQUIV rather than a fourth hand-typed
+       copy: the old copy lacked "crt", so "1200 glen pine crt Glen Pine Pavilion" was
+       returned whole as the street -- and the fine-tuned model was trained on the
+       operator's transcripts, which write "crt".
     """
     if not address_text:
         return address_text, None
 
-    suffixes = r"\b(?:street|st|avenue|ave|drive|drv|way|road|rd|crescent|cres|boulevard|blvd|place|pl|court|ct|highway|hwy|lane|ln|close|cl|gate|gt)\b"
-    
+    if known_streets:
+        hit = _split_on_known_street(address_text, known_streets)
+        if hit:
+            cleaned_addr, sub_val = hit
+            sub_val = sub_val.strip().rstrip(',- ').lstrip(',- ')
+            if not sub_val:
+                return cleaned_addr, None
+            # "and" / "&" in the tail means this is an intersection, not a subaddress.
+            if re.search(r'\b(and|&)\b|\s*&\s*', sub_val, re.IGNORECASE):
+                return address_text, None
+            if re.match(r'^#?\s*\d+$', sub_val):
+                sub_val = f"Unit {sub_val.replace('#', '').strip()}"
+            return cleaned_addr, sub_val.title()
+
+    suffixes = r"\b(?:" + "|".join(sorted(_SUFFIX_EQUIV, key=len, reverse=True)) + r")\b"
+
     # Match suffix followed by any trailing words (business name, unit, station, etc.)
     match = re.search(fr'({suffixes})\s+(.+)$', address_text, re.IGNORECASE)
     if match:
@@ -173,10 +240,8 @@ def split_street_base_suffix(street_text: str) -> Tuple[str, str]:
     words = street_text.strip().split()
     if not words:
         return "", ""
-    suffixes = {"street", "st", "avenue", "ave", "drive", "dr", "road", "rd", 
-                "crescent", "cres", "boulevard", "blvd", "place", "pl", 
-                "court", "ct", "highway", "hwy", "lane", "ln", "way", "wy", "close", "cl", "gate", "gt"}
-    if len(words) >= 2 and words[-1].lower() in suffixes:
+    # One suffix list, not a third hand-typed copy (this one lacked "crt" too).
+    if len(words) >= 2 and words[-1].lower() in _SUFFIX_EQUIV:
         return " ".join(words[:-1]), words[-1]
     return street_text, ""
 
@@ -198,6 +263,7 @@ _SUFFIX_EQUIV = {
     "way": "way", "wy": "way",
     "close": "cl", "cl": "cl",
     "gate": "gt", "gt": "gt",
+    "drv": "dr",          # accepted by the old extractor regex; kept so nothing regresses
 }
 
 

@@ -100,8 +100,12 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                         logging.info(f"Stripping pre-digit noise '{pre_digit_text}' from address '{address_part}'")
                         address_part = address_part[digit_match.start():].strip()
             
-            # Clean and normalize isolated address
-            address_part, extracted_subaddr = extract_subaddress_info(address_part)
+            # Clean and normalize isolated address. The municipal street list lets the
+            # extractor find where the street ends by name rather than by the first suffix
+            # word -- "1234 St Laurence Street Unit 5" is otherwise cut at "St", and the
+            # operator's "crt" was not in the old suffix list at all (2026-09-02).
+            from cfr_dispatch.config.vocab import COQUITLAM_STREETS
+            address_part, extracted_subaddr = extract_subaddress_info(address_part, COQUITLAM_STREETS)
             address_part = clean_location_text(address_part, CALL_TYPES, units_vocab)
             normalized_address = normalize_street_suffix(address_part)
             

@@ -166,7 +166,13 @@ def main():
     logging.info(f"Merged model saved to: {merged_dir}")
     
     # Convert model to CTranslate2 int8 for faster-whisper local loading
-    ct2_output = os.path.join(base_dir, "models", "whisper-base-cfr-ct2")
+    # Never write over the directory the live daemon has deployed. cfr-agent holds the model
+    # in memory, so replacing the files under it would not crash the running process -- it
+    # would wait to fail until the next restart, on a partially-written model, with no
+    # obvious cause. Train to a fresh directory, evaluate it, and swap deliberately.
+    # Override with WHISPER_CT2_OUT; defaults to the original path for a clean machine.
+    ct2_output = os.environ.get(
+        "WHISPER_CT2_OUT", os.path.join(base_dir, "models", "whisper-base-cfr-ct2"))
     logging.info(f"Converting merged model to ctranslate2 int8 format at: {ct2_output}...")
     
     # Run conversion tool via shell command

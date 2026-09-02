@@ -32,11 +32,6 @@ from extract_training_data import normalize_transcript_raw
 
 # --- Geometry constants. Every one carries its source (CLAUDE.md s6.3). ---
 
-# The capture loop ends a recording after 3 seconds of silence (department operational
-# policy, operator 2026-08-31). Independently measured across 15 kiosk recordings the same
-# day: trailing silence 3.14-3.39 s. Subtracted so the midpoint splits speech, not padding.
-TRAILING_SILENCE_S = 3.0
-
 # Whisper's encoder consumes a fixed 30.0 s window: chunk_length(30) * sampling_rate(16000)
 # = 480,000 samples, verified against the installed transformers 5.14.1 on the kiosk
 # 2026-08-31 (WhisperFeatureExtractor.n_samples). A round longer than this cannot be
@@ -68,8 +63,8 @@ ADDENDUM_PATTERN = r"contact\s+dispatch"
 SAMPLE_RATE = 16000
 
 
-def first_spoken_word(model, audio, sample_rate, look_ahead_s):
-    """Returns (first_word, all_words) from the head of the recording."""
+def timestamped_words(model, audio, sample_rate, look_ahead_s):
+    """Transcribes the head of the recording and returns its words with start times."""
     segments, _ = model.transcribe(
         audio[:int(sample_rate * look_ahead_s)],
         beam_size=1, language="en",
@@ -78,7 +73,41 @@ def first_spoken_word(model, audio, sample_rate, look_ahead_s):
     words = []
     for seg in segments:
         words.extend(seg.words or [])
-    return (words[0] if words else None), words
+    return words
+
+
+def round_boundary_time(words, units_vocab):
+    """Start time of round 2, or None if the rounds cannot be separated.
+
+    Does not invent a second round-splitting rule. split_rounds() is the project's
+    authority on where a round ends -- it is what the parser uses, and it already handles
+    the fact that "Coquitlam" occurs twice inside a single round ("...10 Combined Response
+    Coquitlam, map grid 97, Coquitlam Engine 1..."), so a naive second-occurrence cut would
+    slice mid-round-1. This attaches a timestamp to that existing answer: rebuild the
+    normalised text from the timestamped words, split it, then map the boundary offset back
+    to the word that starts round 2 (CLAUDE.md s6.2 -- use the system of record's answer).
+
+    Reconstruction is exact because split_rounds' own normalisation is whitespace
+    collapsing, and a Whisper word token never contains whitespace.
+    """
+    if not words:
+        return None
+    tokens = [w.word.strip() for w in words]
+    offsets, pos = [], 0
+    for tok in tokens:
+        offsets.append(pos)
+        pos += len(tok) + 1                      # +1 for the single joining space
+    text = " ".join(tokens)
+
+    rounds = [r for r in split_rounds(text, units_vocab) if r.strip()]
+    if len(rounds) < 2:
+        return None
+
+    boundary_char = len(rounds[0].strip())
+    for idx, start in enumerate(offsets):
+        if start > boundary_char:
+            return words[idx].start
+    return None
 
 
 def main():
@@ -118,7 +147,7 @@ def main():
     logging.info("Loading '%s' to locate speech onset..." % args.model)
     model = WhisperModel(args.model, device="cpu", compute_type="int8", local_files_only=True)
 
-    kept, dropped, ratios = [], {}, []
+    kept, dropped, ratios, divergence = [], {}, [], []
 
     def drop(reason, did, detail=""):
         dropped.setdefault(reason, []).append(("%s %s" % (did, detail)).strip())
@@ -151,20 +180,29 @@ def main():
         audio, sr = librosa.load(wav, sr=SAMPLE_RATE)
         duration = len(audio) / sr
 
-        # Look far enough ahead to cover onset plus a whole round, so the word list can also
-        # serve the audio-vs-label word-count diagnostic below without a second pass.
-        w0, words = first_spoken_word(model, audio, sr, min(duration, 40.0))
-        if w0 is None:
+        # Look past the end of round 1 so the boundary is inside the transcribed window.
+        words = timestamped_words(model, audio, sr, min(duration, 45.0))
+        if not words:
             drop("no words transcribed", did, "%.1fs" % duration)
             continue
 
+        w0 = words[0]
         first = w0.word.strip().lower().strip(".,!?")
         if difflib.SequenceMatcher(None, first, WAKE_WORD).ratio() < WAKE_WORD_MIN_RATIO:
             drop("does not open with Coquitlam", did, "heard %s" % w0.word.strip()[:20])
             continue
 
+        # Both edges are measured, not derived. The previous formula halved total speech,
+        # which assumed the recording held exactly two rounds of equal pace -- an assumption
+        # a trailing addendum broke silently, and one that a dispatcher reading round 2
+        # faster would bend on every call.
         onset = w0.start
-        round_len = (duration - TRAILING_SILENCE_S - onset) / 2.0
+        boundary = round_boundary_time(words, UNITS_VOCABULARY)
+        if boundary is None:
+            drop("rounds not separable in the audio", did)
+            continue
+
+        round_len = boundary - onset
         if round_len > WHISPER_WINDOW_S:
             drop("round exceeds the 30s window", did, "%.1fs" % round_len)
             continue
@@ -173,15 +211,18 @@ def main():
             continue
 
         if not (os.path.exists(out) and not args.force):
-            clip = audio[int(onset * sr):int((onset + round_len) * sr)]
+            clip = audio[int(onset * sr):int(boundary * sr)]
             sf.write(out, clip, sr, subtype="PCM_16")
         kept.append({"file_name": "%s.wav" % did, "verified_transcript": label})
+        # How far the retired formula would have missed. 3.0 s was its silence constant
+        # (capture ends on 3 s of silence; measured 3.14-3.39 s across 15 recordings).
+        divergence.append(((duration - 3.0 - onset) / 2.0) - round_len)
 
         # Diagnostic only, never a drop rule: how many words the audio actually contains up
         # to the cut, against how many the label claims. A systematically bad cut shows here
         # as a skewed ratio. Content mismatch is NOT used -- dropping calls the base model
         # transcribes poorly would bias the set toward what it already gets right.
-        heard = sum(1 for w in words if w.start < onset + round_len)
+        heard = sum(1 for w in words if w.start < boundary)
         claimed = len(label.split())
         if claimed:
             ratios.append(float(heard) / claimed)
@@ -214,6 +255,12 @@ def main():
             logging.info("               %s" % one)
         if len(ids) > 5:
             logging.info("               ... and %d more" % (len(ids) - 5))
+    if divergence:
+        divergence.sort()
+        mid = divergence[len(divergence) // 2]
+        logging.info("  measured boundary vs the retired midpoint formula: median %+.2fs "
+                     "(range %+.2fs to %+.2fs) -- positive means the old cut ran long, "
+                     "into round 2" % (mid, divergence[0], divergence[-1]))
     if ratios:
         ratios.sort()
         mid = ratios[len(ratios) // 2]

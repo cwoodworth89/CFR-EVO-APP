@@ -86,9 +86,9 @@ Whenever a bug fix or feature edit is completed:
 
 To prevent Windows PowerShell quoting errors and keep all command logs 100% human-readable:
 1. **Use Version-Controlled Helper Scripts**:
-   - Run helper scripts (e.g. `inspect_dispatch.py`, `update_streetview.py`) inside the container stack for clean human-readable output:
+   - Run helper scripts (e.g. `tools/inspect_dispatch.py`, `tools/update_streetview.py`) on the kiosk host with the project virtualenv, from the repository root. They are not in the API image (`tools/` is not copied into it), and `backend/api/database.py` falls back to an empty SQLite file when it cannot reach Postgres (punch-list #61), so `inspect_dispatch.py` refuses to run without a Postgres `DATABASE_URL` from the environment or `backend/.env`:
      ```bash
-     ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec cfr_api python tools/inspect_dispatch.py DISP-2026-2659EC"
+     ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && .venv/bin/python tools/inspect_dispatch.py DISP-2026-55B7B6"
      ```
 2. **Execute Dedicated SQL Scripts**:
    - Use `docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch` with standard SQL queries rather than deeply nested inline quotes.

@@ -36,7 +36,7 @@ print(create_engine(os.environ['DATABASE_URL']).connect().execute(text('SELECT .
 **`DATABASE_URL` is per-machine — check which side you are on.** On the dev laptop it is set
 in your shell and points across Tailscale at the kiosk, which is what makes the one-liner above
 work locally. On the **kiosk itself** it lives in `backend/.env` (git-ignored, so it is not
-synced — it had drifted from `backend/.env.example` and was missing entirely until 2026-08-31).
+synced — it was missing entirely until 2026-08-31).
 
 Its absence there is close to invisible, because the codebase handles it three different ways:
 
@@ -112,7 +112,7 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 ## ⚙️ Project Configuration & Environments
 
 * **`.env` files**:
-  * Copy `.env.example` in `/backend` and `/frontend` respectively to configure environment parameters (database URL, NTFY push topics, MQTT broker). **There is no GCP credentials path** — an earlier version of this line said there was, and cloud STT is forbidden by CLAUDE.md §1.
+  * `backend/.env` and `frontend/.env.local` are git-ignored and have no template in the tree; the `.env.example` files were deleted 2026-09-03 because they named variables the code no longer reads. The running copies are on the kiosk (CLAUDE.md §3). **There is no GCP credentials path** — an earlier version of this line said there was, and cloud STT is forbidden by CLAUDE.md §1.
 * **Consolidated Python Configurations**:
   * All DSP noise floor values, audio sample rates, vocab target directories, and GIS shapefile mappings are centralized and re-exported in [backend/cfr_dispatch/config/\_\_init\_\_.py](../backend/cfr_dispatch/config/__init__.py).
 
@@ -155,23 +155,23 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 
 ## 🤖 AI Agent Customizations (Custom Skills & Sub-agents)
 
-CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in [**`.claude/skills`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills) and [**`.claude/agents`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents) (Claude Code's native convention). These resources extend agent capabilities and document domain runbooks. The original Antigravity-authored copies were archived out of the repository on 2026-08-30 (see `../CFR-EVO-APP-agent-archive/`); `.claude/` is the sole canonical, auto-loaded location.
+CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents** located in [**`.claude/skills`**](../.claude/skills) and [**`.claude/agents`**](../.claude/agents) (Claude Code's native convention). These resources extend agent capabilities and document domain runbooks. The original Antigravity-authored copies were archived out of the repository on 2026-08-30 (see `../CFR-EVO-APP-agent-archive/`); `.claude/` is the sole canonical, auto-loaded location.
 
 ### 🛠️ Specialized Sub-agents
 When spawning helper sub-agents, inherit from these type specifications:
 * **`call-review-analyst`**: Specialist in auditing dispatch call logs, triaging HITL reviews, diagnosing audio transcripts, and phonetic ambiguity analysis.
 * **`dispatch-qa-engineer`**: Specialist in automated end-to-end dispatch simulations, testing protocol enforcement, and clean QA database teardowns.
 * **`performance-metrics-analyst`**: Specialist in operational metrics analytics (Turnout Lead Time, Parsing Accuracy %, Stage Latency) and executive HUD telemetry design.
-* **`frontend-kiosk-architect`**, **`gis-spatial-engineer`**, **`kiosk-remote-operator`**, **`pipeline-core-engineer`**, **`stt-mlops-evaluator`**: see [`.claude/agents/`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/agents) for the full roster.
+* **`frontend-kiosk-architect`**, **`gis-spatial-engineer`**, **`kiosk-remote-operator`**, **`pipeline-core-engineer`**, **`stt-mlops-evaluator`**: see [`.claude/agents/`](../.claude/agents) for the full roster.
 
 ### 📚 Domain Skills
 These markdown runbooks guide agents through complex developer workflows:
-* [**`dispatch-pipeline-ops`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/dispatch-pipeline-ops/SKILL.md): Architecture of the 2-phase real-time dispatch audio pipeline.
-* [**`performance-metrics-analytics`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/performance-metrics-analytics/SKILL.md): Guidelines for measuring pipeline latencies and business intelligence metrics.
-* [**`gis-spatial-analysis`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-spatial-analysis/SKILL.md): Procedures for shapefile queries, coordinate reference transformations, and NFPA 291 hydrants.
-* [**`gis-pipeline-sync`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-pipeline-sync/SKILL.md): Pulling Coquitlam ESRI shapefiles and GIS caching updates.
-* [**`google-imagery-streetview`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/google-imagery-streetview/SKILL.md): Ingestion and display of satellite imagery and Google Street View.
-* [**`road-closure-management`**](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/road-closure-management/SKILL.md): Tracking active road closures, construction zones, and routing around hazards.
+* [**`dispatch-pipeline-ops`**](../.claude/skills/dispatch-pipeline-ops/SKILL.md): Architecture of the 2-phase real-time dispatch audio pipeline.
+* [**`performance-metrics-analytics`**](../.claude/skills/performance-metrics-analytics/SKILL.md): Guidelines for measuring pipeline latencies and business intelligence metrics.
+* [**`gis-spatial-analysis`**](../.claude/skills/gis-spatial-analysis/SKILL.md): Procedures for shapefile queries, coordinate reference transformations, and NFPA 291 hydrants.
+* [**`gis-pipeline-sync`**](../.claude/skills/gis-pipeline-sync/SKILL.md): Pulling Coquitlam ESRI shapefiles and GIS caching updates.
+* [**`google-imagery-streetview`**](../.claude/skills/google-imagery-streetview/SKILL.md): Ingestion and display of satellite imagery and Google Street View.
+* [**`road-closure-management`**](../.claude/skills/road-closure-management/SKILL.md): Tracking active road closures, construction zones, and routing around hazards.
 
 ---
 

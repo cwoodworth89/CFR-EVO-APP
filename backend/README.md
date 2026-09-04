@@ -33,11 +33,10 @@ The backend handles continuous DSP listening, audio tone detection, speech-to-te
    bash scripts/install_dev_packages.sh
    ```
 
-3. **Configure Environment Variables**:
-   Copy `.env.example` to `.env` and configure local stack endpoints (`LOCAL_API_URL`, `MQTT_BROKER_HOST`, `NTFY_SERVER_URL`):
-   ```bash
-   cp .env.example .env
-   ```
+3. **Environment**:
+   `backend/.env` is git-ignored and has no template in the tree (the `.env.example` files were
+   deleted 2026-09-03 because they named variables the code no longer reads). The running copy
+   lives on the kiosk; copy it from there or from the operator (CLAUDE.md §3).
 
 ---
 
@@ -59,7 +58,7 @@ pytest backend/tests/
 
 * **`cfr_dispatch/`**: Central package logic:
   * [cfr_dispatch/orchestration.py](./cfr_dispatch/orchestration.py): Coordinates queue processes, listeners, STT, and notification pipelines.
-  * [cfr_dispatch/parser.py](./cfr_dispatch/parser.py): Address/cross-street parser using anchor-based templates.
-  * [cfr_dispatch/config/](./cfr_dispatch/config/): Houses hardware, vocab, DSP, and cloud configurations.
+  * [cfr_dispatch/parser/](./cfr_dispatch/parser/): Address/cross-street parser package (`sanitize`, `call_types`, `units`, `channels`, `location`, `announcement`).
+  * [cfr_dispatch/config/](./cfr_dispatch/config/): Houses hardware, vocab, DSP, and runtime configurations.
 * **`scripts/`**: Preprocessing and utility scripts. Refer to [scripts/README.md](./scripts/README.md) for individual script details.
 * **`tests/`**: Integration and component tests.

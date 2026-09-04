@@ -266,7 +266,7 @@ The highest-leverage remaining work. `docs/standards/README.md` lists ten expect
 * **Domain standards need acquiring** — NFPA documents are licensed. Worth knowing before
   an agent burns time trying to fetch them.
 
-Also unfinished: I audited all 15 skills for stale *paths and constants* and fixed three,
+Also unfinished at the time (finished 2026-08-30 in [`briefings/skills_audit_2026-08-30.md`](briefings/skills_audit_2026-08-30.md); agents, descriptions and the dangling-path sweep done 2026-09-03 in [`briefings/staleness_audit_2026-09-03.md`](briefings/staleness_audit_2026-09-03.md)): I audited all 15 skills for stale *paths and constants* and fixed three,
 but **not** for described-behaviour that never existed — which is how
 `kiosk-responsive-ergonomics` came to document an `isKioskMode` API that has never been in
 the code. That audit needs reading each skill against the code it claims to describe.

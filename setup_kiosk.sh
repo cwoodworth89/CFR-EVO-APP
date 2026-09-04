@@ -25,11 +25,6 @@ deactivate
 # 3. Build the React frontend
 echo "Installing frontend node packages and building static files..."
 cd "${PROJECT_DIR}/frontend"
-# Copy .env.example if .env does not exist
-if [ ! -f ".env" ]; then
-    echo "Creating default frontend .env file..."
-    cp .env.example .env
-fi
 # Copy/create kiosk station .env.local if not present
 if [ ! -f ".env.local" ]; then
     echo "Creating default frontend .env.local file..."
@@ -165,10 +160,11 @@ sudo systemctl start unattended-upgrades
 echo "Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
 
-# Copy .env.example if .env does not exist
+# backend/.env is git-ignored and has no template in the tree (CLAUDE.md §3). Stop rather
+# than start the agent with no configuration.
 if [ ! -f "${PROJECT_DIR}/backend/.env" ]; then
-    echo "Creating default .env configuration file..."
-    cp "${PROJECT_DIR}/backend/.env.example" "${PROJECT_DIR}/backend/.env"
+    echo "ERROR: ${PROJECT_DIR}/backend/.env is missing. Copy it from the operator's machine (scp); see CLAUDE.md §3." >&2
+    exit 1
 fi
 
 echo "======================================================================"

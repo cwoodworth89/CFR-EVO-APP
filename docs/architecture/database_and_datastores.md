@@ -83,7 +83,7 @@ To guarantee total offline resilience and prevent masked errors, the system enfo
 
 | Component | Hardened Offline Engine | Removed Online Fallback |
 | :--- | :--- | :--- |
-| **Address Geocoding** | Local `Addresses.shp` & PostgreSQL `public.parcels` via `/api/gis/search` | ❌ External ArcGIS REST MapServer queries |
+| **Address Geocoding** | Local `Addresses.shp` & PostgreSQL `public.parcels` via `/api/parcels/search` | ❌ External ArcGIS REST MapServer queries |
 | **Emergency Routing** | Local containerized OSRM graph (Port 5000) | ❌ Google Maps Directions API |
 | **Speech-to-Text (STT)** | Local Whisper engine (`backend/models/`) | ❌ Google Cloud STT API |
 | **Map Basemaps & Imagery** | Local MBTiles server (`cfr_tiles:8081` - Satellite, Street, Grey) | ❌ Remote Mapbox / OSM CDN tile fetches |

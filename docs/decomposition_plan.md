@@ -1,5 +1,10 @@
 # CFR EVO: Module Decomposition & Review Plan
 
+> [!NOTE]
+> **Historical planning document.** Compiled 2026-08-21 against `c7f70ff`. Sections marked
+> ✅ DONE record work that landed; the rest was not re-verified after 2026-08-31. For the
+> current state read `docs/review_status_handoff.md`.
+
 Working document for the module-by-module review, hardening, simplification and
 documentation stage. Each section is scoped to be reviewable in a single focused
 session without carrying the whole system in context.
@@ -352,5 +357,7 @@ Per-case judgement; changes runtime behaviour; must not be bulk-edited.
   `public.city_boundary` is queryable.
 
 <!-- audit-ok: backend/tests/audio_samples/ -- records that the directory was removed -->
+<!-- audit-ok: frontend/src/components/DashboardHUD.jsx -- §2.1 records its split into five components (4e9d578) -->
+<!-- audit-ok: backend/test_capture.wav -- listed as a stray artefact to remove -->
 
 <!-- audit-ok: backend/tests/test_calls/ -- records that the synthesised corpus was deleted 2026-08-31 -->

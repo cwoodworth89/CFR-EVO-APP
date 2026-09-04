@@ -42,7 +42,7 @@ All reliance on external servers at `geodata.coquitlam.ca` has been completely e
 * **Endpoint**: `http://${window.location.hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png`
 * **Format**: 32-bit transparent PNG tiles pre-crawled across Zooms 14–20 (`layers=show:0,1,16` — Road Labels, House Address Numbers, Parcels).
 * **Serving Container**: `cfr_tiles` (`ghcr.io/consbio/mbtileserver:latest`) mounting `backend/data/tiles/cadastral.mbtiles`.
-* **Frontend Component**: [`MapLayers.jsx`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/MapLayers.jsx) (`CoquitlamOverlays`) using a standard Leaflet `TileLayer` with `transparent: true`, `opacity: 0.9`, and `fallbackUrl: null`.
+* **Frontend Component**: [`MapLayers.jsx`](../frontend/src/components/MapLayers.jsx) (`CoquitlamOverlays`) using a standard Leaflet `TileLayer` with `transparent: true`, `opacity: 0.9`, and `fallbackUrl: null`.
 
 ### 2. Relational Vector Property & Parcel API (FastAPI on Port 8000)
 * **Endpoint**: `GET /api/parcels/bbox?min_lon=...&min_lat=...&max_lon=...&max_lat=...`

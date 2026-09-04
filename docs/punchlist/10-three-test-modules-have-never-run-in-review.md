@@ -98,3 +98,7 @@ are current columns.
 `lat` → `centroid_lat` rename surfaced by execution — `pytest` found the `streetview.py` 500 in
 80 seconds, and running the import found its own broken verifier. No static crawl would have
 found either: `r.lat` is valid Python that fails only when the line executes.
+
+<!-- audit-ok: backend/tests/test_database_integration.py -- deleted 2026-08-31 (5aa72e0); this item is the record -->
+<!-- audit-ok: backend/tests/test_listener.py -- deleted 2026-08-31 (5aa72e0); this item is the record -->
+<!-- audit-ok: backend/tests/test_keyword_spotter.py -- deleted 2026-08-31 (5aa72e0); this item is the record -->

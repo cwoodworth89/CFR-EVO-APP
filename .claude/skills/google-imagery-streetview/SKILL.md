@@ -1,6 +1,6 @@
 ---
 name: google-imagery-streetview
-description: Procedures and integration workflows for fetching, caching, orienting, persisting, and rendering Google Street View panoramas and high-resolution satellite aerial imagery in CFR EVO.
+description: Procedures for fetching, caching, orienting, persisting, and rendering Google Street View panoramas in CFR EVO. Not the aerial basemap, which is City orthophotography served offline from ortho.mbtiles (see gis-pipeline-sync).
 ---
 
 # Satellite Imagery & Street View Enrichment Runbook

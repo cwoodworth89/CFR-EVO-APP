@@ -85,6 +85,7 @@ Produce numbers. None of them modify operational data.
 | `trace_geocode_corpus.py` | Scores the geocoder against the human-verified corpus. |
 | `verify_snapping_corpus.py` | Parcel arrival-point benchmark: boundary-to-arrival distance and OSRM ETA. |
 | `audit_skill_references.py` | Finds identifiers a `SKILL.md` names that exist nowhere in the code. `--scripts` checks this README. |
+| `audit_staleness.py` | Deterministic staleness scan: dangling paths in markdown (honours `audit-ok`), schema objects dropped by migrations but still named in code, modules and components nothing imports, frontend/pipeline API calls vs backend routes, compose names, env vars, punch-list status drift, `file://` links, doc age. Writes a Markdown report (`--out`). Overlaps `--docs` above; merging them is on the post-freeze backlog. |
 | `export_complex_sites_for_review.sql` | Sites where a crew arriving at the computed point still has property to search — the `#49` review queue. |
 
 ## STT / MLOps

@@ -1,6 +1,6 @@
 ---
 name: hitl-log-analysis
-description: Procedures for analyzing dispatch call logs, investigating low-confidence dispatches, evaluating Human-in-the-Loop (HITL) corrections, and running transcript hypothesis testing against the parser.
+description: Procedures for analyzing dispatch call logs, investigating low-rated dispatches (quality_rating and review_notes; confidence_score was dropped 2026-08-29), evaluating Human-in-the-Loop (HITL) corrections, and running transcript hypothesis testing against the parser.
 ---
 
 # HITL & Call Log Analysis Runbook

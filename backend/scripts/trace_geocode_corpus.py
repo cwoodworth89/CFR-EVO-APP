@@ -7,9 +7,11 @@ operator's `verified_address`.
 
 Why this exists
 ---------------
-`public.dispatches` holds paired ground truth: what the system concluded (`target`,
-`confidence_score`) alongside what a human confirmed was true (`verified_*`). That
-pairing can score the geocoder, not just STT word error rate.
+`public.dispatches` holds paired ground truth: what the system concluded (`target`)
+alongside what a human confirmed was true (`verified_*`). That pairing can score the
+geocoder, not just STT word error rate. (`confidence_score` used to be read here too; it was
+dropped 2026-08-29, punch-list #45, and the "stored confidence on wrong streets" summary went
+with it on 2026-09-03 when the query started failing.)
 
 This does NOT synthesise dispatches (CLAUDE.md 6.5) -- every row replayed is a real
 historical record. It is read-only: no INSERT/UPDATE, and nothing is published to MQTT.
@@ -223,7 +225,7 @@ def main():
 
     with engine.connect() as conn:
         rows = conn.execute(text(
-            "SELECT dispatch_id, confidence_score, raw_transcript, verified_address, "
+            "SELECT dispatch_id, raw_transcript, verified_address, "
             "       target->>'address'      AS sys_addr, "
             "       target->>'map_grid'     AS sys_grid, "
             "       target->>'intersection' AS sys_intersection, "
@@ -240,7 +242,6 @@ def main():
 
     buckets = Counter()
     step_by_kind = Counter()
-    conf_when_wrong = []
     out = []
 
     for r in rows:
@@ -260,14 +261,11 @@ def main():
         kind = classify(r["sys_addr"], r["verified_address"])
         buckets[kind] += 1
         step_by_kind[(kind, answering)] += 1
-        if kind == "wrong-street" and r["confidence_score"] is not None:
-            conf_when_wrong.append(float(r["confidence_score"]))
 
         out.append({
             "dispatch_id": r["dispatch_id"],
             "kind": kind,
             "answering_step": answering,
-            "stored_confidence": r["confidence_score"],
             "system_address": r["sys_addr"],
             "verified_address": r["verified_address"],
             "replay_address": (result or {}).get("address"),
@@ -279,7 +277,6 @@ def main():
             print("  dispatch      : %s" % r["dispatch_id"])
             print("  probe address : %r" % probe)
             print("  verified      : %r" % r["verified_address"])
-            print("  stored conf   : %s" % r["confidence_score"])
             print("  classification: %s\n" % kind)
             print("  step ladder (in call order):")
             for e in log:
@@ -303,15 +300,6 @@ def main():
         for (kind, step), n in sorted(step_by_kind.items(), key=lambda kv: -kv[1]):
             if kind in ("wrong-street", "house-number", "no-street"):
                 print("  %-13s via %-18s %3d" % (kind, step, n))
-
-        if conf_when_wrong:
-            hi = [c for c in conf_when_wrong if c >= 90]
-            print("\nStored confidence on the %d wrong-street calls:" % len(conf_when_wrong))
-            print("  mean %.1f, max %.0f, at or above 90: %d"
-                  % (sum(conf_when_wrong) / len(conf_when_wrong),
-                     max(conf_when_wrong), len(hi)))
-            print("  A high score on a wrong street means confidence is not measuring")
-            print("  correctness (CLAUDE.md 6.1).")
 
     if args.csv and out:
         with open(args.csv, "w", newline="", encoding="utf-8") as fh:

@@ -205,8 +205,11 @@ backend/data/tiles/
 > **There is one imagery layer now.** `ortho.mbtiles` holds City of Coquitlam 7.5cm
 > orthophotography under the Open Government Licence, crawled from the City's own
 > `Imagery_2025` cache. The Esri `satellite.mbtiles` layer was **retired 2026-08-31** — it
-> was never City data and its terms were never read (#47). Verify provenance with
-> `backend/scripts/verify_ortho_provenance.py`.
+> was never City data and its terms were never read (#47). A verifier script
+> (`backend/scripts/verify_ortho_provenance.py`) was written and deleted the same day
+> (9017e6a) because it could not do its job; there is no script for this.
+
+<!-- audit-ok: backend/scripts/verify_ortho_provenance.py -- records that the verifier was deleted 2026-08-31 -->
 
 * **Resolution**: 7.5 cm ground sampling distance (measured: `.sdw` pixel size 0.075 m).
 * **Extent**: −122.8995, 49.2165 → −122.6110, 49.3628 (covers `public.city_boundary`).

@@ -31,6 +31,7 @@ grep -rnoE "https?://[A-Za-z0-9._-]+" backend/ services/ frontend/src/ \
 |:--|:--|:--|
 | `raw.githubusercontent.com`, `cdnjs.cloudflare.com` | `BlockParcelPanel`, `PropertySatellitePanel`, `RouteOverviewPanel` | **Fixed 2026-08-31.** Six Leaflet marker fetches, including the gold *incident* pin. Vendored to local SVG in `frontend/src/assets/`, shared from `components/map/mapIcons.js`. Vite inlines both (419/431 B, under the 4096 B `assetsInlineLimit`) as data URIs, and the shadow now comes from the installed `leaflet` package — so the markers cost **no** request at all. See §3.1. |
 | `huggingface.co` | `backend/cfr_dispatch/stt/transcriber.py` | **Fixed 2026-08-31.** `WhisperModel(...)` took `local_files_only` at its `False` default, so every `cfr-agent` cold start called `huggingface.co/api/models/Systran/faster-whisper-base/revision/main` to check the model revision — observed live in `journalctl` at 18:35:09. The weights were already cached (142 MB). Now `local_files_only=True`; an absent cache raises with seeding instructions instead of downloading. |
+| `joinjoaomgcd.appspot.com` | `backend/tests/test_variables.py` | **Deleted 2026-09-03.** A 2026-06-14 push-notification probe for the Join service, never registered here, that fired only when `JOIN_API_KEY` was set. It was not a test; removed with the staleness audit (`docs/briefings/staleness_audit_2026-09-03.md`). |
 
 Verified against the installed `faster_whisper` **1.2.1** on the kiosk, not from memory (§7.3):
 the parameter is passed straight to `huggingface_hub.snapshot_download`.
@@ -162,3 +163,5 @@ because it is invisible while the link is up, and because nothing in the repo li
 supposed to be reachable.
 
 An unknown dependency is tracked the same way an unknown value is (§6.1, §7.5): **visibly.**
+
+<!-- audit-ok: backend/tests/test_variables.py -- deleted 2026-09-03; the row in section 1 records the removal -->

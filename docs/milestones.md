@@ -68,7 +68,8 @@ This document outlines the key milestones achieved during the development of CFR
 *   **Reviewer Ergonomics & Call Flow Sequence**: Re-ordered review input fields in `DispatchReview.jsx` to follow the verbal dispatch call sequence (`Captured Dispatch Tone` $\rightarrow$ `Verified Units` $\rightarrow$ `Verified Incident Type` $\rightarrow$ `Verified Address` $\rightarrow$ `Subaddress` $\rightarrow$ `Talkgroup & Map Grid` $\rightarrow$ `Verified Ground-Truth Transcript`).
 *   **Auto-Advance & Audio Auto-Play**: Pressing `Ctrl+Enter` or clicking Submit saves the verification, auto-selects the next dispatch row in the list, resets form scroll to top, and automatically starts playing the new call recording audio.
 *   **Simple Audio Jump-Back & Table Filters**: Added lightweight `⏪ -5s` jump-back button, Status filter tabs (`[All]`, `[Needs HITL Review]`, `[Low Confidence]`, `[Fine-Tuned]`), and metadata dropdown filters (Tone & Units).
-*   **Project Rule Architecture**: Established `.agents/rules/local_stack_and_dsp_rules.md` documenting DSP tone parameters, STT pipeline controls, WER symmetric evaluation, Tailscale SSH workflows, and server git-ignored file management for cross-agent collaboration.
+*   **Project Rule Architecture**: Established `.agents/rules/local_stack_and_dsp_rules.md` *(archived out of the tree 2026-08-30, 82b132a; superseded by `CLAUDE.md` and `.claude/skills/`)* documenting DSP tone parameters, STT pipeline controls, WER symmetric evaluation, Tailscale SSH workflows, and server git-ignored file management for cross-agent collaboration.
+<!-- audit-ok: .agents/rules/local_stack_and_dsp_rules.md -- archived 2026-08-30; the bullet records that it existed -->
 
 ---
 

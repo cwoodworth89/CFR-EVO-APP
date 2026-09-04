@@ -41,32 +41,9 @@ Do not recreate them. If a rule is specific enough to belong beside the code, it
 
 ---
 
-## Antigravity-specific: sub-agent delegation
+Antigravity is no longer used on this project (operator ruling 2026-09-03) and its
+delegation section was removed. Claude Code's delegation model is `CLAUDE.md` §4.
 
-Claude Code's delegation model is `CLAUDE.md` §4. This section covers only Antigravity's
-`invoke_subagent`, which has no Claude Code equivalent.
-
-**The project is in a feature freeze. Delegation is narrowed accordingly.**
-
-1. **Delegate mechanical work**: bulk file edits, test runners, log parsing, tile
-   downloads. These have a defined output and a verifiable end.
-2. **Do not fan out research.** No explorer/challenger/auditor/victory-auditor chains.
-   Their purpose is to find more, and during a freeze finding more is the failure mode,
-   not the goal. A previous run of that pattern produced 68 agent working directories and
-   2.6 MB of reports; it was archived out of the repository on 2026-08-30 because
-   everything of substance in it had already been committed as code or a briefing.
-3. **A sub-agent returns a decision, not a report.** Cap it: finding, `file:line`,
-   recommended action, confidence. A 50 KB report is a context cost paid twice — once to
-   write it, once to read it.
-4. **Model tier allocation**:
-   * `flash_lite` — deterministic test runners (`pytest`),
-     mechanical renames, dead-code and import pruning, log parsing, linting.
-   * `flash` — feature engineering, database migrations, shapefile ingestion, React
-     component decomposition, tile pre-caching, API routes.
-   * `pro` — DSP STFT/FFT harmonic filter maths, OSRM Lua profile maths, LoRA quantization
-     analysis, concurrency deadlock diagnosis.
-5. **Anything discovered that is not already a punch-list item** goes to
-   [`docs/post_freeze_backlog.md`](docs/post_freeze_backlog.md) as one line and is not
-   investigated — unless it is crew-visible (§7.1: *if this is wrong, can crews tell?*),
-   which is promoted immediately.
-6. **Skill lookup**: `.claude/skills/` before drafting any implementation plan.
+<!-- audit-ok: backend/GEMINI.md -- deleted 2026-08-30; this file records why -->
+<!-- audit-ok: frontend/GEMINI.md -- deleted 2026-08-30; this file records why -->
+<!-- audit-ok: services/gis/GEMINI.md -- deleted 2026-08-30; this file records why -->

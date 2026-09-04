@@ -9,7 +9,7 @@ Everything runs **on the kiosk** (`tcfire@100.95.146.94`), where the audio, the 
 the training dependencies are. Prefix every Python invocation with
 `XDG_RUNTIME_DIR=/run/user/1000`: importing `cfr_dispatch` pulls in PortAudio, and without
 it the import dies before your script runs. Design, measurements and rejected alternatives:
-[`docs/briefings/whisper_training_round1_labelling.md`](../../docs/briefings/whisper_training_round1_labelling.md).
+[`docs/briefings/whisper_training_round1_labelling.md`](../../../docs/briefings/whisper_training_round1_labelling.md).
 
 ## Read this first: the two traps that produced wrong numbers
 

@@ -96,6 +96,7 @@ this proved City provenance. Once Esri was shown to serve the same photographs, 
 proved only different processing — so it returned a confident PASS on a question it could not
 decide. Written and deleted within 48 hours.
 
+<!-- audit-ok: frontend/test_tile_layer_adversarial.js -- deleted 2026-08-31 (9017e6a); this passage records why -->
 **`frontend/test_tile_layer_adversarial.js`** hand-copied `getTileUrl` instead of importing it,
 because `apiClient.js` is an ES module reading `import.meta.env`. When the aerial layer moved
 to `/services/ortho` across three files, **all 23 assertions stayed green against the old

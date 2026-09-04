@@ -276,3 +276,5 @@ Pi-hardware benchmarks, where our figures are explicitly from the wrong machine.
 above is reproducible; ask and we will supply the exact query.
 
 <!-- audit-ok: backend/api/routers/dispatch.py -- the sentence exists to say this path never existed -->
+
+<!-- audit-ok: frontend/src/components/DispatchCard.tsx -- the sentence exists to say this file never existed -->

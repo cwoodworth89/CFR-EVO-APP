@@ -125,144 +125,9 @@ def fix_winding_order(dest_dir: str):
     except Exception as e:
         logging.error(f"Failed to correct winding order: {e}", exc_info=True)
 
-def update_hydrant_data():
-    logging.info("=== Starting Coquitlam Fire Hydrants Database Update ===")
-    
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_dir = os.path.join(script_dir, "..", "frontend", "public", "data")
-    output_path = os.path.join(output_dir, "hydrants.json")
-    
-    # 1. Load existing hydrants if file exists
-    old_hydrants = {}
-    if os.path.exists(output_path):
-        try:
-            with open(output_path, "r") as f:
-                old_list = json.load(f)
-                old_hydrants = {h["id"]: h for h in old_list if "id" in h}
-            logging.info(f"Loaded {len(old_hydrants)} existing hydrants from cache.")
-        except Exception as e:
-            logging.warning(f"Could not load existing hydrants file: {e}")
-            
-    # 2. Download fresh list from Coquitlam ArcGIS server
-    url = "https://geodata.coquitlam.ca/arcgis/rest/services/DynamicServices/Water/MapServer/2/query"
-    fresh_features = []
-    offset = 0
-    limit = 1000
-    
-    try:
-        while True:
-            params = {
-                "where": "1=1",
-                "outFields": "OBJECTID,gis_id,status,flow_class",
-                "resultOffset": str(offset),
-                "resultRecordCount": str(limit),
-                "outSR": "4326",
-                "f": "json"
-            }
-            
-            logging.info(f"Fetching hydrants from server, offset {offset}...")
-            encoded_params = urllib.parse.urlencode(params)
-            req = urllib.request.Request(
-                f"{url}?{encoded_params}",
-                headers={'User-Agent': 'Mozilla/5.0'}
-            )
-            with urllib.request.urlopen(req) as response:
-                data = json.loads(response.read().decode())
-                
-            if "error" in data:
-                logging.error(f"ArcGIS server returned error: {data['error']}")
-                return False
-                
-            features = data.get("features", [])
-            if not features:
-                break
-                
-            fresh_features.extend(features)
-            if len(features) < limit:
-                break
-            offset += limit
-            
-    except Exception as e:
-        logging.error(f"Failed to query new hydrant listings from server: {e}")
-        return False
-        
-    logging.info(f"Fetched {len(fresh_features)} fresh hydrants from MapServer.")
-    
-    # 3. Process fresh hydrants
-    new_hydrants_list = []
-    new_hydrants_dict = {}
-    
-    for f in fresh_features:
-        attribs = f.get("attributes", {})
-        geometry = f.get("geometry", {})
-        
-        obj_id = attribs.get("OBJECTID")
-        if not obj_id or not geometry or "x" not in geometry or "y" not in geometry:
-            continue
-            
-        hyd = {
-            "id": obj_id,
-            "gisId": attribs.get("gis_id") or "Unknown",
-            "status": attribs.get("status") or "OPERATING",
-            "flowClass": attribs.get("flow_class") or "",
-            "lng": geometry.get("x"),
-            "lat": geometry.get("y")
-        }
-        new_hydrants_list.append(hyd)
-        new_hydrants_dict[obj_id] = hyd
-        
-    # 4. Compare old and new datasets
-    added = []
-    deleted = []
-    modified = []
-    
-    for obj_id, new_hyd in new_hydrants_dict.items():
-        if obj_id not in old_hydrants:
-            added.append(new_hyd)
-        else:
-            old_hyd = old_hydrants[obj_id]
-            changes = []
-            for key in ["gisId", "status", "flowClass", "lat", "lng"]:
-                if old_hyd.get(key) != new_hyd.get(key):
-                    changes.append(f"{key}: {old_hyd.get(key)} -> {new_hyd.get(key)}")
-            if changes:
-                modified.append((new_hyd, changes))
-                
-    for obj_id, old_hyd in old_hydrants.items():
-        if obj_id not in new_hydrants_dict:
-            deleted.append(old_hyd)
-            
-    # 5. Log change summary
-    logging.info("\n=== Hydrants Change Summary ===")
-    logging.info(f"Additions: {len(added)}")
-    for a in added[:10]:
-        logging.info(f"  [+] Added: ID {a['id']} (GIS ID {a['gisId']}), status={a['status']}, flowClass={a['flowClass']}")
-    if len(added) > 10:
-        logging.info(f"  ... and {len(added) - 10} more.")
-        
-    logging.info(f"Deletions: {len(deleted)}")
-    for d in deleted[:10]:
-        logging.info(f"  [-] Deleted: ID {d['id']} (GIS ID {d['gisId']})")
-    if len(deleted) > 10:
-        logging.info(f"  ... and {len(deleted) - 10} more.")
-        
-    logging.info(f"Status/Metadata Changes: {len(modified)}")
-    for m, changes in modified[:10]:
-        logging.info(f"  [*] Changed: ID {m['id']} (GIS ID {m['gisId']}) - {', '.join(changes)}")
-    if len(modified) > 10:
-        logging.info(f"  ... and {len(modified) - 10} more.")
-    logging.info("================================\n")
-    
-    # 6. Save updated file using compact serialization
-    os.makedirs(output_dir, exist_ok=True)
-    try:
-        with open(output_path, "w") as out_f:
-            json.dump(new_hydrants_list, out_f, separators=(',', ':'))
-        logging.info(f"Successfully updated cached hydrant database (compact format) at: {output_path}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to write updated hydrants file: {e}")
-        return False
+# update_hydrant_data() was removed 2026-09-03. It wrote frontend/public/data/hydrants.json,
+# the browser-side cache retired 2026-08-22 when hydrants moved to public.hydrants
+# (gis-pipeline-sync skill). The live path is backend/scripts/sync_hydrants.py.
 
 
 def main():
@@ -315,23 +180,16 @@ def main():
                 shutil.rmtree(backup)
                 logging.info(f"Reverted {folder} from backup.")
                 
-    # 2. Update fire hydrants database
-    hydrants_success = False
-    try:
-        hydrants_success = update_hydrant_data()
-    except Exception as e:
-        logging.error(f"Fire hydrant database update failed. Error: {e}", exc_info=True)
-        
-    finally:
-        # Clean up temp downloads directory
-        if os.path.exists(TEMP_DIR):
-            try:
-                shutil.rmtree(TEMP_DIR)
-            except Exception:
-                pass
-        
+    # Hydrants are not refreshed here any more: run backend/scripts/sync_hydrants.py.
+    # (public.hydrants is the source of truth; the JSON cache this used to write is gone.)
+    if os.path.exists(TEMP_DIR):
+        try:
+            shutil.rmtree(TEMP_DIR)
+        except Exception:
+            pass
+
     # Check overall success to write success timestamp and set exit code
-    if shapefiles_success and hydrants_success:
+    if shapefiles_success:
         logging.info("=== GIS Update Process Succeeded ===")
         mark_update_success()
         sys.exit(0)

@@ -232,6 +232,6 @@ curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/nul
 ```
 Expected response: `200 image/jpeg (...) bytes` and `200 image/png (...) bytes`.
 
-For deep troubleshooting, coordinate math, and recovery commands, see [`.claude/skills/mbtiles-tile-server/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/mbtiles-tile-server/SKILL.md).
+For deep troubleshooting, coordinate math, and recovery commands, see [`.claude/skills/mbtiles-tile-server/SKILL.md`](../mbtiles-tile-server/SKILL.md).
 
 

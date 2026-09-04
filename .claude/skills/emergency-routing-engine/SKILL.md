@@ -1,11 +1,11 @@
 ---
 name: emergency-routing-engine
-description: Architectural specifications, apparatus-aware pathfinding, station origin lookups, and dual-mode (online Google / offline OSRM) emergency vehicle routing in CFR EVO.
+description: Station origin lookups and emergency vehicle routing through the local OSRM container in CFR EVO. Apparatus tiers are staged seed data, not applied (CLAUDE.md §6.4); the Google Directions section records a path considered and not taken.
 ---
 
 # Emergency Apparatus Routing Engine Runbook
 
-This skill outlines the pathfinding algorithms, station origin mapping, vehicle clearance profiles, and dual-mode (offline OSRM / online Google Directions) routing workflows for **CFR EVO**.
+This skill outlines the pathfinding algorithms, station origin mapping, and OSRM routing workflows for **CFR EVO**. The Google Directions subsection below records a path that was considered and not taken; nothing in the system calls it.
 
 ---
 

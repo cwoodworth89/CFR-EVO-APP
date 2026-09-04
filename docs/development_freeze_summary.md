@@ -17,7 +17,7 @@
 
 ## 1. Import Parcels Logic (Detailed Architecture)
 
-The parcel ingestion engine in [`backend/scripts/import_parcels.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/scripts/import_parcels.py) operates on a **non-destructive, PostGIS-accelerated pipeline**:
+The parcel ingestion engine in [`backend/scripts/import_parcels.py`](../backend/scripts/import_parcels.py) operates on a **non-destructive, PostGIS-accelerated pipeline**:
 
 ```mermaid
 flowchart TD
@@ -60,7 +60,7 @@ flowchart TD
 ### Phase A: PostGIS Migration & Single Source of Truth
 * **Database Container**: Migrated from generic PostgreSQL to `postgis/postgis:16-3.4-alpine` on port `5432`.
 * **Zero In-Memory Shapefiles**: Completely purged `shapefile_loader.py` and in-memory GeoDataFrames. All spatial queries (zones, parcels, intersections, city boundaries) run directly against PostgreSQL/PostGIS.
-* **Master GIS Ingestion**: Created [`backend/scripts/download_gis_data.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/scripts/download_gis_data.py) and [`backend/scripts/import_gis_data.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/scripts/import_gis_data.py):
+* **Master GIS Ingestion**: Created [`backend/scripts/download_gis_data.py`](../backend/scripts/download_gis_data.py) and [`backend/scripts/import_gis_data.py`](../backend/scripts/import_gis_data.py):
   - `public.roads`: 3,214 operating road segments with address ranges
   - `public.intersections`: 3,947 topological junction points *(6,499 as of 2026-08-21; integrity unverified — punch-list #9/#13)*
   - `public.zones`: 134 emergency response zones
@@ -69,13 +69,13 @@ flowchart TD
   - `public.vocabulary`: 256 rows (units, call types, radio channels, response types, map grids)
 
 ### Phase B: STT Whisper Full-Vocabulary Biasing
-* Updated [`backend/cfr_dispatch/stt/bias_prompt.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/cfr_dispatch/stt/bias_prompt.py) and [`vocab.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/cfr_dispatch/config/vocab.py):
+* Updated [`backend/cfr_dispatch/stt/bias_prompt.py`](../backend/cfr_dispatch/stt/bias_prompt.py) and [`vocab.py`](../backend/cfr_dispatch/config/vocab.py):
   - Un-throttled STT prompt biasing: feeds **all 1,079 Coquitlam road names**, all 66 call types, all units, and HITL corrections directly to Whisper.
   - Eliminated artificial array slicing (`[:25]`, `[:15]`).
   - Added DB-first loading with local text file fallback.
 
 ### Phase C: FastAPI Monolith Decomposition
-* Refactored [`backend/api/server.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/api/server.py) from a 900+ line monolith into a clean ~150-line root coordinating 9 modular `APIRouters`:
+* Refactored [`backend/api/server.py`](../backend/api/server.py) from a 900+ line monolith into a clean ~150-line root coordinating 9 modular `APIRouters`:
   - `backend/api/routers/auth.py`
   - `backend/api/routers/dispatches.py`
   - `backend/api/routers/parcels.py`
@@ -87,18 +87,18 @@ flowchart TD
   - `backend/api/routers/tiles.py`
 
 ### Phase D: Parser Cross-Street Segmentation & `custom_places` Rename
-* **Data Model**: Updated [`DispatchData`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/cfr_dispatch/config/models.py) to include `cross_street_1` and `cross_street_2`.
-* **Parsers**: Updated both template [`parser.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/cfr_dispatch/parser.py) and [`destructive_parser.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/backend/cfr_dispatch/destructive_parser.py) to cleanly isolate nearby crossroads (`near Austin Ave and Mariner Way`) without polluting the primary `intersection` field.
+* **Data Model**: Updated [`DispatchData`](../backend/cfr_dispatch/config/models.py) to include `cross_street_1` and `cross_street_2`.
+* **Parsers**: Updated both template `parser.py` and [`destructive_parser.py`](../backend/cfr_dispatch/destructive_parser.py) to cleanly isolate nearby crossroads (`near Austin Ave and Mariner Way`) without polluting the primary `intersection` field.
 * **Landmarks Rename**: Renamed table and vocabulary references from `landmarks` -> `public.custom_places` to distinguish manually added points of interest from authoritative municipal GIS layers.
 
 ### Phase E: Geocoder 2.0 Decomposition & Resolution Order Overhaul
-* Decomposed monolithic `geocoder.py` (723 lines) into 6 specialized modules in [`services/gis/src/gis_service/`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/):
-  1. [`normalization.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/normalization.py) (~80 lines): Pure suffix normalization, intersection keys, address dataclasses.
-  2. [`address_resolver.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/address_resolver.py) (~200 lines): Exact parcel lookup, block interpolation, cross-road narrowing, parcel/road centroids.
-  3. [`intersection_resolver.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/intersection_resolver.py) (~120 lines): Pre-cached topological intersection fuzzy matching & dual-junction disambiguation.
-  4. [`spatial_queries.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/spatial_queries.py) (~120 lines): Zone polygon containment, grid validations, boundary checks.
+* Decomposed monolithic `geocoder.py` (723 lines) into 6 specialized modules in [`services/gis/src/gis_service/`](../services/gis/src/gis_service/):
+  1. [`normalization.py`](../services/gis/src/gis_service/normalization.py) (~80 lines): Pure suffix normalization, intersection keys, address dataclasses.
+  2. [`address_resolver.py`](../services/gis/src/gis_service/address_resolver.py) (~200 lines): Exact parcel lookup, block interpolation, cross-road narrowing, parcel/road centroids.
+  3. [`intersection_resolver.py`](../services/gis/src/gis_service/intersection_resolver.py) (~120 lines): Pre-cached topological intersection fuzzy matching & dual-junction disambiguation.
+  4. [`spatial_queries.py`](../services/gis/src/gis_service/spatial_queries.py) (~120 lines): Zone polygon containment, grid validations, boundary checks.
   5. `custom_places_resolver.py` (~60 lines): Named places fuzzy matching & hardcoded municipal overrides. **DELETED 2026-08-21** — coordinates were script-generated and up to 1.8 km off a parcel, and the step was unreachable because Locution always speaks the civic address before the place name.
-  6. [`geocoder.py`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/services/gis/src/gis_service/geocoder.py) (~150 lines): Thin orchestrator implementing the authoritative 8-step resolution cascade.
+  6. [`geocoder.py`](../services/gis/src/gis_service/geocoder.py) (~150 lines): Thin orchestrator implementing the authoritative 8-step resolution cascade.
 
 #### Resolution Cascade (as of the freeze — now 7 steps, see note below):
 ```
@@ -125,7 +125,7 @@ flowchart TD
 * **Rationale**: The original 4-mode recruit map-training simulator (`TRAINING_ZONES`, `TRAINING_INTERSECTIONS`, `TRAINING_BLOCKS`, `TRAINING_ADDRESSES`) predated the PostGIS migration and depended on a deprecated data pipeline. Removed as part of the freeze rather than carried forward with legacy patterns.
 * **Deleted static datasets** (pre-extracted from the old shapefile pipeline, exclusively used by training quiz modes): `frontend/public/data/addresses.json` (~18MB), `blocks.json` (~356KB), `intersections.json` (~145KB).
 * **Preserved datasets** (still used by live `EXPLORE`-mode map layers, not training-specific): `zones.json`, `hydrants.json`, `coquitlam_city_boundary.json`.
-* **Code changes**: Removed quiz state machines, question loaders, keypress listeners, and tolerance-guessing logic (~470 lines combined) from [`frontend/src/components/MapBoard.jsx`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/MapBoard.jsx) and [`frontend/src/components/DashboardHUD.jsx`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/DashboardHUD.jsx); dropped `TRAINING_*` entries from `MODE_DEFAULTS` in [`MapConstants.js`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/frontend/src/components/MapConstants.js) (remaining supported modes: `EXPLORE`, `KIOSK_VIEW`, `DRIVER_SETUP`, `ADMIN_DISPATCHES`); removed the now-unused `SmartZoom`/`ZoomToFeedback` components from `MapActions.jsx`; deleted orphaned `frontend/src/components/review/SatelliteMiniMap.jsx` and `AudioWaveformPlayer.jsx` (also resolves punch-list items #4 and #5 in `docs/debug_and_qa_punchlist.md`).
+* **Code changes**: Removed quiz state machines, question loaders, keypress listeners, and tolerance-guessing logic (~470 lines combined) from [`frontend/src/components/MapBoard.jsx`](../frontend/src/components/MapBoard.jsx) and `frontend/src/components/DashboardHUD.jsx`; dropped `TRAINING_*` entries from `MODE_DEFAULTS` in [`MapConstants.js`](../frontend/src/components/MapConstants.js) (remaining supported modes: `EXPLORE`, `KIOSK_VIEW`, `DRIVER_SETUP`, `ADMIN_DISPATCHES`); removed the now-unused `SmartZoom`/`ZoomToFeedback` components from `MapActions.jsx`; deleted orphaned `frontend/src/components/review/SatelliteMiniMap.jsx` and `AudioWaveformPlayer.jsx` (also resolves punch-list items #4 and #5 in `docs/debug_and_qa_punchlist.md`).
 * **Verification**: `npm run build` compiled cleanly (0 errors) on both Windows and the remote kiosk with a reduced bundle size. Confirmed independently in this session — `TRAINING_*` and the deleted `.jsx` files are absent from the current working tree.
 * **Future work**: Reimplementation as a decoupled, PostGIS-backed standalone module (not `appMode` branches inside the dispatch kiosk components) is tracked as backlog item #4 in `docs/PROJECT_IDEAS.md`.
 
@@ -176,4 +176,8 @@ flowchart TD
 3. **Next Candidate Work** *(superseded — see [`review_status_handoff.md`](./review_status_handoff.md))*:
    - Monitor first live over-the-air dispatch on the new geocoder cascade.
    - Frontend UI audit of the newly populated parcel polygon rings (`rings` array in dispatch payload) on the Leaflet/MapLibre apparatus bay kiosk HUD.
-   - Updating agent skill files ([`gis-spatial-analysis/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-spatial-analysis/SKILL.md) and [`gis-pipeline-sync/SKILL.md`](file:///c:/Users/Curtis/Nextcloud/Documents/Projects/Coding/CFR-EVO-APP/.claude/skills/gis-pipeline-sync/SKILL.md)) to reflect the PostGIS sub-resolver module structure.
+   - Updating agent skill files ([`gis-spatial-analysis/SKILL.md`](../.claude/skills/gis-spatial-analysis/SKILL.md) and [`gis-pipeline-sync/SKILL.md`](../.claude/skills/gis-pipeline-sync/SKILL.md)) to reflect the PostGIS sub-resolver module structure.
+
+<!-- audit-ok: backend/cfr_dispatch/parser.py -- decomposed into the parser/ package after the freeze; the Phase narrative is historical -->
+<!-- audit-ok: frontend/src/components/DashboardHUD.jsx -- split into five components 2026-08-21 (4e9d578); historical -->
+<!-- audit-ok: frontend/src/components/review/SatelliteMiniMap.jsx -- deleted at the freeze commit d5fbdcc; historical -->

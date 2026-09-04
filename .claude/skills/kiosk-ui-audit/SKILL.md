@@ -17,7 +17,7 @@ sequenceDiagram
     participant Backend as FastAPI Gateway (:8000)
     participant MQTT as Mosquitto MQTT (:9001 WebSockets)
     participant Frontend as React / Vite Kiosk (:5173)
-    participant Agent as Antigravity /browser
+    participant Agent as Claude Code browser tools
 
     Note over Frontend: Station kiosk boots & subscribes to 'cfr/dispatches'
     Backend->>MQTT: Publish Phase 1 INSERT payload

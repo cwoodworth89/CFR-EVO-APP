@@ -12,6 +12,8 @@ Designed to operate seamlessly across **4 station kiosks** (with Hall 1 serving 
 
 > [!NOTE]
 > **Current deployment status**: this is the target multi-hall architecture. Right now CFR EVO runs single-hall — one physical test kiosk — while the core dispatch/GIS/routing pipeline is hardened. Multi-hall rollout is tracked as future work in [`docs/PROJECT_IDEAS.md`](./docs/PROJECT_IDEAS.md) (#5).
+>
+> **The kiosk is a mock production environment.** It runs the full stack on real dispatch audio in a real hall, but one person, the developer, uses it, and only in a testing capacity. No crew depends on it yet. That is what "development" means here, and why the software follows production rules (`CLAUDE.md` §6) while everything around it can still change.
 
 ---
 
@@ -166,17 +168,18 @@ sequenceDiagram
 
 ## 📂 Repository Structure
 
-**Production** is what runs on the station kiosk on its own:
+**The software** is what will be production; today it runs on the mock-production kiosk:
 
 * `backend/cfr_dispatch/` and `backend/main.py`: the dispatch agent. Audio capture, tone detection, Whisper speech-to-text, the parser and the geocoder. Runs as the `cfr-agent` systemd unit.
 * `backend/api/`: the FastAPI gateway, in Docker. `backend/migrations/`: the schema history of the PostGIS database.
 * `services/gis`, `services/audio_analysis`, `services/dispatch_notifications`: sibling packages the agent imports (see `CLAUDE.md` §2). `services/mosquitto`: the MQTT broker's configuration.
 * `frontend/`: the React and Leaflet display, built once and served by nginx on the kiosk.
 * `docker-compose.yml` and `setup_kiosk.sh`: the container stack and the script that built the kiosk.
+* `backend/scripts/`: what a person runs to *operate* the system: backups, municipal data loads, tile archives, sound-card checks. Grouped by purpose in [its README](./backend/scripts/README.md).
 
 **Development and testing** is what a person runs; the kiosk never runs it on its own:
 
-* `backend/tests/`: the pytest suites. `backend/scripts/`: operator maintenance and developer tools, grouped by purpose in [its README](./backend/scripts/README.md). `scripts/`: dev-environment installers and the tone backtest.
+* `tools/`: everything a developer runs: backtests, training, audits, inspection, the one-shot data fixes, the dev-environment installers. [Its README](./tools/README.md) is checked against the directory on every commit. `backend/tests/`: the pytest suites.
 * `docs/`: start at [`docs/README.md`](./docs/README.md), the reading map. `.claude/`: the runbooks (skills) and agent personas, all plain Markdown and readable without any tooling.
 
 ---

@@ -6,23 +6,26 @@ the system as it runs today. The rules for anyone working on the code, person or
 
 ## What runs in production, and what only helps development
 
-CFR EVO is one program that runs unattended on a fire-hall kiosk, plus a set of tools that
-people use to build, check, and maintain it. The two are kept apart by directory and, inside
-`backend/scripts/`, by the sections of its README.
+CFR EVO is one program that runs unattended on a kiosk, plus the tools people use to build,
+check and maintain it. **The kiosk is a mock production environment**: the full stack, on real
+dispatch audio, in a real fire hall, but used by one person, the developer, and only in a testing
+capacity. Nothing depends on it yet. That is what "development" means for this project, and it
+is why the software is held to production rules (`CLAUDE.md` §6) while everything around it is
+still allowed to change.
 
-| Area | Production: runs on the kiosk, on its own | Development and testing: a person runs it |
+| Area | The software: runs on the kiosk unattended | Development and testing: a person runs it |
 |:--|:--|:--|
-| Dispatch agent | `backend/cfr_dispatch/`, `backend/main.py`, the `cfr-agent` systemd unit | `backend/tests/`; `backend/scripts/` sections *QA harnesses*, *STT / MLOps*, *Ad-hoc inspection*, and `oneshot/` |
-| API and database | `backend/api/` (Docker), `backend/migrations/` | `backend/scripts/audit_*.py`, `trace_geocode_corpus.py` |
+| Dispatch agent | `backend/cfr_dispatch/`, `backend/main.py`, the `cfr-agent` systemd unit | `backend/tests/`; the backtests, training and inspection scripts in `tools/`; `tools/oneshot/` |
+| API and database | `backend/api/` (Docker), `backend/migrations/` | `tools/audit_skill_references.py`, `tools/audit_staleness.py`, `tools/trace_geocode_corpus.py` |
 | Sibling services | `services/gis`, `services/audio_analysis`, `services/dispatch_notifications`, `services/mosquitto` | |
 | Display | `frontend/`, built once and served by nginx on the kiosk | `npm run lint:crash`, `npm run build` |
-| Operator maintenance, run occasionally by a person | `backend/scripts/` sections *Scheduled and routine* (one is in the kiosk crontab), *Municipal data ingest*, *Tiles* | |
-| Top-level `scripts/` | | dev-environment installers and `analyze_historical_tones.py`, the tone backtest |
+| Operator maintenance, run occasionally by a person | `backend/scripts/`: *Scheduled and routine* (one is in the kiosk crontab), *Municipal data ingest*, *Tiles*, and the *Audio and DSP* sound-card checks | |
+| `tools/` | | everything else a developer runs, with [its own README](../tools/README.md): the tone backtest, the dev-environment installers, `_repo.py` |
 
-Moving the development tools into their own top-level tree is on
-[`post_freeze_backlog.md`](post_freeze_backlog.md), not done: `backup_db.sh` is pinned in the
-kiosk crontab by absolute path, most scripts find the package from their own file position, and
-fourteen runbooks cite script paths. Until then, the divide is in the READMEs, not the tree.
+The divide has been in the tree since 2026-09-04: `tools/` holds what a developer runs,
+`backend/scripts/` holds what operates the system. `backup_db.sh` stayed where the kiosk crontab
+pins it; every moved script finds the package through `tools/_repo.py` instead of climbing from
+its own file; the pre-commit hook checks both READMEs against their directories.
 
 ## 1. Start here
 
@@ -78,7 +81,7 @@ unless they say so at the top.
 ## Files here that are not documents
 
 - `cfr_whisper_colab_fine_tuning.ipynb`: the Colab notebook for Whisper fine-tuning; the `stt-mlops-backtest` skill is the procedure around it.
-- `complex_sites_for_review.csv`: the entrance-point review queue export, produced by `backend/scripts/export_complex_sites_for_review.sql` (punch-list #49).
+- `complex_sites_for_review.csv`: the entrance-point review queue export, produced by `tools/export_complex_sites_for_review.sql` (punch-list #49).
 
 ## Removed, on purpose
 

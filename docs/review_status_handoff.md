@@ -83,9 +83,9 @@ test. Second piece of monitoring machinery that exists and is not wired in.
 ### Three checks now run on commit
 
 ```bash
-python backend/scripts/audit_skill_references.py            # skills naming absent identifiers
-python backend/scripts/audit_skill_references.py --scripts  # a row per script, a script per row
-python backend/scripts/audit_skill_references.py --docs     # broken links, prose naming nothing
+python tools/audit_skill_references.py            # skills naming absent identifiers
+python tools/audit_skill_references.py --scripts  # a row per script, a script per row
+python tools/audit_skill_references.py --docs     # broken links, prose naming nothing
 ```
 
 The last two fire from `.githooks/pre-commit` when `docs/` or `backend/scripts/` is touched.

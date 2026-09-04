@@ -22,8 +22,8 @@ each has a different notion of "correct".
 | Stage | Question it answers | Harness | Status |
 |:--|:--|:--|:--|
 | **STT** | Did we hear what was said? | — | ⚠️ **Does not exist** (§4) |
-| **Parser** | Did we pull the right values out of what we heard? | [`backtest_parser_corpus.py`](../backend/scripts/backtest_parser_corpus.py) | ✅ Built 2026-08-26 |
-| **Geocoder** | Does the address resolve to the right place? | [`trace_geocode_corpus.py`](../backend/scripts/trace_geocode_corpus.py) | ⚠️ **Needs review** (§3) |
+| **Parser** | Did we pull the right values out of what we heard? | [`backtest_parser_corpus.py`](../tools/backtest_parser_corpus.py) | ✅ Built 2026-08-26 |
+| **Geocoder** | Does the address resolve to the right place? | [`trace_geocode_corpus.py`](../tools/trace_geocode_corpus.py) | ⚠️ **Needs review** (§3) |
 
 The three are **not** interchangeable. Word Error Rate scores transcription and says nothing
 about whether the parser then dropped the qualifier off a call type. Every serious defect in
@@ -38,18 +38,18 @@ Replays `raw_transcript` through the current parser and scores `incident`, `unit
 
 ```bash
 # headline numbers, split by month (the default, and the honest reading)
-python backend/scripts/backtest_parser_corpus.py
+python tools/backtest_parser_corpus.py
 
 # one call in detail -- both rounds, every field, got vs truth
-python backend/scripts/backtest_parser_corpus.py --dispatch-id DISP-2026-A19179
+python tools/backtest_parser_corpus.py --dispatch-id DISP-2026-A19179
 
 # before/after a change
-python backend/scripts/backtest_parser_corpus.py --json /tmp/before.json
+python tools/backtest_parser_corpus.py --json /tmp/before.json
 #   ... make the change ...
-python backend/scripts/backtest_parser_corpus.py --baseline /tmp/before.json
+python tools/backtest_parser_corpus.py --baseline /tmp/before.json
 
 # per-call rows for triage
-python backend/scripts/backtest_parser_corpus.py --csv /tmp/parser.csv
+python tools/backtest_parser_corpus.py --csv /tmp/parser.csv
 ```
 
 Baseline as of 2026-08-26 (see §5 on why the split matters):
@@ -95,9 +95,9 @@ resolvers to record **which step answered**, and buckets the result against
 `verified_address`.
 
 ```bash
-python backend/scripts/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
-python backend/scripts/trace_geocode_corpus.py --probe "3000 avenue"
-python backend/scripts/trace_geocode_corpus.py --all --csv /tmp/geocode.csv
+python tools/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
+python tools/trace_geocode_corpus.py --probe "3000 avenue"
+python tools/trace_geocode_corpus.py --all --csv /tmp/geocode.csv
 ```
 
 **Why it needs a review pass before its numbers are trusted again:**
@@ -139,7 +139,7 @@ What one would need:
 
 **`verified_transcript` holds ONE round; `raw_transcript` holds two.** The reviewer verifies
 a single round, and the duplication that matches it to the two-round audio happens only at
-training extraction ([`extract_training_data.py:182`](../backend/scripts/extract_training_data.py)),
+training extraction ([`extract_training_data.py:182`](../tools/extract_training_data.py)),
 never in the database column.
 
 Confirmed by query: `respond` appears once in 197 of 202 verified transcripts.

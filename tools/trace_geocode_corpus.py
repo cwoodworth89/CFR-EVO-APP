@@ -23,10 +23,10 @@ the answering step is not otherwise recorded anywhere.
 Usage
 -----
     # one call, full step-by-step trace
-    python backend/scripts/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
+    python tools/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
 
     # whole verified corpus, summary + per-call CSV
-    python backend/scripts/trace_geocode_corpus.py --all --csv /tmp/geocode_corpus.csv
+    python tools/trace_geocode_corpus.py --all --csv /tmp/geocode_corpus.csv
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ import re
 import sys
 from collections import Counter
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "gis", "src"))
+import _repo  # noqa: F401  tools/_repo.py puts backend/ and services/*/src on sys.path
 
 from sqlalchemy import create_engine, text  # noqa: E402
 

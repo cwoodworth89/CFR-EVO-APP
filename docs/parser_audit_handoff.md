@@ -94,19 +94,19 @@ shape that produces this.
 
 ## 3. What is already covered, and what is not
 
-`backend/scripts/trace_geocode_corpus.py` (committed `8d00ea3`) replays verified
+`tools/trace_geocode_corpus.py` (committed `8d00ea3`) replays verified
 dispatches through the live geocoder, wraps all seven resolvers to record **which step
 answered**, and buckets the result against `verified_address`.
 
 ```bash
 # one call, full step ladder
-python backend/scripts/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
+python tools/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
 
 # geocode an arbitrary string (use the text the PARSER produced)
-python backend/scripts/trace_geocode_corpus.py --probe "3000 avenue"
+python tools/trace_geocode_corpus.py --probe "3000 avenue"
 
 # whole corpus, summary + per-call CSV
-python backend/scripts/trace_geocode_corpus.py --all --csv /tmp/geocode_corpus.csv
+python tools/trace_geocode_corpus.py --all --csv /tmp/geocode_corpus.csv
 ```
 
 **It covers the geocoder only.** It probes `target->>'address'`, which is the geocoder's
@@ -152,7 +152,7 @@ Confirmed by query: `respond` appears **once** in 197 of 202 verified transcript
 matching `raw_transcript` carries two or more rounds.
 
 The duplication happens **downstream, at STT training extraction only** --
-[`extract_training_data.py:182`](../backend/scripts/extract_training_data.py):
+[`extract_training_data.py:182`](../tools/extract_training_data.py):
 
 ```python
 if duration > 25.0 and normalized_text:
@@ -455,10 +455,10 @@ over intermediate values is not a rate over what shipped.
 
 | Harness | Covers |
 |:--|:--|
-| `backend/scripts/backtest_parser_corpus.py` | parser vs `verified_*` — see `qa_harnesses.md` §2 |
-| `backend/scripts/backtest_regression.py` | before/after over the corpus |
-| `backend/scripts/backtest_round_comparison.py` | cross-round agreement, scored against ratings |
-| `backend/scripts/trace_geocode_corpus.py` | which geocoder rung answered — §3, *needs review* |
+| `tools/backtest_parser_corpus.py` | parser vs `verified_*` — see `qa_harnesses.md` §2 |
+| `tools/backtest_regression.py` | before/after over the corpus |
+| `tools/backtest_round_comparison.py` | cross-round agreement, scored against ratings |
+| `tools/trace_geocode_corpus.py` | which geocoder rung answered — §3, *needs review* |
 | — | **STT harness still does not exist** (§4, punch-list #46) |
 
 Read [`qa_harnesses.md`](./qa_harnesses.md) **before quoting any number from them.** It

@@ -1,4 +1,4 @@
-# scripts/install_dev_packages.ps1
+# tools/install_dev_packages.ps1
 # Installs CFR EVO microservices into the active Python environment in editable mode (-e)
 
 $ErrorActionPreference = "Stop"

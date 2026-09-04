@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 **Re:** punch-list #54 — the confidence score is scrapped; warnings move to the amber flag model
-**Harness:** `backend/scripts/backtest_round_comparison.py` (read-only, real records only)
+**Harness:** `tools/backtest_round_comparison.py` (read-only, real records only)
 **Module:** `backend/cfr_dispatch/pipeline/round_comparison.py`
 
 ---

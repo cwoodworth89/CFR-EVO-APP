@@ -2,7 +2,9 @@ import os
 import sys
 from sqlalchemy import text
 
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/, for _repo
+from _repo import BACKEND
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 

@@ -142,10 +142,10 @@ For a **corpus run**, use the harnesses — and read
 
 | Script | Measures |
 | :--- | :--- |
-| `backend/scripts/backtest_parser_corpus.py` | parser output vs the operator's `verified_*` |
-| `backend/scripts/backtest_regression.py` | before/after a change, over the corpus |
-| `backend/scripts/backtest_round_comparison.py` | round 1 vs round 2 agreement, scored against ratings |
-| `backend/scripts/backtest_parser.py` | production parser vs the destructive parser (no arguments) |
+| `tools/backtest_parser_corpus.py` | parser output vs the operator's `verified_*` |
+| `tools/backtest_regression.py` | before/after a change, over the corpus |
+| `tools/backtest_round_comparison.py` | round 1 vs round 2 agreement, scored against ratings |
+| `tools/backtest_parser.py` | production parser vs the destructive parser (no arguments) |
 
 ### Common Root Causes & Fixes:
 

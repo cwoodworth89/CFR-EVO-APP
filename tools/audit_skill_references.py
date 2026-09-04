@@ -30,8 +30,8 @@ Expect false positives, and read them rather than acting on the list:
 
 Usage
 -----
-    python backend/scripts/audit_skill_references.py
-    python backend/scripts/audit_skill_references.py --skills-dir .claude/skills
+    python tools/audit_skill_references.py
+    python tools/audit_skill_references.py --skills-dir .claude/skills
 """
 from __future__ import annotations
 
@@ -156,7 +156,7 @@ def _git_ignored(repo: str, target: str) -> bool:
     _IGNORE_CACHE[target] = ignored
     return ignored
 
-BACKTICK_PATH = re.compile(r"`((?:backend|frontend|services|docs|scripts|\.claude|\.githooks)/[A-Za-z0-9_./-]+)`")
+BACKTICK_PATH = re.compile(r"`((?:backend|frontend|services|docs|scripts|tools|\.claude|\.githooks)/[A-Za-z0-9_./-]+)`")
 FENCE = re.compile(r"```.*?```", re.S)
 
 
@@ -190,8 +190,7 @@ def audit_docs(docs_dir: str) -> int:
         or removal word in the same line -- which is how this project already writes them.
     """
     broken_links, broken_paths, scanned = [], [], 0
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    repo = os.path.dirname(repo)
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # tools/.. is the repository root
 
     for root, _dirs, files in os.walk(docs_dir):
         for f in files:

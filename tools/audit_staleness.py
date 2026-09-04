@@ -30,8 +30,8 @@ dropped), and generic column names (`lat`, `id`) match everything.
 
 Usage
 -----
-    python backend/scripts/audit_staleness.py                  # writes staleness_scan.md
-    python backend/scripts/audit_staleness.py --out report.md
+    python tools/audit_staleness.py                  # writes staleness_scan.md
+    python tools/audit_staleness.py --out report.md
 """
 from __future__ import annotations
 
@@ -219,7 +219,7 @@ def main() -> int:
         stem = base[:-3]
         if base == "__init__.py" or stem in entry:
             continue
-        if "/tests/" in f or "/scripts/" in f or stem.startswith("test_"):
+        if "/tests/" in f or "/scripts/" in f or f.startswith("tools/") or stem.startswith("test_"):
             continue
         pat = re.compile(r"^\s*(?:from\s+[\w.]*\b" + re.escape(stem) + r"\b\s+import|import\s+[\w.]*\b"
                          + re.escape(stem) + r"\b|from\s+[\w.]+\s+import\s+[^\n]*\b" + re.escape(stem) + r"\b)", re.M)
@@ -241,7 +241,7 @@ def main() -> int:
 
     H("D. Scripts, tests, and shell/PS files referenced from nothing")
     P("Tests are discovered by pytest and `oneshot/` scripts are provenance; both are expected here.\n")
-    script_like = [f for f in tracked if ("/scripts/" in f or f.startswith("scripts/") or "/tests/" in f
+    script_like = [f for f in tracked if ("/scripts/" in f or f.startswith("tools/") or "/tests/" in f
                                           or f.endswith((".sh", ".ps1")) or os.path.basename(f).startswith("test_"))]
     d_n = 0
     for f in script_like:
@@ -501,7 +501,7 @@ def main() -> int:
         P(f"- {a} `{f}`")
 
     header = (f"# Staleness scan — deterministic checks\n\nGenerated from the working tree at `{head}` by "
-              f"`backend/scripts/audit_staleness.py`. Every item is a mechanical cross-reference; none is a "
+              f"`tools/audit_staleness.py`. Every item is a mechanical cross-reference; none is a "
               f"judgement call. Read each one: generic names and migration ordering produce false positives, "
               f"and they are marked where the script can tell.\n")
     io.open(args.out, "w", encoding="utf-8", newline="\n").write(header + "\n".join(out) + "\n")

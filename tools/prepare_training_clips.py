@@ -1,4 +1,4 @@
-# backend/scripts/prepare_training_clips.py
+# tools/prepare_training_clips.py
 """Builds the Whisper fine-tuning dataset as round-1 clips paired with round-1 labels.
 
 Design, provenance and rejected alternatives:
@@ -21,7 +21,8 @@ import difflib
 import logging
 import argparse
 
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 

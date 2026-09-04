@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-backend/scripts/verify_snapping_corpus.py
+tools/verify_snapping_corpus.py
 Dispatch Corpus Verification & Efficacy Benchmark for Boundary-Edge Decomposition Snapping.
 
 Evaluates:
@@ -28,7 +28,8 @@ from collections import Counter
 from datetime import datetime, timezone
 
 # Sibling paths
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 

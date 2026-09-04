@@ -82,15 +82,15 @@ Follow the existing convention rather than inventing one.
 | What governs an operational value | `docs/standards/README.md` — and if nothing covers it, **stop and ask** (§7.2) |
 | A library or field that does not behave like its name | [`docs/standards/dependency-behaviour.md`](standards/dependency-behaviour.md) |
 | A repeatable procedure | `.claude/skills/<name>/SKILL.md` — check there before writing a runbook |
-| A script | `backend/scripts/`, with a row in its README. Already-run ones go to `backend/scripts/oneshot/` |
+| A script | `backend/scripts/`, with a row in its README. Already-run ones go to `tools/oneshot/` |
 | Something found mid-task that is out of scope | `docs/post_freeze_backlog.md`, one line — unless it is crew-visible, which promotes immediately |
 
 **These are checked, not merely documented:**
 
 ```bash
-python backend/scripts/audit_skill_references.py            # skills naming absent identifiers
-python backend/scripts/audit_skill_references.py --scripts  # a row per script, a script per row
-python backend/scripts/audit_skill_references.py --docs     # broken links, prose naming nothing
+python tools/audit_skill_references.py            # skills naming absent identifiers
+python tools/audit_skill_references.py --scripts  # a row per script, a script per row
+python tools/audit_skill_references.py --docs     # broken links, prose naming nothing
 ```
 
 Run the last two before committing documentation. Everything that rotted badly enough to
@@ -124,7 +124,7 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 | :--- | :--- | :--- |
 | `docker compose up -d` | `./` | Start the local containerized stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI). |
 | `python main.py` | `backend/` | Launch the continuous audio listener background runner. |
-| `python scripts/backtest_parser.py` | `backend/` | Run comparative accuracy benchmarks between production and test parsers on database ground-truth calls. |
+| `python tools/backtest_parser.py` | `./` | Run comparative accuracy benchmarks between production and test parsers on database ground-truth calls. |
 | `python scripts/update_gis_data.py` | `backend/` | Execute the monthly GIS update and compare cache changes (runs automated via Windows Scheduler). |
 | `npm run dev` | `frontend/` | Run the React dashboard development server. |
 | `npm run build` | `frontend/` | Compile the frontend client production build into `frontend/dist`. |

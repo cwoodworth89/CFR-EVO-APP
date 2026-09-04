@@ -51,7 +51,7 @@ To prevent punctuation from breaking regex anchor matching:
 
 ## 🔬 Sequential Destructive Parser vs. Production Anchor Parser
 
-To test alternative parsing philosophies for structured Computer-Aided Dispatch (CAD) audio, we created a secondary test module in [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py) alongside a backtester [backtest_parser.py](../backend/scripts/backtest_parser.py).
+To test alternative parsing philosophies for structured Computer-Aided Dispatch (CAD) audio, we created a secondary test module in [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py) alongside a backtester [backtest_parser.py](../tools/backtest_parser.py).
 
 ### Design Philosophies
 

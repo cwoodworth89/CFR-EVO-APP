@@ -1,4 +1,4 @@
-# backend/scripts/backtest_parser_corpus.py
+# tools/backtest_parser_corpus.py
 """Replay verified dispatches through the CURRENT parser and score each field against
 human ground truth.
 
@@ -34,20 +34,20 @@ Two other traps this encodes so they are not re-derived:
 USAGE
 -----
     # headline numbers, split by month (the honest default)
-    python backend/scripts/backtest_parser_corpus.py
+    python tools/backtest_parser_corpus.py
 
     # everything pooled -- only for a corpus you know is homogeneous
-    python backend/scripts/backtest_parser_corpus.py --pooled
+    python tools/backtest_parser_corpus.py --pooled
 
     # one call, showing every field and both rounds
-    python backend/scripts/backtest_parser_corpus.py --dispatch-id DISP-2026-A19179
+    python tools/backtest_parser_corpus.py --dispatch-id DISP-2026-A19179
 
     # per-call rows for spreadsheet triage
-    python backend/scripts/backtest_parser_corpus.py --csv /tmp/parser_corpus.csv
+    python tools/backtest_parser_corpus.py --csv /tmp/parser_corpus.csv
 
     # before/after a change: run, stash the json, change code, run again, diff
-    python backend/scripts/backtest_parser_corpus.py --json /tmp/before.json
-    python backend/scripts/backtest_parser_corpus.py --baseline /tmp/before.json
+    python tools/backtest_parser_corpus.py --json /tmp/before.json
+    python tools/backtest_parser_corpus.py --baseline /tmp/before.json
 
 Requires DATABASE_URL (see CLAUDE.md §3 -- without it the kiosk database is unreachable and
 this refuses to run rather than silently scoring nothing).
@@ -62,7 +62,8 @@ import sys
 
 import psycopg2
 
-_BACKEND = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ on sys.path
+_BACKEND = str(BACKEND)
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 

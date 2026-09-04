@@ -88,7 +88,7 @@ To prevent Windows PowerShell quoting errors and keep all command logs 100% huma
 1. **Use Version-Controlled Helper Scripts**:
    - Run helper scripts (e.g. `inspect_dispatch.py`, `update_streetview.py`) inside the container stack for clean human-readable output:
      ```bash
-     ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec cfr_api python backend/scripts/inspect_dispatch.py DISP-2026-2659EC"
+     ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec cfr_api python tools/inspect_dispatch.py DISP-2026-2659EC"
      ```
 2. **Execute Dedicated SQL Scripts**:
    - Use `docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch` with standard SQL queries rather than deeply nested inline quotes.

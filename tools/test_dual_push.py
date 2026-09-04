@@ -1,7 +1,8 @@
 import os
 import sys
 
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 root_dir = os.path.dirname(backend_dir)
 service_path = os.path.join(root_dir, "services", "dispatch_notifications", "src")
 if service_path not in sys.path:

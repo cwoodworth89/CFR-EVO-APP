@@ -32,7 +32,7 @@ Audio is available on essentially every dispatch (`audio_url`), so the corpus su
 
 **`verified_transcript` holds ONE round; `raw_transcript` holds two.** The reviewer verifies a
 single round; the duplication that matches it to the two-round audio happens only at training
-extraction ([`extract_training_data.py:182`](../../backend/scripts/extract_training_data.py)),
+extraction ([`extract_training_data.py:182`](../../tools/extract_training_data.py)),
 never in the database column. Confirmed by query: `respond` appears once in 197 of 202 verified
 transcripts.
 

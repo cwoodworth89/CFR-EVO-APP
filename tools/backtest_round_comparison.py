@@ -35,9 +35,9 @@ Two caveats on reading the output:
 
 Usage
 -----
-    python backend/scripts/backtest_round_comparison.py
-    python backend/scripts/backtest_round_comparison.py --csv /tmp/rounds.csv
-    python backend/scripts/backtest_round_comparison.py --show-disagreements 20
+    python tools/backtest_round_comparison.py
+    python tools/backtest_round_comparison.py --csv /tmp/rounds.csv
+    python tools/backtest_round_comparison.py --show-disagreements 20
 """
 from __future__ import annotations
 
@@ -48,9 +48,7 @@ import re
 import sys
 from collections import defaultdict
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "gis", "src"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import _repo  # noqa: F401  tools/_repo.py puts backend/ and services/*/src on sys.path
 
 from sqlalchemy import create_engine, text  # noqa: E402
 

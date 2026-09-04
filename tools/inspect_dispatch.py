@@ -1,5 +1,6 @@
 import sys
 import json
+import _repo  # noqa: F401  tools/_repo.py puts backend/ on sys.path
 from cfr_dispatch.database import get_db_session
 from sqlalchemy import text
 

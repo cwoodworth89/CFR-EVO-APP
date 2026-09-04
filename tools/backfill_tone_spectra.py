@@ -30,9 +30,9 @@ because it means backfilled and live rows are not quite the same measurement.
 
 ## Usage
 
-    python backend/scripts/backfill_tone_spectra.py                  # all recordings
-    python backend/scripts/backfill_tone_spectra.py --tone chief     # only chief-tagged
-    python backend/scripts/backfill_tone_spectra.py --limit 20
+    python tools/backfill_tone_spectra.py                  # all recordings
+    python tools/backfill_tone_spectra.py --tone chief     # only chief-tagged
+    python tools/backfill_tone_spectra.py --limit 20
 
 Output: backend/data/tone_spectra_backfill.jsonl (does NOT touch the live history).
 """
@@ -47,8 +47,9 @@ import logging
 import numpy as np
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.dirname(SCRIPT_DIR)
-REPO_ROOT = os.path.dirname(BACKEND_DIR)
+from _repo import BACKEND, ROOT  # tools/_repo.py locates the repo
+BACKEND_DIR = str(BACKEND)
+REPO_ROOT = str(ROOT)
 sys.path.insert(0, os.path.join(REPO_ROOT, "services", "audio_analysis", "src"))
 sys.path.insert(0, BACKEND_DIR)
 

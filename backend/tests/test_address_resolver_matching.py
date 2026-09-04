@@ -1,7 +1,7 @@
 """Street matching guards in gis_service.address_resolver.
 
 These cover three defects found on 2026-08-23 by scoring the geocoder against the
-human-verified dispatch corpus (backend/scripts/trace_geocode_corpus.py). All three
+human-verified dispatch corpus (tools/trace_geocode_corpus.py). All three
 produced confident, plausible, wrong output rather than an error, which is the failure
 mode CLAUDE.md §6 exists to prevent:
 

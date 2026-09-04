@@ -13,8 +13,8 @@ import psycopg2
 from pathlib import Path
 
 # Add backend and sibling service roots to path
-BACKEND_DIR = Path(__file__).resolve().parent.parent
-SERVICES_DIR = BACKEND_DIR.parent / "services"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # tools/, for _repo
+from _repo import BACKEND as BACKEND_DIR, SERVICES as SERVICES_DIR
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 if str(SERVICES_DIR / "gis" / "src") not in sys.path:

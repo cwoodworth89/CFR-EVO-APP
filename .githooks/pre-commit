@@ -35,7 +35,7 @@ PY=$(command -v python3 || command -v python)
 
 if [ -n "$PY" ] && git diff --cached --name-only | grep -qE '^docs/.*\.md$'; then
   echo "pre-commit: checking documentation links and paths..."
-  if ! PYTHONIOENCODING=utf-8 "$PY" backend/scripts/audit_skill_references.py --docs; then
+  if ! PYTHONIOENCODING=utf-8 "$PY" tools/audit_skill_references.py --docs; then
     echo
     echo "COMMIT BLOCKED: documentation points at files that are not there."
     echo "Fix the path, delete the reference, or -- if the text is deliberately"
@@ -48,13 +48,13 @@ if [ -n "$PY" ] && git diff --cached --name-only | grep -qE '^docs/.*\.md$'; the
   fi
 fi
 
-if [ -n "$PY" ] && git diff --cached --name-only | grep -qE '^backend/scripts/'; then
-  echo "pre-commit: checking backend/scripts/README.md..."
-  if ! PYTHONIOENCODING=utf-8 "$PY" backend/scripts/audit_skill_references.py --scripts; then
+if [ -n "$PY" ] && git diff --cached --name-only | grep -qE '^(backend/scripts/|tools/)'; then
+  echo "pre-commit: checking backend/scripts/README.md and tools/README.md..."
+  if ! PYTHONIOENCODING=utf-8 "$PY" tools/audit_skill_references.py --scripts || ! PYTHONIOENCODING=utf-8 "$PY" tools/audit_skill_references.py --scripts --scripts-dir tools; then
     echo
     echo "COMMIT BLOCKED: a script has no README row, or a row names no script."
     echo "A row per script, and a script per row. Already-run scripts belong in"
-    echo "backend/scripts/oneshot/, which is not scanned."
+    echo "tools/oneshot/, which is not scanned."
     echo
     echo "Bypass with 'git commit --no-verify' if you are certain."
     exit 1

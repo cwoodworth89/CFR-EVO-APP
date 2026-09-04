@@ -1,7 +1,7 @@
 """Subaddress / business-name extraction in cfr_dispatch.parser.location.
 
 Two defects found 2026-09-02 while spell-checking the operator's verified transcripts
-against public.roads (backend/scripts/check_verified_transcripts.py). Both produced a
+against public.roads (tools/check_verified_transcripts.py). Both produced a
 plausible, wrong street rather than an error -- the failure mode CLAUDE.md s6 exists to
 prevent -- and neither had a test.
 

@@ -17,7 +17,7 @@
 > in the geocoder; a staleness risk in the tool used to measure it. See
 > [`docs/qa_harnesses.md`](../qa_harnesses.md) §3.
 
-`backend/scripts/trace_geocode_corpus.py` (committed `8d00ea3`) replays verified dispatches
+`tools/trace_geocode_corpus.py` (committed `8d00ea3`) replays verified dispatches
 through the live geocoder and records which of seven resolver steps answered. Four reasons its
 output should not be quoted until it is re-checked:
 

@@ -3,7 +3,7 @@
 **Scope:** the whole tree — 421 tracked files, 144 of them Markdown — plus the eight
 `.claude/agents/` personas and the fourteen skill `description:` lines, neither of which the
 [2026-08-30 skills audit](skills_audit_2026-08-30.md) covered.
-**Method:** deterministic cross-reference scans (`backend/scripts/audit_staleness.py`), every
+**Method:** deterministic cross-reference scans (`tools/audit_staleness.py`), every
 candidate then checked against the source line, git history, or the kiosk database
 (`cfr-postgres`, read-only) before it appears here. No item below came from judgement about
 prose. The raw scan output is [`staleness_audit_2026-09-03_raw_scan.md`](staleness_audit_2026-09-03_raw_scan.md).
@@ -54,7 +54,7 @@ deferred by the operator, so this is recorded in `docs/post_freeze_backlog.md` r
    `MQTT_DISPATCH_TOPIC`). Every doc and script that said "copy `.env.example`" was corrected;
    `setup_kiosk.sh` now stops with a message if `backend/.env` is absent instead of copying a
    template that no longer exists.
-2. **`backend/scripts/trace_geocode_corpus.py:226` selected `dispatches.confidence_score`**,
+2. **`tools/trace_geocode_corpus.py:226` selected `dispatches.confidence_score`**,
    dropped 2026-08-29 and confirmed absent on the kiosk. The script raised on its first query.
    **Fixed**: the column and the "stored confidence on wrong streets" summary are gone.
 3. **`backend/scripts/update_gis_data.py::update_hydrant_data` still wrote
@@ -112,7 +112,7 @@ deferred by the operator, so this is recorded in `docs/post_freeze_backlog.md` r
 16. `migration_stt_tuning.sql` sat at the repository root; applied on the kiosk and already in
     `init_db.sql`. **Moved** to `backend/migrations/2026-07-12_stt_tuning_columns.sql` with a
     `WHY` header.
-17. `scripts/analyze_historical_tones.py` is referenced only from a walkthrough bannered as
+17. `tools/analyze_historical_tones.py` is referenced only from a walkthrough bannered as
     historical. **Kept** — it imports `services/audio_analysis`, which exists, and whether the PA
     tone work superseded it is not something a scan can tell.
 18. `backend/migrations/2026-08-28_snapshot_parcel_front_points.sql` creates a table that does

@@ -36,7 +36,7 @@ Replaced by `backend/api/closure_spatial.py` using `ST_Intersects` / `ST_Contain
 against `public.city_boundary` and `public.zones`.
 
 Also added `zones.unit_id/station/hall_id` (backfilled by
-`backend/scripts/oneshot/import_zone_units.py`, 134/134 zones) and
+`tools/oneshot/import_zone_units.py`, 134/134 zones) and
 `road_closures.geom` + `hall_id`, so hall grouping is resolved server-side instead of
 the kiosk fetching `zones.json`.
 

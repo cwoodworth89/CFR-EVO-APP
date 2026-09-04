@@ -28,7 +28,7 @@ for a model comes from that holdout or from calls the model has not trained on.
 ## 0. Check the labels
 
 ```bash
-ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python scripts/check_verified_transcripts.py --blocking-only"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/check_verified_transcripts.py --blocking-only"
 ```
 
 A verified transcript is both the training label and the scoring reference, so a typo in it
@@ -56,7 +56,7 @@ PA pages and cut-off recordings. The check runs in that order:
 ## 1. Build the dataset
 
 ```bash
-ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python scripts/prepare_training_clips.py --force"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/prepare_training_clips.py --force"
 ```
 
 Selects calls with `feedback_submitted`, a verified transcript, and the operator's
@@ -82,7 +82,7 @@ assumption would have missed.
 ## 2. Train
 
 ```bash
-ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 OMP_NUM_THREADS=6 WHISPER_CT2_OUT=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN nice -n 15 .venv/bin/python scripts/train_whisper_lora.py"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 OMP_NUM_THREADS=6 WHISPER_CT2_OUT=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN nice -n 15 .venv/bin/python tools/train_whisper_lora.py"
 ```
 
 * **`WHISPER_CT2_OUT` to a fresh directory, always.** The default path is the one the live
@@ -98,7 +98,7 @@ ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR
 ## 3. Score on the holdout
 
 ```bash
-ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python scripts/eval_round1_holdout.py --models base /home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2 /home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/eval_round1_holdout.py --models base /home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2 /home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN"
 ```
 
 Prints WER and exact-match per model on the clips training never saw. **Caveat when
@@ -121,14 +121,14 @@ It reads `data/training/metadata.csv` (whole-call), so refresh that first and re
 to the holdout for an honest number:
 
 ```bash
-ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python scripts/extract_training_data.py"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/extract_training_data.py"
 ```
 
 Then swap in a holdout-only `metadata.csv` (back the full one up, filter to the
 `file_name`s in `metadata_round1_holdout.csv`, restore afterwards) and run:
 
 ```bash
-ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python scripts/backtest_regression.py"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/backtest_regression.py"
 ```
 
 **To score a model other than the deployed one:** `backend/.env` overrides the shell
@@ -138,7 +138,7 @@ is silently ignored. Patch the module instead, in a wrapper:
 ```python
 import cfr_dispatch, cfr_dispatch.stt.transcriber as T, runpy
 T.WHISPER_MODEL = "/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN"
-runpy.run_path("scripts/backtest_regression.py", run_name="__main__")
+runpy.run_path("tools/backtest_regression.py", run_name="__main__")
 ```
 
 Reference: v1 on its holdout — WER 39.7%→4.9%, SMMR 93.5% (units 100, incident 97.8,

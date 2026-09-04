@@ -1,4 +1,4 @@
-# backend/scripts/check_verified_transcripts.py
+# tools/check_verified_transcripts.py
 """Spell- and street-checks the operator's verified transcripts before they become labels.
 
 Run before every Whisper training pass. prepare_training_clips.py calls it and refuses to
@@ -39,7 +39,8 @@ import logging
 import argparse
 from collections import Counter, defaultdict
 
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 

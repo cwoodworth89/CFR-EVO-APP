@@ -1,4 +1,4 @@
-# backend/scripts/extract_training_data.py
+# tools/extract_training_data.py
 import os
 import csv
 import sys
@@ -6,7 +6,8 @@ import logging
 import requests
 
 # Set up paths so we can import cfr_dispatch package
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
@@ -16,7 +17,7 @@ from cfr_dispatch.config import UNITS_VOCABULARY
 def load_env():
     # Simple parser for .env
     env = {}
-    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    env_path = os.path.join(backend_dir, ".env")
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -99,7 +100,7 @@ def main():
     local_api_url = env.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
     
     # 2. Setup folders
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = backend_dir
     training_dir = os.path.join(base_dir, "data", "training")
     audio_dir = os.path.join(training_dir, "audio")
     os.makedirs(audio_dir, exist_ok=True)

@@ -314,11 +314,11 @@ model — but it is invisible at the call site. `feature_extractor(speech, sampl
 with no `max_length` returns the same shaped tensor for a 12-second clip and a 75-second
 one. Nothing warns, and the discarded audio does not appear in any log.
 
-**Where this bites us**: [`train_whisper_lora.py`](../../backend/scripts/train_whisper_lora.py)
+**Where this bites us**: [`train_whisper_lora.py`](../../tools/train_whisper_lora.py)
 pairs that call with a label covering the **whole** recording. CFR dispatches are
 double-round broadcasts averaging ~48 s — 486 of the 490 training-eligible calls run longer
 than 30 s, the longest 74.9 s — and
-[`extract_training_data.py`](../../backend/scripts/extract_training_data.py) deliberately
+[`extract_training_data.py`](../../tools/extract_training_data.py) deliberately
 duplicates the transcript for calls over 25 s so the label spans both rounds. The input is
 therefore the first 30 seconds and the target is roughly twice that much speech.
 
@@ -347,7 +347,7 @@ Two things make this dangerous rather than merely untidy:
 
 `ctranslate2.converters.transformers` does not copy the file, even though the preceding
 `processor.save_pretrained(merged_dir)` writes it. The converter takes `--copy_files`;
-[`train_whisper_lora.py`](../../backend/scripts/train_whisper_lora.py) now passes
+[`train_whisper_lora.py`](../../tools/train_whisper_lora.py) now passes
 `--copy_files tokenizer.json`.
 
 Verified after the fix: the model loads under `HF_HUB_OFFLINE=1` + `TRANSFORMERS_OFFLINE=1`

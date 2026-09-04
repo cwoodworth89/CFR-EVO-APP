@@ -1,4 +1,4 @@
-# backend/scripts/backtest_parser.py
+# tools/backtest_parser.py
 # Compares production parser against the new sequential destructive parser using PostgreSQL ground-truth reviews
 
 import sys
@@ -7,7 +7,8 @@ import requests
 from typing import List, Dict, Any
 
 # Ensure backend directory is in the path
-backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 

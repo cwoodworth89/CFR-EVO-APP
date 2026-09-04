@@ -1,4 +1,4 @@
-# backend/scripts/backtest_regression.py
+# tools/backtest_regression.py
 import os
 import sys
 import csv
@@ -10,7 +10,8 @@ import numpy as np
 import requests
 
 # Set up paths so we can import cfr_dispatch package
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
@@ -89,7 +90,7 @@ def main():
     
     if not os.path.exists(metadata_csv_path):
         logging.error(f"Metadata file not found: {metadata_csv_path}")
-        logging.error("Please run scripts/extract_training_data.py first to sync verified dataset.")
+        logging.error("Please run tools/extract_training_data.py first to sync verified dataset.")
         sys.exit(1)
         
     # 2. Load dataset

@@ -65,7 +65,7 @@ This test script evaluates the performance of the production parser ([parser.py]
 
 ### 🏃 Running the Backtest Suite
 ```powershell
-.venv\Scripts\python.exe backend/scripts/backtest_parser.py
+.venv\Scripts\python.exe tools/backtest_parser.py
 ```
 
 ### 📋 What it Validates & Reports:

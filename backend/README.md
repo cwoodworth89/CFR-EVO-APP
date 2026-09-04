@@ -28,9 +28,9 @@ The backend handles continuous DSP listening, audio tone detection, speech-to-te
 2. **Install Sibling Packages in Editable Mode**:
    ```bash
    # Windows PowerShell
-   powershell -File scripts/install_dev_packages.ps1
+   powershell -File tools/install_dev_packages.ps1
    # Linux/macOS
-   bash scripts/install_dev_packages.sh
+   bash tools/install_dev_packages.sh
    ```
 
 3. **Environment**:

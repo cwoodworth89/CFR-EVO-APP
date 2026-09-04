@@ -1,4 +1,4 @@
-# backend/scripts/eval_round1_holdout.py
+# tools/eval_round1_holdout.py
 """Scores one or more Whisper models on the held-out round-1 clips.
 
 The holdout is written by prepare_training_clips.py and is never trained on, so the WER
@@ -7,8 +7,8 @@ the fine-tuned model side by side; a fine-tune that does not beat base on this s
 earned deployment.
 
 Usage:
-    python scripts/eval_round1_holdout.py
-    python scripts/eval_round1_holdout.py --models base ../models/whisper-base-cfr-ct2
+    python tools/eval_round1_holdout.py
+    python tools/eval_round1_holdout.py --models base ../models/whisper-base-cfr-ct2
 """
 import os
 import csv
@@ -16,7 +16,8 @@ import sys
 import logging
 import argparse
 
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ and services/*/src on sys.path
+backend_dir = str(BACKEND)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 

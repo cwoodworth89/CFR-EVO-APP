@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/install_dev_packages.sh
+# tools/install_dev_packages.sh
 # Installs CFR EVO microservices into the active Python environment in editable mode (-e)
 
 set -e

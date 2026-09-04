@@ -1,4 +1,4 @@
-# backend/scripts/train_whisper_lora.py
+# tools/train_whisper_lora.py
 import os
 import re
 import sys
@@ -22,12 +22,13 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     
     # 1. Setup paths
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    from _repo import BACKEND  # tools/_repo.py locates the repo
+    base_dir = str(BACKEND)
     training_dir = os.path.join(base_dir, "data", "training")
     # Round-1 clips, not whole calls. The previous dataset paired a ~48s double-round
     # recording with a label for all of it, while the feature extractor kept only the
     # first 30s -- see docs/briefings/whisper_training_round1_labelling.md. Built by
-    # backend/scripts/prepare_training_clips.py.
+    # tools/prepare_training_clips.py.
     # The train split only. metadata_round1_holdout.csv is scored by
     # eval_round1_holdout.py on calls the model never saw; training on everything would
     # leave train-on-test as the only available number.

@@ -13,7 +13,7 @@
 ---
 
 ## 41. `629 Cottonwood Ave` is absent from `public.parcels`
-> **Status**: ⚠️ **Open — confirmed. A data gap, not a search bug.**
+> **Status**: ✅ **Closed 2026-08-23.** *(Opened as: ⚠️ Open — confirmed. A data gap, not a search bug.)*
 
 The operator could not find `629 Cottonwood Ave` in the search bar. It is not there to find:
 723 parcels match `%Cottonwood%`, and **zero** match `629 Cottonwood%`.

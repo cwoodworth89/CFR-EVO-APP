@@ -13,7 +13,7 @@
 ---
 
 ## 39. Review table: restore the verified value in the row, drop the pencil-and-legend
-> **Status**: ⚠️ **Open — operator wants the earlier behaviour back, with a caveat below.**
+> **Status**: ✅ **Closed 2026-08-23.** *(Opened as: ⚠️ Open — operator wants the earlier behaviour back, with a caveat below.)*
 
 The operator ask: *"I just want to see the accurate information in the row if it has been
 verified, and if something was updated by a reviewer, make that obvious."*

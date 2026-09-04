@@ -5,7 +5,7 @@ description: Procedures for auditing, testing, and verifying the station kiosk f
 
 # Station Kiosk UI & Frontend Audit Runbook
 
-This skill provides testing and verification procedures for the **CFR EVO Station Kiosk Frontend** (`frontend/`) using Chrome DevTools browser automation (`/browser`) and live MQTT event simulation.
+This skill provides testing and verification procedures for the **CFR EVO Station Kiosk Frontend** (`frontend/`) using Chrome DevTools browser automation (`/browser`) and the review replay to put a real call on the display.
 
 ---
 
@@ -55,13 +55,14 @@ When performing a visual or automated audit using `/browser`:
 
 ---
 
-## 4. Simulating Live MQTT Dispatches for UI Testing
+## 4. Putting a call on the display without a broadcast
 
-To test the frontend without waiting for a live radio broadcast, publish a synthetic dispatch payload:
-
-```powershell
-.\.venv\Scripts\python.exe -c "from notification_service import publish_mqtt_dispatch; from backend.tests.test_database_integration import TEST_DISPATCHES; from cfr_dispatch.pipeline import build_dispatch_payload; from cfr_dispatch.worker import get_shared_validator; val = get_shared_validator(); p, _ = build_dispatch_payload('DISP-UI-TEST', 'raw', 'coquitlam engine 1 respond structure fire 2648 sandstone crescent', [], val); publish_mqtt_dispatch(p, event_type='INSERT'); print('Simulated Phase 1 Alert sent over MQTT!')"
-```
+There is no synthetic publisher. CLAUDE.md §6.5 forbids fabricated dispatches, and the test
+module the old command here imported (`backend/tests/test_database_integration.py`) was
+deleted 2026-08-31. Use the **review replay** instead: in the console, open a historical
+dispatch in Kiosk view. `frontend/src/App.jsx` sends it through the same path as a live MQTT
+call with `isReview: true`, so the banner reads REVIEW REPLAY and auto-dismiss is paused. What
+you see is the call exactly as it was received.
 
 ---
 
@@ -69,5 +70,7 @@ To test the frontend without waiting for a live radio broadcast, publish a synth
 
 When using `/browser` automation:
 1. Navigate to `http://localhost:5173`.
-2. Wait 2 seconds for Leaflet/MapLibre tiles to render.
+2. Wait 2 seconds for Leaflet tiles to render.
 3. Capture a full-page screenshot to verify layout, color contrast, and dark-mode kiosk readability.
+
+<!-- audit-ok: backend/tests/test_database_integration.py -- deleted 2026-08-31; section 4 records that -->

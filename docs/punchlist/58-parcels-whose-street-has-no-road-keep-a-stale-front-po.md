@@ -14,7 +14,7 @@
 
 ## 58. A front point that survived the fix, still pointing at the wrong street
 
-> **Status**: ⚠️ **Open — found and measured 2026-08-31 against the running database.**
+> **Status**: ✅ **Closed 2026-08-31.** *(Opened as: ⚠️ Open — found and measured 2026-08-31 against the running database.)*
 
 The #38 fix constrains frontage to the addressed street. Its road lookup is a
 `CROSS JOIN LATERAL` that returns no row when no road carries that street name, so the

@@ -13,7 +13,7 @@
 ---
 
 ## 35. "Near roads" stopped being recorded on 2026-08-21 — Phase 2 rebuilds `target` and drops `cross_streets`
-> **Status**: 🔴 **Open — live regression, found 2026-08-23.** Reported by the operator
+> **Status**: ✅ **Closed 2026-08-31.** *(Opened as: 🔴 Open — live regression, found 2026-08-23.)* Reported by the operator
 > ("we've seemed to have dropped recording near roads completely") and **confirmed** against
 > the kiosk database and the working tree. Root cause identified; no fix applied.
 

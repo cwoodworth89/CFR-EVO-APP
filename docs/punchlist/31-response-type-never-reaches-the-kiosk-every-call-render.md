@@ -13,7 +13,7 @@
 ---
 
 ## 31. `response_type` never reaches the kiosk — every call renders as ROUTINE
-> **Status**: ⚠️ **Open — found 2026-08-23 while investigating #30.** **Confirmed** against
+> **Status**: ✅ **Closed 2026-08-30.** *(Opened as: ⚠️ Open — found 2026-08-23 while investigating #30.)* **Confirmed** against
 > the running kiosk database and the working tree. This is the defect #30 was sitting on
 > top of; #30 is the wording, this is the data.
 

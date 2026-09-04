@@ -13,8 +13,7 @@
 ---
 
 ## 42. The roads import silently discards 242 road segments, including 45 streets that 1,918 parcels are addressed on
-> **Status**: ⚠️ **Open — confirmed against source and database. This is the answer to the
-> "missing `public.roads` entries" report.**
+> **Status**: ✅ **Closed 2026-08-30.** *(Opened as: ⚠️ Open — confirmed against source and database. This is the answer to the "missing `public.roads` entries" report.)*
 
 `backend/scripts/import_gis_data.py`, `step2_import_roads` (~`:228`):
 

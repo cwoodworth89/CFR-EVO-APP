@@ -142,7 +142,7 @@ export default function ActiveDispatchPanel({ activeDispatch, setActiveDispatch,
               ) : (
                 <div className="bg-slate-900 border border-slate-850 rounded-xl p-3.5 flex flex-col gap-2 relative overflow-hidden text-left">
                   <div className="text-[9px] text-slate-450 font-bold leading-relaxed">
-                    Google Maps API Key not configured. Visual mock and coordinates computed:
+                    Street View is online-only and no Google key is configured. Location:
                   </div>
                   <div className="grid grid-cols-2 gap-2 font-mono text-[9px] bg-slate-950/80 p-2 rounded border border-slate-850 text-center">
                     <div>

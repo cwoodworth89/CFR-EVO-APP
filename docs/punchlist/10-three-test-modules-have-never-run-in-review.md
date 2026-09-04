@@ -13,7 +13,7 @@
 ---
 
 ## 10. Three test modules have never run in review
-> **Status**: ⚠️ **Open — unchanged 2026-08-21.** No attempt was made to run them this pass;
+> **Status**: ✅ **Closed 2026-08-31.** *(Opened as: ⚠️ Open — unchanged 2026-08-21.)* No attempt was made to run them this pass;
 > the missing dependencies have not been installed.
 
 `test_database_integration`, `test_listener` and `test_keyword_spotter` were excluded all

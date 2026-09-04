@@ -13,7 +13,7 @@
 ---
 
 ## 38. `DISP-2026-ACCF6D` routed to the wrong street — the parcel front point is on Pinetree Way
-> **Status**: ⚠️ **Open — confirmed by spatial query. Likely systemic; see the estimate.**
+> **Status**: ✅ **Closed 2026-08-31.** *(Opened as: ⚠️ Open — confirmed by spatial query. Likely systemic; see the estimate.)*
 
 Dispatch (2026-08-23 09:29) for **`1178 Heffley Cres`**, transcript
 *"medical aid - chest pain, 1178 heffley crescent Number 1202"*, confidence 100. The operator

@@ -77,17 +77,20 @@ All pipeline logs are tagged with `[dispatch_id]` prefixes and structured metric
 
 ---
 
-## 4. Testing & Simulating Dispatch Calls
+## 4. Testing & Replaying Dispatch Calls
 
 ### Rapid Unit Testing (No Audio Hardware Required):
 ```powershell
 .\.venv\Scripts\python.exe backend/tests/test_pipeline_unit.py
 ```
 
-### Database Integration & Polygon Contract Verification:
-```powershell
-.\.venv\Scripts\python.exe backend/tests/test_database_integration.py
-```
+### Replaying a real call on the display
+Open a historical dispatch from the console in Kiosk view. That is the review replay
+(`frontend/src/App.jsx`): it reaches the kiosk in exactly the shape a live call does, with
+`isReview: true`, the banner reading REVIEW REPLAY and auto-dismiss paused. It is the only
+sanctioned way to put a call on the display without a broadcast (CLAUDE.md §6.5).
+`backend/tests/test_database_integration.py`, once listed here, was deleted 2026-08-31
+(5aa72e0): it was not a test.
 
 ### End-to-End Testing
 There is no WAV feeder. `feed_recorded_call.py` was retired 2026-08-31 along with the
@@ -102,3 +105,5 @@ exercise the whole path, and the HITL review panel is where correctness is judge
 * **`PHASE_1_CHECK_INTERVAL_S`** (`5.0`s): Interval between periodic Phase 1 completion checks.
 * **`END_OF_DISPATCH_SILENCE_S`** (`8.0`s): Continuous silence required to trigger Phase 2 finalization.
 * **`NOISE_AMPLITUDE_THRESHOLD`** (`500` RMS): Minimum sound amplitude to begin tone spotting.
+
+<!-- audit-ok: backend/tests/test_database_integration.py -- deleted 2026-08-31; the section records that -->

@@ -13,7 +13,7 @@
 ---
 
 ## 12. Street centroid reports the requested address as though exact
-> **Status**: ⚠️ **Open — re-confirmed in the working tree 2026-08-21.** Both overwrites are
+> **Status**: ✅ **Closed 2026-08-30.** *(Opened as: ⚠️ Open — re-confirmed in the working tree 2026-08-21.)* Both overwrites are
 > still present: `geocoder.py:170–174` (step 5, street centroid) and `:177–181` (step 6,
 > road centroid). Unchanged since the item was written.
 

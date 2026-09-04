@@ -133,6 +133,8 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 
 ## 📂 Documentation Catalog
 
+For the reading map grouped by purpose, start at [`docs/README.md`](./README.md).
+
 Please refer to the following documents for comprehensive domain-specific blueprints:
 
 | Document | Target Location | Scope | Active Agent Skill |
@@ -140,12 +142,10 @@ Please refer to the following documents for comprehensive domain-specific bluepr
 | **Project Overview** | [README.md](../README.md) | High-level system structure and two-phase pipelines. | `dispatch-pipeline-ops` |
 | **Ntfy Server & QR Spec** | [docs/ntfy_server_access_and_qr_spec.md](./ntfy_server_access_and_qr_spec.md) | Ntfy server access, HTTPS, and QR payloads. | None |
 | **Call Structure** | [docs/call_structure.md](./call_structure.md) | Dispatch templates and phonetic matrices. | `hitl-log-analysis` |
-| **GIS Endpoints** | [docs/gis_endpoints.md](./gis_endpoints.md) | MapServer layers and Dynamic Viewport mocks. | `gis-spatial-analysis` |
 | **Hardware Spec** | [docs/hardware_specification.md](./hardware_specification.md) | Pi soundcards and laptop kiosk hardware. | None |
 | **Laptop Kiosk Setup** | [docs/laptop_kiosk_setup.md](./laptop_kiosk_setup.md) | Kiosk displays and auto-updates. | `kiosk-remote-ops` |
 | **Milestones** | [docs/milestones.md](./milestones.md) | Development roadmap and releases. | None |
 | **Privacy Compliance** | [docs/privacy.md](./privacy.md) | Voice monitoring rules and local RAM buffer. | None |
-| **Local Stack & DSP Walkthrough** | [docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md](./walkthroughs/local_stack_and_dsp_calibration_walkthrough.md) | PostgreSQL index tuning and DSP calibration. | `performance-metrics-analytics` |
 | **Development Freeze Summary** | [docs/development_freeze_summary.md](./development_freeze_summary.md) | Current implementation status (Phase A–F): PostGIS migration, STT vocab biasing, API decomposition, geocoder 2.0. **Start here for current state.** | `gis-spatial-analysis` |
 | **Dispatch Integration Options** | [docs/dispatch_integration_options.md](./dispatch_integration_options.md) | Radio/audio ingestion integration approaches. | `dispatch-pipeline-ops` |
 | **Project Purpose & History** | [docs/PROJECT_PURPOSE_AND_HISTORY.md](./PROJECT_PURPOSE_AND_HISTORY.md) | Origin story and evolution from training-game prototype to dispatch HUD. | None |
@@ -160,7 +160,6 @@ CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents
 ### 🛠️ Specialized Sub-agents
 When spawning helper sub-agents, inherit from these type specifications:
 * **`call-review-analyst`**: Specialist in auditing dispatch call logs, triaging HITL reviews, diagnosing audio transcripts, and phonetic ambiguity analysis.
-* **`dispatch-qa-engineer`**: Specialist in automated end-to-end dispatch simulations, testing protocol enforcement, and clean QA database teardowns.
 * **`performance-metrics-analyst`**: Specialist in operational metrics analytics (Turnout Lead Time, Parsing Accuracy %, Stage Latency) and executive HUD telemetry design.
 * **`frontend-kiosk-architect`**, **`gis-spatial-engineer`**, **`kiosk-remote-operator`**, **`pipeline-core-engineer`**, **`stt-mlops-evaluator`**: see [`.claude/agents/`](../.claude/agents) for the full roster.
 

@@ -13,7 +13,7 @@
 ---
 
 ## 51. Add cross_street_1 and cross_street_2 to the review panel for HITL verification
-> **Status**: ?? **Open — Feature request logged.**
+> **Status**: ✅ **Closed 2026-08-31.** *(Opened as: Open — Feature request logged.)*
 * **Requirement**: The parser extracts cross_street_1 and cross_street_2, but they need to be fully exposed, verifiable, and editable by dispatchers in the Human-In-The-Loop (HITL) review panel.
 * **Context**: This will allow operators to correct or confirm cross streets during the review process, ensuring accuracy for routed crews.
 

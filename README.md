@@ -13,8 +13,6 @@ Designed to operate seamlessly across **4 station kiosks** (with Hall 1 serving 
 > [!NOTE]
 > **Current deployment status**: this is the target multi-hall architecture. Right now CFR EVO runs single-hall — one physical test kiosk — while the core dispatch/GIS/routing pipeline is hardened. Multi-hall rollout is tracked as future work in [`docs/PROJECT_IDEAS.md`](./docs/PROJECT_IDEAS.md) (#5).
 
-Furthermore, it doubles as a geographical training simulator, helping drivers memorize response zones, street intersections, block numbers, and parcel shapes through interactive training games.
-
 ---
 
 ## 🏛️ 100% Offline Survival, $0 Subscription-Free & Municipal Data Authority
@@ -168,12 +166,18 @@ sequenceDiagram
 
 ## 📂 Repository Structure
 
-* [**`/backend`**](./backend): Core orchestrator running the STT engine, parser, GIS geocoder, and the local **FastAPI Gateway** (`backend/api`).
-* [**`/frontend`**](./frontend): React/Vite client dashboard, Leaflet mapping layers, MQTT WebSocket listeners, and recruitment training games.
-* [**`/services/gis`**](./services/gis): Sibling GIS service packaging Coquitlam parcel geocoders and emergency zone spatial indices.
-* [**`/services/audio_analysis`**](./services/audio_analysis): Sibling DSP service implementing Butterworth filters, FFT peak analysis, and audio capture streams.
-* [**`/services/dispatch_notifications`**](./services/dispatch_notifications): Sibling notification service wrapping local FastAPI sync engine and Mosquitto MQTT alert broker.
-* [**`/services/mosquitto`**](./services/mosquitto): Configuration for Mosquitto MQTT broker (`mosquitto.conf`).
+**Production** is what runs on the station kiosk on its own:
+
+* `backend/cfr_dispatch/` and `backend/main.py`: the dispatch agent. Audio capture, tone detection, Whisper speech-to-text, the parser and the geocoder. Runs as the `cfr-agent` systemd unit.
+* `backend/api/`: the FastAPI gateway, in Docker. `backend/migrations/`: the schema history of the PostGIS database.
+* `services/gis`, `services/audio_analysis`, `services/dispatch_notifications`: sibling packages the agent imports (see `CLAUDE.md` §2). `services/mosquitto`: the MQTT broker's configuration.
+* `frontend/`: the React and Leaflet display, built once and served by nginx on the kiosk.
+* `docker-compose.yml` and `setup_kiosk.sh`: the container stack and the script that built the kiosk.
+
+**Development and testing** is what a person runs; the kiosk never runs it on its own:
+
+* `backend/tests/`: the pytest suites. `backend/scripts/`: operator maintenance and developer tools, grouped by purpose in [its README](./backend/scripts/README.md). `scripts/`: dev-environment installers and the tone backtest.
+* `docs/`: start at [`docs/README.md`](./docs/README.md), the reading map. `.claude/`: the runbooks (skills) and agent personas, all plain Markdown and readable without any tooling.
 
 ---
 

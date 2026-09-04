@@ -13,7 +13,7 @@
 ---
 
 ## 48. One civic address, many parcels — the import keeps whichever the shapefile lists first
-> **Status**: ⚠️ **Open — measured 2026-08-28. Ours, not a City data gap.**
+> **Status**: ✅ **Closed 2026-08-31.** *(Opened as: ⚠️ Open — measured 2026-08-28. Ours, not a City data gap.)*
 
 Found while accounting for the 4,307-record difference between `Addresses.dbf` (69,708) and
 `public.parcels` (65,401). **The accounting reconciles exactly** — there are 65,401 distinct

@@ -136,8 +136,8 @@ deferred by the operator, so this is recorded in `docs/post_freeze_backlog.md` r
     `> **Status**:` line still says Open**: 10, 12, 31, 35b, 38, 39, 40, 41, 42, 48, 51a, 58.
     Checked #10 and #35b: the header is current and the closing analysis is at the foot of each
     file; the body line is a fossil. 33 of the other 45 closed items updated that line
-    (`> **Status**: ✅ **Closed <date> — …**`). **Not changed here** — twelve one-line edits to
-    history-bearing files are for the operator to approve, not a scan to make.
+    (`> **Status**: ✅ **Closed <date> — …**`). **Fixed 2026-09-04** on the operator's instruction: each body line now reads
+    `✅ **Closed <date>.**` with the original opening text kept after it in italics.
 
 ### Already acknowledged before this audit (excused with `audit-ok`, listed so nobody re-finds them)
 
@@ -156,17 +156,19 @@ deferred by the operator, so this is recorded in `docs/post_freeze_backlog.md` r
 section, ignore file and the one skill reference are gone; `GEMINI.md` remains as a pointer so a
 Gemini-based tool that wanders in reads `CLAUDE.md` instead of nothing.
 
-**B. Bannered-superseded documents — open.** The convention is to keep a superseded document
-with a CAUTION banner rather than delete it (`gis_endpoints.md`, the DSP walkthrough,
-`database_and_datastores.md`, `development_freeze_summary.md`). About ten of the 35 dangling
-paths live inside those banners and were left alone. If the policy stays "banner, don't
-delete", the scan should learn to skip bannered files; if not, the four files are prune
-candidates.
+**B. Bannered-superseded documents — resolved 2026-09-04, pruned.** Operator ruling: a document
+that describes a system no longer run is deleted, not kept with a banner. `gis_endpoints.md` and
+`walkthroughs/local_stack_and_dsp_calibration_walkthrough.md` are gone (the walkthrough also
+repeated the `FREQUENCY_TOLERANCE_HZ = 8` claim that `GEMINI.md` records as wrong).
+`database_and_datastores.md` and `development_freeze_summary.md` stay: each has sections that
+are still the current description, marked as such. `docs/README.md` now carries the rule.
 
-**C. `ActiveDispatchPanel.jsx:145` — open.** Renders "Google Maps API Key not configured.
-Visual mock and coordinates computed:" over real lat/lng when no key is set. Labelled and
-real, so not a §6.1 fabrication, but "mock" on a panel a crew might see reads badly. It reaches
-the map via `hud/LeftSidebar` → `MapBoard`. Is it crew-visible?
+**C. `ActiveDispatchPanel.jsx:145` — resolved 2026-09-04.** "Visual mock" was a hangover from
+the removed simulator vocabulary. The kiosk's real replay is the review mode (`isReview`, the
+REVIEW REPLAY banner with auto-dismiss paused); this panel's fallback branch is simply Street
+View being unavailable, so the label now says that: "Street View is online-only and no Google
+key is configured. Location:". The two runbook sections that still said "simulating", and ran
+a test module deleted 2026-08-31, were rewritten to point at the review replay.
 
 **D. Setup and deployment material — deferred by ruling.** `setup_kiosk.sh` was edited only
 where it referenced the deleted templates; it documents the machine that exists.
@@ -195,3 +197,7 @@ skill's procedure still runs end to end on the kiosk. Those need reading, not sc
 <!-- audit-ok: services/gis/src/gis_service/shapefile_loader.py -- deleted 2026-08-20; listed under already-acknowledged -->
 <!-- audit-ok: backend/cfr_dispatch/parser.py -- now a package; item 19 -->
 <!-- audit-ok: migration_stt_tuning.sql -- moved into backend/migrations/ 2026-09-03; item 16 -->
+
+<!-- audit-ok: docs/gis_endpoints.md -- deleted 2026-09-04; decision B records it -->
+<!-- audit-ok: docs/walkthroughs/local_stack_and_dsp_calibration_walkthrough.md -- deleted 2026-09-04; decision B records it -->
+<!-- audit-ok: backend/cfr_dispatch/config/cloud.py -- renamed to runtime.py 2026-08-31; item 19 records it -->

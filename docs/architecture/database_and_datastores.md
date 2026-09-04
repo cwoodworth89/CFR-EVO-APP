@@ -8,8 +8,9 @@
 >   (see `docs/development_freeze_summary.md` and `docs/city_gis_data_register.md`).
 >   The figure below labels the pre-deduplication shapefile count as the table count.
 > * **`hydrants.json` is no longer a frontend datastore.** The frontend reads
->   `public.hydrants` through the API — see
->   [`docs/gis_endpoints.md`](../gis_endpoints.md) for what changed and why.
+>   `public.hydrants` through the API (moved 2026-08-22). The JSON fetch path it replaced,
+>   and the endpoint notes that described it, were retired with `docs/gis_endpoints.md`
+>   on 2026-09-04.
 >
 > The overall store map is otherwise current.
 
@@ -91,3 +92,4 @@ To guarantee total offline resilience and prevent masked errors, the system enfo
 
 *The only allowed online network calls are the optional visual PiP augmentations (Google Street View panorama & Satellite photo).*
 
+<!-- audit-ok: docs/gis_endpoints.md -- deleted 2026-09-04; the correction above records it -->

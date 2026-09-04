@@ -13,7 +13,7 @@
 ---
 
 ## 40. Street basemap has no tiles above zoom 18 — but the reported symptom did not reproduce
-> **Status**: ⚠️ **Open — partially characterized; needs the exact location from the operator.**
+> **Status**: ✅ **Closed 2026-08-27.** *(Opened as: ⚠️ Open — partially characterized; needs the exact location from the operator.)*
 
 Reported: *"Zoom 17 and greater, on map mode in Austin's north area is showing blank."*
 

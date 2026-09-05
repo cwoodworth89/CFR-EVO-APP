@@ -96,6 +96,22 @@ Rule B is better than the baseline and not good enough: eight wrong grids surviv
 completion that has settled ("map grid 68" three chunks running on DISP-2026-3E1426) is as
 stable as speech. Rule C is useless: the model completes the talk-group clause too.
 
+### The whole corpus says the same, 2026-09-05 (`5eeaae4`, recorded, n=507)
+
+503 of 507 recordings pass the completion check inside the recording, at a median of 19 s;
+448 of them have a verified grid.
+
+| | Grid right | Grid wrong | Address exact | Wrong street | Location withheld |
+|:--|--:|--:|--:|--:|--:|
+| **Today (baseline)** | 128 | **314** | 388 | 52 | 0 |
+| A, location gate | 110 | 272 | 373 | **4** | 81 |
+| B, two chunks agree (419 published) | 232 | 141 | 347 | 17 | 0 |
+| C, talk group in front | 105 | 283 | 388 | 52 | 0 |
+
+Seven grids in ten wrong, as on the holdout; 230 of the 314 are "68" and 52 are "82", the two
+grids the model saw most in training. Rule A costs 81 unknown cards, 15 of them on an address
+that was in fact exact, and removes 48 of the 52 wrong streets shown in the first minute.
+
 ### What follows
 
 No rule on the transcript text can tell a settled completion from speech. Two honest options

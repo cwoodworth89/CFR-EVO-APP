@@ -7,6 +7,11 @@ backend/data/training/output/
 backend/data/training/merged_base/
 # Regenerated from the database by tools/extract_training_data.py on every run (untracked 2026-09-05).
 backend/data/training/metadata.csv
+# The Colab upload bundle (51 recordings + metadata, 65 MB) and two one-off outputs from
+# 2026-08-10; generated, referenced by nothing in the code, untracked 2026-09-05.
+backend/data/training/cfr_whisper_dataset.zip
+backend/data/training/batch_test_outputs.txt
+backend/data/training/dispatch_query_results.json
 backend/models/whisper-base-cfr-ct2/
 
 # Byte-compiled / optimized / DLL files

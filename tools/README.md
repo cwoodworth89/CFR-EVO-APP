@@ -50,6 +50,7 @@ Produce numbers. None of them modify operational data.
 | `harness_history.py` | Every recorded harness run, oldest first: stage, git hash, model, corpus slice, headline. The answer to "are we improving over time". |
 | `verify_snapping_corpus.py` | Parcel arrival-point benchmark: boundary-to-arrival distance and OSRM ETA. |
 | `audit_skill_references.py` | Finds identifiers a `SKILL.md` names that exist nowhere in the code. `--scripts` checks this README. |
+| `kiosk_capture_state.sh` | Run on the kiosk before restarting `cfr-agent`: exits 1 while a broadcast is being captured or its phase 2 is running, from the agent's own journal lines. A restart mid-capture loses the call (#70). |
 | `vulture_whitelist.py` | Names `vulture` reports as unused that are used by something it cannot see (`__exit__` arguments, side-effect imports, the `server.py` re-export facade). Run: `.venv/Scripts/vulture backend services tools tools/vulture_whitelist.py --min-confidence 80`. |
 | `audit_staleness.py` | Deterministic staleness scan: schema objects dropped by migrations but still named in code, modules and components nothing imports, frontend/pipeline API calls vs backend routes, compose names, env vars, punch-list status drift, `file://` links, doc age. Writes a Markdown report (`--out`). Overlaps `--docs` above; merging them is on the post-freeze backlog. |
 | `export_complex_sites_for_review.sql` | Sites where a crew arriving at the computed point still has property to search — the `#49` review queue. |

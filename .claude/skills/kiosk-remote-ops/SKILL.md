@@ -59,6 +59,14 @@ Restart the audio listener daemon:
 ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
 ```
 
+**Before any restart: the operator chooses the moment, and the capture check must say SAFE.**
+A restart during a broadcast loses the call and its recording (punch list #70, 2026-09-05).
+`tools/kiosk_capture_state.sh` reads the agent's own journal lines on the kiosk and exits 1
+while a capture or its phase 2 is running:
+```bash
+ssh tcfire@100.95.146.94 "bash /home/tcfire/CFR-EVO-APP/tools/kiosk_capture_state.sh"
+```
+
 That needs sudo, which needs a password at a prompt. The unit has `Restart=always` with
 `RestartSec=5s` and runs as `tcfire`, so a SIGTERM to the main process is a restart that needs
 no password (used 2026-09-05; the worker child is in the same cgroup and goes with it):

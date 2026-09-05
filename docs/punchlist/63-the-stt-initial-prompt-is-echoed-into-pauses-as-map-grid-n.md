@@ -108,8 +108,25 @@ dropped round 2's opening and the digit join made "map grid 8210" (#68, fixed th
 afternoon). Two defaults of "default" are not byte-identical either: the list is built live
 from HITL-verified streets and dispatch frequency, so only a same-code, same-hour pair counts.
 
-To apply: `STT_HOTWORDS_EXCLUDE=map grid` in the kiosk's `backend/.env`, then restart
-`cfr-agent`. Not applied; the operator's call, with the numbers above.
+**Applied 2026-09-05 09:04 PDT**, operator ruling: `STT_HOTWORDS_EXCLUDE=map grid` in the kiosk's
+`backend/.env` beside the empty prompt, `cfr-agent` restarted, the loader read both back.
+
+**Full corpus with the live settings**, 507 verified calls 2026-07-12 to 2026-09-01 (`[PA]`
+pages out), code `715aa57`, recorded in `evaluation_history` against the morning's 529-call
+baseline (`88ea5de`: template prompt, pre-#62 geocoder, default hotwords). The gap is the
+whole day's changes, not the hotword alone; the holdout A/B above is the isolated number.
+
+| Full corpus | Morning baseline (n=529) | Live settings (n=507) |
+|:--|--:|--:|
+| WER mean / median (non-training clips) | 9.62 % / 3.23 % | 4.78 % / 0 % |
+| Map grid wrong | 32 | 6 |
+| Address wrong | 85 | 27 |
+| Wrong street | 48 | 13 |
+| Placed exactly | 394 | 428 |
+| Nearest civic (step 4b) | 0 | 9 |
+
+By month, the model in service on the calls it never trained on: July WER 5.07 % (n=50),
+August 4.57 % (n=69). The 6 grids still wrong are the number-mangling class below.
 
 ### What is not done, and why
 

@@ -128,6 +128,39 @@ remain, and the operator's rule decides between them:
 Option 1 is a small change in `phase1.py` and `payload_builder.py`, measurable with this tool
 and reversible. The full-corpus run of the simulator is in `evaluation_history` for the record.
 
+3. **Derive the grid from the address, confirm it with the spoken grid.** The operator's
+   proposal, 2026-09-05. The map grid *is* a City response zone, and every parcel already
+   carries its zone (`parcels.zone_id`, computed at import by point-in-polygon against the
+   City's Emergency Response Zones layer). So when phase 1 has placed the call on a parcel,
+   the zone is a lookup, not a guess. Measured on the corpus:
+
+   | Grid from | Against the announced grid | Calls |
+   |:--|--:|--:|
+   | the parcel's own `zone_id`, exact placements | **96.3 % agree** | 736 parcel rows |
+   | the zone containing the frontage point, solid placements | 88.0 % agree | 401 |
+
+   The gap between the two is the boundary: the frontage point sits on the street, zones
+   are bounded by streets, and 40 of the 46 point-based disagreements are at 0 m from the
+   announced zone (`ST_Intersects` then picks whichever polygon sorts first, CLAUDE.md
+   §7.3a). The parcel polygon does not have that problem. The remaining 4 % are a mix of
+   verified-column slips (grid "6" for 68 on 3030 Gordon Ave) and dispatch assignments
+   that differ from the geometry; phase 2 sees both.
+
+   The machinery exists: `payload_builder.py` already calls `get_map_grid_for_point` as a
+   *fallback* when no grid was parsed. The change is precedence and provenance. In phase 1
+   the parsed grid is ignored (it is the model's, seven times in ten), the grid comes from
+   the placed parcel's `zone_id` (or `zone_for_point` for an intersection), and the payload
+   says so (`map_grid_source: "parcel-zone"`) so the kiosk can label it derived. Behind
+   rule A, a call with no solid placement gets no grid. In phase 2 the spoken grid from the
+   full recording replaces it, and a new review flag `GRID_MISMATCH` is raised when the two
+   differ, which is also how the verified-column slips surface. The completed grid must also
+   stop being passed as `target_map_grid` into street narrowing in phase 1; the journal shows
+   that narrowing has not fired in 14 days, so nothing is lost.
+
+   Expected on the corpus, from the measurements above: a grid at 16-19 s on the ~78 % of
+   calls whose address is a parcel by then, right about 96 % of the time, against 29 % today;
+   no grid, rather than a wrong one, on the rest until phase 2. This is the option to build.
+
 ### Related
 
 #70 (the restart that stopped phase 2), #63 (the same completion behaviour in pauses),

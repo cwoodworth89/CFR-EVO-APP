@@ -2,10 +2,11 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-51 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+52 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **44a** | 🔴 crew-visible | CLOSED | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **62** | 🔴 crew-visible | CLOSED | [The geocoder's street-centroid step has raised on every call since the `parcels.lat` rename](62-the-geocoders-street-centroid-step-has-raised-on-every-call-si.md) |
 | **45a** | ⚪ hygiene | CLOSED | [Geocoder harness needs a review pass before its numbers are trusted again](45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |

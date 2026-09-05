@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🔁 Batch follow-up, 2026-08-23 (operator screenshots + kiosk probes) |
 | **Blocks** | 1 |
@@ -13,7 +13,8 @@
 ---
 
 ## 44. Round 1 wins the address unconditionally — Phase 2 never compares the two rounds
-> **Status**: ⚠️ **Open — measured 2026-08-23.** **Confirmed live**, not historical: split by
+> **Status**: ✅ **Closed 2026-09-05 — fixed in `8b962b8` the way this item proposed, measured; see the
+> closing note.** *(Opened as: ⚠️ Open — measured 2026-08-23.)* **Confirmed live**, not historical: split by
 > month, it still costs ~5% of double-round calls in 2026-08. Characterised only; no fix
 > applied. Related to `parser_audit_handoff.md` §5, which flagged this as a lead but never
 > sized it.
@@ -115,3 +116,29 @@ deliberate filters and stale source data, not import bugs.** One filter is a gen
 operational problem and is the largest finding in this batch.
 
 ---
+
+### Closed 2026-09-05
+
+Done as this item proposed: the parcel data decides, not the round order. `build_dispatch_payload`
+(`backend/cfr_dispatch/pipeline/payload_builder.py`, `8b962b8`) now geocodes every candidate and
+keeps the one with the highest resolver confidence, which is the geocoder's own ranking per step
+(exact and intersection highest, then cross-street section, block, street centroid, road
+centroid); round order only breaks ties. A round-1 `29883 Robson Dr` that falls through to a
+section no longer beats round 2's `2983 Robson Dr`. Every candidate is geocoded now, one more
+call per dispatch on the common path, milliseconds on this kiosk.
+
+The regression gate this item asked for first exists: `tools/harness_chain.py`, with
+`--baseline`. Measured on the stored transcripts since 2026-08-01, against the morning baseline
+at `eb0f801`:
+
+| | Before | After |
+|:--|--:|--:|
+| Placed exactly | 251 | 254 |
+| Resolved by a cross-street section (step 4) | 8 | 6 |
+| Wrong street | 23 | 21 |
+
+The same run carried two measurement changes (the *approximate* bucket, and `[PA]` pages
+excluded, which took the corpus from 325 to 303), so the whole-run percentages are not
+comparable; the resolved-by shift and the exact count are the signal. Two of the four
+section-for-parcel calls in the briefing flipped; the other two have no resolvable number in
+either round. The kiosk agent picks the change up on its next restart.

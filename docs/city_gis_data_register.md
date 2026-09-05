@@ -346,6 +346,21 @@ a fallback. Record the answer here either way.
 
 ---
 
+## 14. Sixteen civic numbers the dispatcher uses are not in the Addresses layer
+
+**Found 2026-09-05** by replaying every verified dispatch through the geocoder
+(`tools/harness_chain.py`). Sixteen civic numbers that Locution announced and the operator
+verified are absent from `Addresses.shp` (69,708 rows, the file our parcel import reads),
+while their neighbours are present: `1414 Pinetree Way` (1413 and 1415 exist), `1734 Eagle
+Mountain Dr` (1735 exists), `1290 Pipeline Rd` (1289 and 1291 exist), `1378 Oxford St`,
+`3062 Lougheed Hwy`, `2833 David Ave`, `1550 United Blvd`, `4000` and `3990 Quarry Rd`,
+`1101 Pinetree Way`, `629 Cottonwood Ave` (#41), `39 United Blvd`, `2905` and `2929 Lougheed
+Hwy`, `4992 Upper Harper Rd`. The full table with the nearest numbers is punch-list #64.
+
+**Question for the City:** is there an address layer the open data portal does not publish
+(strata units, large-site secondary numbers, recent assignments) that carries these? Until
+then the kiosk places them on the block or the street, labelled as such.
+
 ## Closed items
 
 ### `Deer's Leap Pl` — OURS, not a City gap

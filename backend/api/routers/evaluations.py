@@ -99,7 +99,12 @@ def get_metrics_summary(db: Session = Depends(get_db)):
         LiveCallModel.target["review_flag_count"].as_integer() > 0
     ).count()
 
-    latest_eval = db.query(EvaluationHistoryModel).order_by(desc(EvaluationHistoryModel.created_at)).first()
+    # The latest STT evaluation. Since 2026-09-05 the table also holds parser, geocoder and
+    # chain harness runs (stage != 'stt') that carry no WER or CER; the first of those made
+    # float(None) raise here, found by test_evaluations_router the same day.
+    latest_eval = (db.query(EvaluationHistoryModel)
+                   .filter(EvaluationHistoryModel.stage == "stt")
+                   .order_by(desc(EvaluationHistoryModel.created_at)).first())
 
     return {
         "status": "online",
@@ -114,11 +119,13 @@ def get_metrics_summary(db: Session = Depends(get_db)):
             "gis_lookup_time_ms": 6.3,
             "vad_silence_removal_percent": 34.2
         },
+        # No evaluation means no number (CLAUDE.md 6.1); the 4.2 / 1.8 / 93.3 / 2.1 that
+        # stood here until 2026-09-05 were invented.
         "latest_evaluation": {
-            "wer": float(latest_eval.wer) if latest_eval else 4.2,
-            "cer": float(latest_eval.cer) if latest_eval else 1.8,
-            "perfect_percent": float(latest_eval.perfect_percent) if latest_eval else 93.3,
-            "failed_percent": float(latest_eval.failed_percent) if latest_eval else 2.1
+            "wer": _num(latest_eval.wer) if latest_eval else None,
+            "cer": _num(latest_eval.cer) if latest_eval else None,
+            "perfect_percent": _num(latest_eval.perfect_percent) if latest_eval else None,
+            "failed_percent": _num(latest_eval.failed_percent) if latest_eval else None,
         },
         "containers": [
             {"name": "cfr_api", "status": "running", "uptime": "99.9%"},

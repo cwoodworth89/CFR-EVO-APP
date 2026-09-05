@@ -39,6 +39,11 @@ not captured.
 
 Nothing in this system can recover the address; CAD or the radio is the source for that call.
 
+The payload the kiosk showed was published by phase 1 at 11:41:40, 23 seconds in, before the
+restart: the model completed the cut chunk with *"166 coquitlam map grid 68"* and the completion
+check accepted it. That is its own defect, #72; the restart is what stopped phase 2 from
+correcting it.
+
 ### Two defects
 
 1. **Process rule, already in force:** the agent is not restarted without the operator

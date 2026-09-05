@@ -111,13 +111,17 @@ def get_metrics_summary(db: Session = Depends(get_db)):
         "total_dispatches": total_calls,
         "verified_dispatches": verified_calls,
         "flagged_dispatches": flagged_calls,
+        # Nothing here is measured by the API. The agent times every call (dsp, stt, gis,
+        # broadcast: pipeline/phase1.py `metrics`) but keeps the numbers in the worker's memory;
+        # until they are stored, the honest value is null (CLAUDE.md 6.1). The literals that
+        # stood here until 2026-09-05 (12.4 s, 47.2 s, 1.82 s, 0.05, 6.3 ms, 34.2 %) were invented.
         "telemetry": {
-            "phase1_alert_latency_s": 12.4,
-            "phase2_total_latency_s": 47.2,
-            "stt_inference_time_s": 1.82,
-            "stt_speed_ratio": 0.05,
-            "gis_lookup_time_ms": 6.3,
-            "vad_silence_removal_percent": 34.2
+            "phase1_alert_latency_s": None,
+            "phase2_total_latency_s": None,
+            "stt_inference_time_s": None,
+            "stt_speed_ratio": None,
+            "gis_lookup_time_ms": None,
+            "vad_silence_removal_percent": None,
         },
         # No evaluation means no number (CLAUDE.md 6.1); the 4.2 / 1.8 / 93.3 / 2.1 that
         # stood here until 2026-09-05 were invented.
@@ -127,10 +131,7 @@ def get_metrics_summary(db: Session = Depends(get_db)):
             "perfect_percent": _num(latest_eval.perfect_percent) if latest_eval else None,
             "failed_percent": _num(latest_eval.failed_percent) if latest_eval else None,
         },
-        "containers": [
-            {"name": "cfr_api", "status": "running", "uptime": "99.9%"},
-            {"name": "cfr_postgres", "status": "running", "uptime": "99.9%"},
-            {"name": "cfr_mosquitto", "status": "running", "uptime": "99.9%"},
-            {"name": "cfr_ntfy", "status": "running", "uptime": "99.9%"}
-        ]
+        # The API container has no Docker socket, so it cannot see the other containers; the
+        # four "running, 99.9%" rows that stood here until 2026-09-05 were literals.
+        "containers": None,
     }

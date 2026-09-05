@@ -302,7 +302,10 @@ def main() -> int:
                          "place": place or "", "resolved_by": resolved_by, "verified_resolved_by": verified_by,
                          "distance_m": None if dist is None else round(dist, 1),
                          "system_address": sys_addr, "verified_address": truth["address"],
-                         "lat": target.get("lat"), "lng": target.get("lng")})
+                         "lat": target.get("lat"), "lng": target.get("lng"),
+                         # What was heard, so a bad row can be read without rerunning STT.
+                         "transcript": (transcript or "")[:400],
+                         "verified_round1": round1(r["verified_transcript"])[:400] if r["verified_transcript"] else ""})
 
         if args.dispatch_id:
             print(f"  dispatch    : {did}  ({r['timestamp']})")

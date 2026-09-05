@@ -220,6 +220,18 @@ def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None,
         core_dispatch_terms + unit_terms + hitl_streets + ranked_streets + all_call_types
     ))
 
+    # STT_HOTWORDS_EXCLUDE: comma-separated terms removed before the budget is spent, so one
+    # term's effect can be measured with tools/harness_chain.py (CLAUDE.md 6.4). First use
+    # 2026-09-05, "map grid": the template prompt echoed that phrase into pauses (#63) and the
+    # hotwords sit in the same previous-text slot of the decoder.
+    excluded = {t.strip().lower() for t in os.environ.get("STT_HOTWORDS_EXCLUDE", "").split(",")
+                if t.strip()}
+    if excluded:
+        before = len(ordered)
+        ordered = [t for t in ordered if t.lower() not in excluded]
+        logging.info("STT hotwords: %d term(s) removed by STT_HOTWORDS_EXCLUDE (%s).",
+                     before - len(ordered), ", ".join(sorted(excluded)))
+
     budget = hotword_token_budget(max_length)
     kept, used = _trim_to_budget(ordered, budget, encoder)
 

@@ -59,6 +59,16 @@ Restart the audio listener daemon:
 ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"
 ```
 
+That needs sudo, which needs a password at a prompt. The unit has `Restart=always` with
+`RestartSec=5s` and runs as `tcfire`, so a SIGTERM to the main process is a restart that needs
+no password (used 2026-09-05; the worker child is in the same cgroup and goes with it):
+```bash
+ssh tcfire@100.95.146.94 "kill -TERM \$(systemctl show cfr-agent -p MainPID --value); sleep 15; systemctl is-active cfr-agent; tail -n 5 /home/tcfire/CFR-EVO-APP/backend/dispatch.log"
+```
+
+Importing `cfr_dispatch` in a one-off check pulls in PortAudio; without `XDG_RUNTIME_DIR=/run/user/1000`
+it dies on `PulseAudio_Initialize`.
+
 Rebuild frontend production assets (since `frontend/dist` is `.gitignore`d):
 ```bash
 ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/frontend && npm install && npm run build"

@@ -14,8 +14,8 @@
 
 ## 63. The model in service writes the prompt's own phrase into the transcript
 
-> **Status**: 🔴 **Open — parser mitigation shipped 2026-09-05 (`8b962b8`); the prompt itself is the
-> operator's call, with the measurement below.** Crew-visible: the map grid drives the zone the
+> **Status**: 🔴 **Open — parser mitigation shipped 2026-09-05 (`8b962b8`); operator ruling 2026-09-05:
+> no prompt, applied on the kiosk at 08:28 PDT. Stays open until fresh calls are measured without it.** Crew-visible: the map grid drives the zone the
 > kiosk shows, and the same insertion loses the cross streets.
 
 ### What happens
@@ -74,6 +74,14 @@ The parser fix recovers what it can; the prompt is the cause.
 
 Most clips are clean either way; the prompt's damage lands in pauses and hard audio, which
 is why the tail shows it at fifteen times the size the holdout does.
+
+### Applied 2026-09-05
+
+The operator ruled: no prompt. `STT_INITIAL_PROMPT=` (empty) is in the kiosk's `backend/.env`
+and `cfr-agent` restarted at 08:28 PDT with the loader reading `''`. The hotwords still list
+*map grid*; one variable at a time. To close: run `tools/harness_chain.py --since 2026-09-05`
+once a few dozen calls have arrived and compare the map-grid and address misses against the
+baseline rows in `evaluation_history`.
 
 ### What is not done, and why
 

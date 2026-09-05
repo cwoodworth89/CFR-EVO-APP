@@ -95,8 +95,8 @@ before 2026-09-05 fold *approximate* into *cosmetic* and include the PA pages.
 
 ## For the operator
 
-1. **The prompt** (#63): `STT_INITIAL_PROMPT=` empty in `backend/.env`, then restart `cfr-agent`.
-   The holdout number is in `evaluation_history`. The hotwords still list *map grid*; untested.
-2. **Restart `cfr-agent`** to pick up the sanitiser and #44a; the listener drops for seconds.
+1. ~~**The prompt** (#63): `STT_INITIAL_PROMPT=` empty in `backend/.env`, then restart `cfr-agent`.~~
+   **Done 2026-09-05 08:28 PDT** on the operator's ruling. The hotwords still list *map grid*; untested.
+2. ~~**Restart `cfr-agent`** to pick up the sanitiser and #44a.~~ **Done**, same restart.
 3. **Two verified-column typos** (*Riverband*, *Pintree*) and one probable one (*Beaty Pl*).
 4. **The City question** in register §14, sixteen numbers.

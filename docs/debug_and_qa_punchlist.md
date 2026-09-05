@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**25 open** (17 crew-visible) · **56 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**26 open** (18 crew-visible) · **56 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 25
+## Open — 26
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -41,6 +41,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
 | **65** | ⚪ hygiene | OPEN | [The admin login accepts three hardcoded passwords besides the configured one](punchlist/65-the-admin-login-accepts-three-hardcoded-passwords-besides-t.md) |
 | **70** | 🔴 crew-visible | OPEN | [A restart during a capture loses the call and its audio](punchlist/70-a-restart-during-a-capture-loses-the-call-and-its-audio.md) |
+| **71** | 🔴 crew-visible | OPEN | [The hotword budget is spent on intersections, suffix duplicates and template words; *Thor* never gets in](punchlist/71-the-hotword-budget-is-spent-on-intersections-suffix-duplicat.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
 | **49** | 🟠 operational | OPEN | [Access-point review UX — operators cannot set an entrance without direct SQL](punchlist/49-access-point-review-ux-operators-cannot-set-an-entrance.md) |

@@ -29,6 +29,14 @@ Two rules are scored on the same chunks, without changing production:
      publishes units and incident with the location unknown (the Tier 1 card).
   B  stability: the grid and the address string must be the same on two consecutive chunks; the
      payload is built on the second. Speech persists from chunk to chunk; completions change.
+  C  anchor: the grid is published only when the same chunk parsed a talk group (the template
+     puts "use talk group N ..." immediately before "coquitlam map grid N"); otherwise the grid
+     is withheld and the rest of the payload goes out.
+
+Measured on DISP-2026-3E1426 before the corpus run: at 19, 22 and 25 s the model completed the
+chunk with "use talk group 10 combined response coquitlam map grid 68", the same wrong grid three
+chunks running, with a talk group in front of it; the real "map grid 82" appeared at 28 s. So B
+and C are expected to fail on completions of that shape; the corpus run says how common it is.
 
 A call is "published" under a rule at the chunk where the rule first allows it; a call the rule
 never allows within the recording is "left to phase 2", which runs on the full recording anyway.
@@ -105,7 +113,7 @@ def new_bucket():
             "location_unknown": 0, "resolved_by": Counter()}
 
 
-def score(bucket, t, payload, resolved_by, truth, location_shown=True):
+def score(bucket, t, payload, resolved_by, truth, location_shown=True, grid_shown=True):
     bucket["published"] += 1
     bucket["t_pub"].append(t)
     target = (payload or {}).get("target") or {}
@@ -115,7 +123,7 @@ def score(bucket, t, payload, resolved_by, truth, location_shown=True):
         bucket["location_unknown"] += 1
         bucket["grid"]["withheld"] += 1
         return
-    bucket["grid"][grid_verdict(got_grid, truth["map_grid"])] += 1
+    bucket["grid"][grid_verdict(got_grid, truth["map_grid"]) if grid_shown else "withheld"] += 1
     if truth["address"]:
         bucket["place"][classify(sys_addr, truth["address"]) or "unresolved"] += 1
     bucket["resolved_by"][resolved_by] += 1
@@ -174,7 +182,7 @@ def main() -> int:
     trace_log = install_tracer()
     model_version = os.path.basename(WHISPER_MODEL.rstrip("/\\")) or WHISPER_MODEL
 
-    buckets = {k: new_bucket() for k in ("baseline", "rule A", "rule B")}
+    buckets = {k: new_bucket() for k in ("baseline", "rule A", "rule B", "rule C")}
     per_month = defaultdict(lambda: {k: new_bucket() for k in buckets})
     out_rows = []
 
@@ -210,9 +218,10 @@ def main() -> int:
             first = next((c for c in cands if c.address or c.intersection), None)
             grid = next((c.map_grid for c in cands if c.map_grid), None)
             addr = (first.address or first.intersection) if first else None
-            chunks.append((t, raw, passes, grid, addr))
+            talk = next((c.radio_channel for c in cands if c.radio_channel), None)
+            chunks.append((t, raw, passes, grid, addr, talk))
             if args.dispatch_id:
-                print(f"  {t:5.1f} s  pass={passes!s:5}  grid={grid!s:5}  addr={addr!r:32}  {raw[:150]!r}")
+                print(f"  {t:5.1f} s  pass={passes!s:5}  grid={grid!s:5}  talk={talk!r:22}  addr={addr!r:28}  {raw[:400]!r}")
             if passes and base_t is None:
                 base_t = t
             if passes and b_t is None and len(chunks) >= 2:
@@ -228,13 +237,16 @@ def main() -> int:
             raw_at = next(c[1] for c in chunks if c[0] == base_t)
             payload, step = publish(raw_at)
             target = (payload or {}).get("target") or {}
+            talk_at = next(c[5] for c in chunks if c[0] == base_t)
             for b in (buckets, per_month[month]):
                 score(b["baseline"], base_t, payload, step, truth)
                 score(b["rule A"], base_t, payload, step, truth, location_shown=step in SOLID)
+                score(b["rule C"], base_t, payload, step, truth, grid_shown=bool(talk_at))
             row.update({"t_base": base_t, "base_grid": target.get("map_grid"), "base_address": target.get("address"),
                         "base_resolved_by": step, "base_grid_verdict": grid_verdict(target.get("map_grid"), truth["map_grid"]),
                         "base_place": classify(target.get("address") or "", truth["address"]) if truth["address"] else "",
-                        "rule_a_location": "shown" if step in SOLID else "unknown", "base_transcript": raw_at})
+                        "rule_a_location": "shown" if step in SOLID else "unknown",
+                        "rule_c_grid": "shown" if talk_at else "withheld", "base_transcript": raw_at})
         if b_t is not None:
             raw_b = next(c[1] for c in chunks if c[0] == b_t)
             payload_b, step_b = publish(raw_b)
@@ -268,11 +280,11 @@ def main() -> int:
     summary = {"stage": "phase1", "model_version": model_version, "n": buckets["baseline"]["n"],
                "pooled": {k: summarize(b) for k, b in buckets.items()},
                "months": {m: {k: summarize(b) for k, b in per_month[m].items()} for m in sorted(per_month)}}
-    b0, ba, bb = (summarize(buckets[k]) for k in ("baseline", "rule A", "rule B"))
+    b0, ba, bb, bc = (summarize(buckets[k]) for k in ("baseline", "rule A", "rule B", "rule C"))
     headline = (f"phase 1 published {b0['published']}/{b0['n']} (median {b0['t_pub_median']} s); "
                 f"grid wrong {b0['grid'].get('WRONG', 0)}, wrong street {b0['place'].get('wrong-street', 0)}; "
-                f"rule A withholds {ba['location_unknown']}, rule B publishes {bb['published']} "
-                f"(grid wrong {bb['grid'].get('WRONG', 0)})")
+                f"A withholds {ba['location_unknown']} locations; B publishes {bb['published']}, grid wrong "
+                f"{bb['grid'].get('WRONG', 0)}; C withholds {bc['grid'].get('withheld', 0)} grids, wrong {bc['grid'].get('WRONG', 0)}")
     print("\n" + headline)
     if args.json:
         hc.save_summary(args.json, summary)

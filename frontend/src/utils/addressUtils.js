@@ -15,11 +15,16 @@ export function sanitizeAddress(rawAddr) {
   addr = addr.replace(/^\d+[-/]\s*(\d+\s+[A-Za-z])/i, '$1');
 
   // 3. Handle prefix keyword unit numbers: "UNIT 105 - 3000 Riverbend Dr", "Unit B - 3000 Riverbend Dr", "#105 3000 Riverbend Dr", "Suite 200 - 3000 Riverbend Dr"
-  addr = addr.replace(/^(?:UNIT|APT|STE|SUITE|BAY|BLDG|BUILDING|#)\s*[\w\d]+(?:[-/\s]+|\s+-\s+)(\d{1,5}\s+[A-Za-z])/i, '$1');
+  addr = addr.replace(/^(?:(?:UNIT|APT|STE|SUITE|BAY|BLDG|BUILDING)(?![A-Za-z])|#)\s*[\w\d]+(?:[-/\s]+|\s+-\s+)(\d{1,5}\s+[A-Za-z])/i, '$1');
 
   // 4. Remove keywords + unit designations anywhere in trailing/middle:
   // e.g. "UNIT 105", "BAY 4", "SUITE 200", "#116", "BLDG B", "PHASE 2", "LOT 3", "WHSE 5", "ROOM 12"
-  addr = addr.replace(/\s+(?:UNIT|APT|SUITE|STE|BAY|BLDG|BUILDING|LOT|WHSE|WAREHOUSE|PHASE|PH|COMP|RM|ROOM|FL|FLOOR|#)\s*[\w-]+/gi, '');
+  // The keyword must be a whole word: (?![A-Za-z]) stops "UNIT" matching "United" and "STE"
+  // matching "Steeple". Measured 2026-09-05 against public.road_names (1,079 City road names):
+  // without it 18 street names were removed, e.g. "1550 United Blvd" -> "1550 Blvd",
+  // "1332 Steeple Dr" -> "1332 Dr", Fleet St, Lotus Crt, Bayview Sq, Compton Crt, Pheasant St.
+  // Guarded by backend/tests/test_address_sanitizer_roads.py (punch list #66).
+  addr = addr.replace(/\s+(?:(?:UNIT|APT|SUITE|STE|BAY|BLDG|BUILDING|LOT|WHSE|WAREHOUSE|PHASE|PH|COMP|RM|ROOM|FL|FLOOR)(?![A-Za-z])|#)\s*[\w-]+/gi, '');
 
   // 5. Remove trailing unit numbers/letters after standard street suffixes:
   // e.g. "3000 Riverbend Dr 105", "3000 Riverbend Dr 105A", "3000 Riverbend Dr A", "3000 Riverbend Dr #1"

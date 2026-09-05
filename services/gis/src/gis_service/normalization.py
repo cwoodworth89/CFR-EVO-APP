@@ -79,7 +79,7 @@ class ParsedAddress:
     street: str
     street_type: str
     raw: str
-    has_block_indicator: bool = False  # True if original had 'block'/'blk'
+    has_block_indicator: bool = False  # set by parse_house_and_street; nothing reads it yet
 
 def normalize_street_name(name: str) -> str:
     """Normalizes street name suffix to municipal abbreviation.

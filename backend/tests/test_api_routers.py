@@ -118,8 +118,12 @@ class TestAPIRouters(unittest.TestCase):
         mock_req.headers = {}
         mock_req.client.host = "127.0.0.1"
 
-        # 1. Login success
-        login_res = login(LoginRequest(username="cfradmin", password="rescue"), mock_req)
+        # 1. Login success. The password comes from the environment, never a literal in the
+        # tree (punch list #65); auth.py reads ADMIN_PASSWORD, so any value set here is accepted.
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+        if not admin_password:
+            self.skipTest("ADMIN_PASSWORD is not set; the login test never carries a password literal")
+        login_res = login(LoginRequest(username="cfradmin", password=admin_password), mock_req)
         self.assertIn("access_token", login_res)
         token = login_res["access_token"]
 

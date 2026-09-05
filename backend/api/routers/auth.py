@@ -12,9 +12,9 @@ import jwt
 from fastapi import APIRouter, HTTPException, Request, Depends
 
 try:
-    from backend.api.schemas import LoginRequest, TokenResponse, SessionResponse
+    from backend.api.schemas import LoginRequest
 except ModuleNotFoundError:
-    from api.schemas import LoginRequest, TokenResponse, SessionResponse
+    from api.schemas import LoginRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

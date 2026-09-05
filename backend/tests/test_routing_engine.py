@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from gis_service.routing_engine import (
     EVORoutingEngine,
     FIRE_HALLS,
-    APPARATUS_TIERS,
     get_unit_type,
     get_unit_station_id,
     get_apparatus_profile_class,

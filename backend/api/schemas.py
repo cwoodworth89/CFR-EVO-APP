@@ -14,16 +14,6 @@ class LoginRequest(BaseModel):
     password: Optional[str] = None
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: Dict[str, Any]
-
-
-class SessionResponse(BaseModel):
-    session: Optional[Dict[str, Any]] = None
-
-
 class DispatchCreateSchema(BaseModel):
     dispatch_id: str
     incident_type: Optional[str] = "Unknown Incident"
@@ -134,29 +124,3 @@ class ParcelCameraOverrideSchema(BaseModel):
     front_lng: Optional[float] = None
 
 
-class ParcelMetadataSchema(BaseModel):
-    gis_id: str
-    lock_box_notes: Optional[str] = None
-    hazard_notes: Optional[str] = None
-    pre_plan_pdf_url: Optional[str] = None
-    entrance_lat: Optional[float] = None
-    entrance_lng: Optional[float] = None
-    construction_type: Optional[str] = None
-    floor_count: Optional[int] = None
-
-
-class RoadClosureSchema(BaseModel):
-    closure_id: Optional[str] = None
-    headline: Optional[str] = None
-    street_name: Optional[str] = None
-    closure_type: Optional[str] = "FULL_CLOSURE"
-    emergency_access: Optional[bool] = True
-    description: Optional[str] = None
-    coordinates: Optional[List[float]] = None
-    geometry: Optional[Dict[str, Any]] = None
-    source: Optional[str] = None
-    zone_id: Optional[str] = None
-    affected_zones: Optional[List[str]] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    active: Optional[bool] = True

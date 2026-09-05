@@ -32,7 +32,6 @@ import logging
 from queue import Full, Empty
 
 PHASE_1 = "phase_1_check"
-PHASE_2 = "phase_2_finalize"
 
 
 def enqueue_dispatch_task(dispatch_queue, task: dict) -> bool:

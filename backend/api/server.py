@@ -48,8 +48,6 @@ try:
         FeedbackSchema,
         StreetViewOverrideSchema,
         ParcelCameraOverrideSchema,
-        ParcelMetadataSchema,
-        RoadClosureSchema,
     )
     from backend.api.routers.parcels import (
         _clean_streetview_address,
@@ -94,8 +92,6 @@ except ModuleNotFoundError:
         FeedbackSchema,
         StreetViewOverrideSchema,
         ParcelCameraOverrideSchema,
-        ParcelMetadataSchema,
-        RoadClosureSchema,
     )
     from api.routers.parcels import (
         _clean_streetview_address,

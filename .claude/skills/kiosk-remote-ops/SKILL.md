@@ -26,9 +26,9 @@ Check system uptime and container status:
 ssh tcfire@100.95.146.94 "uptime && docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
 ```
 
-Query PostgreSQL directly without shell escaping issues:
+Query PostgreSQL directly without shell escaping issues (`tcfire` is in the `docker` group: no `sudo`, and never a password on a command line):
 ```bash
-ssh tcfire@100.95.146.94 "echo rescue | sudo -S docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch -c 'SELECT * FROM streetview_overrides;'"
+ssh tcfire@100.95.146.94 "docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch -c 'SELECT * FROM streetview_overrides;'"
 ```
 
 ---

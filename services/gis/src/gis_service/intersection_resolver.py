@@ -232,16 +232,6 @@ class IntersectionResolver:
             return f"{right} & {left}"
         return name
 
-    @staticmethod
-    def _metres(a: Tuple[float, float], b: Tuple[float, float]) -> float:
-        import math
-        R = 6371000.0
-        p1, p2 = math.radians(a[0]), math.radians(b[0])
-        dp = p2 - p1
-        dl = math.radians(b[1] - a[1])
-        h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-        return 2 * R * math.asin(math.sqrt(h))
-
     def _narrow_by_x_streets(self, candidates: List[dict],
                                  x_streets: List[str]) -> Tuple[List[dict], str | None]:
         """Narrow several junctions of one street pair using nearby bounding roads.

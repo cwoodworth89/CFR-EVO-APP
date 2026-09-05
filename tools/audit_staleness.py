@@ -11,15 +11,14 @@ that is visible to a test suite. All of it is visible to a cross-reference.
 
 Relation to `audit_skill_references.py`
 ---------------------------------------
-That script already checks skills for phantom identifiers and docs for dangling paths
-(`--docs`), and honours `<!-- audit-ok: path -- why -->` exemptions. This one honours the same
-markers and adds checks the older one does not have: schema objects removed by a migration but
-still named in code, modules and components nothing imports, frontend and pipeline API calls
-against the backend route table, container and service names against `docker-compose.yml`,
-environment variables read by code against what compose declares, punch-list header status
-against the body status line, `file://` links, and document age. **The overlap is deliberate
-debt**: folding these checks into the older script and deleting this one is on
-`docs/post_freeze_backlog.md`. Do not add a third.
+That script checks skills for phantom identifiers and docs for dangling paths (`--docs`,
+run by the pre-commit hook), and honours `<!-- audit-ok: path -- why -->` exemptions. This one
+has only the checks it lacks: schema objects removed by a migration but still named in code,
+modules and components nothing imports, frontend and pipeline API calls against the backend
+route table, container and service names against `docker-compose.yml`, environment variables
+read by code against what compose declares, punch-list header status against the body status
+line, `file://` links, and document age. The dangling-path section this scan once duplicated
+was removed on 2026-09-05. Do not add a third checker.
 
 What it cannot do
 -----------------
@@ -58,22 +57,13 @@ def read(path: str) -> str:
 TEXT_EXT = (".md", ".py", ".js", ".jsx", ".sql", ".yml", ".yaml", ".sh", ".ps1", ".json",
             ".toml", ".txt", ".html", ".css", ".example", ".gitignore", ".lua", ".conf",
             ".cfg", ".ini")
-# Paths that are absent from a checkout by design: kiosk-only data, models, library sources.
-IGNORED_PREFIXES = ("backend/models/", "backend/data/", "frontend/.env", "backend/.env",
-                    "venv/", ".venv/", "etc/", "var/", "tmp/", "transformers/",
-                    "faster_whisper/", "node_modules/", "frontend/public/data/", "archive/",
-                    "dist/")
-AUDIT_OK = re.compile(r"<!--\s*audit-ok:\s*([^\s]+)")
 # Fenced code is output or an example, not a claim about the tree; both checkers skip it.
 FENCE = re.compile(r"```.*?```", re.S)
-LINK = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
 
 
 def prose(text: str) -> str:
     """Blank out fenced blocks but keep their line count so reported line numbers stay right."""
     return FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
-TICK = re.compile(r"`([^`\n]+)`")
-PATHISH = re.compile(r"^\.?[A-Za-z0-9_./\-]+\.[A-Za-z0-9]{1,5}$")
 
 
 def main() -> int:
@@ -109,59 +99,6 @@ def main() -> int:
             cur = line
         elif line.strip() and cur and line not in last:
             last[line] = cur
-
-    # ======================================================================================
-    H("A. Dangling file paths referenced from markdown")
-    P("Honours `<!-- audit-ok: path -- why -->` per file, as `audit_skill_references.py` does.\n")
-
-    def resolves(c: str, d: str) -> bool:
-        if c in tset or os.path.exists(c):
-            return True
-        rel = os.path.normpath(os.path.join(d, c)).replace(os.sep, "/")
-        if rel in tset or os.path.exists(rel):
-            return True
-        if os.path.isdir(c) or os.path.isdir(rel):
-            return True
-        suf = "/" + c.lstrip("./")
-        return any(t.endswith(suf) for t in tracked)
-
-    dangling: dict[str, list] = defaultdict(list)
-    total = 0
-    for f in md:
-        d = os.path.dirname(f)
-        excused = set(AUDIT_OK.findall(contents[f]))
-        for ln, line in enumerate(prose(contents[f]).split("\n"), 1):
-            for c in LINK.findall(line) + TICK.findall(line):
-                c = c.strip().strip("`")
-                c = re.sub(r":\d+(-\d+)?$", "", c)
-                if c.startswith("./"):
-                    c = c[2:]
-                if c.startswith(("http", "mailto", "<", "$", "-")):
-                    continue
-                if "/" not in c and not c.startswith(("CLAUDE", "GEMINI", "PROJECT", "README")):
-                    continue
-                if not PATHISH.match(c) or "YYYY" in c:
-                    continue
-                total += 1
-                if c.lstrip("/").startswith(IGNORED_PREFIXES):
-                    continue
-                if any(c == e or c.endswith("/" + e.lstrip("./")) or e.endswith("/" + c.lstrip("./"))
-                       for e in excused):
-                    continue
-                if resolves(c, d):
-                    continue
-                dangling[f].append((ln, c))
-    n = sum(len(v) for v in dangling.values())
-    P(f"Checked {total} path-like references. **{n} dangling across {len(dangling)} docs.**\n")
-    summary.append(f"A dangling paths: {n} in {len(dangling)} docs (of {total} checked)")
-    for f, items in sorted(dangling.items(), key=lambda kv: -len(kv[1])):
-        P(f"- `{f}` (last touched {last.get(f, '?')})")
-        seen = set()
-        for ln, c in items:
-            if c in seen:
-                continue
-            seen.add(c)
-            P(f"    - L{ln} `{c}`")
 
     # ======================================================================================
     H("B. Schema objects dropped or renamed by migrations, still referenced in code")

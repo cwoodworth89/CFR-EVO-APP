@@ -18,8 +18,7 @@ from sqlalchemy import create_engine, text
 
 from .normalization import (
     normalize_street_name, normalize_intersection_key,
-    split_intersection_parts, parse_house_and_street, extract_near_street,
-    ParsedAddress
+    split_intersection_parts, parse_house_and_street, ParsedAddress
 )
 from .address_resolver import AddressResolver
 from .intersection_resolver import IntersectionResolver

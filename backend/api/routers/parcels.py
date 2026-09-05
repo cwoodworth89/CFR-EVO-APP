@@ -13,11 +13,11 @@ from sqlalchemy.exc import IntegrityError
 try:
     from backend.api.database import get_db
     from backend.api.models import ParcelModel
-    from backend.api.schemas import ParcelCameraOverrideSchema, ParcelMetadataSchema
+    from backend.api.schemas import ParcelCameraOverrideSchema
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import ParcelModel
-    from api.schemas import ParcelCameraOverrideSchema, ParcelMetadataSchema
+    from api.schemas import ParcelCameraOverrideSchema
 
 router = APIRouter(prefix="/api/parcels", tags=["parcels"])
 

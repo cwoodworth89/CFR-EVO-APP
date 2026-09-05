@@ -7,7 +7,7 @@ import torch
 import pandas as pd
 from typing import Any, Dict, List, Union
 from dataclasses import dataclass
-from datasets import Dataset, Audio
+from datasets import Dataset
 from transformers import (
     WhisperFeatureExtractor,
     WhisperTokenizer,

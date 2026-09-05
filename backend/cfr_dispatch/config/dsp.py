@@ -27,7 +27,6 @@ MATCH_THRESHOLD_PERCENT = 0.50
 # 5 Hz) and Chief Tone has only 4 samples behind it. Do not tighten without
 # re-running the analysis in docs/briefings/pa_tone_discriminator.md.
 FREQUENCY_TOLERANCE_HZ = 8
-MIN_TONE_BURST_DURATION_S = 2.0
 NUM_PEAKS_TO_FIND = 10
 TONE_ZSCORE_THRESHOLD = 30.0
 

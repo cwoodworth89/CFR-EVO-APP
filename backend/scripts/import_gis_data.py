@@ -25,8 +25,8 @@ from datetime import datetime
 from collections import defaultdict
 
 from sqlalchemy import create_engine, text
-from shapely.geometry import shape, Point, MultiPoint, Polygon, MultiPolygon
-from shapely.ops import unary_union, transform
+from shapely.geometry import shape
+from shapely.ops import transform
 
 # Setup path resolution
 script_dir = os.path.dirname(os.path.abspath(__file__))

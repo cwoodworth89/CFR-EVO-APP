@@ -81,19 +81,6 @@ class EvaluationHistoryModel(Base):
     notes = Column(Text, nullable=True)
 
 
-class DispatchUploadModel(Base):
-    __tablename__ = "dispatch_uploads"
-    __table_args__ = {'extend_existing': True}
-
-    id = Column(SafeUUID, primary_key=True, default=lambda: str(uuid.uuid4()))
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    audio_url = Column(Text, nullable=False)
-    verified_transcript = Column(Text, nullable=True)
-    status = Column(String, default="pending", nullable=False)
-    result = Column(SafeJSON, nullable=True)
-    error_message = Column(Text, nullable=True)
-
-
 class RoadClosureModel(Base):
     __tablename__ = "road_closures"
     __table_args__ = {'extend_existing': True}

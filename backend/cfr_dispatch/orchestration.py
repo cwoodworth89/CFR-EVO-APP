@@ -15,10 +15,6 @@ from cfr_dispatch.pipeline import (
 # setup_logging moved to cfr_dispatch.logging_setup so the worker process can call it too.
 # It is not inherited across a multiprocessing spawn on Python 3.14, whose default start
 # method on Linux is forkserver -- see that module for the full explanation.
-def process_and_post_payload(*args, **kwargs):
-    """Backward compatibility alias for build_dispatch_payload."""
-    return build_dispatch_payload(*args, **kwargs)
-
 def run_dispatch_system():
     """Main program entrypoint. Initiates multiprocessing worker and PortAudio listener loop."""
     setup_logging()

@@ -31,7 +31,6 @@ class DispatchSessionManager:
 
     def __init__(self, max_history: int = 50, session_ttl_seconds: int = 600):
         self._store = PostgresSessionStore(ttl_seconds=session_ttl_seconds)
-        self._session_ttl_s = session_ttl_seconds
         self._recent_profiles = deque(maxlen=max_history)
 
     def _evict_stale_sessions(self):
@@ -67,9 +66,6 @@ class DispatchSessionManager:
 
     def cleanup_session(self, dispatch_id: str):
         self._store.cleanup(dispatch_id)
-
-    def get_recent_profiles(self) -> list:
-        return list(self._recent_profiles)
 
 _cached_validator = None
 

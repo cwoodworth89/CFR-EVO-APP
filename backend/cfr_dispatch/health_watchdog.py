@@ -100,18 +100,6 @@ def run_full_health_audit() -> Dict[str, Any]:
         
     return audit
 
-def send_it_alert_if_unhealthy(audit: Dict[str, Any], ntfy_topic: str = None, ntfy_token: str = None):
-    """Sends an automated IT notification if health checks fail."""
-    if audit.get("overall_status") == "HEALTHY":
-        return
-    try:
-        from notification_service import notify_it_alert
-        notify_it_alert(audit, ntfy_topic=ntfy_topic, ntfy_token=ntfy_token)
-        logging.info("Automated IT Health Alert posted successfully.")
-    except Exception as e:
-        logging.error(f"Failed to post IT health alert: {e}")
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     print("=" * 60)

@@ -7,8 +7,7 @@ from unittest.mock import MagicMock, patch
 from gis_service.geocoder import CoquitlamDataValidator
 from gis_service.normalization import (
     normalize_street_name, normalize_intersection_key,
-    split_intersection_parts, parse_house_and_street, extract_near_street,
-    ParsedAddress
+    split_intersection_parts, parse_house_and_street, ParsedAddress
 )
 from cfr_dispatch.pipeline.payload_builder import build_dispatch_payload
 from cfr_dispatch.config.models import DispatchData

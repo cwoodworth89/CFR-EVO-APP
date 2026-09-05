@@ -52,8 +52,20 @@ def sanitize_transcript(text: str) -> str:
             break
         text = new_text
 
+    def _join_unless_map_grid_overflows(m: re.Match) -> str:
+        # A map grid is at most three digits (MAP_GRIDS: the City of Coquitlam response
+        # zones, 1-134). When the STT drops the opening of round 2, the grid is followed
+        # directly by the next clause's number, "map grid 82 10 combined response", and
+        # this join made "8210", which the parser rejected as not a zone: DISP-2026-CF0CC2,
+        # 2026-09-05. "map grid 10 9" still becomes 109; a join past three digits is refused.
+        joined = m.group(1) + m.group(2)
+        before = m.string[max(0, m.start() - 9):m.start()]
+        if before == 'map grid ' and len(joined) > 3:
+            return m.group(0)
+        return joined
+
     while True:
-        new_text = re.sub(r'\b(\d+)\s+(\d+)\b', r'\1\2', text)
+        new_text = re.sub(r'\b(\d+)\s+(\d+)\b', _join_unless_map_grid_overflows, text)
         if new_text == text:
             break
         text = new_text

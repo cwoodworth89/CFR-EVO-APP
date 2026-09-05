@@ -70,3 +70,22 @@ def test_road_centroid_statement_is_valid_against_the_live_schema(engine, resolv
     assert "road centroid fallback" not in caplog.text, caplog.text
     assert point is not None, roadname
     assert _inside_city(point), point
+
+
+def test_nearest_civic_statement_is_valid_against_the_live_schema(engine, resolver, caplog):
+    """Punch-list #67. A house number the City does not have, one above a parcel in the same
+    100-block, on whatever street has one today (3304 Abbey Lane on 2026-09-05)."""
+    with engine.connect() as conn:
+        street, stype, house = conn.execute(text(
+            "SELECT p.street, p.streettype, p.house::int + 1 FROM public.parcels p "
+            "WHERE p.house::text ~ '^[0-9]+$' AND p.centroid_lat IS NOT NULL "
+            "  AND NOT EXISTS (SELECT 1 FROM public.parcels q WHERE q.street = p.street "
+            "      AND coalesce(q.streettype, '') = coalesce(p.streettype, '') "
+            "      AND q.house::text = (p.house::int + 1)::text) "
+            "  AND (p.house::int + 1) / 100 = p.house::int / 100 "
+            "ORDER BY p.street, p.house::int LIMIT 1")).fetchone()
+    with caplog.at_level("ERROR"):
+        point = resolver.resolve_nearest_civic(str(house), street, stype or "")
+    assert "nearest civic address fallback" not in caplog.text, caplog.text
+    assert point is not None and point.get("is_nearest_civic"), (street, stype, house, point)
+    assert _inside_city(point), point

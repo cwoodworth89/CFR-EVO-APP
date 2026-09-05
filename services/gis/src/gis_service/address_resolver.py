@@ -668,8 +668,12 @@ class AddressResolver:
 
                 return {
                     "address": row['address'],
-                    "lat": float(row['lat']),
-                    "lng": float(row['lng']),
+                    # The statement selects centroid_lat/centroid_lng (renamed be0e7bf,
+                    # 2026-08-30); reading 'lat' raised NoSuchColumnError and this step never
+                    # answered (punch-list #67, found by the holdout harness 2026-09-05).
+                    # test_address_resolver_db.py runs it live.
+                    "lat": float(row['centroid_lat']),
+                    "lng": float(row['centroid_lng']),
                     "rings": [],
                     "confidence": confidence,
                     "is_nearest_civic": True,

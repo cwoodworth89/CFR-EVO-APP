@@ -1,7 +1,8 @@
 # CFR EVO: Test Procedures & Diagnostics
 
-Two procedures remain, and both are live. Four were removed on 2026-08-31 because every
-command in them referenced something that no longer exists:
+One procedure remains. Four were removed on 2026-08-31 because every command in them
+referenced something that no longer exists, and the comparative parser backtest went on
+2026-09-04 with the experimental parser it compared (`call_structure.md` keeps the result):
 
 | Removed | Why |
 |:--|:--|
@@ -59,29 +60,6 @@ python backend/scripts/calibrate_audio_interactive.py
 This utility records loud sound events, matches them against the golden frequency profiles for `Chief Tone`, `Engine Tone`, and `Rescue Tone`, and prompts you to log correct matches or false positives.
 
 ---
-## 🧪 Procedure 6: Comparative Parser Backtesting Suite (`backtest_parser.py`)
-
-This test script evaluates the performance of the production parser ([parser.py](../backend/cfr_dispatch/parser/)) against alternative parsing modules (such as [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py)) by benchmarking their extractions against the entire dataset of human-verified calls stored in the local PostgreSQL database.
-
-### 🏃 Running the Backtest Suite
-```powershell
-.venv\Scripts\python.exe tools/backtest_parser.py
-```
-
-### 📋 What it Validates & Reports:
-1. **Ground-Truth Data Pull**: Queries all live calls from the local PostgreSQL database where `feedback_submitted = true`.
-2. **Side-by-Side Accuracy Metrics**: Calculates exact precision for 5 key extraction variables:
-   - **Address / Location**: Normalizes street suffixes (e.g. `Street` $\rightarrow$ `St`, `Avenue` $\rightarrow$ `Ave`) and performs set-overlap intersection comparisons.
-   - **Incident Type**: Evaluates full incident name resolution (e.g. `Medical Aid - Fall` vs generic `Medical Aid`).
-   - **Responding Units**: Normalizes parsed apparatuses via `abbreviate_units` and computes set equality.
-   - **Map Grid**: Compares extracted grid numbers against verified database grids.
-   - **Talk Group**: Compares radio channels (e.g. `10 Combined Response` vs `5`).
-3. **Discrepancy Log**: Prints a detailed side-by-side diff table for any dispatches where the parsers diverged, allowing developers to audit edge cases without impacting production listener services.
-
----
-
----
-
 ## 🛑 Troubleshooting Reference
 
 | Issue | Root Cause | Resolution |

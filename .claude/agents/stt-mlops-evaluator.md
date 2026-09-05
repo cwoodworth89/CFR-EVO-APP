@@ -23,7 +23,7 @@ Specialised in:
   `backtest_regression.py` for round-aligned SMMR, restricted to the holdout. Never a
   full-call transcript against a single-round reference, and never train-on-test.
 * **Parser regressions on stored transcripts** — `backtest_parser_corpus.py` by month is
-  the honest parser number; `backtest_parser.py` pools across fields and periods.
+  the honest parser number (`--pooled` gives a single figure, which mixes fixed and live defects).
 
 Returns a decision — model, holdout WER, SMMR by field, drop counts by reason, what blocked
 — with `file:line` where a defect was found. Not a report.

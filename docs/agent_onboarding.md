@@ -124,7 +124,6 @@ During static analysis, the IDE's python typechecker might throw `ImportError: c
 | :--- | :--- | :--- |
 | `docker compose up -d` | `./` | Start the local containerized stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI). |
 | `python main.py` | `backend/` | Launch the continuous audio listener background runner. |
-| `python tools/backtest_parser.py` | `./` | Run comparative accuracy benchmarks between production and test parsers on database ground-truth calls. |
 | `python scripts/update_gis_data.py` | `backend/` | Execute the monthly GIS update and compare cache changes (runs automated via Windows Scheduler). |
 | `npm run dev` | `frontend/` | Run the React dashboard development server. |
 | `npm run build` | `frontend/` | Compile the frontend client production build into `frontend/dist`. |

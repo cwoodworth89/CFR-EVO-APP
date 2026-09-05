@@ -88,7 +88,7 @@ both, same list, all pre-existing and environmental), and a golden diff against 
 pre-split module loaded side by side produced **byte-identical output on 6/6
 transcripts**, five of them reconstructed from real dispatches.
 
-**Still outstanding:** `destructive_parser.py` was not reviewed for divergence against
+**Was outstanding, moot since the file was deleted 2026-09-04:** `destructive_parser.py` was not reviewed for divergence against
 the template parser. It imports `sanitize_transcript` from this package and duplicates
 some location logic. That comparison remains a separate task.
 
@@ -302,7 +302,7 @@ Not tied to a single file — worth handling as their own passes.
 1. ~~`road_closure_service.py` → PostGIS.~~ **Done** (`206af55`).
 2. ~~`DashboardHUD.jsx` → five files.~~ **Done.**
 3. ~~`parser.py` → modules.~~ **Done** (six-module package). The
-   `destructive_parser.py` divergence review was *not* done and is still open.
+   `destructive_parser.py` divergence review was never done; the file was deleted 2026-09-04.
 4. **Helper extraction for `react-refresh`.** Move non-component exports out of
    `MapLayers.jsx`, `ActiveAlertBanner.jsx`, `ReviewTable.jsx` and
    `VerificationSidebar.jsx` into sibling modules. Mechanical, clears 14 of the
@@ -349,7 +349,7 @@ One stale test cascades into ~6 others. Three modules have never run in review.
 Per-case judgement; changes runtime behaviour; must not be bulk-edited.
 
 ### H7. Deferred from earlier phases
-* `destructive_parser.py` divergence review — deferred from the parser split.
+* ~~`destructive_parser.py` divergence review~~ — moot, file deleted 2026-09-04.
 * `EVORoutingConfigModal` controls reference values removed in `c332b81` and currently do
   nothing; rebuild against PROJECT_IDEAS #6.
 * `isWithinCoquitlam()` uses a bounding box that is 61.6% larger than the real municipal

@@ -121,8 +121,8 @@ as they are.
 |:--|:--|
 | `backend/scripts/download_gis_data.py`, `update_gis_data.py` | `opendata.arcgis.com`, `geodata.coquitlam.ca` |
 | `backend/scripts/sync_hydrants.py` | City ArcGIS endpoint |
-| `backend/scripts/crawl_cadastral_tiles.py`, `compile_mbtiles.py`, `test_tile_sources.py` | `basemaps.cartocdn.com` — see the §1 licence caution before touching |
-| `tools/extract_training_data.py`, `backtest_parser.py`, `backtest_regression.py`, `clean_old_dispatches.py` | local API only |
+| `backend/scripts/crawl_cadastral_tiles.py`, `compile_mbtiles.py` | `basemaps.cartocdn.com` — see the §1 licence caution before touching |
+| `tools/extract_training_data.py`, `backtest_regression.py`, `clean_old_dispatches.py` | local API only |
 
 ---
 

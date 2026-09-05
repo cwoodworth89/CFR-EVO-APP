@@ -184,7 +184,6 @@ These replay `raw_transcript` through the parser and never touch Whisper:
 | Script | Measures | Read it as |
 |:--|:--|:--|
 | `backtest_parser_corpus.py` | per-field accuracy **by month** against `verified_*` | the honest parser number; pooled rates mix fixed and live defects |
-| `backtest_parser.py` | production vs destructive parser | single denominator across fields — treat per-field rates as approximate |
 | `backtest_round_comparison.py` | round-1 vs round-2 disagreement as a warning signal | where STT still splits on street names |
 
 ## What is still open

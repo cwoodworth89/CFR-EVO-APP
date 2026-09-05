@@ -41,7 +41,6 @@ Produce numbers. None of them modify operational data.
 
 | Script | Purpose |
 |:--|:--|
-| `backtest_parser.py` | Production parser against the sequential destructive parser, on ground truth. |
 | `backtest_parser_corpus.py` | Replays verified dispatches through the current parser, scoring each field. |
 | `backtest_regression.py` | WER / Levenshtein regression for STT output. |
 | `backtest_round_comparison.py` | Scores cross-round disagreement as a warning signal. |
@@ -70,12 +69,11 @@ Reach for these while debugging something specific.
 | `inspect_dispatch.py` | Dumps one dispatch record by id as JSON. Run on the host with the project venv; refuses to run without a Postgres `DATABASE_URL` (the API's own SQLite fallback was removed in #61; the check stays for a clearer message). Rewritten 2026-09-04: the original imported a module that never existed and had never run. |
 | `clean_old_dispatches.py` | Lists old dispatches for review. **Deletion requires manual confirmation.** |
 | `update_streetview.py` | Refreshes Street View heading/pitch/fov for parcels. |
-| `test_dual_push.py` | Exercises the MQTT and Ntfy push paths. **Not a pytest test** despite the name. |
 
 ## Audio and DSP analysis
 
 Measurement over recordings. The sound-card diagnostics that a person runs *on the kiosk*
-(`debug_audio.py`, `record_test.py`, `live_monitor.py`, `calibrate_audio_interactive.py`) stayed
+(`debug_audio.py`, `record_test.py`, `calibrate_audio_interactive.py`) stayed
 in `backend/scripts/`.
 
 | Script | Purpose |

@@ -55,10 +55,6 @@ The offline basemap pipeline. See the `mbtiles-tile-server` skill before touchin
 | `calc_tile_counts.py` | Estimates tile counts for a bounding box and zoom range before a crawl. |
 | `export_tile_coverage.py` | Regenerates `coquitlam_tile_coverage.geojson`. |
 | `inspect_loose_tiles.py` | Inspects loose tile directories under `backend/data/tiles/`. |
-| `verify_mbtiles_endpoints.py` | Checks sample tile requests against `mbtileserver` on 8081. |
-| `verify_ortho_coverage.py` | Diffs `ortho.mbtiles` against the expected tile grid and classifies every missing tile as outside the City's published imagery extent (expected — our polygon carries a 1 km mutual-aid buffer) or inside it (a real gap worth re-crawling). A bare failure count cannot tell scattered network noise from a systematic hole over one neighbourhood. |
-| `test_mbtiles_setup.py` | Builds a minimal archive and verifies the server reads it. **Not a pytest test** despite the name. |
-| `test_tile_sources.py` | Probes tile source URLs for availability. **Not a pytest test** despite the name. |
 
 ## Audio and DSP
 
@@ -69,4 +65,3 @@ Run when investigating the capture pipeline or calibrating hardware.
 | `calibrate_audio_interactive.py` | Interactive input-device selection and noise-floor calibration. |
 | `debug_audio.py` | Lists PortAudio devices and properties, to find device IDs. |
 | `record_test.py` | Records a sample from the configured input for inspection. |
-| `live_monitor.py` | Live RMS monitor on the capture device. |

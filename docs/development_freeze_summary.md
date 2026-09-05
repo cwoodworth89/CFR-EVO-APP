@@ -88,7 +88,7 @@ flowchart TD
 
 ### Phase D: Parser Cross-Street Segmentation & `custom_places` Rename
 * **Data Model**: Updated [`DispatchData`](../backend/cfr_dispatch/config/models.py) to include `cross_street_1` and `cross_street_2`.
-* **Parsers**: Updated both template `parser.py` and [`destructive_parser.py`](../backend/cfr_dispatch/destructive_parser.py) to cleanly isolate nearby crossroads (`near Austin Ave and Mariner Way`) without polluting the primary `intersection` field.
+* **Parsers**: Updated both template `parser.py` and `destructive_parser.py` to cleanly isolate nearby crossroads (`near Austin Ave and Mariner Way`) without polluting the primary `intersection` field.
 * **Landmarks Rename**: Renamed table and vocabulary references from `landmarks` -> `public.custom_places` to distinguish manually added points of interest from authoritative municipal GIS layers.
 
 ### Phase E: Geocoder 2.0 Decomposition & Resolution Order Overhaul

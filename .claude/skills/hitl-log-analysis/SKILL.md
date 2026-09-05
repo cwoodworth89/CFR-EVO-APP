@@ -126,10 +126,10 @@ Look for key audit tags:
 
 ## 4. Comparing Transcripts Against Parser Hypotheses
 
-> [!WARNING]
-> **`backtest_parser.py` takes no arguments** — verified 2026-08-30, it has no `argparse` and
-> reads no `sys.argv`. The `--text` flag documented here was silently ignored, and the script
-> ran its full corpus comparison instead. Corrected below.
+> [!NOTE]
+> `backtest_parser.py`, once documented here with a `--text` flag it never had, was deleted
+> 2026-09-04 together with the experimental destructive parser it compared against.
+> `backtest_parser_corpus.py` is the parser harness.
 
 For a **single hypothesis**, parse it inline:
 
@@ -145,7 +145,6 @@ For a **corpus run**, use the harnesses — and read
 | `tools/backtest_parser_corpus.py` | parser output vs the operator's `verified_*` |
 | `tools/backtest_regression.py` | before/after a change, over the corpus |
 | `tools/backtest_round_comparison.py` | round 1 vs round 2 agreement, scored against ratings |
-| `tools/backtest_parser.py` | production parser vs the destructive parser (no arguments) |
 
 ### Common Root Causes & Fixes:
 

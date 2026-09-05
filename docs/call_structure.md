@@ -51,7 +51,14 @@ To prevent punctuation from breaking regex anchor matching:
 
 ## 🔬 Sequential Destructive Parser vs. Production Anchor Parser
 
-To test alternative parsing philosophies for structured Computer-Aided Dispatch (CAD) audio, we created a secondary test module in [destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py) alongside a backtester [backtest_parser.py](../tools/backtest_parser.py).
+> [!NOTE]
+> **Rejected design, kept as the record.** `destructive_parser.py` and the `backtest_parser.py`
+> that compared it were deleted 2026-09-04. Nothing in production ever called it, and the
+> comparison below is why. The figures are from 81 verified calls in 2026-07 and describe that
+> code path only; the production parser's current numbers come from
+> `tools/backtest_parser_corpus.py` (`qa_harnesses.md`).
+
+To test alternative parsing philosophies for structured Computer-Aided Dispatch (CAD) audio, we created a secondary test module in `destructive_parser.py` alongside a backtester `backtest_parser.py`.
 
 ### Design Philosophies
 
@@ -60,7 +67,7 @@ To test alternative parsing philosophies for structured Computer-Aided Dispatch 
    - Preserves strict street-suffix rules and candidate list outputs.
    - **Strength**: High precision on single-round addresses and clean handling of street suffixes.
 
-2. **Sequential Destructive Parser ([destructive_parser.py](../backend/cfr_dispatch/destructive_parser.py))**:
+2. **Sequential Destructive Parser (`destructive_parser.py`)**:
    - Leverages the rigid CAD sequence of operations: `[Agency] -> [Units] -> [Response Type] -> [Incident] -> [Location] -> [Talk Group] -> [Map Grid]`.
    - **Destructive Consumption**: Matches and strips tokens one-by-one from the string (left-to-right for Agency/Units/Priority/Incident, right-to-left for Grid/TalkGroup).
    - What remains is guaranteed to be *only* the location text.

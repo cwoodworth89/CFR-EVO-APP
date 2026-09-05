@@ -178,7 +178,7 @@ It caught three separate wrong claims during the 2026-08-23 audit:
 
 A fourth wrong claim came from a different mistake worth naming here too: a **46% talk-group
 accuracy** figure was quoted as a live defect when it was measuring `destructive_parser.py`,
-which nothing in production calls. Production stores the talk group correctly on 97/97 August
+which nothing in production called (deleted 2026-09-04). Production stores the talk group correctly on 97/97 August
 calls. **Always state which code path a number describes.**
 
 ---

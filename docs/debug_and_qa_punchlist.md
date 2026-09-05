@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**25 open** (16 crew-visible) · **47 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**24 open** (15 crew-visible) · **48 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 25
+## Open — 24
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -38,7 +38,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](punchlist/54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
 | **56** | 🔴 crew-visible | OPEN | [Bring XStreets onto the same resolution path as main addresses](punchlist/56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
 | **57** | 🔴 crew-visible | OPEN | [Candidate-level parse bleed — latent, not live](punchlist/57-candidate-level-parse-bleed-latent-not-live.md) |
-| **61** | 🔴 crew-visible | OPEN | [The API silently falls back to an empty SQLite file when Postgres is unreachable](punchlist/61-the-api-silently-falls-back-to-an-empty-sqlite-file-when-po.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
 | **49** | 🟠 operational | OPEN | [Access-point review UX — operators cannot set an entrance without direct SQL](punchlist/49-access-point-review-ux-operators-cannot-set-an-entrance.md) |

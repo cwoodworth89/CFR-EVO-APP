@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🗄️ API & Database |
 | **Blocks** | 1 |
@@ -14,9 +14,10 @@
 
 ## 61. The API silently falls back to an empty SQLite file when Postgres is unreachable
 
-> **Status**: 🔴 **Open — found 2026-09-04 by reading the code; the fallback file on the kiosk
-> proves the path has executed at least once.** Not fixed here: it is the production API's own
-> startup behaviour and removing it is a design change, so it is the operator's call (§6.1).
+> **Status**: ✅ **Closed 2026-09-04 — fallback removed (`e6569ad`), both paths verified on the
+> kiosk.** *(Opened as: 🔴 Open — found 2026-09-04 by reading the code; the fallback file on the
+> kiosk proves the path has executed at least once.)* Operator ruling the same day: fail loudly;
+> the production database is the test database and is backed up nightly.
 
 ### What the code does
 
@@ -77,3 +78,21 @@ empty database is a plausible wrong answer.
 
 `tools/inspect_dispatch.py` already refuses to run without a Postgres `DATABASE_URL` for this
 reason, so a developer cannot be misled the same way.
+
+### Fixed 2026-09-04
+
+`backend/api/database.py` (`e6569ad`): the SQLite branch and `ensure_sqlite_compatibility()`
+are gone. `DATABASE_URL` must be PostgreSQL; the 2 s probe is unchanged; any failure logs at
+CRITICAL and exits non-zero with the URL (password hidden) and the error. Under compose that
+stops `cfr_api` and `restart: always` retries until Postgres answers.
+
+| Verified on the kiosk | Result |
+|:--|:--|
+| `docker compose up -d --build api`, then `/api/health` | online 3 s after start |
+| `/api/dispatches?limit=1` | `DISP-2026-03760A`, served from Postgres |
+| `import api.database` on the host with `DATABASE_URL` pointing at `127.0.0.1:1` | prints the refusal naming the address, exits non-zero |
+| Container restart loop with Postgres actually down | **not tested**: stopping Postgres would interrupt the live pipeline; reasoned from `restart: always` (`docker-compose.yml`) |
+
+`backend/data/cfr_dispatch.db` (0 rows) is still on the kiosk and is now dead weight; deleting
+it is a one-line operator action. `tools/inspect_dispatch.py` keeps its own URL check so the
+message names what is missing before the import fails.

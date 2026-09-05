@@ -67,7 +67,7 @@ Reach for these while debugging something specific.
 
 | Script | Purpose |
 |:--|:--|
-| `inspect_dispatch.py` | Dumps one dispatch record by id as JSON. Run on the host with the project venv; refuses to run without a Postgres `DATABASE_URL`, because `api/database.py` would otherwise fall back to an empty SQLite file (punch-list #61). Rewritten 2026-09-04: the original imported a module that never existed and had never run. |
+| `inspect_dispatch.py` | Dumps one dispatch record by id as JSON. Run on the host with the project venv; refuses to run without a Postgres `DATABASE_URL` (the API's own SQLite fallback was removed in #61; the check stays for a clearer message). Rewritten 2026-09-04: the original imported a module that never existed and had never run. |
 | `clean_old_dispatches.py` | Lists old dispatches for review. **Deletion requires manual confirmation.** |
 | `update_streetview.py` | Refreshes Street View heading/pitch/fov for parcels. |
 | `test_dual_push.py` | Exercises the MQTT and Ntfy push paths. **Not a pytest test** despite the name. |

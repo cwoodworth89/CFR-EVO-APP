@@ -8,11 +8,11 @@ repository root. Not inside the API container: tools/ is not copied into that im
 
 Why it insists on a Postgres DATABASE_URL
 -----------------------------------------
-``backend/api/database.py`` binds its engine at import time and, when it cannot reach
-Postgres, silently falls back to an empty SQLite file under backend/data/. A tool built on
-that would report a real dispatch as "not found" and look correct doing it (CLAUDE.md 6.1).
-So the URL is settled first, from the environment or backend/.env, and the script stops if
-it is missing or not Postgres.
+``backend/api/database.py`` used to fall back silently to an empty SQLite file when it could
+not reach Postgres, so a tool built on it would report a real dispatch as "not found" and look
+correct doing it (CLAUDE.md 6.1). Punch-list #61 removed that on 2026-09-04: the module now
+exits. The URL is still settled here first, from the environment or backend/.env, so the
+message names what is missing before the import fails.
 
 History
 -------
@@ -42,8 +42,8 @@ def settle_database_url() -> str:
                         break
     if not url.startswith(("postgresql://", "postgres://")):
         sys.exit("DATABASE_URL is not set (environment or backend/.env) or is not Postgres. "
-                 "Refusing to run: api/database.py would fall back to an empty SQLite file and "
-                 "report a real dispatch as missing.")
+                 "Refusing to run without it (api/database.py exits without one too, since "
+                 "punch-list #61; this check just names the missing URL first).")
     os.environ["DATABASE_URL"] = url
     return url
 

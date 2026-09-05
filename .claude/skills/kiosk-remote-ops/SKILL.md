@@ -86,7 +86,7 @@ Whenever a bug fix or feature edit is completed:
 
 To prevent Windows PowerShell quoting errors and keep all command logs 100% human-readable:
 1. **Use Version-Controlled Helper Scripts**:
-   - Run helper scripts (e.g. `tools/inspect_dispatch.py`, `tools/update_streetview.py`) on the kiosk host with the project virtualenv, from the repository root. They are not in the API image (`tools/` is not copied into it), and `backend/api/database.py` falls back to an empty SQLite file when it cannot reach Postgres (punch-list #61), so `inspect_dispatch.py` refuses to run without a Postgres `DATABASE_URL` from the environment or `backend/.env`:
+   - Run helper scripts (e.g. `tools/inspect_dispatch.py`, `tools/update_streetview.py`) on the kiosk host with the project virtualenv, from the repository root. They are not in the API image (`tools/` is not copied into it), and both `backend/api/database.py` (since punch-list #61) and `inspect_dispatch.py` refuse to run without a Postgres `DATABASE_URL` from the environment or `backend/.env`:
      ```bash
      ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && .venv/bin/python tools/inspect_dispatch.py DISP-2026-55B7B6"
      ```

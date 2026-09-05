@@ -111,22 +111,39 @@ from HITL-verified streets and dispatch frequency, so only a same-code, same-hou
 **Applied 2026-09-05 09:04 PDT**, operator ruling: `STT_HOTWORDS_EXCLUDE=map grid` in the kiosk's
 `backend/.env` beside the empty prompt, `cfr-agent` restarted, the loader read both back.
 
-**Full corpus with the live settings**, 507 verified calls 2026-07-12 to 2026-09-01 (`[PA]`
-pages out), code `715aa57`, recorded in `evaluation_history` against the morning's 529-call
-baseline (`88ea5de`: template prompt, pre-#62 geocoder, default hotwords). The gap is the
-whole day's changes, not the hotword alone; the holdout A/B above is the isolated number.
+**Full corpus, same code, both ways**, 507 verified calls 2026-07-12 to 2026-09-01 (`[PA]` pages
+out), code `715aa57` (`6ab5eb0` is docs only), both recorded in `evaluation_history`, run B at
+10:16 and run A at 10:29 to 11:00 PDT. The morning baseline (`88ea5de`: template prompt, pre-#62
+geocoder, default hotwords, 529 calls) is the third column for the day's trend; the gap to it is
+the whole day's changes, not the hotword.
 
-| Full corpus | Morning baseline (n=529) | Live settings (n=507) |
-|:--|--:|--:|
-| WER mean / median (non-training clips) | 9.62 % / 3.23 % | 4.78 % / 0 % |
-| Map grid wrong | 32 | 6 |
-| Address wrong | 85 | 27 |
-| Wrong street | 48 | 13 |
-| Placed exactly | 394 | 428 |
-| Nearest civic (step 4b) | 0 | 9 |
+| Full corpus | A: default hotwords | B: without "map grid" (live) | Morning baseline |
+|:--|--:|--:|--:|
+| WER mean, non-training clips (n=119) | 4.59 % | 4.78 % | 9.62 % (n=129) |
+| WER July / August | 4.04 % / 4.99 % | 5.07 % / 4.57 % | |
+| Map grid wrong | 6 | 6 | 32 |
+| Address wrong (parser field) | 33 | 27 | 85 |
+| Placed exactly | 425 | 428 | 394 |
+| Resolved by a cross-street section | 6 | 3 | |
+| Place ok | 94.3 % | 94.7 % | 90.2 % |
 
-By month, the model in service on the calls it never trained on: July WER 5.07 % (n=50),
-August 4.57 % (n=69). The 6 grids still wrong are the number-mangling class below.
+Call by call, A against B: transcripts differ on 347 of 507 calls, almost all in round 2. WER
+moved on 14 of the 119 scored clips, 10 better without "map grid" and 4 worse; the mean goes the
+other way on one clip, DISP-2026-C41EFE (3.7 → 63 %), where run B swallowed the tail of round 1
+and wrote *"coquitlam map grid 100"* in its place. The sanitiser removed the orphan correctly,
+which left nothing for `split_rounds` to cut on, so the scored "round 1" was both rounds; the
+parser still had the right address and grid. Run A inserted a *"map grid 71"* into that call's
+round 2 instead. The insertion is the model's, in both conditions. Address verdicts changed on 8
+calls, 7 toward B; two are crew-visible, both A's: *"routine 61300 pinetree way"* fell to a
+cross-street section where B placed `1300 Pinetree Way`, and `Parkway Blvd (Near Eagle Mountain
+Dr)` where B placed `1999 Parkway Blvd`. The other six are parser-field verdicts with the same
+final address, since #44a picks the better round either way. Grids are identical: the six wrong
+are the number-mangling class below.
+
+**Reading.** On the full corpus the term is a wash on the intermediate figure and slightly
+better on the crew-visible ones: three more parcels placed, three fewer sections, six fewer
+parser-field misses, the same grids. The holdout gave −0.36 WER points, the corpus +0.19, and
+each is a handful of clips. The setting stays as applied; revisit if the hotword list changes.
 
 ### What is not done, and why
 

@@ -93,6 +93,22 @@ def round1(text_: str) -> str:
     return rounds[0] if rounds else san
 
 
+def winning_step(trace_log, address: str) -> str:
+    """The ladder step whose answer became `address`: the LAST hit that carries it.
+
+    Last, not first. The tracer appends after a step returns, so a step that runs another
+    inside it (1b puts every reading through step 1) is logged after the inner hits; and
+    build_dispatch_payload geocodes every candidate (#44a), so the first hit in the log can
+    belong to a round that was not chosen. Found 2026-09-05 when step 1b's answers all showed
+    up as "1-exact". Falls back to the last hit when no entry carries the address.
+    """
+    hits = [e for e in trace_log if e["hit"]]
+    for e in reversed(hits):
+        if (e.get("address") or "") == (address or ""):
+            return e["step"]
+    return hits[-1]["step"] if hits else "none"
+
+
 def candidates_like_phase2(transcript: str):
     """Exactly phase2.py's candidate build: sanitise, split rounds, parse each round with
     more than two words."""
@@ -262,10 +278,10 @@ def main() -> int:
             payload = {}
             if args.dispatch_id:
                 print(f"  payload err : {exc}")
-        # Read before the verified address is geocoded below, which would overwrite the log.
-        resolved_by = next((e["step"] for e in trace_log if e["hit"]), "none")
         target = payload.get("target") or {}
         sys_addr = target.get("address") or payload.get("address") or ""
+        # Read before the verified address is geocoded below, which would overwrite the log.
+        resolved_by = winning_step(trace_log, sys_addr)
         place = dist = None
         verified_by = ""
         if truth["address"]:
@@ -279,7 +295,7 @@ def main() -> int:
                 # Which step placed the VERIFIED address. When it is not step 1, the distance
                 # below is between two fallbacks, not to a parcel, and 0 m proves little.
                 verified_points[did] = (res.get("lat"), res.get("lng"),
-                                        next((e["step"] for e in trace_log if e["hit"]), "none"))
+                                        winning_step(trace_log, res.get("address") or ""))
             vlat, vlng, verified_by = verified_points[did]
             if verified_by != "1-exact":
                 counts["verified_address_not_exact"] += 1

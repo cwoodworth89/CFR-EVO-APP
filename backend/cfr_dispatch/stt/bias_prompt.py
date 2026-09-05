@@ -235,6 +235,14 @@ def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None,
 
     hotwords_str = ', '.join(kept)
 
+    # STT_INITIAL_PROMPT, when set, replaces the template prompt below; set it to an empty
+    # string to send no prompt at all. A named tuning surface (CLAUDE.md 6.4) so the prompt's
+    # effect is measured with tools/harness_chain.py rather than argued: on 2026-09-05 the
+    # model in service was inserting this prompt's own "map grid" phrase into pauses
+    # (punch-list #63).
+    env_prompt = os.environ.get("STT_INITIAL_PROMPT")
+    if env_prompt is not None:
+        return (env_prompt.strip() or None), hotwords_str
     initial_prompt_str = (
         'Coquitlam Fire Dispatch. Engine 1, Ladder 1, Quint 5, Rescue 1. '
         'Structure Fire, Medical Aid, Alarm Activated, Commercial Alarm. '

@@ -161,6 +161,9 @@ def classify(sys_addr, true_addr):
     right-street/wrong-number result ("307 Glen Dr" for "3007 Glen Dr") is absorbed
     into "cosmetic" and disappears from the count.
     """
+    # A cross-street section ("Gordon Ave (Between Christmas Way & Westwood St)") is the
+    # right street with no house number, not a junction: compare the street it names.
+    sys_addr = re.sub(r"\s*\((?:between|btwn)\b[^)]*\)\s*$", "", sys_addr or "", flags=re.I)
     if norm(sys_addr) == norm(true_addr):
         return "exact"
     if not norm(sys_addr):
@@ -183,7 +186,11 @@ def classify(sys_addr, true_addr):
     if same_street and hn_s and hn_t and hn_s.group(1) != hn_t.group(1):
         return "house-number"
     if same_street:
-        return "cosmetic"
+        # Same street, but only one side carries a house number: a street centroid or a
+        # cross-street section standing in for a civic address. Not the same place, and not
+        # a wrong street. Split out of "cosmetic" on 2026-09-05 (classify v2); rows recorded
+        # before that date fold these into cosmetic.
+        return "cosmetic" if bool(hn_s) == bool(hn_t) else "approximate"
     # A house number with no street name at all: the pipeline emitted a fragment.
     # Distinct from wrong-street because nothing was mismatched -- the street was lost.
     if not street_of(sys_addr):
@@ -320,14 +327,14 @@ def main():
         total = sum(buckets.values()) or 1
         print("THEN: the stored outcome, what production concluded on the day, against verified_address")
         print("-" * 48)
-        for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
+        for k in ("exact", "cosmetic", "approximate", "house-number", "wrong-street", "no-street", "unresolved"):
             n = buckets.get(k, 0)
             print("  %-14s %4d  %5.1f%%" % (k, n, 100.0 * n / total))
         print("  %-14s %4d" % ("TOTAL", sum(buckets.values())))
         print("\nNOW: the stored address probed through the current geocoder (a stability check)")
         print("-" * 48)
         tot_now = sum(buckets_now.values()) or 1
-        for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
+        for k in ("exact", "cosmetic", "approximate", "house-number", "wrong-street", "no-street", "unresolved"):
             n = buckets_now.get(k, 0)
             print("  %-14s %4d  %5.1f%%" % (k, n, 100.0 * n / tot_now))
 
@@ -342,7 +349,7 @@ def main():
             c, cn = per_month[month], per_month_now[month]
             tot, tot_now = (sum(c.values()) or 1), (sum(cn.values()) or 1)
             print(f"\n{month}  (n={sum(c.values())})   {'then':>10} {'now':>12}")
-            for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
+            for k in ("exact", "cosmetic", "approximate", "house-number", "wrong-street", "no-street", "unresolved"):
                 print("  %-14s %4d %5.1f%%   %4d %5.1f%%" % (
                     k, c.get(k, 0), 100.0 * c.get(k, 0) / tot, cn.get(k, 0), 100.0 * cn.get(k, 0) / tot_now))
         summary = {"stage": "geocoder-trace", "n": sum(buckets.values()),

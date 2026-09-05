@@ -251,7 +251,13 @@ change to STT configuration, the parser, vocabulary, or geocoding:
 
 `--baseline` prints every number that moved; the tables above say which direction is good
 (WRONG and the defect place-buckets down, EXACT and "same place" up, WER down, median metres
-down). `--record` writes one row to `public.evaluation_history` with the stage, the git hash,
+down). Two measurement changes on 2026-09-05, so compare rows across that date with care: the
+place bucket **approximate** (right street, no house number: a street centroid or a
+cross-street section) was split out of *cosmetic*, so "same place" no longer counts an
+approximation; and calls the operator tagged `[PA]` in the review notes are excluded from
+every harness, because a captured PA page is not a dispatch (#14).
+
+`--record` writes one row to `public.evaluation_history` with the stage, the git hash,
 the model, the corpus slice and the summary, so a number can always be traced to the code that
 produced it. Compare like with like: the same stage and the same `--since`. The parser and
 geocoder harnesses take the same flags for a single-stage view.

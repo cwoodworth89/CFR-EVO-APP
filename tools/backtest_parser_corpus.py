@@ -253,6 +253,8 @@ def fetch(conn, args):
         params.append(args.dispatch_id)
     else:
         where.append("verified_incident IS NOT NULL")
+        # PA pages tagged "[PA]" by the operator are not dispatches (punch-list #14).
+        where.append("position('[PA]' in coalesce(target->>'review_notes', '')) = 0")
         if args.since:
             where.append("timestamp >= %s")
             params.append(args.since)

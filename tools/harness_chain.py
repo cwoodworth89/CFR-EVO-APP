@@ -72,7 +72,7 @@ from cfr_dispatch.pipeline.payload_builder import build_dispatch_payload  # noqa
 from gis_service.geocoder import CoquitlamDataValidator  # noqa: E402
 
 PLACE_OK = ("exact", "cosmetic")          # the same place; every other bucket is a defect
-PLACE_BUCKETS = ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved")
+PLACE_BUCKETS = ("exact", "cosmetic", "approximate", "house-number", "wrong-street", "no-street", "unresolved")
 RECORDINGS = os.path.join(str(BACKEND), "audio_files", "recordings")
 TRAINING_CSV = os.path.join(str(BACKEND), "data", "training", "metadata_round1_train.csv")
 
@@ -173,7 +173,10 @@ def main() -> int:
         where, params = ["dispatch_id = :did"], {"did": args.dispatch_id}
     else:
         where = ["(coalesce(btrim(verified_address), '') <> '' OR verified_incident IS NOT NULL "
-                 "OR coalesce(btrim(verified_transcript), '') <> '')"]
+                 "OR coalesce(btrim(verified_transcript), '') <> '')",
+                 # PA pages the listener captured and the operator tagged "[PA]" in the review
+                 # notes are not dispatches (punch-list #14); scoring them is noise.
+                 "position('[PA]' in coalesce(target->>'review_notes', '')) = 0"]
         dw, params = hc.date_where(args)
         where += dw
     sql = ("SELECT dispatch_id, timestamp, raw_transcript, verified_transcript, verified_address, "

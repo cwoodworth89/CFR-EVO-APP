@@ -4,6 +4,33 @@
 
 import regex as re
 
+_MAP_GRID_PHRASE = re.compile(r'\b(?:coquitlam\s+)?map\s+grid\s+\d+\b')
+_TALK_GROUP_ANCHOR = re.compile(r'\btalk\s+group\b')
+
+
+def _strip_orphan_map_grids(text: str) -> str:
+    """Drop "map grid N" phrases the STT inserted mid-round (punch-list #63).
+
+    The model in service writes "coquitlam map grid N" into pauses, with a wrong N: measured
+    2026-09-05 on 19 of 129 scored calls, and absent from the base model's stored transcripts
+    of the same audio. The phrase is in the STT initial prompt and hotwords
+    (stt/bias_prompt.py). split_rounds cuts at the first "map grid N" and the parser reads
+    the first one, so a single insertion loses both the grid and the cross streets.
+
+    The template (docs/call_structure.md) puts the map grid last, immediately after the
+    talk-group clause: "use talk group 10 combined response coquitlam map grid 82", 46
+    characters between "talk group" and the grid. A map-grid phrase with no "talk group" in
+    the 60 characters before it, AND another map-grid phrase somewhere after it, is not that
+    field and is removed. The last phrase in the transcript is never removed, so a call whose
+    talk-group clause was lost keeps its grid.
+    """
+    matches = list(_MAP_GRID_PHRASE.finditer(text))
+    for m in reversed(matches[:-1]):
+        if not _TALK_GROUP_ANCHOR.search(text[max(0, m.start() - 60):m.start()]):
+            text = text[:m.start()] + ' ' + text[m.end():]
+    return text
+
+
 def sanitize_transcript(text: str) -> str:
     """
     Cleans a transcript by converting to lowercase, applying phonetic corrections,
@@ -212,5 +239,8 @@ def sanitize_transcript(text: str) -> str:
     # Join consecutive single digits separated by spaces (e.g. "4 2 8" -> "428")
     text = re.sub(r'\b(\d)\s+(?=\d\b)', r'\1', text)
     
+    # Inserted "map grid N" phrases go before the rounds are split (punch-list #63).
+    text = _strip_orphan_map_grids(text)
+
     # Trim and normalize spaces
     return ' '.join(text.split())

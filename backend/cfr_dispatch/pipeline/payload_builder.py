@@ -99,31 +99,48 @@ def build_dispatch_payload(
             "rings": []
         }
     else:
+        # Punch-list #44a (2026-09-05): every candidate is geocoded and the best resolution
+        # wins; round order only breaks ties. Before this the first candidate that resolved
+        # at all won, so a round-1 address corrupted by STT ("29883 Robson Dr") that fell
+        # through to a cross-street section beat round 2's "2983 Robson Dr", which resolves
+        # to the parcel. The ranking is the geocoder's own confidence per step (exact and
+        # intersection highest, then section, block, street centroid, road centroid), so the
+        # authority that already exists decides, not a positional rule (CLAUDE.md 6.2).
+        grid_hint = next((d.map_grid for d in all_candidates if d.map_grid), None)
+        best, best_conf, best_idx = None, -1.0, -1
         for i, candidate_address in enumerate(unique_addresses):
             logging.debug(f"[{dispatch_id}] Attempting Local Geocode for Candidate #{i+1}: '{candidate_address}'")
             res = validator.local_geocode(
                 candidate_address,
-                target_map_grid=next((d.map_grid for d in all_candidates if d.map_grid), None),
+                target_map_grid=grid_hint,
                 x_street_1=x_street_1,
                 x_street_2=x_street_2
             ) if validator else None
-            if res:
-                logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}'")
-                local_geocode_result = {
-                    "address": res["address"],
-                    "lat": res["lat"],
-                    "lng": res["lng"],
-                    "rings": res.get("rings", [])
-                }
-                # A "<street> and <street>" dispatch resolves to a street SECTION rather
-                # than a point. These fields are what let the kiosk highlight the stretch
-                # and warn that it is not a located incident; dropping them here would
-                # leave the representative midpoint looking like an exact match.
-                for k in ("location_type", "segment", "endpoints", "length_m",
-                          "resolution_note", "requested_address"):
-                    if res.get(k) is not None:
-                        local_geocode_result[k] = res[k]
-                break
+            if not res:
+                continue
+            conf = float(res.get("confidence") or 0.0)
+            if conf > best_conf:
+                best, best_conf, best_idx = res, conf, i
+        if best:
+            res = best
+            if best_idx > 0:
+                logging.info(f"[{dispatch_id}] Candidate #{best_idx+1} '{unique_addresses[best_idx]}' outranked "
+                             f"#1 '{unique_addresses[0]}' at confidence {best_conf:.0f} (punch-list #44a)")
+            logging.info(f"[{dispatch_id}] Local GIS Match SUCCEEDED: '{res['address']}'")
+            local_geocode_result = {
+                "address": res["address"],
+                "lat": res["lat"],
+                "lng": res["lng"],
+                "rings": res.get("rings", [])
+            }
+            # A "<street> and <street>" dispatch resolves to a street SECTION rather
+            # than a point. These fields are what let the kiosk highlight the stretch
+            # and warn that it is not a located incident; dropping them here would
+            # leave the representative midpoint looking like an exact match.
+            for k in ("location_type", "segment", "endpoints", "length_m",
+                      "resolution_note", "requested_address"):
+                if res.get(k) is not None:
+                    local_geocode_result[k] = res[k]
         
         if not local_geocode_result:
             logging.warning(f"[{dispatch_id}] Geocoding failed for '{first_candidate}'. Storing with null coordinates.")

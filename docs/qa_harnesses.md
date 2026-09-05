@@ -22,6 +22,7 @@ each has a different notion of "correct".
 | Stage | Question it answers | Harness | Status |
 |:--|:--|:--|:--|
 | **STT** | Did we hear what was said, and did hearing it differently change what the parser and geocoder got? | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05, holdout only (§4) |
+| **Phase 1** | Did the preliminary payload carry what was heard, or what the model finished for itself, and when did it publish? | [`harness_phase1.py`](../tools/harness_phase1.py) | ✅ Built 2026-09-05 (#72) |
 | **Parser** | Did we pull the right values out of what we heard? | [`backtest_parser_corpus.py`](../tools/backtest_parser_corpus.py) | ✅ Built 2026-08-26 |
 | **Geocoder** | Does the address resolve to the right place? | [`harness_chain.py --skip-stt`](../tools/harness_chain.py); [`trace_geocode_corpus.py`](../tools/trace_geocode_corpus.py) for the step ladder | ✅ Reviewed 2026-09-05 (§3) |
 | **Whole chain** | From the recording to the point on the map, built the way production builds it; every stage scored at once | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05 |

@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**24 open** (15 crew-visible) · **48 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**23 open** (15 crew-visible) · **49 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 24
+## Open — 23
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -45,7 +45,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |
 | **37** | ⚪ hygiene | OPEN | [Close button and timer timeout should not dismiss to the same place](punchlist/37-close-button-and-timer-timeout-should-not-dismiss-to-th.md) |
 | **45a** | ⚪ hygiene | OPEN | [Geocoder harness needs a review pass before its numbers are trusted again](punchlist/45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
-| **46a** | ⚪ hygiene | OPEN | [No STT harness exists — WER is computed for training, never for regression](punchlist/46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |
 | **52a** | ⚪ hygiene | OPEN | [Kiosk review button formatting and review rating functionality](punchlist/52a-kiosk-review-button-formatting-and-review-rating-functi.md) |
 
 ---

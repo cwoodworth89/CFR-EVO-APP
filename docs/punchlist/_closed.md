@@ -2,10 +2,11 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-48 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+49 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |
 | **61** | 🔴 crew-visible | CLOSED | [The API silently falls back to an empty SQLite file when Postgres is unreachable](61-the-api-silently-falls-back-to-an-empty-sqlite-file-when-po.md) |
 | **53** | 🟠 operational | CLOSED | [The dispatch agent makes a WAN call to huggingface.co on every start](53-the-dispatch-agent-makes-a-wan-call-to-huggingface-co-o.md) |
 | **44b** | 🟠 operational | CLOSED | [Kiosk crashed on a live dispatch — stale chunk after a frontend deploy](44b-kiosk-crashed-on-a-live-dispatch-stale-chunk-after-a-fr.md) |

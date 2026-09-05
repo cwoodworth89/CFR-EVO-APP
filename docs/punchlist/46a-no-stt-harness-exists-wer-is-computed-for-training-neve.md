@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | hygiene |
 | **Area** | 🧾 Import Completeness Audit, 2026-08-23 |
 | **Blocks** | 1 |
@@ -13,7 +13,8 @@
 ---
 
 ## 46. No STT harness exists — WER is computed for training, never for regression
-> **Status**: ⚠️ **Open — raised 2026-08-26.** See [`docs/qa_harnesses.md`](../qa_harnesses.md) §4.
+> **Status**: ✅ **Closed 2026-09-05 — `tools/harness_chain.py` is the harness; first runs recorded.**
+> *(Opened as: ⚠️ Open — raised 2026-08-26.)* See [`docs/qa_harnesses.md`](../qa_harnesses.md) §4 and §8.
 
 `extract_training_data.py` and `backtest_regression.py` compute Word Error Rate to feed Whisper
 training. Neither answers **"did this STT change make the system better or worse against
@@ -50,3 +51,26 @@ the verified text first the way the extractor does, or compare round-for-round.
   street vocabulary, the same pattern already applied to call types in #43.
 
 ---
+
+### Closed 2026-09-05
+
+[`tools/harness_chain.py`](../../tools/harness_chain.py) (`eb0f801`, `ec6988a`) does what this item
+asked for: it replays the stored recordings through the model in service, scores round 1
+against `verified_transcript` (the round trap above is handled by comparing round 1 to round
+1), pushes each transcript through the parser and the production payload builder with the
+real geocoder, and reports by month with `--json`/`--baseline` for before-and-after and
+`--record` into `public.evaluation_history`. The round-1 training clips are left out of the
+WER unless `--include-training`; `--only-csv` restricts to the round-1 holdout.
+
+First recorded runs on the kiosk, model `whisper-base-cfr-ct2`:
+
+| Run | n | WER (round 1) | Map grid wrong | Same place |
+|:--|--:|--:|--:|--:|
+| Verified calls since 2026-08-31 | 12 | 1.92 % on the 2 not in the training set | 2 | 91.7 % |
+| Round-1 holdout, 44 clips the model never saw | 44 | **4.55 %** mean, 0 % median | 1 | 88.6 %, p90 22 m |
+
+The holdout figure is the honest one until this week's 32 unreviewed calls are verified; those
+become the next holdout automatically because they post-date the training set. What the item
+predicted the harness would surface is now measurable rather than argued: a transcription
+change that moves the WER but drops the map grid shows up as a `map_grid` WRONG count in the
+same run. `tools/harness_history.py` lists every run; `qa_harnesses.md` §8 is the procedure.

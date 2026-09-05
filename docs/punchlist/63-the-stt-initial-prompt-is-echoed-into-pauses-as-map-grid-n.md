@@ -78,10 +78,38 @@ is why the tail shows it at fifteen times the size the holdout does.
 ### Applied 2026-09-05
 
 The operator ruled: no prompt. `STT_INITIAL_PROMPT=` (empty) is in the kiosk's `backend/.env`
-and `cfr-agent` restarted at 08:28 PDT with the loader reading `''`. The hotwords still list
-*map grid*; one variable at a time. To close: run `tools/harness_chain.py --since 2026-09-05`
+and `cfr-agent` restarted at 08:28 PDT with the loader reading `''`. The hotwords were then
+measured without *map grid*, below. To close: run `tools/harness_chain.py --since 2026-09-05`
 once a few dozen calls have arrived and compare the map-grid and address misses against the
 baseline rows in `evaluation_history`.
+
+### Hotwords without "map grid", measured 2026-09-05
+
+`STT_HOTWORDS_EXCLUDE` (`bias_prompt.py`, `62d70d4`) removes named terms from the hotword list
+before the budget is spent. A and B ran on the same code (`56a68a5`, #67 and #68 in), the same
+44 clips, no initial prompt, within the same half hour; both are in `evaluation_history`.
+
+| Round-1 holdout, 44 clips | A: default hotwords | B: without "map grid" |
+|:--|--:|--:|
+| WER mean / median | 4.38 % / 0 % | 4.02 % / 0 % |
+| Map grid wrong | 0 | 0 |
+| Address wrong | 3 | 3 |
+| Placed exactly | 34 | 34 |
+| Wrong street | 3 | 3 |
+
+Round 1, the scored text, moved on 5 of 44 clips: four better (the Port Mann Bridge call
+25.6 → 16.3 %, DISP-2026-F5C0FC 18.5 → 14.8 %, D239B1 2.9 → 0, 815224 6.3 → 3.1 %) and one
+worse by an abbreviation (*Tahsis Ave* for *Tahsis Avenue*, 0 → 3.3 %). Round 2 differed on
+34 of 44, which is where the model varies from run to run (the opening of round 2 kept or
+dropped, "&" for "and", capitalisation); nothing downstream moved either way.
+
+The first B run (`62d70d4`, 15:41) showed one wrong grid. That was the parser: the model
+dropped round 2's opening and the digit join made "map grid 8210" (#68, fixed the same
+afternoon). Two defaults of "default" are not byte-identical either: the list is built live
+from HITL-verified streets and dispatch frequency, so only a same-code, same-hour pair counts.
+
+To apply: `STT_HOTWORDS_EXCLUDE=map grid` in the kiosk's `backend/.env`, then restart
+`cfr-agent`. Not applied; the operator's call, with the numbers above.
 
 ### What is not done, and why
 

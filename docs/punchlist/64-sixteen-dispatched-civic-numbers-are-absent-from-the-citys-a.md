@@ -60,3 +60,9 @@ data does not carry (large sites, strata, recent assignments), and until then th
 entrance-point queue (#49) is where a person pins them.
 
 Register entry: `docs/city_gis_data_register.md` §14.
+
+**Later on 2026-09-05 (#67):** step 4b, the nearest civic address, had been raising on every
+call since 2026-08-30. With it answering again, `2905` and `2929 Lougheed Hwy` route to
+`2950 Lougheed Hwy` with the substitution note instead of the street centroid. The other
+three street-centroid placements (`39 United Blvd` twice, `4992 Upper Harper Rd`) still fall
+through: their nearest numbers are in another 100-block, which step 4b refuses by design.

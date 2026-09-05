@@ -2,13 +2,15 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-53 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+55 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **44a** | 🔴 crew-visible | CLOSED | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **62** | 🔴 crew-visible | CLOSED | [The geocoder's street-centroid step has raised on every call since the `parcels.lat` rename](62-the-geocoders-street-centroid-step-has-raised-on-every-call-si.md) |
 | **66** | 🔴 crew-visible | CLOSED | [The kiosk address sanitizer removed 18 City street names that begin with a unit keyword](66-the-kiosk-address-sanitizer-removed-18-city-street-names-tha.md) |
+| **67** | 🔴 crew-visible | CLOSED | [Step 4b, the nearest civic address, has raised on every call since the parcel column rename](67-step-4b-the-nearest-civic-address-has-raised-on-every-call-s.md) |
+| **68** | 🔴 crew-visible | CLOSED | [The digit join glued the next clause's number onto the map grid when the STT lost round 2's opening](68-the-digit-join-glued-the-next-clauses-number-onto-the-map-gr.md) |
 | **45a** | ⚪ hygiene | CLOSED | [Geocoder harness needs a review pass before its numbers are trusted again](45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |
 | **61** | 🔴 crew-visible | CLOSED | [The API silently falls back to an empty SQLite file when Postgres is unreachable](61-the-api-silently-falls-back-to-an-empty-sqlite-file-when-po.md) |

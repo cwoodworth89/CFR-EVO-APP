@@ -44,7 +44,7 @@ Produce numbers. None of them modify operational data.
 | `backtest_parser_corpus.py` | Replays verified dispatches through the current parser, scoring each field. |
 | `backtest_regression.py` | WER / Levenshtein regression for STT output. |
 | `backtest_round_comparison.py` | Scores cross-round disagreement as a warning signal. |
-| `trace_geocode_corpus.py` | Scores the geocoder against the human-verified corpus. |
+| `trace_geocode_corpus.py` | Traces the geocoder over the verified corpus: which resolver step answers, and whether each stored address still resolves the same way today ("then" vs "now"). A diagnostic, reviewed 2026-09-05 (#45a); the geocoder regression number is `harness_chain.py --skip-stt`. |
 | `harness_chain.py` | The whole chain, scored: recording → STT → parser → geocoder → point on the map, every stage against the verified columns in one pass, by month. `--skip-stt` starts from the stored transcript. Leaves the round-1 training clips out of the WER. Kiosk only for STT. |
 | `harness_common.py` | Shared by the three harnesses: `--since/--until`, `--json/--baseline`, `--record` into `public.evaluation_history`, WER and distance helpers. Imported, never run. |
 | `harness_history.py` | Every recorded harness run, oldest first: stage, git hash, model, corpus slice, headline. The answer to "are we improving over time". |

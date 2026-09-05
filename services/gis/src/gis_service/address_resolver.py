@@ -695,7 +695,10 @@ class AddressResolver:
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(text("""
-                    SELECT AVG(lat) as avg_lat, AVG(lng) as avg_lng, COUNT(*) as cnt
+                    -- parcels.lat/lng became centroid_lat/centroid_lng on 2026-08-30 (be0e7bf);
+                    -- this statement was missed and step 5 raised on every call for six days
+                    -- (punch-list #62). backend/tests/test_address_resolver_db.py runs it live.
+                    SELECT AVG(centroid_lat) as avg_lat, AVG(centroid_lng) as avg_lng, COUNT(*) as cnt
                     FROM public.parcels
                     WHERE UPPER(street) = UPPER(:street)
                       AND (UPPER(streettype) = UPPER(:stype) OR :stype = '');

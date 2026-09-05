@@ -23,7 +23,7 @@ each has a different notion of "correct".
 |:--|:--|:--|:--|
 | **STT** | Did we hear what was said, and did hearing it differently change what the parser and geocoder got? | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05, holdout only (§4) |
 | **Parser** | Did we pull the right values out of what we heard? | [`backtest_parser_corpus.py`](../tools/backtest_parser_corpus.py) | ✅ Built 2026-08-26 |
-| **Geocoder** | Does the address resolve to the right place? | [`trace_geocode_corpus.py`](../tools/trace_geocode_corpus.py) | ⚠️ **Needs review** (§3) |
+| **Geocoder** | Does the address resolve to the right place? | [`harness_chain.py --skip-stt`](../tools/harness_chain.py); [`trace_geocode_corpus.py`](../tools/trace_geocode_corpus.py) for the step ladder | ✅ Reviewed 2026-09-05 (§3) |
 | **Whole chain** | From the recording to the point on the map, built the way production builds it; every stage scored at once | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05 |
 
 The three are **not** interchangeable. Word Error Rate scores transcription and says nothing
@@ -89,36 +89,48 @@ parser output compared to ground truth directly, and can be read at face value.
 
 ---
 
-## 3. Geocoder harness — `trace_geocode_corpus.py` ⚠️ needs review
+## 3. Geocoder harness — reviewed 2026-09-05; the regression number is `harness_chain.py --skip-stt`
 
-Committed `8d00ea3`. Replays verified dispatches through the live geocoder, wraps all seven
-resolvers to record **which step answered**, and buckets the result against
-`verified_address`.
+The review #45a asked for, point by point:
+
+1. **Resolver list.** `trace_geocode_corpus.py` wraps seven methods: exact, intersection
+   candidates, block, cross-street narrowing, nearest civic, street centroid, road centroid.
+   `Geocoder.get_coordinates` (`services/gis/src/gis_service/geocoder.py:153-255`) calls exactly
+   those seven, in that order, today. One spatial call outside the ladder,
+   `resolve_street_section_in_grid` (line 302), is not traced.
+2. **Date split.** Added 2026-09-04: every table is per month, the pooled figure last.
+3. **Cosmetic bucketing.** Already there: `classify()` returns exact / cosmetic / house-number /
+   wrong-street / no-street / unresolved, and exact + cosmetic are "the same place".
+4. **It probes the geocoder's own output.** Confirmed from the data on 2026-09-05:
+   `target->>'address'` is canonical and, on every resolved call sampled, identical to the
+   verified address. Replaying it through the geocoder mostly returns itself. So the tool now
+   reports two things by name: **then**, the stored outcome (history; it cannot move), and
+   **now**, the stored address re-resolved by current code (a stability check). Neither is a
+   regression number, and the tool refuses `--record` for that reason.
+
+**The geocoder regression number is [`tools/harness_chain.py --skip-stt`](../tools/harness_chain.py)**:
+the stored transcript through the current parser, then production's own payload builder with the
+real geocoder, scored with the same `classify()` and in metres. It takes `--json` / `--baseline` /
+`--record` like every harness (§8).
+
+**Baseline, 2026-09-05, verified calls since 2026-08-01, git `eb0f801`:**
+
+| Measure | Same place | house-number | wrong-street | no-street | unresolved |
+|:--|--:|--:|--:|--:|--:|
+| Stored outcome, "then" (n=303) | 92.7 % | 5 | 16 | 1 | 0 |
+| Chain, current parser and geocoder (n=303) | 92.4 % | 0 | 23 | 0 | 0 |
+
+The two agree within a third of a point on the same window, which is the cross-check the review
+wanted. The first full run of the chain harness the same day also found that step 5, the street
+centroid, had been raising on every call since 2026-08-30 (#62); the "after" run against this
+baseline is recorded in that item.
 
 ```bash
-python tools/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF
-python tools/trace_geocode_corpus.py --probe "3000 avenue"
-python tools/trace_geocode_corpus.py --all --csv /tmp/geocode.csv
+python tools/trace_geocode_corpus.py --dispatch-id DISP-2026-156DCF     # one call, the step ladder
+python tools/trace_geocode_corpus.py --probe "3000 avenue"                # one string, the step ladder
+python tools/trace_geocode_corpus.py --all --since 2026-08-01             # then vs now, by month
+python tools/harness_chain.py --skip-stt --since 2026-08-01 --record      # the regression number
 ```
-
-**Why it needs a review pass before its numbers are trusted again:**
-
-1. **It predates the 2026-08-21/23 geocoder rewrite.** Nine commits landed on
-   `services/gis/` in that window — tie-breaking by map grid, near-road ranking, civic
-   substitution bounds, honest centroid labelling. Whether the seven-step ladder it wraps is
-   still the seven steps that run has not been re-checked.
-2. **It probes `target->>'address'`, the geocoder's own output** — so it measures whether an
-   address round-trips, never how the parser arrived at it. That gap is what
-   `backtest_parser_corpus.py` now fills; the two should be read together.
-3. **It has no date split** (§5). Its headline "30 of 34 stored defects already remediated"
-   is a *historical* statement, and the same pooling trap applies to any rate it reports.
-4. **Its ground truth is contested.** Reviewers use `verified_address` for cosmetic edits —
-   expanding suffixes, stripping unit numbers — which inflates a naive error rate by roughly
-   3×. The parser harness buckets EXACT / COSMETIC / WRONG for exactly this reason; the
-   geocoder harness should adopt the same buckets.
-
-**Action:** re-run it against current `services/gis/`, confirm the resolver list matches,
-add a `--by-month` split and cosmetic bucketing, and record a fresh baseline here.
 
 ---
 

@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**23 open** (15 crew-visible) · **49 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**22 open** (15 crew-visible) · **51 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 23
+## Open — 22
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -44,7 +44,6 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **55** | 🟠 operational | OPEN | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](punchlist/55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |
 | **37** | ⚪ hygiene | OPEN | [Close button and timer timeout should not dismiss to the same place](punchlist/37-close-button-and-timer-timeout-should-not-dismiss-to-th.md) |
-| **45a** | ⚪ hygiene | OPEN | [Geocoder harness needs a review pass before its numbers are trusted again](punchlist/45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **52a** | ⚪ hygiene | OPEN | [Kiosk review button formatting and review rating functionality](punchlist/52a-kiosk-review-button-formatting-and-review-rating-functi.md) |
 
 ---

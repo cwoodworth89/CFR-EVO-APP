@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
-"""Score the geocoder against the human-verified dispatch corpus.
+"""Trace the geocoder over the human-verified corpus: which resolver step answers, and
+whether each stored address still resolves the same way today.
 
-Replays the *stored* parsed address for each verified dispatch back through the live
-Geocoder, records which resolution step answered, and diffs the result against the
-operator's `verified_address`.
+Reviewed 2026-09-05 (punch-list #45a). `target->>'address'` is the geocoder's OUTPUT at the
+time: canonical, and on every resolved call sampled identical to what the operator later
+verified. So this tool measures two things and calls them by name:
+
+* "then": the stored outcome bucketed against `verified_address`, what production concluded
+  on the day. It is history and cannot move.
+* "now": that stored address probed through the current geocoder, bucketed the same way, with
+  the step that answered. A canonical address mostly re-resolves to itself, so this is a
+  stability check on resolution, not a measure of geocoder accuracy on parser output.
+
+The geocoder REGRESSION number, current parser output through the current geocoder against
+the verified columns, is `tools/harness_chain.py --skip-stt`. That is where --record belongs;
+this tool refuses it.
 
 Why this exists
 ---------------
@@ -192,6 +203,10 @@ def main():
         "target.address is the geocoder's own answer, so replaying it only shows that "
         "the answer round-trips, never how it was arrived at."))
     args = ap.parse_args()
+    if args.record:
+        sys.exit("--record is not supported here: this tool measures the stored outcome and a "
+                 "re-resolution of the geocoder's own output, neither of which is a regression "
+                 "number. Record the geocoder trend with: tools/harness_chain.py --skip-stt --record")
 
     db = os.environ.get("DATABASE_URL")
     if not db:
@@ -248,6 +263,8 @@ def main():
 
     buckets = Counter()
     per_month = defaultdict(Counter)
+    buckets_now = Counter()
+    per_month_now = defaultdict(Counter)
     step_by_kind = Counter()
     out = []
 
@@ -268,11 +285,15 @@ def main():
         kind = classify(r["sys_addr"], r["verified_address"])
         buckets[kind] += 1
         per_month[hc.month_of(r["timestamp"])][kind] += 1
+        kind_now = classify((result or {}).get("address") or "", r["verified_address"])
+        buckets_now[kind_now] += 1
+        per_month_now[hc.month_of(r["timestamp"])][kind_now] += 1
         step_by_kind[(kind, answering)] += 1
 
         out.append({
             "dispatch_id": r["dispatch_id"],
             "kind": kind,
+            "kind_now": kind_now,
             "answering_step": answering,
             "system_address": r["sys_addr"],
             "verified_address": r["verified_address"],
@@ -297,12 +318,18 @@ def main():
 
     if not args.dispatch_id:
         total = sum(buckets.values()) or 1
-        print("Address outcome across the verified corpus")
+        print("THEN: the stored outcome, what production concluded on the day, against verified_address")
         print("-" * 48)
         for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
             n = buckets.get(k, 0)
             print("  %-14s %4d  %5.1f%%" % (k, n, 100.0 * n / total))
         print("  %-14s %4d" % ("TOTAL", sum(buckets.values())))
+        print("\nNOW: the stored address probed through the current geocoder (a stability check)")
+        print("-" * 48)
+        tot_now = sum(buckets_now.values()) or 1
+        for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
+            n = buckets_now.get(k, 0)
+            print("  %-14s %4d  %5.1f%%" % (k, n, 100.0 * n / tot_now))
 
         print("\nWhich step answered, for the calls that were wrong:")
         for (kind, step), n in sorted(step_by_kind.items(), key=lambda kv: -kv[1]):
@@ -311,28 +338,25 @@ def main():
 
     if not args.dispatch_id:
         # Split by month before believing any rate (qa_harnesses.md §5).
-        for month in sorted(per_month):
-            c = per_month[month]
-            tot = sum(c.values()) or 1
-            print(f"\n{month}  (n={sum(c.values())})")
+        for month in sorted(set(per_month) | set(per_month_now)):
+            c, cn = per_month[month], per_month_now[month]
+            tot, tot_now = (sum(c.values()) or 1), (sum(cn.values()) or 1)
+            print(f"\n{month}  (n={sum(c.values())})   {'then':>10} {'now':>12}")
             for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
-                print("  %-14s %4d  %5.1f%%" % (k, c.get(k, 0), 100.0 * c.get(k, 0) / tot))
-        summary = {"stage": "geocoder", "n": sum(buckets.values()),
-                   "pooled": dict(buckets),
-                   "months": {m: dict(c) for m, c in sorted(per_month.items())}}
+                print("  %-14s %4d %5.1f%%   %4d %5.1f%%" % (
+                    k, c.get(k, 0), 100.0 * c.get(k, 0) / tot, cn.get(k, 0), 100.0 * cn.get(k, 0) / tot_now))
+        summary = {"stage": "geocoder-trace", "n": sum(buckets.values()),
+                   "then": {"pooled": dict(buckets),
+                            "months": {m: dict(c) for m, c in sorted(per_month.items())}},
+                   "now": {"pooled": dict(buckets_now),
+                           "months": {m: dict(c) for m, c in sorted(per_month_now.items())}},
+                   # --baseline diffs "now": "then" is history and cannot move.
+                   "pooled": dict(buckets_now)}
         if args.json:
             hc.save_summary(args.json, summary)
         if args.baseline:
-            hc.diff_summaries(summary["pooled"], hc.load_summary(args.baseline).get("pooled", {}))
-        if args.record:
-            ts_all = [x["timestamp"] for x in rows]
-            ok = buckets.get("exact", 0) + buckets.get("cosmetic", 0)
-            hc.record_run(stage="geocoder", n=summary["n"], args=args, metrics=summary,
-                          model_version="stored-parser-output",
-                          period=(min(ts_all).date(), max(ts_all).date()),
-                          headline=f"same place {hc.pct(ok, summary['n'])}% (n={summary['n']}); "
-                                   + ", ".join(f"{k} {buckets.get(k, 0)}" for k in
-                                               ("house-number", "wrong-street", "no-street", "unresolved")))
+            hc.diff_summaries(summary["pooled"], hc.load_summary(args.baseline).get("pooled", {}),
+                              title="CHANGE VS BASELINE, 'now' buckets")
 
     if args.csv and out:
         with open(args.csv, "w", newline="", encoding="utf-8") as fh:

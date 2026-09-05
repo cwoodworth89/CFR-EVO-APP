@@ -60,7 +60,7 @@ from collections import Counter, defaultdict
 from _repo import BACKEND  # noqa: F401  tools/_repo.py puts backend/ and services/*/src on sys.path
 import harness_common as hc  # noqa: E402
 from backtest_parser_corpus import FIELDS, parse_like_production, score_row  # noqa: E402
-from trace_geocode_corpus import classify  # noqa: E402
+from trace_geocode_corpus import classify, install_tracer  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 from cfr_dispatch.config import UNITS_VOCABULARY  # noqa: E402
 from cfr_dispatch.parser import (  # noqa: E402
@@ -105,7 +105,8 @@ def candidates_like_phase2(transcript: str):
 
 
 def new_bucket():
-    return {"n": 0, "fields": {f: Counter() for f in FIELDS}, "place": Counter(), "dist": [], "wer": []}
+    return {"n": 0, "fields": {f: Counter() for f in FIELDS}, "place": Counter(), "dist": [], "wer": [],
+            "resolved_by": Counter()}
 
 
 def summarise(b: dict) -> dict:
@@ -117,6 +118,10 @@ def summarise(b: dict) -> dict:
         "fields_wrong": {f: b["fields"][f].get("WRONG", 0) for f in FIELDS},
         "place": {k: b["place"].get(k, 0) for k in PLACE_BUCKETS},
         "place_ok_pct": hc.pct(place_ok, place_total),
+        # Which resolver step answered (trace_geocode_corpus's wrapper). Steps 5 and 6 return
+        # the same address string and differ only in the point, so this is the only view that
+        # separates them (punch-list #62).
+        "resolved_by": dict(sorted(b["resolved_by"].items())),
         "distance_m": {"n": len(b["dist"]),
                        "median": round(statistics.median(b["dist"]), 1) if b["dist"] else None,
                        "p90": round(hc.quantile(b["dist"], 0.9), 1) if b["dist"] else None},
@@ -140,6 +145,7 @@ def print_block(title: str, b: dict) -> None:
           + f"   ok {s['place_ok_pct']}%")
     d = s["distance_m"]
     print(f"  distance    n={d['n']} median={d['median']} m  p90={d['p90']} m   (target vs the geocoded verified address)")
+    print("  resolved by " + "  ".join(f"{k} {v}" for k, v in s["resolved_by"].items()))
     w = s["wer"]
     if w["n"]:
         print(f"  stt wer     n={w['n']} mean={w['mean_pct']}%  median={w['median_pct']}%   (round 1 vs round 1 of verified_transcript)")
@@ -186,6 +192,7 @@ def main() -> int:
         sys.exit("no verified dispatches in that range")
 
     validator = CoquitlamDataValidator(database_url=db)
+    trace_log = install_tracer()  # which resolver answered each call; cleared before every payload build
     if args.skip_stt:
         model_version = "stored-transcript"
         excluded = set()
@@ -244,6 +251,7 @@ def main() -> int:
 
         # 4. the place, production's way
         san, cands = candidates_like_phase2(transcript)
+        trace_log.clear()
         try:
             payload, _units = build_dispatch_payload(did, transcript, san, cands, validator, UNITS_VOCABULARY)
         except Exception as exc:
@@ -251,6 +259,8 @@ def main() -> int:
             payload = {}
             if args.dispatch_id:
                 print(f"  payload err : {exc}")
+        # Read before the verified address is geocoded below, which would overwrite the log.
+        resolved_by = next((e["step"] for e in trace_log if e["hit"]), "none")
         target = payload.get("target") or {}
         sys_addr = target.get("address") or payload.get("address") or ""
         place = dist = None
@@ -277,11 +287,13 @@ def main() -> int:
                 b["dist"].append(dist)
             if w is not None:
                 b["wer"].append(w)
+            b["resolved_by"][resolved_by] += 1
 
         out_rows.append({"dispatch_id": did, "month": month, "stt_ran": stt_ran,
                          "wer": None if w is None else round(w, 4),
                          **{f: verdict[f] or "" for f in FIELDS},
-                         "place": place or "", "distance_m": None if dist is None else round(dist, 1),
+                         "place": place or "", "resolved_by": resolved_by,
+                         "distance_m": None if dist is None else round(dist, 1),
                          "system_address": sys_addr, "verified_address": truth["address"],
                          "lat": target.get("lat"), "lng": target.get("lng")})
 
@@ -295,7 +307,7 @@ def main() -> int:
             for f in FIELDS:
                 print(f"  {f:<12}: got {got[f]!r:<40} truth {truth[f]!r:<30} {verdict[f] or ''}")
             print(f"  place       : {sys_addr!r} vs {truth['address']!r} -> {place}"
-                  + (f", {dist:.0f} m apart" if dist is not None else ""))
+                  + (f", {dist:.0f} m apart" if dist is not None else "") + f"  (resolved by {resolved_by})")
 
     if args.dispatch_id:
         return 0

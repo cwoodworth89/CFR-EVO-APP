@@ -25,7 +25,7 @@ try:
         ParcelCameraOverrideSchema,
         StreetViewOverrideSchema
     )
-    from scripts.oneshot.migrate_streetview_to_parcels import migrate_overrides
+    from tools.oneshot.migrate_streetview_to_parcels import migrate_overrides  # tools/ since 2026-09-04; root_dir is on sys.path above
 except ModuleNotFoundError:
     from backend.api.database import SessionLocal, engine, Base
     from backend.api.models import ParcelModel, StreetViewOverrideModel
@@ -38,7 +38,7 @@ except ModuleNotFoundError:
         ParcelCameraOverrideSchema,
         StreetViewOverrideSchema
     )
-    from backend.scripts.oneshot.migrate_streetview_to_parcels import migrate_overrides
+    from tools.oneshot.migrate_streetview_to_parcels import migrate_overrides
 
 # Ensure tables exist in active database
 for table in Base.metadata.tables.values():

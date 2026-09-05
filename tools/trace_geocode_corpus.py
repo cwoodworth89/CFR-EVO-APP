@@ -35,9 +35,10 @@ import csv
 import os
 import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 
 import _repo  # noqa: F401  tools/_repo.py puts backend/ and services/*/src on sys.path
+import harness_common as hc  # noqa: E402
 
 from sqlalchemy import create_engine, text  # noqa: E402
 
@@ -184,6 +185,7 @@ def main():
     ap.add_argument("--dispatch-id")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--csv")
+    hc.add_common_args(ap)
     ap.add_argument("--probe", help=(
         "Geocode this literal address string and print the step ladder. Use for the "
         "text the PARSER produced, which is not what the record stores: the stored "
@@ -222,17 +224,21 @@ def main():
     else:
         where, params = ("verified_address IS NOT NULL "
                          "AND btrim(verified_address) <> ''"), {}
+        date_w, date_p = hc.date_where(args)
+        if date_w:
+            where = where + " AND " + " AND ".join(date_w)
+            params = {**params, **date_p}
 
     with engine.connect() as conn:
         rows = conn.execute(text(
-            "SELECT dispatch_id, raw_transcript, verified_address, "
+            "SELECT dispatch_id, timestamp, raw_transcript, verified_address, "
             "       target->>'address'      AS sys_addr, "
             "       target->>'map_grid'     AS sys_grid, "
             "       target->>'intersection' AS sys_intersection, "
             "       target->>'lat'          AS lat "
             "FROM public.dispatches "
             f"WHERE {where} "
-            "ORDER BY dispatch_id"
+            "ORDER BY dispatch_id" + (f" LIMIT {int(args.limit)}" if args.limit else "")
         ), params).mappings().fetchall()
 
     print("Replaying %d record(s) from the verified corpus.\n" % len(rows))
@@ -241,6 +247,7 @@ def main():
     geo = CoquitlamDataValidator(database_url=db)
 
     buckets = Counter()
+    per_month = defaultdict(Counter)
     step_by_kind = Counter()
     out = []
 
@@ -260,6 +267,7 @@ def main():
         answering = next((e["step"] for e in log if e["hit"]), "none")
         kind = classify(r["sys_addr"], r["verified_address"])
         buckets[kind] += 1
+        per_month[hc.month_of(r["timestamp"])][kind] += 1
         step_by_kind[(kind, answering)] += 1
 
         out.append({
@@ -300,6 +308,31 @@ def main():
         for (kind, step), n in sorted(step_by_kind.items(), key=lambda kv: -kv[1]):
             if kind in ("wrong-street", "house-number", "no-street"):
                 print("  %-13s via %-18s %3d" % (kind, step, n))
+
+    if not args.dispatch_id:
+        # Split by month before believing any rate (qa_harnesses.md §5).
+        for month in sorted(per_month):
+            c = per_month[month]
+            tot = sum(c.values()) or 1
+            print(f"\n{month}  (n={sum(c.values())})")
+            for k in ("exact", "cosmetic", "house-number", "wrong-street", "no-street", "unresolved"):
+                print("  %-14s %4d  %5.1f%%" % (k, c.get(k, 0), 100.0 * c.get(k, 0) / tot))
+        summary = {"stage": "geocoder", "n": sum(buckets.values()),
+                   "pooled": dict(buckets),
+                   "months": {m: dict(c) for m, c in sorted(per_month.items())}}
+        if args.json:
+            hc.save_summary(args.json, summary)
+        if args.baseline:
+            hc.diff_summaries(summary["pooled"], hc.load_summary(args.baseline).get("pooled", {}))
+        if args.record:
+            ts_all = [x["timestamp"] for x in rows]
+            ok = buckets.get("exact", 0) + buckets.get("cosmetic", 0)
+            hc.record_run(stage="geocoder", n=summary["n"], args=args, metrics=summary,
+                          model_version="stored-parser-output",
+                          period=(min(ts_all).date(), max(ts_all).date()),
+                          headline=f"same place {hc.pct(ok, summary['n'])}% (n={summary['n']}); "
+                                   + ", ".join(f"{k} {buckets.get(k, 0)}" for k in
+                                               ("house-number", "wrong-street", "no-street", "unresolved")))
 
     if args.csv and out:
         with open(args.csv, "w", newline="", encoding="utf-8") as fh:

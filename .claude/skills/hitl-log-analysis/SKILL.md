@@ -145,6 +145,7 @@ For a **corpus run**, use the harnesses — and read
 | `tools/backtest_parser_corpus.py` | parser output vs the operator's `verified_*` |
 | `tools/backtest_regression.py` | before/after a change, over the corpus |
 | `tools/backtest_round_comparison.py` | round 1 vs round 2 agreement, scored against ratings |
+| `tools/harness_chain.py` | recording → STT → parser → geocoder, every stage against the verified columns at once; `--baseline` for before/after, `--record` for the trend (`harness_history.py`) |
 
 ### Common Root Causes & Fixes:
 

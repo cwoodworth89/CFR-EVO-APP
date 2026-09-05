@@ -63,6 +63,7 @@ import sys
 import psycopg2
 
 from _repo import BACKEND  # tools/_repo.py locates the repo and puts backend/ on sys.path
+import harness_common as hc  # noqa: E402
 _BACKEND = str(BACKEND)
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
@@ -295,6 +296,9 @@ def main():
     ap.add_argument("--csv", help="write per-call rows here")
     ap.add_argument("--json", help="write the summary here, for use as a --baseline later")
     ap.add_argument("--baseline", help="compare against a summary written by --json")
+    ap.add_argument("--record", action="store_true",
+                    help="write one row to public.evaluation_history (tools/harness_common.py)")
+    ap.add_argument("--notes", help="free text stored with --record")
     args = ap.parse_args()
 
     db_url = os.environ.get("DATABASE_URL")
@@ -372,6 +376,14 @@ def main():
             if b or n:
                 print(f"  {f:<11}{b:>5} -> {n:<5} {n - b:+d}")
 
+    if args.record:
+        ts_all = [row[1] for row in rows]
+        hc.record_run(stage="parser", n=len(rows), args=args,
+                      metrics={"stage": "parser", "n": len(rows), "pooled": summary,
+                               "months": {m: {f: dict(c) for f, c in per_month[m].items()} for m in sorted(per_month)}},
+                      model_version="stored-transcript",
+                      period=(min(ts_all).date(), max(ts_all).date()),
+                      headline="wrong: " + ", ".join(f"{f} {summary[f].get('WRONG', 0)}" for f in FIELDS))
     if args.csv:
         with open(args.csv, "w", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(fh, fieldnames=list(csv_rows[0].keys()))

@@ -20,6 +20,11 @@ except ModuleNotFoundError:
 router = APIRouter(tags=["evaluations"])
 
 
+def _num(v):
+    """The numeric columns became nullable on 2026-09-05: a parser or geocoder run has no WER."""
+    return None if v is None else float(v)
+
+
 @router.get("/api/evaluations")
 def get_evaluations(db: Session = Depends(get_db)):
     """Retrieves chronological benchmark evaluation history and WER/CER regression records."""
@@ -31,11 +36,17 @@ def get_evaluations(db: Session = Depends(get_db)):
             "created_at": h.created_at.isoformat() if h.created_at else None,
             "model_version": h.model_version,
             "total_samples": h.total_samples,
-            "wer": float(h.wer),
-            "cer": float(h.cer),
-            "perfect_percent": float(h.perfect_percent),
-            "operational_percent": float(h.operational_percent),
-            "failed_percent": float(h.failed_percent)
+            "wer": _num(h.wer),
+            "cer": _num(h.cer),
+            "perfect_percent": _num(h.perfect_percent),
+            "operational_percent": _num(h.operational_percent),
+            "failed_percent": _num(h.failed_percent),
+            "stage": h.stage,
+            "git_hash": h.git_hash,
+            "period_start": h.period_start.isoformat() if h.period_start else None,
+            "period_end": h.period_end.isoformat() if h.period_end else None,
+            "metrics": h.metrics,
+            "notes": h.notes,
         }
         for h in history
     ]
@@ -58,6 +69,12 @@ def create_evaluation(payload: EvaluationCreateSchema, db: Session = Depends(get
         perfect_percent=payload.perfect_percent,
         operational_percent=payload.operational_percent,
         failed_percent=payload.failed_percent,
+        stage=payload.stage,
+        git_hash=payload.git_hash,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        metrics=payload.metrics,
+        notes=payload.notes,
     )
     db.add(row)
     db.commit()

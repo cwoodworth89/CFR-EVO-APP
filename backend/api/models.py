@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, JSON, ARRAY, Numeric, func
+from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, Date, JSON, ARRAY, Numeric, func
 from sqlalchemy.orm import synonym
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY as PG_ARRAY
 import uuid
@@ -64,11 +64,21 @@ class EvaluationHistoryModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     model_version = Column(String, nullable=False)
     total_samples = Column(Integer, nullable=False)
-    wer = Column(Numeric(5, 2), nullable=False)
-    cer = Column(Numeric(5, 2), nullable=False)
-    perfect_percent = Column(Numeric(5, 2), nullable=False)
-    operational_percent = Column(Numeric(5, 2), nullable=False)
-    failed_percent = Column(Numeric(5, 2), nullable=False)
+    # Nullable since 2026-09-05: a parser or geocoder harness run has no WER, and an
+    # invented 0.0 would be a fabricated number (CLAUDE.md 6.1).
+    wer = Column(Numeric(5, 2), nullable=True)
+    cer = Column(Numeric(5, 2), nullable=True)
+    perfect_percent = Column(Numeric(5, 2), nullable=True)
+    operational_percent = Column(Numeric(5, 2), nullable=True)
+    failed_percent = Column(Numeric(5, 2), nullable=True)
+    # Added 2026-09-05 (migration 2026-09-05_evaluation_history_harness_runs.sql) so any
+    # harness run can be recorded and compared over time: tools/harness_history.py.
+    stage = Column(String, nullable=True)
+    git_hash = Column(String, nullable=True)
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
+    metrics = Column(JSONB, nullable=True)
+    notes = Column(Text, nullable=True)
 
 
 class DispatchUploadModel(Base):

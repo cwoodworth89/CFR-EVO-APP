@@ -33,7 +33,8 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
   };
 
   const latestEval = evaluations && evaluations.length > 0
-    ? evaluations[evaluations.length - 1]
+    // The most recent run that measured STT; parser and geocoder runs carry no WER (2026-09-05).
+    ? ([...evaluations].reverse().find((e) => e.wer != null) || evaluations[evaluations.length - 1])
     : metricsSummary?.latest_evaluation;
 
   return (
@@ -195,7 +196,7 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
             <div style={{ background: "rgba(2, 6, 23, 0.6)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
               <div style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: "600" }}>WORD ERROR RATE (WER)</div>
               <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "#4ade80" }}>
-                {latestEval?.wer !== undefined ? `${latestEval.wer}%` : "4.2%"}
+                {latestEval?.wer != null ? `${latestEval.wer}%` : "--"}
               </div>
             </div>
             <div style={{ background: "rgba(2, 6, 23, 0.6)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>

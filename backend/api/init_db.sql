@@ -58,11 +58,19 @@ CREATE TABLE IF NOT EXISTS public.evaluation_history (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
     model_version TEXT NOT NULL,
     total_samples INTEGER NOT NULL,
-    wer NUMERIC(5,2) NOT NULL,
-    cer NUMERIC(5,2) NOT NULL,
-    perfect_percent NUMERIC(5,2) NOT NULL,
-    operational_percent NUMERIC(5,2) NOT NULL,
-    failed_percent NUMERIC(5,2) NOT NULL
+    wer NUMERIC(5,2),
+    cer NUMERIC(5,2),
+    perfect_percent NUMERIC(5,2),
+    operational_percent NUMERIC(5,2),
+    failed_percent NUMERIC(5,2),
+    -- 2026-09-05: any harness run, not only a Whisper WER run
+    -- (migration 2026-09-05_evaluation_history_harness_runs.sql).
+    stage TEXT,
+    git_hash TEXT,
+    period_start DATE,
+    period_end DATE,
+    metrics JSONB,
+    notes TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_evaluation_history_created_at ON public.evaluation_history (created_at ASC);

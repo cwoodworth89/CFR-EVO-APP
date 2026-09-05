@@ -45,6 +45,9 @@ Produce numbers. None of them modify operational data.
 | `backtest_regression.py` | WER / Levenshtein regression for STT output. |
 | `backtest_round_comparison.py` | Scores cross-round disagreement as a warning signal. |
 | `trace_geocode_corpus.py` | Scores the geocoder against the human-verified corpus. |
+| `harness_chain.py` | The whole chain, scored: recording → STT → parser → geocoder → point on the map, every stage against the verified columns in one pass, by month. `--skip-stt` starts from the stored transcript. Leaves the round-1 training clips out of the WER. Kiosk only for STT. |
+| `harness_common.py` | Shared by the three harnesses: `--since/--until`, `--json/--baseline`, `--record` into `public.evaluation_history`, WER and distance helpers. Imported, never run. |
+| `harness_history.py` | Every recorded harness run, oldest first: stage, git hash, model, corpus slice, headline. The answer to "are we improving over time". |
 | `verify_snapping_corpus.py` | Parcel arrival-point benchmark: boundary-to-arrival distance and OSRM ETA. |
 | `audit_skill_references.py` | Finds identifiers a `SKILL.md` names that exist nowhere in the code. `--scripts` checks this README. |
 | `audit_staleness.py` | Deterministic staleness scan: dangling paths in markdown (honours `audit-ok`), schema objects dropped by migrations but still named in code, modules and components nothing imports, frontend/pipeline API calls vs backend routes, compose names, env vars, punch-list status drift, `file://` links, doc age. Writes a Markdown report (`--out`). Overlaps `--docs` above; merging them is on the post-freeze backlog. |

@@ -2,6 +2,7 @@
 Pydantic Schemas for CFR EVO API Gateway.
 Defines request and response data models for auth, dispatches, parcels, streetview, road closures, and metrics.
 """
+from datetime import date
 from typing import List, Optional, Any, Dict
 from datetime import datetime
 from pydantic import BaseModel
@@ -51,11 +52,18 @@ class EvaluationCreateSchema(BaseModel):
     """One backtest run's summary, written to public.evaluation_history."""
     model_version: str
     total_samples: int
-    wer: float
-    cer: float
-    perfect_percent: float
-    operational_percent: float
-    failed_percent: float
+    # Optional since 2026-09-05: only an STT run has these (tools/harness_common.py).
+    wer: Optional[float] = None
+    cer: Optional[float] = None
+    perfect_percent: Optional[float] = None
+    operational_percent: Optional[float] = None
+    failed_percent: Optional[float] = None
+    stage: Optional[str] = None
+    git_hash: Optional[str] = None
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    metrics: Optional[Dict[str, Any]] = None
+    notes: Optional[str] = None
 
 
 class BulkModelUpdatedSchema(BaseModel):

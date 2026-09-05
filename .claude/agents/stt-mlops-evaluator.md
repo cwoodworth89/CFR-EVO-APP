@@ -22,6 +22,10 @@ Specialised in:
 * **Scoring honestly** — `eval_round1_holdout.py` on the clips training never saw;
   `backtest_regression.py` for round-aligned SMMR, restricted to the holdout. Never a
   full-call transcript against a single-round reference, and never train-on-test.
+* **STT regression against the whole system** — `harness_chain.py --since <date> --record` on the
+  kiosk: replays the recordings through the model in service, leaves the round-1 training clips
+  out of the WER, and scores the parser and geocoder on what came out. `--baseline` before/after;
+  `harness_history.py` for the trend.
 * **Parser regressions on stored transcripts** — `backtest_parser_corpus.py` by month is
   the honest parser number (`--pooled` gives a single figure, which mixes fixed and live defects).
 

@@ -21,9 +21,10 @@ each has a different notion of "correct".
 
 | Stage | Question it answers | Harness | Status |
 |:--|:--|:--|:--|
-| **STT** | Did we hear what was said? | — | ⚠️ **Does not exist** (§4) |
+| **STT** | Did we hear what was said, and did hearing it differently change what the parser and geocoder got? | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05, holdout only (§4) |
 | **Parser** | Did we pull the right values out of what we heard? | [`backtest_parser_corpus.py`](../tools/backtest_parser_corpus.py) | ✅ Built 2026-08-26 |
 | **Geocoder** | Does the address resolve to the right place? | [`trace_geocode_corpus.py`](../tools/trace_geocode_corpus.py) | ⚠️ **Needs review** (§3) |
+| **Whole chain** | From the recording to the point on the map, built the way production builds it; every stage scored at once | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05 |
 
 The three are **not** interchangeable. Word Error Rate scores transcription and says nothing
 about whether the parser then dropped the qualifier off a call type. Every serious defect in
@@ -121,13 +122,16 @@ add a `--by-month` split and cosmetic bucketing, and record a fresh baseline her
 
 ---
 
-## 4. STT harness — ⚠️ does not exist
+## 4. STT harness — `harness_chain.py`, built 2026-09-05
 
 `extract_training_data.py` and `backtest_regression.py` compute Word Error Rate for Whisper
-training, but there is no harness that answers **"did this STT change make the system better
-or worse against historical audio?"**
-
-What one would need:
+training. [`harness_chain.py`](../tools/harness_chain.py) is the harness that answers **"did
+this STT change make the system better or worse against historical audio?"**: it replays the
+stored recordings through the model the kiosk runs, scores round 1 against
+`verified_transcript`, pushes each transcript through the parser and the geocoder, and reports
+by month. It leaves the round-1 training clips out of the WER unless told otherwise, because a
+fine-tuned model scoring its own training data is memorisation. What it does, which is what
+this section asked for on 2026-08-26:
 
 * Replay stored audio (`audio_url`, present on essentially every dispatch) through the
   current faster-whisper configuration.
@@ -216,3 +220,26 @@ calls. **Always state which code path a number describes.**
 See also: [`parser_audit_handoff.md`](parser_audit_handoff.md) for the corpus description and
 the traps in full, [`debug_and_qa_punchlist.md`](debug_and_qa_punchlist.md) for open items,
 and [`standards/README.md`](standards/README.md) for what governs each domain value.
+
+---
+
+## 8. Before and after, and the record
+
+Every harness takes the same four flags (`tools/harness_common.py`). The procedure for any
+change to STT configuration, the parser, vocabulary, or geocoding:
+
+```bash
+# on the kiosk, before the change (add --skip-stt for a parser or geocoder change; it is fast)
+.venv/bin/python tools/harness_chain.py --since 2026-08-01 --json /tmp/before.json --record --notes "before: <what you are about to change>"
+# ... change, rebuild, redeploy ...
+.venv/bin/python tools/harness_chain.py --since 2026-08-01 --baseline /tmp/before.json --record --notes "after: <what changed>"
+# the trend, every recorded run oldest first
+.venv/bin/python tools/harness_history.py --stage chain
+```
+
+`--baseline` prints every number that moved; the tables above say which direction is good
+(WRONG and the defect place-buckets down, EXACT and "same place" up, WER down, median metres
+down). `--record` writes one row to `public.evaluation_history` with the stage, the git hash,
+the model, the corpus slice and the summary, so a number can always be traced to the code that
+produced it. Compare like with like: the same stage and the same `--since`. The parser and
+geocoder harnesses take the same flags for a single-stage view.

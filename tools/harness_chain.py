@@ -264,15 +264,22 @@ def main() -> int:
         target = payload.get("target") or {}
         sys_addr = target.get("address") or payload.get("address") or ""
         place = dist = None
+        verified_by = ""
         if truth["address"]:
             place = classify(sys_addr, truth["address"])
             if did not in verified_points:
+                trace_log.clear()
                 try:
                     res = validator.get_coordinates(truth["address"]) or {}
                 except Exception:
                     res = {}
-                verified_points[did] = (res.get("lat"), res.get("lng"))
-            vlat, vlng = verified_points[did]
+                # Which step placed the VERIFIED address. When it is not step 1, the distance
+                # below is between two fallbacks, not to a parcel, and 0 m proves little.
+                verified_points[did] = (res.get("lat"), res.get("lng"),
+                                        next((e["step"] for e in trace_log if e["hit"]), "none"))
+            vlat, vlng, verified_by = verified_points[did]
+            if verified_by != "1-exact":
+                counts["verified_address_not_exact"] += 1
             if None not in (target.get("lat"), target.get("lng"), vlat, vlng):
                 dist = hc.haversine_m(target["lat"], target["lng"], vlat, vlng)
 
@@ -292,7 +299,7 @@ def main() -> int:
         out_rows.append({"dispatch_id": did, "month": month, "stt_ran": stt_ran,
                          "wer": None if w is None else round(w, 4),
                          **{f: verdict[f] or "" for f in FIELDS},
-                         "place": place or "", "resolved_by": resolved_by,
+                         "place": place or "", "resolved_by": resolved_by, "verified_resolved_by": verified_by,
                          "distance_m": None if dist is None else round(dist, 1),
                          "system_address": sys_addr, "verified_address": truth["address"],
                          "lat": target.get("lat"), "lng": target.get("lng")})
@@ -317,7 +324,9 @@ def main() -> int:
           + (f"; skipped {counts['no_audio']} with no recording" if counts["no_audio"] else "")
           + (f"; {counts['stt_failed']} transcriptions failed" if counts["stt_failed"] else "")
           + (f"; {counts['payload_failed']} payload builds failed" if counts["payload_failed"] else "")
-          + (f"; {counts['stt_excluded']} training clips left out of the WER" if counts["stt_excluded"] else ""))
+          + (f"; {counts['stt_excluded']} training clips left out of the WER" if counts["stt_excluded"] else "")
+          + (f"; {counts['verified_address_not_exact']} verified addresses the geocoder itself could not place exactly "
+             f"(their distances are fallback-to-fallback)" if counts["verified_address_not_exact"] else ""))
     for m in sorted(per_month):
         print_block(m, per_month[m])
     print_block("POOLED (all dates; mixes fixed and live defects, prefer the months)", pooled)

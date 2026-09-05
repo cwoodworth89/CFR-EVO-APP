@@ -54,9 +54,22 @@ naming the rename and this item. `backend/tests/test_address_resolver_db.py` run
 and road-centroid statements against the live schema so the next rename cannot pass silently;
 it picks the street with the most parcels rather than naming one.
 
-### Verification
+### Verification, 2026-09-05
 
 | Check | Result |
 |:--|:--|
-| The two new tests, laptop venv against the kiosk database | see the closing commit |
-| `tools/harness_chain.py --skip-stt --since 2026-08-01 --baseline` against the morning baseline (`eb0f801`, step 5 broken) | recorded in `evaluation_history`; the diff is in the closing note |
+| `test_address_resolver_db.py` against the kiosk database, old statement | fails with `UndefinedColumn: column "lat" does not exist`, the log's exact error |
+| Same test, fixed statement (`abf8180`) | 2 passed |
+| `harness_chain.py --skip-stt --since 2026-08-01` after the fix, against the morning baseline (`eb0f801`) | outcome buckets identical on all 325 calls, and they had to be: steps 5 and 6 return the same address string and differ only in the point |
+| Same run, which resolver answered (`8539894` added the metric) | **5 of 325 calls now answered by step 5**; every one of them raised and fell through before the fix |
+| The full STT baseline, started before the fix on the old code | 56 `Error in street centroid fallback` lines by the 3,000-line mark: fresh transcripts reach step 5 far more often than stored ones, because a garbled street name fails every step above it |
+
+The five calls are the case step 5 exists for, a real street with no usable house number: two on
+United Blvd (verified `39 United Blvd`), two on Lougheed Hwy (`2905`, `2929`), one on Upper Harper
+Rd (`4992`). Before the fix they were placed on the road centreline at confidence 45; now on the
+average of the street's parcels at confidence 50, which is what the code always meant to do.
+
+One thing the run exposed about the harness itself: those five read 0 m from the verified
+address because the geocoder places the verified address by the same fallback, so the distance
+was fallback-to-fallback. The harness now records which step placed the verified address too
+and counts the ones the geocoder could not place exactly, so a 0 m is read with that beside it.

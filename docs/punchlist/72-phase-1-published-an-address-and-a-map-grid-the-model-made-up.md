@@ -70,6 +70,48 @@ and 30 seconds through phase 1 and count how often the trigger fires with a grid
 address that is not in the verified transcript. `tools/harness_chain.py` has no truncation
 option yet; that is the first piece of work.
 
+### Measured on the round-1 holdout, 2026-09-05 (`tools/harness_phase1.py`, `e0d4ded`)
+
+44 recordings replayed in the listener's own chunks (10 s, then every 3 s) through the live STT
+settings, the parser and the real completion check; 37 of the 44 have a verified grid.
+
+| | Published in phase 1 | Median at | Grid right | Grid wrong | Address exact / wrong street |
+|:--|--:|--:|--:|--:|:--|
+| **Today (baseline)** | 44 of 44 | 19 s | 10 | **26** | 32 / 4 |
+| A, location gate | 44 | 19 s | 9 | 24 | 32 / 2, 5 withheld |
+| B, two chunks agree | 38 | 25 s | 24 | 8 | 30 / 3 |
+| C, talk group in front | 44 | 19 s | 9 | 22 | 32 / 4, 7 withheld |
+
+**Seven grids in ten are wrong when phase 1 publishes.** Nineteen of the 26 are the number 68,
+the model's habitual completion; the rest are other completions (38, 82, 96, 81, 55). The
+mechanism is structural: the check requires a grid, phase 1 passes at 16-19 s, and the
+dispatcher reaches the grid at 25-35 s, so the grid in the chunk is the model's whenever the
+check fires. Phase 2 corrects it about a minute later; the kiosk shows the wrong zone until then.
+
+The address is a different story: it is spoken early, and 32 of 44 are exact at the baseline
+chunk. Rule A removes two of the four wrong streets and the one bare street by withholding five
+locations, which is what the Tier 1 card is for.
+
+Rule B is better than the baseline and not good enough: eight wrong grids survive, because a
+completion that has settled ("map grid 68" three chunks running on DISP-2026-3E1426) is as
+stable as speech. Rule C is useless: the model completes the talk-group clause too.
+
+### What follows
+
+No rule on the transcript text can tell a settled completion from speech. Two honest options
+remain, and the operator's rule decides between them:
+
+1. **Phase 1 publishes no map grid.** Units, incident and the address (behind rule A) go out
+   at 16-19 s as today; the zone appears with phase 2, about a minute later. Zero fabricated
+   grids by construction. The grid must also stop being passed to the geocoder's street
+   narrowing in phase 1, where a completed grid can pick the wrong street.
+2. **Word timestamps.** faster-whisper can return per-word times; a completion's words are
+   expected to pile up at the end of the audio while spoken words spread over it. Untested;
+   a hypothesis for the simulator, not a plan.
+
+Option 1 is a small change in `phase1.py` and `payload_builder.py`, measurable with this tool
+and reversible. The full-corpus run of the simulator is in `evaluation_history` for the record.
+
 ### Related
 
 #70 (the restart that stopped phase 2), #63 (the same completion behaviour in pauses),

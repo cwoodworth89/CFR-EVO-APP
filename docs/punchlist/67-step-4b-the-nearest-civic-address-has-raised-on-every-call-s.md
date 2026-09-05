@@ -15,9 +15,10 @@
 ## 67. The statement said `centroid_lat`; the code asked the row for `lat`
 
 > **Status**: ✅ **Closed 2026-09-05 — fixed in `56a68a5`, live-schema test added, measured on the
-> corpus.** Crew-visible: a dispatched number the City does not have was placed at the street
-> centroid with no note, when the nearest civic address with a "Verify on arrival" note was
-> the designed answer.
+> corpus.** Crew-visible: a dispatched number the City does not have, and that block interpolation
+> (step 3) cannot place because no road segment's address range brackets it, was placed at
+> the street centroid with no note. The ladder's designed answer for that case is the nearest
+> civic address in the same 100-block with a "Verify on arrival" note.
 
 ### What happened
 
@@ -44,7 +45,10 @@ Stored-transcript replay of the 303 verified calls since 2026-08-01 (`--skip-stt
 | Place bucket *house-number* | 0 | 2 |
 
 The two are `2905 Lougheed Hwy` (DISP-2026-997FB0) and `2929 Lougheed Hwy` (DISP-2026-10A8DC),
-both in #64's table as numbers the City's address layer lacks. Each now routes to
+both in #64's table as numbers the City's address layer lacks. Block interpolation could
+not place them: the Lougheed segments there carry single-address ranges (2950-2950,
+2991-2991, `public.roads`), so nothing brackets 2905 or 2929, while 3062 sits inside
+3025-3051 and is placed by block as #64 shows. Each now routes to
 `2950 Lougheed Hwy`, the nearest civic number in the block, at confidence 70 with the
 substitution note, instead of the average of every parcel on Lougheed Highway at confidence
 50 with no note. The 0 m distance in the harness says nothing here: the verified address

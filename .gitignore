@@ -5,6 +5,8 @@
 *.pth
 backend/data/training/output/
 backend/data/training/merged_base/
+# Regenerated from the database by tools/extract_training_data.py on every run (untracked 2026-09-05).
+backend/data/training/metadata.csv
 backend/models/whisper-base-cfr-ct2/
 
 # Byte-compiled / optimized / DLL files

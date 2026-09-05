@@ -59,9 +59,21 @@ prompt's effect is measured, not argued.
 | Template prompt, parser fixed | 25 in 17 calls | 25 | 18 | 14 | 16.6 % |
 | **No prompt**, parser fixed | **7 in 6 calls** | **7** | **3** | **1** | **2.9 %** |
 
-The parser fix recovers what it can; the prompt is the cause. The fair test, the 44-clip
-round-1 holdout without the prompt against the recorded 4.55 % baseline with it, is in
-`evaluation_history` (note *"experiment: STT_INITIAL_PROMPT empty"*).
+The parser fix recovers what it can; the prompt is the cause.
+
+**The fair test**, the 44-clip round-1 holdout the model never saw, both runs recorded in
+`evaluation_history` (the second also carries the parser fix and classify v2):
+
+| Round-1 holdout, 44 clips | With the prompt (`ec6988a`) | Without (`8b962b8`) |
+|:--|--:|--:|
+| WER mean / median | 4.55 % / 0 % | 4.45 % / 0 % |
+| Map grid wrong | 1 | 0 |
+| Address wrong | 8 | 3 |
+| Placed exactly | 32 | 34 |
+| Wrong street | 4 | 3 |
+
+Most clips are clean either way; the prompt's damage lands in pauses and hard audio, which
+is why the tail shows it at fifteen times the size the holdout does.
 
 ### What is not done, and why
 

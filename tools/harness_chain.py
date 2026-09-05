@@ -154,6 +154,9 @@ def main() -> int:
                     help="score STT on the round-1 training clips too (that is memorisation)")
     ap.add_argument("--training-csv", default=TRAINING_CSV,
                     help="clips left out of the STT figure (default: the round-1 train set)")
+    ap.add_argument("--only-csv", metavar="PATH",
+                    help="replay only the calls this CSV lists (file_name or dispatch_id column), "
+                         "e.g. backend/data/training/metadata_round1_holdout.csv for the honest STT number")
     ap.add_argument("--csv", help="write per-call rows here")
     ap.add_argument("--dispatch-id", help="replay one call and print every stage")
     args = ap.parse_args()
@@ -175,6 +178,10 @@ def main() -> int:
     with engine.connect() as conn:
         rows = conn.execute(text(sql), params).mappings().all()
     engine.dispose()
+    if args.only_csv:
+        keep = training_ids(args.only_csv)
+        rows = [r for r in rows if r["dispatch_id"] in keep]
+        print(f"restricted to the {len(keep)} calls listed in {args.only_csv}: {len(rows)} in range")
     if not rows:
         sys.exit("no verified dispatches in that range")
 

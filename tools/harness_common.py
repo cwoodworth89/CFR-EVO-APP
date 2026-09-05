@@ -70,6 +70,12 @@ def git_hash() -> str:
         return "unknown"
 
 
+# Taken when the harness starts, not when it records. A full STT run takes over an hour
+# and the checkout moved under one on 2026-09-05: the row named a commit whose fix the
+# already-loaded module did not have. The hash must describe the code that ran.
+GIT_HASH_AT_START = git_hash()
+
+
 def git_dirty() -> bool:
     try:
         out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
@@ -194,7 +200,9 @@ def record_run(*, stage: str, n: int, args, metrics: dict, model_version: str,
     notes = getattr(args, "notes", None)
     if git_dirty():
         notes = (notes + "; " if notes else "") + "working tree had uncommitted changes"
-    gh = git_hash()
+    gh = GIT_HASH_AT_START
+    if git_hash() != gh:
+        notes = (notes + "; " if notes else "") + f"checkout moved to {git_hash()} during the run; the code that ran was {gh}"
     with engine.begin() as conn:
         conn.execute(text(
             "INSERT INTO public.evaluation_history "

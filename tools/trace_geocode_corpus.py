@@ -59,6 +59,7 @@ from gis_service.intersection_resolver import IntersectionResolver  # noqa: E402
 
 TRACED = [
     (AddressResolver, "resolve_exact", "1-exact"),
+    (AddressResolver, "resolve_overlong_house", "1b-overlong-house"),
     (AddressResolver, "resolve_block", "3-block"),
     (AddressResolver, "resolve_x_street_narrow", "4-x-street"),
     (AddressResolver, "resolve_nearest_civic", "4b-nearest-civic"),

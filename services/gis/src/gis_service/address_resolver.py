@@ -90,6 +90,33 @@ def score_street(parsed_street: str, db_norm: str) -> int:
     return fuzz.ratio(parsed_street, db_norm)
 
 
+def overlong_house_readings(house: str) -> list:
+    """Every reading of a five- or six-digit house number with the surplus digits removed.
+
+    No civic number in City of Coquitlam records has more than four digits: public.parcels
+    tops out at 6000 and the public.roads address ranges at 7351 (measured 2026-09-05). Five
+    digits come from the STT, not the dispatcher: digit dictation reassembled by the sanitiser
+    ("300, zero, zero" -> 30000; "29, 8, 8, 3" -> 29883) or a word glued on ("3356 Thor"
+    heard as "3356 four" -> 33564). Seven of 565 dispatches in the corpus carried one, six
+    rated FAILED; none of the 565 verified addresses has five digits.
+
+    Which reading was meant is not this function's call: it returns every candidate, and
+    resolve_overlong_house keeps only the ones that exist on the street. Leading zeros are
+    dropped ("0003" -> "3"). Seven digits or more is returned as nothing: two dictation
+    errors in one number is not something the parcel table can adjudicate.
+    """
+    from itertools import combinations
+    digits = str(house or "").strip()
+    if not digits.isdigit() or len(digits) < 5 or len(digits) > 6:
+        return []
+    out = set()
+    for drop in combinations(range(len(digits)), len(digits) - 4):
+        reading = "".join(d for i, d in enumerate(digits) if i not in drop).lstrip("0")
+        if reading and reading != digits:
+            out.add(reading)
+    return sorted(out, key=lambda s: (len(s), s))
+
+
 class AddressResolver:
     def __init__(self, engine, confidence_threshold=80):
         self.engine = engine
@@ -345,6 +372,87 @@ class AddressResolver:
         except Exception as e:
             logging.error(f"Error in exact address resolution: {e}", exc_info=True)
         return None
+
+    def resolve_overlong_house(self, house: str, street_raw: str, street_type: str,
+                               target_map_grid=None,
+                               x_street_1: str = None, x_street_2: str = None) -> dict | None:
+        """Step 1b: a house number with five or more digits, which no Coquitlam parcel has.
+
+        Each shorter reading (overlong_house_readings) is put through step 1 unchanged, so
+        the street matching, the map-grid and near-road narrowing all apply. The parcel
+        table decides:
+
+          exactly one reading exists  -> that parcel, at the substitution tier, saying so
+          more than one exists        -> ambiguous, every reading as a candidate (CLAUDE.md
+                                         section 5: the operator chooses on the map)
+          none                        -> None, and the ladder continues as before
+
+        Simulated on the corpus 2026-09-05 before it was built: 20003 Gable Dr -> 2003;
+        30000 Lougheed Hwy -> 3000 (twice); 61300 Pinetree Way -> 1300; 29883 Robson Dr ->
+        2983 or 2988, ambiguous; the two "33564 Crt" calls (Thor lost) and "30000 Riverband
+        Dr" have no street to read against and stay unresolved.
+
+        Operator ruling 2026-09-05: dispatches outside the city are one or two in the
+        department's memory and are not handled. A real five-digit address from a
+        five-digit municipality (Pitt Meadows, Maple Ridge, Surrey) would only resolve here
+        if a shorter reading of it existed on a Coquitlam street of the same name, and would
+        carry this step's note and tier; on Lougheed Hwy, the one shared arterial, none of
+        19xxx-24xxx does (Coquitlam's Lougheed runs 502-3064).
+        """
+        readings = overlong_house_readings(house)
+        if not readings:
+            return None
+        hits = []
+        for reading in readings:
+            found = self.resolve_exact(reading, street_raw, street_type,
+                                       target_map_grid=target_map_grid,
+                                       x_street_1=x_street_1, x_street_2=x_street_2)
+            if found:
+                hits.append(found)
+        if not hits:
+            logging.info("House number '%s' has %d digits and no shorter reading of it exists "
+                         "on '%s'; falling through.", house, len(str(house)), street_raw)
+            return None
+
+        requested = title_address(f"{house} {street_raw}".strip())
+        source = (f"{requested} is not a civic number: none in City of Coquitlam records has "
+                  f"more than four digits. ")
+        if len(hits) == 1:
+            hit = dict(hits[0])
+            hit.update({
+                # The tier resolve_nearest_civic gives its closest substitution: a real
+                # parcel other than the one announced, never the 100 an exact match earns.
+                "confidence": min(float(hit.get("confidence") or 0.0), 70.0),
+                "is_number_corrected": True,
+                "is_ambiguous": False,
+                "requested_address": requested,
+                "resolution_note": source + (
+                    f"Routed to {hit['address']}, the only shorter reading of the number "
+                    f"that exists on this street. Verify on arrival."),
+            })
+            logging.info("House number '%s' read as %s (the only reading on %s).",
+                         house, hit['address'], street_raw)
+            return hit
+
+        candidates = [{"address": h["address"], "lat": h["lat"], "lng": h["lng"],
+                       "confidence": float(h.get("confidence") or 0.0)} for h in hits]
+        first = dict(hits[0])
+        first.update({
+            # Below every single-parcel answer in the ladder (street centroid is 50): the
+            # operator chooses between the candidates, so the pin is a starting point.
+            "confidence": 50.0,
+            "is_number_corrected": True,
+            "is_ambiguous": True,
+            "candidates": candidates,
+            "requested_address": requested,
+            "resolution_note": source + (
+                "Readings that exist on this street: "
+                + " or ".join(c["address"] for c in candidates) + ". Choose on the map."),
+        })
+        logging.warning("House number '%s' has %d readings on %s (%s); returning them as "
+                        "candidates.", house, len(hits), street_raw,
+                        ", ".join(c["address"] for c in candidates))
+        return first
 
     def resolve_block(self, house: str, street_raw: str, street_type: str) -> dict | None:
         """Step 3: Block interpolation using road address ranges.

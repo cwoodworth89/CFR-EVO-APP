@@ -158,6 +158,22 @@ class CoquitlamDataValidator:
             if result:
                 return result
 
+        # === STEP 1b: A house number with five or more digits ===
+        # No civic number in the City's records has more than four (public.parcels max 6000,
+        # public.roads ranges max 7351, measured 2026-09-05). Five come from the STT: digit
+        # dictation reassembled by the sanitiser ("300, zero, zero" -> 30000) or a word glued
+        # on ("3356 Thor" heard as "3356 four" -> 33564). The parcel table decides which
+        # reading was meant, or offers the readings as candidates; see resolve_overlong_house.
+        if parsed and parsed.house and str(parsed.house).isdigit() and len(str(parsed.house)) >= 5:
+            result = self.address.resolve_overlong_house(
+                parsed.house, parsed.raw, parsed.street_type,
+                target_map_grid=target_map_grid,
+                x_street_1=x_street_1,
+                x_street_2=x_street_2,
+            )
+            if result:
+                return result
+
         # === STEP 2: Intersection lookup ===
         if is_intersection_pattern:
             # 2a. "<street> and <street>" -- the same street in both slots. This is a

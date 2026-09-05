@@ -89,3 +89,31 @@ def test_nearest_civic_statement_is_valid_against_the_live_schema(engine, resolv
     assert "nearest civic address fallback" not in caplog.text, caplog.text
     assert point is not None and point.get("is_nearest_civic"), (street, stype, house, point)
     assert _inside_city(point), point
+
+
+def test_overlong_house_reads_30000_lougheed_as_3000(resolver, caplog):
+    """Step 1b. DISP-2026-E03882 and EF3B07: "300, zero, zero" became 30000; 3000 exists."""
+    with caplog.at_level("ERROR"):
+        point = resolver.resolve_overlong_house("30000", "Lougheed Hwy", "Hwy")
+    assert "Error" not in caplog.text, caplog.text
+    assert point is not None and point["address"] == "3000 Lougheed Hwy", point
+    assert point.get("is_number_corrected") and not point["is_ambiguous"]
+    assert point["confidence"] <= 70.0 and "30000" in point["resolution_note"]
+    assert _inside_city(point), point
+
+
+def test_overlong_house_29883_robson_is_ambiguous(resolver):
+    """DISP-2026-E5D4EC: 2983 and 2988 Robson Dr both exist; the operator chooses."""
+    point = resolver.resolve_overlong_house("29883", "Robson Dr", "Dr")
+    assert point is not None and point["is_ambiguous"], point
+    assert {c["address"] for c in point["candidates"]} == {"2983 Robson Dr", "2988 Robson Dr"}
+    assert point["confidence"] == 50.0
+
+
+def test_overlong_house_with_no_street_stays_unresolved(resolver):
+    """DISP-2026-4E3574: "3356 Thor Crt" heard as "33, 56, 4, court"; nothing to read against."""
+    assert resolver.resolve_overlong_house("33564", "Crt", "Crt") is None
+
+
+def test_four_digit_house_is_not_step_1b(resolver):
+    assert resolver.resolve_overlong_house("1300", "Pinetree Way", "Way") is None

@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **71 items, 27 open (15 crew-visible)**. The live work queue
+  **83 items, 25 open (17 crew-visible), 58 closed** as of 2026-09-05 evening. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -18,6 +18,69 @@ Companion documents:
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
 
 ---
+
+## Update, 2026-09-05 — the harnesses arrived, and they found the model's habits
+
+**Punch list: 83 items, 25 open, 17 crew-visible, 58 closed.** Everything below was measured on
+the corpus before it went live, and every run is a row in `public.evaluation_history` with its
+git hash (`tools/harness_history.py` lists them). Start with
+[`briefings/harness_tails_2026-09-05.md`](briefings/harness_tails_2026-09-05.md) for the day's
+findings and [`qa_harnesses.md`](qa_harnesses.md) for the tools.
+
+### Live on the kiosk since 19:46 PDT
+
+| Change | Item | Measured |
+|:--|:--|:--|
+| Phase 1's map grid is the placed parcel's own zone, labelled "FROM ADDRESS"; phase 2 takes the spoken grid and flags a difference (`GRID_MISMATCH`) | #72 | wrong grid in the first minute 26 of 37 → 2 (holdout) |
+| Rule A: a preliminary payload shows a location only for a parcel or a junction; `location_pending` otherwise, phase 2 places it | #72 | 48 of 52 wrong streets in the first minute gone, 81 unknown cards per 507 |
+| Hotwords: single streets in one suffix form, misheard-street list from the whole corpus | #71 | Thor Crt and Kensal Pl transcribe and place; WER 4.78 → 4.04 % |
+| `STT_INITIAL_PROMPT=` (no prompt) and `STT_HOTWORDS_EXCLUDE=map grid` in `backend/.env` | #63 | operator rulings, A/B on holdout and corpus |
+| Five-digit house numbers read against the parcel table (step 1b) | #69 | 10 calls to the right parcel |
+| Step 4b (nearest civic) answered nothing since 08-30; the sanitiser glued "map grid 82 10" | #67, #68 | fixed |
+| Graceful stop: SIGTERM finishes the capture and phase 2; unit `TimeoutStopSec=150` | #70 | closes on the first restart whose journal shows the drain |
+| The kiosk sanitiser ate 18 City street names beginning with a unit keyword (United, Steeple, Fleet) | #66 | fixed, road-name test |
+| "Ct" folds onto the City's "CRT" (vocabulary alias, migration applied) | | |
+
+### The two findings that change how you should think about phase 1
+
+1. **The model finishes cut audio with the template's tail.** Every verified transcript ends
+   "… map grid N", so on a chunk that stops mid-sentence the fine-tuned model writes the ending,
+   talk group included, and the completion is as stable across chunks as speech. No rule on
+   the transcript text can tell them apart (#72 measured three). The pipeline now takes the
+   grid from the parcel instead; round 2 of the model (below) is the attempt to teach it to stop.
+2. **Phase 1 fires at 16–19 s and the address arrives later on the serious calls.** Ten words
+   before the street on a single-unit call, seventeen on a 4-plus-unit one. Rule A is the
+   guard. The operator's design for what comes next, a kiosk that fills in layer by layer and
+   an ntfy that fires when a driver can act, is
+   [`architecture/progressive_dispatch.md`](architecture/progressive_dispatch.md): post-freeze,
+   measure first.
+
+### What was lost, and the rule that came from it
+
+A restart at 11:42 PDT, mine and unasked, landed 50 s into a structure-fire capture
+(DISP-2026-33D8C2): no recording, no address, a partial payload on the kiosk. **Never restart
+`cfr-agent` without the operator choosing the moment**, and run `tools/kiosk_capture_state.sh`
+first; the runbook says so, and so does the memory. The graceful stop (#70) is the second half.
+
+### Running overnight: round 2 of the model
+
+`tools/prepare_round2_dataset.py` builds the round-1 clips, the calls verified since, a second
+50-clip holdout, and **truncated pairs** (audio cut at 10, 16, 22 s, labelled with the words
+that ended before the cut); `train_whisper_lora.py` takes the set by environment and writes to
+`models/whisper-base-cfr-ct2-r2`. The first build was stopped: it held six labels the label
+check blocks, and it cut only 4 of 65 new calls where the smoke test had cut 45 of the same
+65, unexplained at the time of writing. The scoring commands, including the one that tests the
+completion habit, are in the `stt-mlops-backtest` skill §3. Nothing is deployed until the
+operator has the numbers.
+
+### Open, and whose
+
+- #65, the admin password: the operator's decision.
+- #70 closes on the next restart's journal.
+- Hotword experiment 4 (template and apparatus words) is unmeasured; experiment 3 (names without
+  suffixes) was a wash and stays off.
+- The verified-column re-review list in the tails briefing, done by the operator on 2026-09-05
+  except where noted.
 
 ## Update, 2026-08-31 — a long session; read this before touching anything
 

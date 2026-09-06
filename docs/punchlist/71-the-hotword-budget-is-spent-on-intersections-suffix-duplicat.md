@@ -97,6 +97,33 @@ are the list or run-to-run variance, one run cannot say. Not live: the agent was
 before this landed and is still on the old list. The operator decides whether it goes live
 with step 2 or alone.
 
+### Step 2 built and measured, 2026-09-05 (`7f254d0`)
+
+The misheard-street list now comes from the whole corpus (`get_hitl_verified_streets(engine)`):
+34 streets, most-misheard first, Thor Crt, Kensal Pl and Port Mann Bridge among them. They fill
+the street budget; the live list is 57 terms and only Glen Dr survives from the frequency
+ranking beyond them. "Sugarpine Ct" folds onto the City's CRT since the suffix alias landed the
+same day (`a788e8f`, migration applied).
+
+| Baseline = the step-1 run | Holdout (44) | Corpus (507) |
+|:--|--:|--:|
+| WER mean | 4.39 → 4.26 % | 3.22 → 4.04 % |
+| Scored clips better / worse | | 4 / 4 |
+| Map grid wrong | 0 → 0 | 6 → 5 |
+| Wrong street | 3 → 3 | 16 → 15 |
+| Placed exactly | 34 → 34 | 426 → 429 |
+
+The WER swing is one clip: *"routine testing only 1300 pinetree way"* (DISP-2026-D7F118),
+84 % on Friday's list, 0 % with step 1, 84 % again with step 2, damaged audio that collapses or
+recovers depending on the biasing and moves the mean by 0.7 points on its own. The three
+streets step 1 lost came back (3080 Lincoln Ave, 3001 Gordon Ave, Eagle Mountain Park); two
+others went (2561 Lougheed Hwy to a Thyme Dr section, Ozada and Tahsis heard as *Tosses*).
+
+**What step 2 was for:** both Thor Crt calls now transcribe *Thor* and place exactly, and all
+four Kensal Pl calls place (one exact, three cosmetic). Against Friday's live list, the two
+steps together: WER 4.78 → 4.04 %, grid wrong 6 → 5, exact 428 → 429, wrong street 13 → 15.
+Not live until the agent is restarted; the operator's call.
+
 ### Experiments, one variable each, on the round-1 holdout then the full corpus
 
 `tools/harness_chain.py` with `--record`, against the 2026-09-05 A/B rows in

@@ -103,6 +103,11 @@ services:
       TILE_SERVER_URL: http://tiles:8080
       DISABLE_WAN_FALLBACK: ${DISABLE_WAN_FALLBACK:-false}
       JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
+      # Admin login for the review screen (punch-list #65). Compose interpolates ${...} from
+      # the shell or a root .env, never from backend/.env, and the image excludes every .env
+      # (.dockerignore) -- so put ADMIN_PASSWORD in <repo>/.env. Unset leaves login answering
+      # 503 "not configured" (backend/api/routers/auth.py); there is no default password.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       RECORDINGS_DIR: /app/backend/audio_files/recordings
     ports:
       - "8000:8000"

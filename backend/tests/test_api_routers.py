@@ -127,6 +127,15 @@ class TestAPIRouters(unittest.TestCase):
         self.assertIn("access_token", login_res)
         token = login_res["access_token"]
 
+        # 1b. The three literals the old code accepted beside the configured one are refused,
+        # and the 401 no longer names a default (#65).
+        from fastapi import HTTPException as _HTTPExc
+        for stale in ("cfr2026", "admin", admin_password + "x"):
+            with self.assertRaises(_HTTPExc) as ctx:
+                login(LoginRequest(username="cfradmin", password=stale), mock_req)
+            self.assertEqual(ctx.exception.status_code, 401)
+            self.assertNotIn("rescue", ctx.exception.detail)
+
         # 2. Session verification
         session_res = get_session(mock_req, authorization=f"Bearer {token}")
         self.assertIsNotNone(session_res.get("session"))

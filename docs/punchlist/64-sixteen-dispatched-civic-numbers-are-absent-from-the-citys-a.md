@@ -61,6 +61,28 @@ entrance-point queue (#49) is where a person pins them.
 
 Register entry: `docs/city_gis_data_register.md` §14.
 
+### Checklist for the operator (2026-09-05)
+
+One line per number, to tick off against the runsheet, the building, or whatever the City
+says. The nearest numbers the City does have are beside each.
+
+- [ ] 2833 David Ave — City has 2910, 2925, 2980
+- [ ] 1550 United Blvd — 1555, 1539, 1500
+- [ ] 4000 Quarry Rd — 4141, 4201, 4250
+- [ ] 3990 Quarry Rd — 4141, 4201, 3748
+- [ ] 1734 Eagle Mountain Dr — 1735
+- [ ] 1414 Pinetree Way — 1413, 1415, 1417
+- [ ] 1101 Pinetree Way — 1140
+- [ ] 1290 Pipeline Rd — 1291, 1289, 1287
+- [ ] 629 Cottonwood Ave — 628, 633, 625 (#41)
+- [ ] 3062 Lougheed Hwy — 3064, 3051, 3025
+- [ ] 1378 Oxford St — 1377, 1380, 1381
+- [ ] 39 United Blvd — nothing below 995 (two calls)
+- [ ] 2905 Lougheed Hwy — 2950, 2991 (now routed to 2950 with a note, #67)
+- [ ] 2929 Lougheed Hwy — 2950, 2991 (as above)
+- [ ] 4992 Upper Harper Rd — 5000, the only parcel
+- [x] 1883 Beaty Pl — was a slip for 1883 Beedie Pl, corrected 2026-09-05
+
 **Later on 2026-09-05 (#67):** step 4b, the nearest civic address, had been raising on every
 call since 2026-08-30. With it answering again, `2905` and `2929 Lougheed Hwy` route to
 `2950 Lougheed Hwy` with the substitution note instead of the street centroid. The other

@@ -63,10 +63,16 @@ def login(req: LoginRequest, request: Request):
     user_id = (req.username or req.email or "cfradmin").strip()
     user_pass = (req.password or "").strip()
 
-    expected_user = os.environ.get("ADMIN_USERNAME", "cfradmin")
-    expected_pass = os.environ.get("ADMIN_PASSWORD", "rescue")
+    # One password, from the environment, and no other (punch-list #65, operator ruling
+    # 2026-09-05). This used to accept the configured value OR three literals, so setting
+    # ADMIN_PASSWORD added a password and never removed the defaults; the 401 text named one.
+    # Unset is a configuration error, reported as such, never a default (CLAUDE.md 6.1, #61).
+    expected_pass = os.environ.get("ADMIN_PASSWORD", "").strip()
+    if not expected_pass:
+        logging.error("ADMIN_PASSWORD is not set; admin login is disabled until it is (backend/.env).")
+        raise HTTPException(status_code=503, detail="Admin login is not configured on this server.")
 
-    if user_pass in [expected_pass, "rescue", "cfr2026", "admin"]:
+    if user_pass and user_pass == expected_pass:
         token_payload = {
             "sub": user_id,
             "exp": datetime.now(timezone.utc) + timedelta(days=30)
@@ -77,7 +83,7 @@ def login(req: LoginRequest, request: Request):
             "token_type": "bearer",
             "user": {"username": user_id, "role": "admin"}
         }
-    raise HTTPException(status_code=401, detail="Invalid username or password. Default password is 'rescue'.")
+    raise HTTPException(status_code=401, detail="Invalid username or password.")
 
 
 @router.get("/session")

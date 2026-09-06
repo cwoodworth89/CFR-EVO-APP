@@ -201,7 +201,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         // it enforced is about FREE-TEXT boxes, where a prefilled guess submitted
         // unedited becomes a machine value recorded as human-verified ("Christmas Way
         // Way", fifteen times over). Talk group is a <select> over a closed vocabulary
-        // (TALK_GROUPS) -- a wrong value cannot be typed here, only chosen from a fixed
+        // (the radio_channel rows, fetched) -- a wrong value cannot be typed here, only chosen from a fixed
         // list, and it reads as a selection rather than hiding as text the eye slides
         // over. The Sys badge still shows what was parsed, so disagreement stays visible.
         setVerifiedTalkgroup(selectedCall.verified_talkgroup || selectedCall.target?.radio_channel || '');

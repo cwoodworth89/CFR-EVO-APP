@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { TALK_GROUPS, toTitleCase } from './verificationConstants';
+import { toTitleCase } from './verificationConstants';
 import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
 
 // Shown only when the parser produced nothing for a field. These placeholders used to carry
@@ -87,6 +87,32 @@ export default function VerificationSidebar({
   // so could never be produced by the parser no matter how good the parse (punch-list #43).
   const [callTypes, setCallTypes] = useState([]);
   const [callTypesFailed, setCallTypesFailed] = useState(false);
+  // Talk groups come from the same vocabulary the parser matches against (category
+  // radio_channel). A hardcoded copy lived here and had drifted from it (punch-list #20);
+  // like the call types, a failed fetch shows an empty picker that says so, never a stale list.
+  const [talkGroups, setTalkGroups] = useState([]);
+  const [talkGroupsFailed, setTalkGroupsFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE_URL}/api/vocabulary?category=radio_channel`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setTalkGroups(Array.isArray(data) ? data : []);
+        setTalkGroupsFailed(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load radio_channel vocabulary:', err);
+        setTalkGroups([]);
+        setTalkGroupsFailed(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -683,10 +709,14 @@ export default function VerificationSidebar({
                 }}
                 className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-sky-500 text-xs text-white rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
               >
-                <option value="">-- No Channel --</option>
-                {TALK_GROUPS.map(tg => (
+                <option value="">{talkGroupsFailed ? '-- vocabulary unavailable --' : '-- No Channel --'}</option>
+                {talkGroups.map(tg => (
                   <option key={tg} value={tg}>{tg}</option>
                 ))}
+                {/* The saved value stays choosable even if the vocabulary changed under it. */}
+                {verifiedTalkgroup && !talkGroups.includes(verifiedTalkgroup) && (
+                  <option value={verifiedTalkgroup}>{verifiedTalkgroup}</option>
+                )}
               </select>
             </div>
 

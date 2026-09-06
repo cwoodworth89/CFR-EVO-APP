@@ -3,6 +3,13 @@ import os
 import re
 import sys
 import logging
+
+# No hub traffic: transformers sends HEAD revision checks for every cached file of
+# openai/whisper-base at the start of a run (three seen in /tmp/round2.log, 2026-09-05 21:38).
+# Offline mode reads the cache and nothing else, verified 2026-09-06 on the kiosk: all four
+# loads below succeed with no request. Seed the cache once, on a machine with WAN, with
+# HF_HUB_OFFLINE=0 in front of the command. docs/external_calls.md, operator ruling 2026-09-06.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 import torch
 import pandas as pd
 from typing import Any, Dict, List, Union

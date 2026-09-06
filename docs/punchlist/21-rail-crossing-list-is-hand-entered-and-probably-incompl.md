@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧱 Duplicated & Unsourced Frontend Constants |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 21. Rail crossing list is hand-entered and probably incomplete
-> **Status**: 🟡 **Measured 2026-09-05 — the four are real crossings, each within 53 m of OSM `level_crossing` nodes; inside the City the extract adds three CPKC spur crossings off United Blvd. Closes on the operator's word about those.** *(Opened as: ⚠️ Open — found 2026-08-22.)*
+> **Status**: ✅ **Closed 2026-09-06 — the list is the operator's, confirmed against OSM; the two Port Coquitlam-side crossings stay because crews cross them to reach 3000 Riverbend Dr; the United Blvd spurs are ruled out.** *(Opened as: 🟡 Measured 2026-09-05 — the four are real crossings, each within 53 m of OSM `level_crossing` nodes; inside the City the extract adds three CPKC spur crossings off United Blvd. Closes on the operator's word about those.)*
 
 `frontend/src/components/map/railroadCrossings.js` holds **four** level crossings with
 seven-decimal coordinates and `avoidable` flags, none of which carry provenance (§6.3).
@@ -62,3 +62,13 @@ the OSM node ids per crossing.
 
 Open for the operator: are the two spur crossings in the United Blvd industrial park, and the
 disused one across United Blvd itself, crossings a crew would want on the layer?
+
+### Closed 2026-09-06
+
+Operator, 2026-09-06: the Kingsway and Westwood crossings are crossed on the way to 3000
+Riverbend Dr and stay listed (the Westwood one is the crossing at Gordon Ave: the City's
+Gordon Ave & Westwood St junction is 70 m north of the OSM nodes, so RR-01's label now says
+so). *"I don't care about the railroad spurs"*: the three CPKC spur crossings off United
+Blvd are not wanted on the layer. The file names its source, the ruling, and the OSM node ids.
+The layer stays display-only; the `avoidable` judgement is the operator's and is labelled as
+such, which is what "attributed to someone" in the original fix asked for.

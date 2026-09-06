@@ -15,19 +15,17 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**11 open** (5 crew-visible) · **72 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**9 open** (3 crew-visible) · **74 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 11
+## Open — 9
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **1** | 🔴 crew-visible | OPEN | [Erratic Routing Loops & Intra-Municipal Path Preference](punchlist/01-erratic-routing-loops-intra-municipal-path-preference.md) |
 | **19a** | 🔴 crew-visible | OPEN | [Remaining fuzzy-match sites have not been reviewed](punchlist/19a-remaining-fuzzy-match-sites-have-not-been-reviewed.md) |
-| **21** | 🔴 crew-visible | OPEN | [Rail crossing list is hand-entered and probably incomplete](punchlist/21-rail-crossing-list-is-hand-entered-and-probably-incompl.md) |
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
-| **70** | 🔴 crew-visible | OPEN | [A restart during a capture loses the call and its audio](punchlist/70-a-restart-during-a-capture-loses-the-call-and-its-audio.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
 | **49** | 🟠 operational | OPEN | [Access-point review UX — operators cannot set an entrance without direct SQL](punchlist/49-access-point-review-ux-operators-cannot-set-an-entrance.md) |

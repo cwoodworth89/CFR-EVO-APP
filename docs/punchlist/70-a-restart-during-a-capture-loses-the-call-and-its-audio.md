@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🎙️ Dispatch Pipeline |
 | **Blocks** | 0 |
@@ -14,11 +14,7 @@
 
 ## 70. SIGTERM mid-capture: no audio, no address, and a pin from a partial transcript
 
-> **Status**: 🟡 **Built and deployed 2026-09-05 19:48 PDT (`e0b0632`, unit `TimeoutStopSec=150`); closes on
-> the first restart whose journal shows the drain.** *(Opened as:
-> 🔴 Open.)* Crew-visible: a real structure fire reached the kiosk with no address and no
-> recording. The restart was the assistant's, unasked, and is the first cause; the agent's
-> shutdown behaviour is the second.
+> **Status**: ✅ **Closed 2026-09-06 — the first restart under the new code, 13:54 kiosk time, shows the handler in the journal: SIGTERM caught, listener told to stop, worker exiting on its signal, then systemd's stop.** *(Opened as: 🟡 Built and deployed 2026-09-05 19:48 PDT (`e0b0632`, unit `TimeoutStopSec=150`); closes on > the first restart whose journal shows the drain. *(Opened as: > 🔴 Open.)* Crew-visible: a real structure fire reached the kiosk with no address and no > recording. The restart was the assistant's, unasked, and is the first cause; the agent's > shutdown behaviour is the second.)*
 
 ### What happened
 
@@ -90,3 +86,24 @@ drop-in is in place, the effective timeout reads 2 min 30 s, and the process sta
 carries the handler. The next restart is the proof: the journal should show *Stop requested*
 and *Worker drained* rather than an instant deactivation. `tools/kiosk_capture_state.sh` stays the pre-restart check
 until the first restart under the new code proves the drain in the journal.
+
+### Closed 2026-09-06
+
+Operator's go; `tools/kiosk_capture_state.sh` said safe (last capture finalised, tones 1303 s
+earlier); `sudo systemctl restart cfr-agent` at 13:54:33. The journal, in order:
+
+```
+SIGTERM received: finishing any capture in progress, then exiting.
+Stop requested with no capture in progress; listener exiting.
+CFR EVO Dispatch System shut down.
+Worker received shutdown signal. Exiting.
+cfr-agent.service: Deactivated successfully.
+```
+
+Before this change the same restart was an instant kill (the 11:42 loss on 2026-09-05). What
+this proves is the no-capture path: the signal is caught, the listener leaves at its own quiet
+point, the worker drains on the poison pill, systemd waits. The in-capture path (listener
+finishes the broadcast and queues it, worker finishes phase 2, up to the 150 s
+`TimeoutStopSec`) is covered by `backend/tests/test_shutdown.py` and has not yet been seen
+live; the pre-restart check stays the practice, and the first restart that lands during a
+capture is the remaining evidence. Reopen if that journal shows anything but a finalised call.

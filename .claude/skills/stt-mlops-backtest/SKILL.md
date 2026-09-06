@@ -98,6 +98,10 @@ check blocks and names them in the log. Why: every verified transcript ends in
 
 ## 2. Train
 
+The script runs with `HF_HUB_OFFLINE=1` (no hub traffic, `docs/external_calls.md`); a machine
+whose cache lacks `openai/whisper-base` seeds it once with `HF_HUB_OFFLINE=0` in front of the
+command.
+
 ```bash
 ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 OMP_NUM_THREADS=6 WHISPER_CT2_OUT=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN nice -n 15 .venv/bin/python tools/train_whisper_lora.py"
 ```

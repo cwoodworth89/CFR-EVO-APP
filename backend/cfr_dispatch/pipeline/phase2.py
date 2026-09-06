@@ -265,6 +265,25 @@ def process_phase_2_finalize(
                         logging.warning(f"[{dispatch_id}] Template reconstruction warning: {r_err}")
 
                 p1_address = p1_target.get("address") or (p1_candidate.address or p1_candidate.intersection if p1_candidate else "")
+                # Rule A: phase 1 withheld a fallback location (location_pending). Phase 2 owns
+                # the placement now: geocode the address from the full recording and carry
+                # whatever the resolver says, note included, instead of the empty phase 1 point.
+                if p1_target.get("location_pending") and validator:
+                    p2_res = validator.local_geocode(
+                        p1_address, target_map_grid=p2_grid,
+                        x_street_1=p2_cross_1, x_street_2=p2_cross_2)
+                    if p2_res:
+                        p1_target = {**p1_target, "lat": p2_res["lat"], "lng": p2_res["lng"],
+                                     "rings": p2_res.get("rings", []), "location_pending": False,
+                                     "resolution_note": p2_res.get("resolution_note"),
+                                     "requested_address": p2_res.get("requested_address")}
+                        for k in ("location_type", "segment", "endpoints", "length_m"):
+                            if p2_res.get(k) is not None:
+                                p1_target[k] = p2_res[k]
+                        p1_address = p2_res["address"]
+                        logging.info(f"[{dispatch_id}] [Phase 2] Placed the location phase 1 withheld: '{p1_address}'")
+                    else:
+                        p1_target = {**p1_target, "location_pending": False}
                 # MERGE onto the Phase 1 target, never rebuild it. This PATCH replaces the
                 # whole `target` object, so any key not carried forward is destroyed.
                 # Rebuilding from a hand-picked allowlist silently dropped `x_streets`
@@ -398,6 +417,7 @@ def process_phase_2_finalize(
                             "lat": res["lat"],
                             "lng": res["lng"],
                             "rings": res.get("rings", []),
+                            "location_pending": False,
                             "map_grid": p2_grid,
                             "map_grid_source": p2_grid_source,
                             "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") == "parcel-zone" else None,

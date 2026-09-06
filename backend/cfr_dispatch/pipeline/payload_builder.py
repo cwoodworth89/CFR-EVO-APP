@@ -136,6 +136,9 @@ def build_dispatch_payload(
                 "lng": res["lng"],
                 "rings": res.get("rings", []),
                 "zone_id": res.get("zone_id"),  # set only by an exact parcel match
+                "is_junction": "candidates" in res,  # the intersection resolver's payload shape
+                "is_ambiguous": res.get("is_ambiguous", False),
+                "confidence": res.get("confidence"),
             }
             # A "<street> and <street>" dispatch resolves to a street SECTION rather
             # than a point. These fields are what let the kiosk highlight the stretch
@@ -153,6 +156,39 @@ def build_dispatch_payload(
                 "lat": None,
                 "lng": None,
                 "rings": []
+            }
+
+    # Rule A, the location gate (punch-list #72, operator's rule: unknown beats a guess).
+    # A preliminary payload shows a location only when the resolver answered with a parcel
+    # (zone_id set, steps 1 and 1b) or a junction (an intersection result with no
+    # resolution_note; an ambiguous one still goes out, since the operator chooses on the
+    # map). A block interpolation, a nearest civic number, a street section or a street
+    # centroid is not a place yet: measured on 507 recordings replayed in the listener's
+    # chunks, withholding those removes 48 of the 52 wrong streets shown in the first
+    # minute at the cost of 81 unknown cards, 15 of them on an address that was in fact
+    # exact. Phase 2 geocodes the full recording and fills the location in.
+    location_pending = False
+    if preliminary and local_geocode_result.get("lat") is not None:
+        # A junction is solid when the street pair matched exactly (the resolver's 100; a
+        # fuzzy "suggested" pair scores lower and is a guess) or when several junctions exist
+        # and the operator chooses on the map. Its resolution_note is not the test: the
+        # resolver also uses it for information ("cross streets do not distinguish these").
+        solid = bool(local_geocode_result.get("zone_id")) or (
+            local_geocode_result.get("is_junction")
+            and (float(local_geocode_result.get("confidence") or 0.0) >= 100.0
+                 or local_geocode_result.get("is_ambiguous")))
+        if not solid:
+            location_pending = True
+            logging.info(f"[{dispatch_id}] Phase 1 location withheld: '{local_geocode_result.get('address')}' "
+                         f"came from a fallback ({local_geocode_result.get('resolution_note') or 'no parcel'}); "
+                         f"phase 2 places it")
+            local_geocode_result = {
+                "address": local_geocode_result.get("requested_address") or local_geocode_result["address"],
+                "lat": None, "lng": None, "rings": [],
+                # No resolution_note here: LOCATION_UNRESOLVED already follows from the empty
+                # point, and a note would raise LOCATION_SUBSTITUTED for a substitution that
+                # was not shown. The Tier 1 card is the display.
+                "requested_address": local_geocode_result.get("requested_address") or local_geocode_result["address"],
             }
 
     best_address = clean_address_string(local_geocode_result["address"])
@@ -254,6 +290,8 @@ def build_dispatch_payload(
         # "parcel-zone" (phase 1, derived from the placed parcel), "announced" (spoken),
         # "point-zone" (nothing spoken; the zone containing the point), or None.
         "map_grid_source": map_grid_source,
+        # True on a preliminary payload whose location was withheld by rule A; phase 2 clears it.
+        "location_pending": location_pending,
         "radio_channel": radio_channel,
         "routing_metrics": routing_metrics,
         "x_street_1": x_street_1,

@@ -119,7 +119,7 @@ def score(bucket, t, payload, resolved_by, truth, location_shown=True, grid_show
     target = (payload or {}).get("target") or {}
     got_grid = target.get("map_grid")
     sys_addr = target.get("address") or (payload or {}).get("address") or ""
-    if not location_shown:
+    if not location_shown or target.get("location_pending"):
         bucket["location_unknown"] += 1
         bucket["grid"]["withheld"] += 1
         return

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧱 Duplicated & Unsourced Frontend Constants |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 20. `TALK_GROUPS` duplicates `public.vocabulary`
-> **Status**: ⚠️ **Open — found 2026-08-22 during the MapBoard decomposition.**
+> **Status**: ✅ **Closed 2026-09-05 — the sidebar reads `radio_channel` from `/api/vocabulary`; the constant is gone (`2c7c051`).** *(Opened as: ⚠️ Open — found 2026-08-22 during the MapBoard decomposition.)*
 
 `frontend/src/components/review/verificationConstants.js` hardcodes eight talk groups.
 `public.vocabulary` category `radio_channel` holds **the same eight**, and is what the
@@ -32,3 +32,11 @@ database, so a talk group change corrects one and not the other.
 **Fix**: serve `radio_channel` from the API and have the sidebar consume it, as the kiosk
 already does for hydrants. Left in place rather than changed as a side effect of a lint
 extraction; the constant now carries a comment saying so.
+
+### Closed 2026-09-05
+
+`VerificationSidebar.jsx` fetches `GET /api/vocabulary?category=radio_channel` the way it
+already fetched the call types: a failed fetch shows *vocabulary unavailable* and an empty
+picker, never a stale list; a saved value the vocabulary no longer carries stays choosable so
+the record is not silently blanked. `TALK_GROUPS` is deleted from `verificationConstants.js`.
+Built on the kiosk.

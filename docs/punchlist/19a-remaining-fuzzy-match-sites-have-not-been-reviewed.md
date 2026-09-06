@@ -35,6 +35,8 @@ the parser, the near roads being resolved against the roads near the placed addr
 stage still uses `token_set_ratio` on that slot. Remaining: `channels.py` (talk group) and
 that fuzzy stage. Neither places a call.
 
+Nothing is needed from the operator for this item: both remaining sites are code, and neither affects the map.
+
 `token_set_ratio` scoring a short string against a longer one that contains it returns 100
 (#15), so any site comparing a street fragment against a full street name is exposed.
 `sanitize_transcript`'s phonetic corrections are hardcoded regex rather than fuzzy — they

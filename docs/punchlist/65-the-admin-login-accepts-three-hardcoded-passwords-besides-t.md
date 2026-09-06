@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | hygiene |
 | **Area** | 🔐 API |
 | **Blocks** | 0 |
@@ -14,9 +14,7 @@
 
 ## 65. `auth.py` takes any of four passwords, and its 401 message tells you the default
 
-> **Status**: ⚪ **Open — the operator's decision, because fixing it changes the password the
-> running kiosk accepts.** Not crew-visible: the admin console answers only to localhost and the
-> Tailscale network (`is_allowed_network`), and one person uses the kiosk.
+> **Status**: ✅ **Closed 2026-09-05 — one password, from `ADMIN_PASSWORD`, wired through compose; the operator chose the value (`2c7c051`).** *(Opened as: ⚪ Open — the operator's decision, because fixing it changes the password the > running kiosk accepts. Not crew-visible: the admin console answers only to localhost and the > Tailscale network (`is_allowed_network`), and one person uses the kiosk.)*
 
 ### What the code does
 
@@ -46,3 +44,18 @@ holds, so any value serves the test.
 
 Step 2 before step 1 locks the operator out of the admin console, which is why this is filed
 rather than done. Choosing the value is the operator's.
+
+### Closed 2026-09-05
+
+`auth.py` accepts `ADMIN_PASSWORD` and nothing else; unset answers 503 *not configured* with
+a log line, and the 401 no longer names a default. The test refuses the three old literals.
+
+Found on the way: **the API container never read `backend/.env`.** Compose interpolates
+`${...}` from the shell or a root `.env`, and `.dockerignore` keeps every `.env` out of the
+image, so the value the punch list said to set there could never have reached the API; the
+"rescue" that worked was the code's fallback. `docker-compose.yml` now passes
+`ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}` with a comment, and the value lives in the kiosk's
+root `.env` (git-ignored), moved out of `backend/.env` so there is one copy.
+
+Verified on the rebuilt container: the configured password 200, `cfr2026` and `admin` 401,
+body `Invalid username or password.`

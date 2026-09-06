@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-70 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+72 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -19,6 +19,8 @@
 | **55** | 🟠 operational | SUPERSEDED | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **63** | 🔴 crew-visible | CLOSED | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
 | **14** | 🔴 crew-visible | CLOSED | [PA announcements are being captured as dispatches](14-pa-announcements-are-being-captured-as-dispatches.md) |
+| **65** | ⚪ hygiene | CLOSED | [The admin login accepts three hardcoded passwords besides the configured one](65-the-admin-login-accepts-three-hardcoded-passwords-besides-t.md) |
+| **20** | 🔴 crew-visible | CLOSED | [`TALK_GROUPS` duplicates `public.vocabulary`](20-talk-groups-duplicates-public-vocabulary.md) |
 | **34a** | 🔴 crew-visible | CLOSED | [Apparatus names collide with call-type names, turning STT damage into a confident wrong answer](34a-apparatus-names-collide-with-call-type-names-turning-st.md) |
 | **56** | 🔴 crew-visible | CLOSED | [Bring XStreets onto the same resolution path as main addresses](56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
 | **51b** | 🔴 crew-visible | CLOSED | [The kiosk shows the junction field labelled "cross streets", and never reads the real one](51b-the-kiosk-shows-the-junction-field-labelled-cross-stree.md) |

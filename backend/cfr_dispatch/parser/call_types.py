@@ -27,7 +27,37 @@ CALL_TYPES = load_call_types()
 CALL_TYPE_ALIASES = load_call_type_aliases()
 
 
-def match_incident_type(transcript: str, call_types: List[str], aliases: dict = None) -> str:
+_RESPOND = re.compile(r'\brespond(?:\s+(?:emergency|routine))?\b', re.IGNORECASE)
+
+
+def incident_search_text(transcript: str, units_vocabulary=None) -> str:
+    """The part of an announcement the call type can legitimately be in (punch-list #34a).
+
+    The template (docs/call_structure.md) is "coquitlam <units> respond <priority> <incident>
+    <address> ...": the apparatus come before "respond", the call type after it. Four call
+    types are also apparatus names, Rescue and Hazmat 1/2/3, so a search over the whole
+    transcript reads "rescue 2" in the unit list as the incident whenever the STT has mangled
+    the real one, and does so at full score: DISP-2026-A19179, an alarm call shown as Rescue.
+    Two of 530 verified incidents on the corpus, 2026-09-05.
+
+    After "respond [priority]" when it is there. When it is not, the unit tokens are blanked
+    out and the rest is searched, so a garbled announcement can still yield its call type
+    but never one made of its unit list.
+    """
+    m = _RESPOND.search(transcript or "")
+    if m:
+        return transcript[m.end():]
+    if units_vocabulary is None:
+        from cfr_dispatch.config import UNITS_VOCABULARY as units_vocabulary
+    names = sorted((str(u) for u in units_vocabulary if str(u).strip()), key=len, reverse=True)
+    if not names:
+        return transcript or ""
+    unit_token = re.compile(r'\b(?:' + '|'.join(re.escape(n) for n in names) + r')\s*\d+\b', re.IGNORECASE)
+    return unit_token.sub(' ', transcript or "")
+
+
+def match_incident_type(transcript: str, call_types: List[str], aliases: dict = None,
+                        units_vocabulary=None) -> str:
     """Matches transcript text to incident/call types using exact substring or fuzzy matching.
 
     Returns a CANONICAL term always. `aliases` maps a recognition-only spelling to the
@@ -37,6 +67,9 @@ def match_incident_type(transcript: str, call_types: List[str], aliases: dict = 
     """
     if aliases is None:
         aliases = CALL_TYPE_ALIASES
+
+    # Only the incident slot is searched (#34a): the unit list is never a source of a call type.
+    transcript = incident_search_text(transcript, units_vocabulary)
 
     # Normalize transcript by removing hyphens and double spaces for clean matching
     norm_transcript = re.sub(r'\s*-\s*', ' ', transcript.lower())

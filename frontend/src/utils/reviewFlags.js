@@ -15,6 +15,8 @@ export const FLAG_LABELS = {
   NO_TALK_GROUP: 'No talk group announced or transcribed',
   NO_MAP_GRID: 'No map grid announced or transcribed',
   GRID_MISMATCH: 'Announced map grid differs from the zone the address sits in',
+  XSTREET_UNRESOLVED: 'A near road as heard matches no road near the address',
+  XSTREET_SUBSTITUTED: 'A near road was matched to a nearby road by spelling; check it',
   NO_UNITS: 'No responding units identified',
   UNKNOWN_CALL_TYPE: 'Call type missing or generic',
   RESPONSE_TYPE_UNKNOWN: 'Response type not announced or not transcribed',

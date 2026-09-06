@@ -122,7 +122,28 @@ def candidates_like_phase2(transcript: str):
 
 def new_bucket():
     return {"n": 0, "fields": {f: Counter() for f in FIELDS}, "place": Counter(), "dist": [], "wer": [],
-            "resolved_by": Counter()}
+            "resolved_by": Counter(), "xstreets": Counter()}
+
+
+def _road_key(name: str) -> str:
+    import re as _re
+    from gis_service.normalization import normalize_street_name
+    bare = _re.sub(r"\s*\([^)]*\)\s*$", "", (name or "").split(",")[0])
+    return normalize_street_name(bare).strip().upper()
+
+
+def xstreets_verdict(got: list, truth: list):
+    """EXACT (same roads, any order), PARTIAL (some), WRONG (none), MISSING (nothing shown);
+    None when the operator verified no near road. Punch-list #56."""
+    t = {_road_key(x) for x in truth if x and str(x).strip()}
+    if not t:
+        return None
+    g = {_road_key(x) for x in got if x and str(x).strip()}
+    if not g:
+        return "MISSING"
+    if g == t:
+        return "EXACT"
+    return "PARTIAL" if g & t else "WRONG"
 
 
 def summarise(b: dict) -> dict:
@@ -138,6 +159,7 @@ def summarise(b: dict) -> dict:
         # the same address string and differ only in the point, so this is the only view that
         # separates them (punch-list #62).
         "resolved_by": dict(sorted(b["resolved_by"].items())),
+        "xstreets": {k: b["xstreets"].get(k, 0) for k in ("EXACT", "PARTIAL", "WRONG", "MISSING")},
         "distance_m": {"n": len(b["dist"]),
                        "median": round(statistics.median(b["dist"]), 1) if b["dist"] else None,
                        "p90": round(hc.quantile(b["dist"], 0.9), 1) if b["dist"] else None},
@@ -162,6 +184,10 @@ def print_block(title: str, b: dict) -> None:
     d = s["distance_m"]
     print(f"  distance    n={d['n']} median={d['median']} m  p90={d['p90']} m   (target vs the geocoded verified address)")
     print("  resolved by " + "  ".join(f"{k} {v}" for k, v in s["resolved_by"].items()))
+    xs = s["xstreets"]
+    if sum(xs.values()):
+        print(f"  near roads  exact {xs['EXACT']}  partial {xs['PARTIAL']}  wrong {xs['WRONG']}  missing {xs['MISSING']}"
+              f"   (verified near roads, as sets; punch-list #56)")
     w = s["wer"]
     if w["n"]:
         print(f"  stt wer     n={w['n']} mean={w['mean_pct']}%  median={w['median_pct']}%   (round 1 vs round 1 of verified_transcript)")
@@ -196,7 +222,8 @@ def main() -> int:
         dw, params = hc.date_where(args)
         where += dw
     sql = ("SELECT dispatch_id, timestamp, raw_transcript, verified_transcript, verified_address, "
-           "verified_incident, verified_units, verified_map_grid, verified_talkgroup "
+           "verified_incident, verified_units, verified_map_grid, verified_talkgroup, "
+           "verified_x_street_1, verified_x_street_2 "
            "FROM public.dispatches WHERE " + " AND ".join(f"({w})" for w in where) + " ORDER BY timestamp")
     if args.limit:
         sql += f" LIMIT {int(args.limit)}"
@@ -235,7 +262,8 @@ def main() -> int:
         did, month = r["dispatch_id"], hc.month_of(r["timestamp"])
         truth = {"incident": r["verified_incident"], "units": r["verified_units"],
                  "address": r["verified_address"], "map_grid": r["verified_map_grid"],
-                 "talkgroup": r["verified_talkgroup"]}
+                 "talkgroup": r["verified_talkgroup"],
+                 "xstreets": [r["verified_x_street_1"], r["verified_x_street_2"]]}
 
         # 1. the transcript
         stt_ran = False
@@ -302,11 +330,15 @@ def main() -> int:
             if None not in (target.get("lat"), target.get("lng"), vlat, vlng):
                 dist = hc.haversine_m(target["lat"], target["lng"], vlat, vlng)
 
+        xs_got = [target.get("x_street_1"), target.get("x_street_2")]
+        xs_verdict = xstreets_verdict(xs_got, truth["xstreets"])
         for b in (pooled, per_month[month]):
             b["n"] += 1
             for f in FIELDS:
                 if verdict[f]:
                     b["fields"][f][verdict[f]] += 1
+            if xs_verdict:
+                b["xstreets"][xs_verdict] += 1
             if place:
                 b["place"][place] += 1
             if dist is not None:
@@ -321,6 +353,8 @@ def main() -> int:
                          "place": place or "", "resolved_by": resolved_by, "verified_resolved_by": verified_by,
                          "distance_m": None if dist is None else round(dist, 1),
                          "system_address": sys_addr, "verified_address": truth["address"],
+                         "xstreets": xs_verdict or "", "xstreets_got": " & ".join(x for x in xs_got if x),
+                         "xstreets_truth": " & ".join(x for x in truth["xstreets"] if x),
                          "lat": target.get("lat"), "lng": target.get("lng"),
                          # What was heard, so a bad row can be read without rerunning STT.
                          "transcript": (transcript or "")[:400],

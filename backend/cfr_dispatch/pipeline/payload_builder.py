@@ -12,6 +12,7 @@ from cfr_dispatch.parser import (
     CALL_TYPES
 )
 
+from cfr_dispatch.pipeline.near_roads import apply_near_roads
 from cfr_dispatch.pipeline.review_flags import (
     compute_review_flags, LOCATION_UNRESOLVED, LOCATION_SUBSTITUTED,
 )
@@ -195,6 +196,13 @@ def build_dispatch_payload(
     lat = local_geocode_result["lat"]
     lng = local_geocode_result["lng"]
     rings = local_geocode_result["rings"]
+
+    # Near roads resolved against the roads near the placed point, or crossing the parcel's
+    # zone when the point is withheld (#56). The heard names went into the geocoder's
+    # narrowing above; what the kiosk shows is what resolved, and what did not is flagged.
+    near = apply_near_roads(x_street_1, x_street_2, validator, lat, lng,
+                            zone_id=local_geocode_result.get("zone_id"))
+    x_street_1, x_street_2 = near["x_street_1"], near["x_street_2"]
     # TWO VARIABLES, never a list. Locution announces
     #   [address] NEAR [x_street_1] AND [x_street_2]
     # and either may be omitted. This was `[s for s in [c1, c2] if s]`, and that
@@ -258,6 +266,8 @@ def build_dispatch_payload(
         response_type=detected_resp,
         resolution_note=local_geocode_result.get("resolution_note"),
         location_type=local_geocode_result.get("location_type"),
+        xstreets_unresolved=near["xstreets_unresolved"],
+        xstreets_substituted=near["xstreets_substituted"],
     )
 
     # verify_location survives as the operator-facing "check this location" marker,
@@ -296,6 +306,10 @@ def build_dispatch_payload(
         "routing_metrics": routing_metrics,
         "x_street_1": x_street_1,
         "x_street_2": x_street_2,
+        # As heard, and how each resolved (exact | base | nearby-fuzzy | ambiguous | unresolved
+        # | no-candidates), so a substitution is never silent (#56).
+        "x_streets_heard": near["x_streets_heard"],
+        "x_streets_how": near["x_streets_how"],
         # Named reasons this dispatch may need a human look, and their count
         # (punch-list #45). These live in TARGET, not at the top level: there is no
         # review_flags column, and the API applies updates with

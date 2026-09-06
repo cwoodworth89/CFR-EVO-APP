@@ -194,14 +194,30 @@ export default function ActiveAlertBanner({
         {/* XStreets -- the block-confirmation reference, as the run sheet labels it.
             Rendered only when announced: absent is absent, never a placeholder (§6.1).
             Deliberately quieter than the address, which stays the primary target. */}
-        {(activeCall.x_street_1 || activeCall.x_street_2) && (
-          <div className={`font-mono font-bold tracking-wide text-slate-300 mt-0.5 ${
-            isTvMode ? 'text-lg sm:text-xl' : 'text-sm sm:text-base'
-          }`}>
-            <span className="text-slate-500 uppercase mr-1.5">XStreets</span>
-            {[activeCall.x_street_1, activeCall.x_street_2].filter(Boolean).join(' & ')}
-          </div>
-        )}
+        {/* The fields live in target; the top level never carried them, which is why this
+            line never rendered (punch list #51b). A name the resolver could not match to a
+            road near the address is shown as heard with a mark, never rewritten (#56). */}
+        {(() => {
+          const t = activeCall.target || {};
+          const names = [activeCall.x_street_1 ?? t.x_street_1, activeCall.x_street_2 ?? t.x_street_2];
+          const how = t.x_streets_how || [];
+          if (!names[0] && !names[1]) return null;
+          const shown = names.map((n, i) => {
+            if (!n) return null;
+            const h = how[i];
+            const mark = h === 'unresolved' || h === 'no-candidates' || h === 'ambiguous' ? ' (as heard)'
+                       : h === 'nearby-fuzzy' ? ' (?)' : '';
+            return `${n}${mark}`;
+          }).filter(Boolean).join(' & ');
+          return (
+            <div className={`font-mono font-bold tracking-wide text-slate-300 mt-0.5 ${
+              isTvMode ? 'text-lg sm:text-xl' : 'text-sm sm:text-base'
+            }`}>
+              <span className="text-slate-500 uppercase mr-1.5">Near</span>
+              {shown}
+            </div>
+          );
+        })()}
 
         <div className={`font-black tracking-wider uppercase font-mono mt-1 ${
           activeCall.is_test ? 'text-orange-400' : 'text-amber-400'

@@ -34,6 +34,7 @@ from notification_service import (
 )
 
 from cfr_dispatch.pipeline.review_flags import compute_review_flags
+from cfr_dispatch.pipeline.near_roads import apply_near_roads
 
 def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None, save_to_disk: bool = True) -> Tuple[str | None, float]:
     """Computes duration and conditionally saves audio buffer locally via notification_service."""
@@ -298,12 +299,18 @@ def process_phase_2_finalize(
                 # An allowlist has to be edited every time a field is added, and nothing
                 # fails when it is not. Spreading means a new Phase 1 field survives by
                 # default and only Phase 2's own results override.
+                near = apply_near_roads(p2_cross_1, p2_cross_2, validator, p1_target.get("lat"), p1_target.get("lng"),
+                                        zone_id=p2_grid)
                 target_payload = {
                     **p1_target,
                     "address": p1_address,
                     "lat": p1_target.get("lat"),
                     "lng": p1_target.get("lng"),
                     "rings": p1_target.get("rings", []),
+                    "x_street_1": near["x_street_1"],
+                    "x_street_2": near["x_street_2"],
+                    "x_streets_heard": near["x_streets_heard"],
+                    "x_streets_how": near["x_streets_how"],
                     "map_grid": p2_grid,
                     "map_grid_source": p2_grid_source,
                     # Phase 1's derived grid, kept so the reviewer sees both when they differ.
@@ -327,6 +334,8 @@ def process_phase_2_finalize(
                     resolution_note=target_payload.get("resolution_note"),
                     location_type=target_payload.get("location_type"),
                     derived_map_grid=target_payload.get("derived_map_grid"),
+                    xstreets_unresolved=near["xstreets_unresolved"],
+                    xstreets_substituted=near["xstreets_substituted"],
                 )
                 target_payload["review_flags"] = p2_flags
                 target_payload["review_flag_count"] = len(p2_flags)
@@ -411,12 +420,18 @@ def process_phase_2_finalize(
                         # `x_streets` is parser-derived, not geocoder-derived: both phases
                         # read the same announcement, so it carries forward unchanged even
                         # though the address was corrected.
+                        near = apply_near_roads(p2_cross_1, p2_cross_2, validator, res.get("lat"), res.get("lng"),
+                                                zone_id=p2_grid)
                         target_payload = {
                             **p1_target,
                             "address": res["address"],
                             "lat": res["lat"],
                             "lng": res["lng"],
                             "rings": res.get("rings", []),
+                            "x_street_1": near["x_street_1"],
+                            "x_street_2": near["x_street_2"],
+                            "x_streets_heard": near["x_streets_heard"],
+                            "x_streets_how": near["x_streets_how"],
                             "location_pending": False,
                             "map_grid": p2_grid,
                             "map_grid_source": p2_grid_source,
@@ -442,6 +457,8 @@ def process_phase_2_finalize(
                             resolution_note=target_payload.get("resolution_note"),
                             location_type=target_payload.get("location_type"),
                             derived_map_grid=target_payload.get("derived_map_grid"),
+                            xstreets_unresolved=near["xstreets_unresolved"],
+                            xstreets_substituted=near["xstreets_substituted"],
                         )
                         target_payload["review_flags"] = p2_flags
                         target_payload["review_flag_count"] = len(p2_flags)

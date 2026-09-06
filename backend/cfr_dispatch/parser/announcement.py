@@ -120,13 +120,14 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                     x_streets_end = min(x_streets_end, map_grid_match.start())
                 x_streets_raw = remainder[x_streets_start:x_streets_end].strip()
                 x_streets_clean = clean_location_text(x_streets_raw, CALL_TYPES, units_vocab)
-                x_streets_str = normalize_street_suffix(x_streets_clean)
-                try:
-                    from cfr_dispatch.config.vocab import COQUITLAM_STREETS
-                    if COQUITLAM_STREETS:
-                        x_streets_str = fuzzy_correct_x_streets(x_streets_str, COQUITLAM_STREETS)
-                except Exception as ex:
-                    logging.warning(f"Failed to fuzzy correct cross roads: {ex}")
+                # What was heard, suffix-normalised and nothing more. The city-wide fuzzy
+                # rewrite that used to run here (fuzzy_correct_x_streets, threshold 75) could
+                # swap one real street for another on 87 % of the city's names; the near roads
+                # are now resolved against the roads near the placed address, in the payload
+                # builder, and a substitution is flagged (punch-list #56, 2026-09-05).
+                x_streets_str = " and ".join(
+                    normalize_street_suffix(part) for part in
+                    re.split(r'\s+(?:and|at|&)\s+', x_streets_clean, flags=re.IGNORECASE) if part.strip())
                 
             # Extract Talk Group (Radio channel)
             talk_group_str = None

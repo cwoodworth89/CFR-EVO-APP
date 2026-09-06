@@ -147,6 +147,43 @@ class SpatialQueryEngine:
             logging.error(f"Point-to-grid spatial lookup error: {e}", exc_info=True)
         return None
 
+    def roads_near_point(self, lat: float, lng: float, radius_m: float) -> List[str]:
+        """Distinct road names within radius_m of a point, nearest first (punch-list #56)."""
+        if lat is None or lng is None:
+            return []
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT fullname, MIN(ST_Distance(geom::geography,
+                               ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)) AS d
+                    FROM public.roads
+                    WHERE fullname IS NOT NULL AND btrim(fullname) <> ''
+                      AND ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :r)
+                    GROUP BY fullname ORDER BY d;
+                """), {"lat": float(lat), "lng": float(lng), "r": float(radius_m)}).fetchall()
+                return [r[0] for r in res if r[0]]
+        except Exception as e:
+            logging.error(f"Error fetching roads near point: {e}", exc_info=True)
+            return []
+
+    def roads_in_zone(self, grid_id: str) -> List[str]:
+        """Distinct road names whose centreline crosses a response zone (punch-list #56)."""
+        if not grid_id:
+            return []
+        clean_grid = re.sub(r'^(?:GRID|ZONE)\s*', '', str(grid_id).strip(), flags=re.IGNORECASE)
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT DISTINCT r.fullname
+                    FROM public.roads r JOIN public.zones z ON ST_Intersects(r.geom, z.geom)
+                    WHERE z.map_name = :grid_id AND r.fullname IS NOT NULL AND btrim(r.fullname) <> ''
+                    ORDER BY r.fullname;
+                """), {"grid_id": clean_grid}).fetchall()
+                return [r[0] for r in res if r[0]]
+        except Exception as e:
+            logging.error(f"Error fetching roads in zone '{grid_id}': {e}", exc_info=True)
+            return []
+
     def get_streets_in_grid(self, grid_id: str) -> List[str]:
         """Returns the list of unique street names contained within a specific map grid."""
         if not grid_id:

@@ -37,6 +37,8 @@ STREET_SECTION_ONLY = "STREET_SECTION_ONLY"
 NO_TALK_GROUP = "NO_TALK_GROUP"
 NO_MAP_GRID = "NO_MAP_GRID"
 GRID_MISMATCH = "GRID_MISMATCH"
+XSTREET_UNRESOLVED = "XSTREET_UNRESOLVED"
+XSTREET_SUBSTITUTED = "XSTREET_SUBSTITUTED"
 NO_UNITS = "NO_UNITS"
 UNKNOWN_CALL_TYPE = "UNKNOWN_CALL_TYPE"
 RESPONSE_TYPE_UNKNOWN = "RESPONSE_TYPE_UNKNOWN"
@@ -49,6 +51,8 @@ FLAG_LABELS = {
     NO_TALK_GROUP: "No talk group announced or transcribed",
     NO_MAP_GRID: "No map grid announced or transcribed",
     GRID_MISMATCH: "Announced map grid differs from the zone the address sits in",
+    XSTREET_UNRESOLVED: "A near road as heard matches no road near the address",
+    XSTREET_SUBSTITUTED: "A near road was matched to a nearby road by spelling; check it",
     NO_UNITS: "No responding units identified",
     UNKNOWN_CALL_TYPE: "Call type missing or generic",
     RESPONSE_TYPE_UNKNOWN: "Response type not announced or not transcribed",
@@ -73,7 +77,8 @@ def _blank(value):
 
 def compute_review_flags(*, lat, lng, responding_units, incident_type,
                          map_grid, radio_channel, response_type,
-                         resolution_note=None, location_type=None, derived_map_grid=None):
+                         resolution_note=None, location_type=None, derived_map_grid=None,
+                         xstreets_unresolved=0, xstreets_substituted=0):
     """Return the sorted list of flags that apply to one dispatch.
 
     Pure and keyword-only: every input is passed explicitly so this can be tested
@@ -99,6 +104,11 @@ def compute_review_flags(*, lat, lng, responding_units, incident_type,
     if (not _blank(map_grid) and not _blank(derived_map_grid)
             and str(map_grid).strip().lstrip("0") != str(derived_map_grid).strip().lstrip("0")):
         flags.append(GRID_MISMATCH)
+    # Near roads (#56): a name left as heard, and a name matched by spelling within the nearby set.
+    if xstreets_unresolved:
+        flags.append(XSTREET_UNRESOLVED)
+    if xstreets_substituted:
+        flags.append(XSTREET_SUBSTITUTED)
 
     units = [u for u in (responding_units or []) if not _blank(u)]
     if not units or (len(units) == 1 and str(units[0]).strip().lower() == "unknown unit"):

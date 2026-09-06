@@ -90,7 +90,10 @@ second holdout (seed 2026) from everything round 1 did not hold out, and adds tr
 each train clip cut at 10, 16 and 22 s (phase 1's check times) with the label cut to the words
 that ended before the cut, aligned through the model in service's word timestamps. The round-1
 holdout is never touched. Outputs `round2_clips/`, `metadata_round2_train.csv`,
-`metadata_round2_holdout.csv`. `--limit 3` first. Why: every verified transcript ends in
+`metadata_round2_holdout.csv`. `--limit 3` first. **Plain environment, never `OMP_NUM_THREADS=6`**:
+under six threads the word timestamps change and the cut finds 3 calls instead of 42
+(`docs/standards/dependency-behaviour.md`). The builder also leaves out every call the label
+check blocks and names them in the log. Why: every verified transcript ends in
 "map grid N" and the round-1 model finishes any cut chunk with that tail (punch list #72).
 
 ## 2. Train

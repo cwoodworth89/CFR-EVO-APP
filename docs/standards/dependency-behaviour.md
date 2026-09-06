@@ -355,6 +355,25 @@ with `local_files_only=True`, and holdout WER is unchanged at 2.76% -- the downl
 tiny tokenizer and the model's own were equivalent, so this was a live outage risk rather
 than a correctness bug. It would not have stayed that way for a differently-sized model.
 
+### faster-whisper 1.2.1 / CTranslate2 — word timestamps change with `OMP_NUM_THREADS`
+
+**Measured 2026-09-05 on the kiosk**, same 61 recordings, same code
+(`tools/prepare_round2_dataset.py --stop-after-cut`, the round-1 cut: speech onset and the
+round boundary from `word_timestamps=True`, `beam_size=1`, int8 on CPU):
+
+| Environment | New calls cut | Dropped as "rounds not separable" / "over 30 s" |
+|:--|--:|--:|
+| plain | 42 of 61 | 5 / 8 |
+| `OMP_NUM_THREADS=6 nice -n 15` | 3 of 61 | 25 / 24 |
+
+The mechanism is not known and is not guessed at here. The result is that the timestamped
+words under six threads are different enough that the round boundary is found on 3 calls
+instead of 42; the transcripts themselves were not compared. Consequence: build a dataset, or
+measure anything that depends on word timestamps, in the plain environment. `OMP_NUM_THREADS=6`
+stays for training only, where it exists to leave cores for a live dispatch and numeric
+determinism does not matter. The round-2 job runs the build plain and the training under six
+threads for exactly this reason.
+
 ## Unverified — assumptions still resting on names
 
 Recorded so they are visible (§7.5). None of these have been checked.

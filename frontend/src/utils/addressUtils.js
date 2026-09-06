@@ -28,7 +28,7 @@ export function sanitizeAddress(rawAddr) {
 
   // 5. Remove trailing unit numbers/letters after standard street suffixes:
   // e.g. "3000 Riverbend Dr 105", "3000 Riverbend Dr 105A", "3000 Riverbend Dr A", "3000 Riverbend Dr #1"
-  const streetSuffixes = '(?:AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|BLVD|BOULEVARD|CRES|CRESCENT|PL|PLACE|LANE|LN|HWY|HIGHWAY)';
+  const streetSuffixes = '(?:AVE|AVENUE|ST|STREET|RD|ROAD|WAY|DR|DRIVE|CRT|COURT|CT|BLVD|BOULEVARD|CRES|CRESCENT|PL|PLACE|LANE|LN|HWY|HIGHWAY)';
   const trailingUnitRegex = new RegExp(`(\\b${streetSuffixes})\\s+(?:#\\w+|\\d+[A-Za-z]?|[A-Za-z])$`, 'i');
   addr = addr.replace(trailingUnitRegex, '$1');
 

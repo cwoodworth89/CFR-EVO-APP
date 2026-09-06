@@ -13,7 +13,7 @@ def normalize_street_suffix(text: str) -> str:
         "highway": "Hwy", "hwy": "Hwy",
         "street": "St", "st": "St",
         "avenue": "Ave", "ave": "Ave",
-        "court": "Crt", "crt": "Crt",
+        "court": "Crt", "crt": "Crt", "ct": "Crt",  # "ct" as typed in review, 2026-09-05 (#71)
         "place": "Pl", "pl": "Pl",
         "drive": "Dr", "dr": "Dr",
         "boulevard": "Blvd", "blvd": "Blvd",

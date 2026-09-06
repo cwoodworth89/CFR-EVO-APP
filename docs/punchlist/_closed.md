@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-57 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+58 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -13,6 +13,7 @@
 | **68** | 🔴 crew-visible | CLOSED | [The digit join glued the next clause's number onto the map grid when the STT lost round 2's opening](68-the-digit-join-glued-the-next-clauses-number-onto-the-map-gr.md) |
 | **69** | 🔴 crew-visible | CLOSED | [A five-digit house number was routed on as if it were a civic number](69-a-five-digit-house-number-was-routed-on-as-if-it-were-a-civic.md) |
 | **72** | 🔴 crew-visible | CLOSED | [Phase 1 published an address and a map grid the model made up to finish a cut chunk](72-phase-1-published-an-address-and-a-map-grid-the-model-made-up.md) |
+| **71** | 🔴 crew-visible | CLOSED | [The hotword budget is spent on intersections, suffix duplicates and template words; *Thor* never gets in](71-the-hotword-budget-is-spent-on-intersections-suffix-duplicat.md) |
 | **45a** | ⚪ hygiene | CLOSED | [Geocoder harness needs a review pass before its numbers are trusted again](45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |
 | **61** | 🔴 crew-visible | CLOSED | [The API silently falls back to an empty SQLite file when Postgres is unreachable](61-the-api-silently-falls-back-to-an-empty-sqlite-file-when-po.md) |

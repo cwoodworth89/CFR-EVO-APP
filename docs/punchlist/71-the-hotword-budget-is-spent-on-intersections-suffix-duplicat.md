@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🎙️ STT Vocabulary Biasing |
 | **Blocks** | 0 |
@@ -14,10 +14,10 @@
 
 ## 71. 52 terms survive the 223-token cap, and a quarter of them are not street names
 
-> **Status**: 🔴 **Open — measured, experiments proposed, nothing changed.** Each proposal
-> alters what the model is primed for, so each is one harness A/B (CLAUDE.md §7.6), and the
-> live list is the operator's to change. Crew-visible: the streets that get misheard are
-> mostly the ones the list cannot reach.
+> **Status**: ✅ **Closed 2026-09-05 — the three leaks fixed and live from 19:16 PDT (steps 1 and 2,
+> `ab4da95`, `7f254d0`); experiment 3 measured and not applied; experiment 4 not run.**
+> *(Opened as: 🔴 Open — measured, experiments proposed, nothing changed.)* Crew-visible: the
+> streets that get misheard are mostly the ones the list cannot reach.
 
 ### The live list, reproduced on the kiosk 2026-09-05 with the model's tokenizer
 
@@ -141,3 +141,27 @@ Not live until the agent is restarted; the operator's call.
 Each is an env switch or a small change in `bias_prompt.py`, measured before it is applied,
 and applied only by the operator. Expected end state if all four hold up: the list reaches
 rank 80-100, which covers 83-87 % of calls and 30 of the 36 misheard streets.
+
+### Experiment 3 measured, 2026-09-05 (`7ca2c40`): names without suffixes, a wash
+
+`STT_HOTWORDS_NAMES_ONLY=1` for the run only. Against the step-2 runs, same live settings:
+
+| | Holdout (44) | Corpus (507) |
+|:--|--:|--:|
+| WER mean | 4.26 → 4.30 % | 4.04 → 4.03 % |
+| Scored clips better / worse | | 5 / 5 |
+| Map grid wrong | 0 → 0 | 5 → 5 |
+| Wrong street | 3 → 3 | 15 → 13 |
+| Placed exactly | 34 → 34 | 429 → 428 |
+
+The list reaches further and nothing measurable follows on this model; the suffix words are
+not where it goes wrong. Not applied; the switch stays for a later model. Experiment 4, the
+template and unit words, is on the backlog and unmeasured.
+
+### Closed 2026-09-05
+
+Steps 1 and 2 are the fix: the hotword list is single streets in one suffix form, the
+misheard-street list comes from the whole corpus, and Thor Crt and Kensal Pl transcribe and
+place. Live since the 19:16 restart. Whole-corpus record against Friday's list: WER 4.78 →
+4.04 %, grid wrong 6 → 5, exact 428 → 429, wrong street 13 → 15, each within the one-clip
+swings the same corpus shows between runs.

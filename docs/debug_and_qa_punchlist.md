@@ -15,16 +15,15 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**20 open** (13 crew-visible) · **63 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**19 open** (12 crew-visible) · **64 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 20
+## Open — 19
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **1** | 🔴 crew-visible | OPEN | [Erratic Routing Loops & Intra-Municipal Path Preference](punchlist/01-erratic-routing-loops-intra-municipal-path-preference.md) |
-| **14** | 🔴 crew-visible | OPEN | [PA announcements are being captured as dispatches](punchlist/14-pa-announcements-are-being-captured-as-dispatches.md) |
 | **17** | 🔴 crew-visible | OPEN | [Grade-separated interchanges have no junction to find](punchlist/17-grade-separated-interchanges-have-no-junction-to-find.md) |
 | **19a** | 🔴 crew-visible | OPEN | [Remaining fuzzy-match sites have not been reviewed](punchlist/19a-remaining-fuzzy-match-sites-have-not-been-reviewed.md) |
 | **20** | 🔴 crew-visible | OPEN | [`TALK_GROUPS` duplicates `public.vocabulary`](punchlist/20-talk-groups-duplicates-public-vocabulary.md) |

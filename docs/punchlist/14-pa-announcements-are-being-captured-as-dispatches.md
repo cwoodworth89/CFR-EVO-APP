@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 📢 PA Page Leakage |
 | **Blocks** | 2 |
@@ -13,7 +13,7 @@
 ---
 
 ## 14. PA announcements are being captured as dispatches
-> **Status**: ⚠️ **Open — mechanism identified; blocked on corpus.** Re-checked 2026-08-21:
+> **Status**: ✅ **Closed 2026-09-05 — the PA discriminator is enforcing and the captures stopped.** *(Opened as: ⚠️ **Open — mechanism identified; blocked on corpus.** Re-checked 2026-08-21:)*
 > **0 of 408** dispatches carry the `[PA]` tag
 > (`count(*) FILTER (WHERE review_notes LIKE '%[PA]%')`).
 >
@@ -130,3 +130,14 @@ ships should cite this analysis (§6.3 tier 3) or a published PA tone spec if on
 ---
 
 ## 🔊 Audio Playback & UI State
+
+### Closed 2026-09-05
+
+Two records agree. The database: PA pages captured as dispatches ran 4, 4, 6 and 8 a week
+through the week of 2026-08-24, the last on 2026-08-29, and **0 of 51 captures in the week of
+2026-08-31**. The journal, last 14 days: 13 *"TONE DETECTED: PA Tone (station paging).
+Disregarding"* and 13 *"REJECTED: PA page (647 Hz marker present)"*, five of which *"would
+otherwise have dispatched as Chief Tone"*, so the discriminator is enforcing and has stopped
+real false dispatches. **Operator, 2026-09-05:** the hall pages several times a day; none
+reaching the kiosk in that time is the proof. The harnesses exclude the earlier `[PA]`-tagged
+captures from every score.

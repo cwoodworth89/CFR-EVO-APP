@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-63 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+64 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -18,6 +18,7 @@
 | **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
 | **55** | 🟠 operational | SUPERSEDED | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **63** | 🔴 crew-visible | CLOSED | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
+| **14** | 🔴 crew-visible | CLOSED | [PA announcements are being captured as dispatches](14-pa-announcements-are-being-captured-as-dispatches.md) |
 | **71** | 🔴 crew-visible | CLOSED | [The hotword budget is spent on intersections, suffix duplicates and template words; *Thor* never gets in](71-the-hotword-budget-is-spent-on-intersections-suffix-duplicat.md) |
 | **45a** | ⚪ hygiene | CLOSED | [Geocoder harness needs a review pass before its numbers are trusted again](45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |

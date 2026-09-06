@@ -73,6 +73,30 @@ With the model's tokenizer: `Thor Crt` is 3 tokens, `Thor` 1; `Lougheed Hwy` 5,
 tokens as full names and 134 as names alone. Suffix words are the ones the model never
 mishears. (#18 flagged this as untested; still untested.)
 
+### Step 1 built and measured, 2026-09-05 (`ab4da95`)
+
+`street_terms()` in `bias_prompt.py`: an intersection gives its two streets, the house number
+goes, the suffix is normalised, and the final list is de-duplicated on the normalised name.
+The live list went from 27 streets reaching rank 15 to 34 streets reaching rank 27, with the
+seven intersection strings and the suffix pairs gone. Kensal Pl is rank 28 and still just
+misses; Thor Crt is rank 58.
+
+| Same live settings otherwise; baseline = Friday's run B | Holdout (44) | Corpus (507) |
+|:--|--:|--:|
+| WER mean | 4.02 → 4.39 % | 4.78 → **3.22 %** |
+| Scored clips moved, better / worse | 2 / 5 | 10 / 8 |
+| Map grid wrong | 0 → 0 | 6 → 6 |
+| Wrong street | 3 → 3 | 13 → **16** |
+| Placed exactly | 34 → 34 | 428 → 426 |
+
+The WER gain is four hard clips recovered outright (*"routine testing only 1300 pinetree way"*
+84 → 0 %, the Chrome Cres call 63 → 0 %, 2525 Como Lake Ave 26 → 0 %). The three streets
+lost are `3080 Lincoln Ave` heard as *Lnkin*, `3001 Gordon Ave` falling to a Christmas Way
+section, and `Eagle Mountain Park` landing on the contact-dispatch placeholder; whether those
+are the list or run-to-run variance, one run cannot say. Not live: the agent was restarted
+before this landed and is still on the old list. The operator decides whether it goes live
+with step 2 or alone.
+
 ### Experiments, one variable each, on the round-1 holdout then the full corpus
 
 `tools/harness_chain.py` with `--record`, against the 2026-09-05 A/B rows in

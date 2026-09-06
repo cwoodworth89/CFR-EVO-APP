@@ -118,7 +118,15 @@ ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR
 ## 3. Score on the holdout
 
 Round 2 is scored on both holdouts and on the completion habit, before anything is deployed,
-with the model chosen by environment (`WHISPER_MODEL` is read by `cfr_dispatch.config.runtime`):
+with the model chosen by environment (`WHISPER_MODEL` is read by `cfr_dispatch.config.runtime`).
+
+> **The override did nothing before 2026-09-06.** `cfr_dispatch/__init__.py` copied
+> `backend/.env` over the process environment, so `WHISPER_MODEL=<other>` in front of either
+> harness loaded the `.env` model and recorded it under a note saying otherwise: the first
+> five "round 2" rows in `evaluation_history` (2026-09-06 13:42–14:02 UTC) scored the round-1
+> model, and the three holdout-2 summaries were byte-identical. Fixed with `setdefault`.
+> **Check the harness's own `model <path>;` line at the top of its output before believing a
+> number** — the `recorded: ... model=` line at the bottom says the same thing.
 
 ```bash
 ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && XDG_RUNTIME_DIR=/run/user/1000 WHISPER_MODEL=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-r2 .venv/bin/python tools/harness_chain.py --only-csv backend/data/training/metadata_round1_holdout.csv --record --notes 'round 2 on the round-1 holdout'"

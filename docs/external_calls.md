@@ -123,6 +123,7 @@ as they are.
 | `backend/scripts/sync_hydrants.py` | City ArcGIS endpoint |
 | `backend/scripts/crawl_cadastral_tiles.py`, `compile_mbtiles.py` | `basemaps.cartocdn.com` — see the §1 licence caution before touching |
 | `tools/extract_training_data.py`, `backtest_regression.py`, `clean_old_dispatches.py` | local API only |
+| `tools/train_whisper_lora.py` | `huggingface.co` — `transformers` loading `openai/whisper-base` sends `HEAD` revision checks for the cached files at the start of a run (seen in `/tmp/round2.log` 2026-09-05 21:38, three requests, all answered from the cache afterwards). Training only, never the agent; offline it falls back to the cache with a warning. Found 2026-09-06 while reading the training log, registered per the 2026-08-31 ruling, not fixed. |
 
 ---
 

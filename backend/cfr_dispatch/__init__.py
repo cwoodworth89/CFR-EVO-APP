@@ -20,8 +20,13 @@ def _load_env():
                     # Strip quotes if they surround the value
                     if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
                         value = value[1:-1]
-                    
-                    os.environ[key] = value
+                    # The process environment wins over backend/.env, the way python-dotenv and
+                    # tools/harness_common.py already behave. Until 2026-09-06 this line was an
+                    # unconditional assignment, so `WHISPER_MODEL=<other> harness_chain.py` loaded
+                    # the .env model and recorded five "round 2" scores that were the round-1 model
+                    # (stt-mlops-backtest skill, section 3). The agent's systemd unit sets nothing
+                    # but XDG_RUNTIME_DIR, so the live service reads .env exactly as before.
+                    os.environ.setdefault(key, value)
 
 _load_env()
 

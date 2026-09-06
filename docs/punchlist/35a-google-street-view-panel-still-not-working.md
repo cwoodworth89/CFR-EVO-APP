@@ -179,3 +179,11 @@ one line, post-freeze.
 The in-app browser could not reproduce this: it blocks the page's requests to `:8000` and
 `:9001` (`ERR_BLOCKED_BY_CLIENT`), so no address ever resolves there. Real Chrome did it in
 one search.
+
+Verified in Chrome after the kiosk build (`32a4386`, bundle `index-D700fJrZ.js`): the strip
+renders over the embed and the button reads *No interactive view to save*, disabled. One
+thing learned on the way: nginx sends `index.html` with no `Cache-Control`, and Chrome kept
+serving the previous build's `index.html` (and so the previous bundle) across a plain reload
+until a cache-busting query forced it. `main.jsx` reloads once when a chunk from a previous
+build fails to load, which covers the kiosk after a build in practice but not by design; one
+line on the backlog.

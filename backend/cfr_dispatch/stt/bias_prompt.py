@@ -105,15 +105,46 @@ def dedupe_terms(terms: list[str]) -> list[str]:
     return out
 
 
-def get_hitl_verified_streets() -> list[str]:
-    """
-    Fetches the most frequently misheard street names that required HITL correction.
-    Cached in memory for 10 minutes to prevent blocking network requests during transcription.
+def get_hitl_verified_streets(engine=None) -> list[str]:
+    """The streets the operator has corrected in review, most often misheard first.
+
+    From the whole corpus when a database engine is given (the validator's), otherwise from
+    the API's last 200 dispatches. The API window was the only source until 2026-09-05; on
+    that day it reached back to 2026-08-17, PA pages included, and both Thor Crt calls
+    (08-08, 08-14) sat outside it: the list built for misheard streets did not hold the
+    street misheard twice (punch-list #71). Cached for 10 minutes either way.
     """
     global _cached_hitl_streets, _last_hitl_fetch_time
     now = time.time()
     if _cached_hitl_streets and (now - _last_hitl_fetch_time < 600.0):
         return _cached_hitl_streets
+
+    if engine is not None:
+        try:
+            from collections import defaultdict
+            from sqlalchemy import text
+            tally = defaultdict(int)
+            with engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT verified_address, target->>'address' AS system_address
+                    FROM public.dispatches
+                    WHERE feedback_submitted
+                      AND coalesce(btrim(verified_address), '') <> ''
+                      AND position('[PA]' in coalesce(target->>'review_notes', '')) = 0
+                """)).fetchall()
+            for verified_addr, system_addr in rows:
+                sys_streets = set(street_terms(system_addr or ''))
+                for street in street_terms(verified_addr):
+                    if street not in sys_streets:
+                        tally[street] += 1
+            sorted_streets = sorted(tally, key=lambda st: (-tally[st], st))
+            _cached_hitl_streets = sorted_streets
+            _last_hitl_fetch_time = now
+            logging.info("STT hotwords: %d misheard streets from %d reviewed dispatches (corpus).",
+                         len(sorted_streets), len(rows))
+            return sorted_streets
+        except Exception as e:
+            logging.warning(f"HITL streets from the database failed, trying the API: {e}")
 
     try:
         local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000").rstrip("/")
@@ -242,7 +273,7 @@ def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None,
     if units_vocabulary and isinstance(units_vocabulary, (list, set)):
         unit_terms = [str(u).title() for u in units_vocabulary if len(str(u).strip()) > 1]
 
-    hitl_streets = get_hitl_verified_streets()
+    hitl_streets = get_hitl_verified_streets(getattr(validator, "engine", None))
 
     ranked_streets = _streets_by_frequency(getattr(validator, 'engine', None))
     if not ranked_streets and validator and hasattr(validator, 'get_all_road_names'):

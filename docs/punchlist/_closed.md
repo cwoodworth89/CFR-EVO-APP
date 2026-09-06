@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-58 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+63 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -13,6 +13,11 @@
 | **68** | 🔴 crew-visible | CLOSED | [The digit join glued the next clause's number onto the map grid when the STT lost round 2's opening](68-the-digit-join-glued-the-next-clauses-number-onto-the-map-gr.md) |
 | **69** | 🔴 crew-visible | CLOSED | [A five-digit house number was routed on as if it were a civic number](69-a-five-digit-house-number-was-routed-on-as-if-it-were-a-civic.md) |
 | **72** | 🔴 crew-visible | CLOSED | [Phase 1 published an address and a map grid the model made up to finish a cut chunk](72-phase-1-published-an-address-and-a-map-grid-the-model-made-up.md) |
+| **34b** | 🔴 crew-visible | CLOSED | [Live overdose call still showed the green ROUTINE (Code 1) badge](34b-live-overdose-call-still-showed-the-green-routine-code.md) |
+| **47a** | 🔴 crew-visible | CLOSED | [`Chartwell Rd` does not exist in municipal data — three sources give three street names](47a-chartwell-rd-does-not-exist-in-municipal-data-three-sou.md) |
+| **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
+| **55** | 🟠 operational | SUPERSEDED | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
+| **63** | 🔴 crew-visible | CLOSED | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
 | **71** | 🔴 crew-visible | CLOSED | [The hotword budget is spent on intersections, suffix duplicates and template words; *Thor* never gets in](71-the-hotword-budget-is-spent-on-intersections-suffix-duplicat.md) |
 | **45a** | ⚪ hygiene | CLOSED | [Geocoder harness needs a review pass before its numbers are trusted again](45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |

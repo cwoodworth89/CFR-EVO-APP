@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🖥️ Live Operation Batch, 2026-08-23 |
 | **Blocks** | 1 |
@@ -13,7 +13,9 @@
 ---
 
 ## 34. Live overdose call still showed the green ROUTINE (Code 1) badge
-> **Status**: ⚠️ **Open — duplicate symptom of #31, now confirmed in live operation.**
+> **Status**: ✅ **Closed 2026-09-05 — verified against the database: since the #31 fix (2026-08-23), no
+> call has been stored *routine* against a verified *emergency* (0 of 28 verified).** *(Opened as: ⚠️
+> Open — duplicate symptom of #31, now confirmed in live operation.)*
 
 An overdose dispatch (an *emergency* response) rendered with the green border and the
 `ROUTINE (CODE 1)` badge. This is exactly the failure #31 predicts: `response_type` never
@@ -51,3 +53,12 @@ dispatch — that cannot be established from here, and inferring it from the dat
 exactly the reported-vs-confirmed conflation §6.6 warns about.
 
 **Closes on**: one operator screenshot of a live `emergency` call showing the badge.
+
+### Closed 2026-09-05
+
+Checked, not assumed (CLAUDE.md §6.6): of the 28 calls verified since 2026-08-23, none was
+stored `routine` where the operator verified `emergency`. The green badge cannot come back
+from a default because there is no default (#31). What the check also showed: 11 of the 12
+overdose calls in that window carry **no** stored response type at all, so they render as
+UNKNOWN on amber, which is #31's design and a separate, smaller thing: the parser is not
+catching *emergency* on overdose announcements. One line on the backlog.

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | EXTERNAL |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧾 Import Completeness Audit, 2026-08-23 |
 | **Blocks** | 1 |
@@ -13,7 +13,9 @@
 ---
 
 ## 47. `Chartwell Rd` does not exist in municipal data — three sources give three street names
-> **Status**: 📋 **Open — for the City GIS team, not a code defect.** Raised by the operator
+> **Status**: ✅ **Closed 2026-09-05 — the operator ruled the verified column keeps what was spoken; the
+> geocoder places the call on 3305 Chartwell Green, the City's name for it; the question for the
+> City lives in `city_gis_data_register.md` §15.** *(Opened as: 📋 Open — for the City GIS team, not a code defect.)* Raised by the operator
 > from HITL review of `DISP-2026-EC4501` (2026-08-19, rated OPERATIONAL): *"Flag this call.
 > The dispatch announces 3305 Chartwell Rd, but that's not on the cadastral data. The map only
 > shows it as 3305 Chartwell Green. Strange?"* All figures below **confirmed** by query.

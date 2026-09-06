@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🎙️ Dispatch Pipeline |
 | **Blocks** | 1 |
@@ -14,8 +14,10 @@
 
 ## 63. The model in service writes the prompt's own phrase into the transcript
 
-> **Status**: 🔴 **Open — parser mitigation shipped 2026-09-05 (`8b962b8`); operator ruling 2026-09-05:
-> no prompt, applied on the kiosk at 08:28 PDT. Stays open until fresh calls are measured without it.** Crew-visible: the map grid drives the zone the
+> **Status**: ✅ **Closed 2026-09-05 — no prompt and no "map grid" hotword, both measured on the holdout
+> and the corpus and applied; the parser drops orphan insertions. The residual, the model finishing
+> cut audio, is #72's workaround today and round 2 of the model tonight.** *(Opened as: 🔴 Open —
+> parser mitigation shipped 2026-09-05.)* Crew-visible: the map grid drives the zone the
 > kiosk shows, and the same insertion loses the cross streets.
 
 ### What happens

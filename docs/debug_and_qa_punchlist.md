@@ -15,11 +15,11 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**25 open** (17 crew-visible) · **58 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**20 open** (13 crew-visible) · **63 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 25
+## Open — 20
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -31,20 +31,15 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | **21** | 🔴 crew-visible | OPEN | [Rail crossing list is hand-entered and probably incomplete](punchlist/21-rail-crossing-list-is-hand-entered-and-probably-incompl.md) |
 | **30** | 🔴 crew-visible | OPEN | ["Code 1 / Code 3" is not Coquitlam terminology, and the border has no warning or review state](punchlist/30-code-1-code-3-is-not-coquitlam-terminology-and-the-bord.md) |
 | **34a** | 🔴 crew-visible | OPEN | [Apparatus names collide with call-type names, turning STT damage into a confident wrong answer](punchlist/34a-apparatus-names-collide-with-call-type-names-turning-st.md) |
-| **34b** | 🔴 crew-visible | OPEN | [Live overdose call still showed the green ROUTINE (Code 1) badge](punchlist/34b-live-overdose-call-still-showed-the-green-routine-code.md) |
-| **47a** | 🔴 crew-visible | EXTERNAL | [`Chartwell Rd` does not exist in municipal data — three sources give three street names](punchlist/47a-chartwell-rd-does-not-exist-in-municipal-data-three-sou.md) |
 | **51b** | 🔴 crew-visible | OPEN | [The kiosk shows the junction field labelled "cross streets", and never reads the real one](punchlist/51b-the-kiosk-shows-the-junction-field-labelled-cross-stree.md) |
-| **54** | 🔴 crew-visible | SUPERSEDED | [Confidence 100 means "the two STT passes agreed", not "the location is right"](punchlist/54-confidence-100-means-the-two-stt-passes-agreed-not-the.md) |
 | **56** | 🔴 crew-visible | OPEN | [Bring XStreets onto the same resolution path as main addresses](punchlist/56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
 | **57** | 🔴 crew-visible | OPEN | [Candidate-level parse bleed — latent, not live](punchlist/57-candidate-level-parse-bleed-latent-not-live.md) |
-| **63** | 🔴 crew-visible | OPEN | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](punchlist/63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
 | **65** | ⚪ hygiene | OPEN | [The admin login accepts three hardcoded passwords besides the configured one](punchlist/65-the-admin-login-accepts-three-hardcoded-passwords-besides-t.md) |
 | **70** | 🔴 crew-visible | OPEN | [A restart during a capture loses the call and its audio](punchlist/70-a-restart-during-a-capture-loses-the-call-and-its-audio.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **35a** | 🟠 operational | OPEN | [Google Street View panel still not working](punchlist/35a-google-street-view-panel-still-not-working.md) |
 | **49** | 🟠 operational | OPEN | [Access-point review UX — operators cannot set an entrance without direct SQL](punchlist/49-access-point-review-ux-operators-cannot-set-an-entrance.md) |
-| **55** | 🟠 operational | OPEN | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](punchlist/55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |
 | **37** | ⚪ hygiene | OPEN | [Close button and timer timeout should not dismiss to the same place](punchlist/37-close-button-and-timer-timeout-should-not-dismiss-to-th.md) |
 | **52a** | ⚪ hygiene | OPEN | [Kiosk review button formatting and review rating functionality](punchlist/52a-kiosk-review-button-formatting-and-review-rating-functi.md) |

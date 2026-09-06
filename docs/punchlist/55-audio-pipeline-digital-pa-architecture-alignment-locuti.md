@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | SUPERSEDED |
 | **Severity** | operational |
 | **Area** | 🧷 Parcel Import Integrity |
 | **Blocks** | 1 |
@@ -13,7 +13,10 @@
 ---
 
 ## 55. Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)
-> **Status**: ⚠️ **Open — originated from Gemini team review, needs verification against live kiosk.** Documented 2026-08-30.
+> **Status**: 🟡 **Superseded 2026-09-05 by the operator's design in
+> `docs/architecture/progressive_dispatch.md`**, which measured the phase-1 timing on 507 recordings
+> and sets the layered publication this item was reaching for. *(Opened as: ⚠️ Open — originated from
+> Gemini team review, needs verification against live kiosk. Documented 2026-08-30.)*
 >
 > [!IMPORTANT]
 > **Origin & Verification Guard (CLAUDE.md §6.6)**: This punchcard entry was compiled during the Gemini team architectural review. All parameters and operational model descriptions are staged/reported and must be verified against the running kiosk system (`tcfire@100.95.146.94`) and live Locution broadcast audio before marking complete.

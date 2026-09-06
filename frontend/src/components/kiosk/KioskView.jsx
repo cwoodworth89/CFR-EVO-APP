@@ -165,7 +165,12 @@ export default function KioskView({ kioskState }) {
 
   const talkGroup = activeCall?.radio_channel || activeCall?.target?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
   const rawMapGrid = activeCall?.map_grid || activeCall?.target?.map_grid || activeCall?.mapGrid || activeCall?.grid || null;
-  const formattedGrid = rawMapGrid ? (rawMapGrid.toString().toUpperCase().startsWith('GRID') ? rawMapGrid.toString().toUpperCase() : `GRID ${rawMapGrid}`) : null;
+  const gridLabel = rawMapGrid ? (rawMapGrid.toString().toUpperCase().startsWith('GRID') ? rawMapGrid.toString().toUpperCase() : `GRID ${rawMapGrid}`) : null;
+  // Until phase 2 hears the grid, phase 1 shows the zone the placed parcel sits in and says so
+  // (target.map_grid_source === 'parcel-zone', punch list #72). A derived value is labelled, never
+  // dressed as the announced one (CLAUDE.md section 6.1).
+  const gridSource = activeCall?.target?.map_grid_source || activeCall?.map_grid_source || null;
+  const formattedGrid = gridLabel && gridSource === 'parcel-zone' ? `${gridLabel} · FROM ADDRESS` : gridLabel;
 
   const isReviewed = activeCall.feedback_submitted || (activeCall.quality_rating && activeCall.quality_rating !== 'PENDING');
   const displayAddress = (isReviewed && typeof activeCall.verified_address === 'string' && activeCall.verified_address.trim().length > 0)

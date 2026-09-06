@@ -367,7 +367,13 @@ class AddressResolver:
                         "lng": float(dest_lng),
                         "rings": rings,
                         "confidence": float(best_score),
-                        "is_ambiguous": False
+                        "is_ambiguous": False,
+                        # The parcel's own response zone (public.parcels.zone_id, computed at
+                        # import by point-in-polygon against the City's Emergency Response
+                        # Zones layer). Phase 1 publishes it as the map grid: it agrees with
+                        # the announced grid on 96.3 % of exact placements, measured
+                        # 2026-09-05 on 736 parcel rows (punch-list #72).
+                        "zone_id": (str(best_row['zone_id']).strip() if best_row['zone_id'] is not None else None),
                     }
         except Exception as e:
             logging.error(f"Error in exact address resolution: {e}", exc_info=True)

@@ -14,6 +14,7 @@ export const FLAG_LABELS = {
   STREET_SECTION_ONLY: 'Street section only — no point location',
   NO_TALK_GROUP: 'No talk group announced or transcribed',
   NO_MAP_GRID: 'No map grid announced or transcribed',
+  GRID_MISMATCH: 'Announced map grid differs from the zone the address sits in',
   NO_UNITS: 'No responding units identified',
   UNKNOWN_CALL_TYPE: 'Call type missing or generic',
   RESPONSE_TYPE_UNKNOWN: 'Response type not announced or not transcribed',

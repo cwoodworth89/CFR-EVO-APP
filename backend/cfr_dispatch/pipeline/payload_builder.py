@@ -40,7 +40,8 @@ def build_dispatch_payload(
     audio_duration: float = None,
     verified_transcript: str = None,
     tone_name: str | list = None,
-    is_test: bool = False
+    is_test: bool = False,
+    preliminary: bool = False
 ) -> Tuple[dict, list]:
     """
     Unified constructor for dispatch payloads conforming to local database and MQTT contracts.
@@ -106,7 +107,9 @@ def build_dispatch_payload(
         # to the parcel. The ranking is the geocoder's own confidence per step (exact and
         # intersection highest, then section, block, street centroid, road centroid), so the
         # authority that already exists decides, not a positional rule (CLAUDE.md 6.2).
-        grid_hint = next((d.map_grid for d in all_candidates if d.map_grid), None)
+        # Phase 1 does not narrow streets by the parsed grid: at 16-19 s that grid is the
+        # model's completion seven times in ten (punch-list #72).
+        grid_hint = None if preliminary else next((d.map_grid for d in all_candidates if d.map_grid), None)
         best, best_conf, best_idx = None, -1.0, -1
         for i, candidate_address in enumerate(unique_addresses):
             logging.debug(f"[{dispatch_id}] Attempting Local Geocode for Candidate #{i+1}: '{candidate_address}'")
@@ -131,7 +134,8 @@ def build_dispatch_payload(
                 "address": res["address"],
                 "lat": res["lat"],
                 "lng": res["lng"],
-                "rings": res.get("rings", [])
+                "rings": res.get("rings", []),
+                "zone_id": res.get("zone_id"),  # set only by an exact parcel match
             }
             # A "<street> and <street>" dispatch resolves to a street SECTION rather
             # than a point. These fields are what let the kiosk highlight the stretch
@@ -164,11 +168,31 @@ def build_dispatch_payload(
     
     timestamp = datetime.datetime.now().astimezone().isoformat()
     
-    map_grid = next((d.map_grid for d in all_candidates if d.map_grid), None)
-    if (not map_grid or str(map_grid).lower() == "none") and lat is not None and lng is not None and validator:
+    # Where the grid comes from, and what the payload says about it (punch-list #72).
+    #   preliminary (phase 1): the parsed grid is ignored. At 16-19 s, when phase 1 fires, it
+    #     is the model finishing the cut chunk with the template's tail: wrong on 314 of 448
+    #     recordings, measured 2026-09-05. The grid is the placed parcel's own zone
+    #     (public.parcels.zone_id, the City's response zones), which agrees with the
+    #     announced grid on 96.3 % of exact placements. No parcel, no grid: an intersection
+    #     sits on a zone line by construction, and a fallback placement is not a place.
+    #     Phase 2 replaces it with the spoken grid and flags a difference.
+    #   otherwise (phase 2, the harnesses): the spoken grid first, and the zone containing
+    #     the point only when nothing was spoken, as before.
+    parsed_grid = next((d.map_grid for d in all_candidates if d.map_grid), None)
+    if parsed_grid is not None and str(parsed_grid).lower() == "none":
+        parsed_grid = None
+    map_grid, map_grid_source = None, None
+    if preliminary:
+        if local_geocode_result.get("zone_id"):
+            map_grid, map_grid_source = str(local_geocode_result["zone_id"]), "parcel-zone"
+            logging.info(f"[{dispatch_id}] Phase 1 map grid {map_grid} is the parcel's zone, not the chunk's"
+                         + (f" ('{parsed_grid}')" if parsed_grid else ""))
+    elif parsed_grid:
+        map_grid, map_grid_source = str(parsed_grid), "announced"
+    elif lat is not None and lng is not None and validator:
         spatial_grid = validator.get_map_grid_for_point(lat, lng)
         if spatial_grid:
-            map_grid = spatial_grid
+            map_grid, map_grid_source = str(spatial_grid), "point-zone"
             logging.info(f"[{dispatch_id}] Spatial fallback: Map grid auto-populated from emergency response zones -> '{map_grid}'")
 
     radio_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), None)
@@ -227,6 +251,9 @@ def build_dispatch_payload(
         "lng": lng,
         "rings": rings,
         "map_grid": map_grid,
+        # "parcel-zone" (phase 1, derived from the placed parcel), "announced" (spoken),
+        # "point-zone" (nothing spoken; the zone containing the point), or None.
+        "map_grid_source": map_grid_source,
         "radio_channel": radio_channel,
         "routing_metrics": routing_metrics,
         "x_street_1": x_street_1,

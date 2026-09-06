@@ -191,7 +191,8 @@ def main() -> int:
         san, cands = candidates_like_phase2(chunk_raw)
         trace_log.clear()
         try:
-            payload, _units = build_dispatch_payload("SIM", chunk_raw, san, cands, validator, UNITS_VOCABULARY)
+            payload, _units = build_dispatch_payload("SIM", chunk_raw, san, cands, validator, UNITS_VOCABULARY,
+                                                     preliminary=True)
         except Exception:
             payload = {}
         target = (payload or {}).get("target") or {}

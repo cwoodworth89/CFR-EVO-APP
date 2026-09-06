@@ -120,7 +120,8 @@ def process_phase_1_check(
             with PipelineTimer("payload_building") as t_gis:
                 db_payload, responding_units = build_dispatch_payload(
                     dispatch_id, raw_transcript, transcript, all_candidates, validator, units_vocab,
-                    verify_location_override=False, tone_name=tone_name, is_test=is_test
+                    verify_location_override=False, tone_name=tone_name, is_test=is_test,
+                    preliminary=True,  # the grid is the parcel's zone, never the chunk's (#72)
                 )
             metrics["gis_ms"] = t_gis.elapsed_ms
 

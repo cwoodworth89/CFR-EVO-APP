@@ -36,6 +36,7 @@ LOCATION_SUBSTITUTED = "LOCATION_SUBSTITUTED"
 STREET_SECTION_ONLY = "STREET_SECTION_ONLY"
 NO_TALK_GROUP = "NO_TALK_GROUP"
 NO_MAP_GRID = "NO_MAP_GRID"
+GRID_MISMATCH = "GRID_MISMATCH"
 NO_UNITS = "NO_UNITS"
 UNKNOWN_CALL_TYPE = "UNKNOWN_CALL_TYPE"
 RESPONSE_TYPE_UNKNOWN = "RESPONSE_TYPE_UNKNOWN"
@@ -47,6 +48,7 @@ FLAG_LABELS = {
     STREET_SECTION_ONLY: "Street section only — no point location",
     NO_TALK_GROUP: "No talk group announced or transcribed",
     NO_MAP_GRID: "No map grid announced or transcribed",
+    GRID_MISMATCH: "Announced map grid differs from the zone the address sits in",
     NO_UNITS: "No responding units identified",
     UNKNOWN_CALL_TYPE: "Call type missing or generic",
     RESPONSE_TYPE_UNKNOWN: "Response type not announced or not transcribed",
@@ -71,7 +73,7 @@ def _blank(value):
 
 def compute_review_flags(*, lat, lng, responding_units, incident_type,
                          map_grid, radio_channel, response_type,
-                         resolution_note=None, location_type=None):
+                         resolution_note=None, location_type=None, derived_map_grid=None):
     """Return the sorted list of flags that apply to one dispatch.
 
     Pure and keyword-only: every input is passed explicitly so this can be tested
@@ -91,6 +93,12 @@ def compute_review_flags(*, lat, lng, responding_units, incident_type,
         flags.append(NO_TALK_GROUP)
     if _blank(map_grid):
         flags.append(NO_MAP_GRID)
+    # Phase 1 published the parcel's zone; phase 2 heard a different grid. Either the
+    # dispatcher assigned across a zone line or the transcript is wrong; a person decides
+    # (punch-list #72). Numeric strings compare without leading zeros, as round_comparison does.
+    if (not _blank(map_grid) and not _blank(derived_map_grid)
+            and str(map_grid).strip().lstrip("0") != str(derived_map_grid).strip().lstrip("0")):
+        flags.append(GRID_MISMATCH)
 
     units = [u for u in (responding_units or []) if not _blank(u)]
     if not units or (len(units) == 1 and str(units[0]).strip().lower() == "unknown unit"):

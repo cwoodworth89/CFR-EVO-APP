@@ -62,6 +62,23 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None,
         logging.error(f"[{dispatch_id}] Error saving dispatch audio: {e}", exc_info=True)
         return None, 0.0
 
+def _grid_after_phase_2(all_candidates, lat, lng, validator):
+    """The grid phase 2 publishes, and where it came from (punch-list #72).
+
+    The spoken grid from the full recording, or the zone containing the point when none was
+    spoken. Never phase 1's parsed grid: at 16-19 s that was the model's completion on seven
+    calls in ten, which is why phase 1 now publishes the parcel's zone instead.
+    """
+    spoken = next((d.map_grid for d in all_candidates if d.map_grid), None)
+    if spoken and str(spoken).lower() != "none":
+        return str(spoken), "announced"
+    if lat is not None and lng is not None and validator:
+        point_zone = validator.get_map_grid_for_point(lat, lng)
+        if point_zone:
+            return str(point_zone), "point-zone"
+    return None, None
+
+
 def _coalesce_across_rounds(all_candidates, p1_candidate, p1_target):
     """First non-empty XStreet and subaddress across every parsed round.
 
@@ -202,9 +219,8 @@ def process_phase_2_finalize(
                 p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                 p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                 
-                p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
-                if (not p2_grid or str(p2_grid).lower() == "none") and p1_target.get("lat") and validator:
-                    p2_grid = validator.get_map_grid_for_point(p1_target["lat"], p1_target["lng"])
+                p2_grid, p2_grid_source = _grid_after_phase_2(
+                    all_candidates, p1_target.get("lat"), p1_target.get("lng"), validator)
                 p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
                 p2_incident_type = match_incident_type(transcript, CALL_TYPES)
 
@@ -270,6 +286,9 @@ def process_phase_2_finalize(
                     "lng": p1_target.get("lng"),
                     "rings": p1_target.get("rings", []),
                     "map_grid": p2_grid,
+                    "map_grid_source": p2_grid_source,
+                    # Phase 1's derived grid, kept so the reviewer sees both when they differ.
+                    "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") == "parcel-zone" else None,
                     "radio_channel": p2_channel
                 }
 
@@ -288,6 +307,7 @@ def process_phase_2_finalize(
                     response_type=(best_p2_candidate.response_type if best_p2_candidate else None),
                     resolution_note=target_payload.get("resolution_note"),
                     location_type=target_payload.get("location_type"),
+                    derived_map_grid=target_payload.get("derived_map_grid"),
                 )
                 target_payload["review_flags"] = p2_flags
                 target_payload["review_flag_count"] = len(p2_flags)
@@ -332,9 +352,8 @@ def process_phase_2_finalize(
                         p2_units_str = merge_units(p1_units, p2_units) if (p1_units or p2_units) else None
                         p2_responding_units = abbreviate_units(p2_units_str) if p2_units_str else []
                         
-                        p2_grid = next((d.map_grid for d in all_candidates if d.map_grid), (p1_candidate.map_grid if p1_candidate else None))
-                        if (not p2_grid or str(p2_grid).lower() == "none") and res.get("lat") and validator:
-                            p2_grid = validator.get_map_grid_for_point(res["lat"], res["lng"])
+                        p2_grid, p2_grid_source = _grid_after_phase_2(
+                            all_candidates, res.get("lat"), res.get("lng"), validator)
                         p2_channel = next((d.radio_channel for d in all_candidates if d.radio_channel), (p1_candidate.radio_channel if p1_candidate else None))
                         p2_incident_type = match_incident_type(transcript, CALL_TYPES)
 
@@ -380,6 +399,8 @@ def process_phase_2_finalize(
                             "lng": res["lng"],
                             "rings": res.get("rings", []),
                             "map_grid": p2_grid,
+                            "map_grid_source": p2_grid_source,
+                            "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") == "parcel-zone" else None,
                             "radio_channel": p2_channel
                         }
                         if p2_subaddress:
@@ -400,6 +421,7 @@ def process_phase_2_finalize(
                             response_type=(best_p2_candidate.response_type if best_p2_candidate else None),
                             resolution_note=target_payload.get("resolution_note"),
                             location_type=target_payload.get("location_type"),
+                            derived_map_grid=target_payload.get("derived_map_grid"),
                         )
                         target_payload["review_flags"] = p2_flags
                         target_payload["review_flag_count"] = len(p2_flags)

@@ -22,10 +22,14 @@ import { apiClient } from '../../apiClient';
  *   * The API key is inlined by Vite at BUILD time, so frontend/.env.local must be
  *     present on the kiosk when `npm run build` runs. It is git-ignored, so a fresh
  *     clone will not have it.
- *   * A failed SDK load and a successful one currently look identical: the loading
- *     spinner is cleared by a 3.5s timer whether or not the panorama mounted, and
- *     the <iframe> fallback only renders when the key is MISSING or sdkError is set.
- *     See punch-list #35.
+ *   * Found 2026-09-06 in Chrome against the kiosk build (punch-list #35a): the Maps
+ *     JavaScript API answers `ApiTargetBlockedMapError` -- the key's API restrictions
+ *     in the Google Cloud console do not include the Maps JavaScript API -- so
+ *     gm_authFailure fires, sdkError is set, and the <iframe> Embed API fallback (a
+ *     different API, which the key is allowed) renders. That fallback used to be
+ *     silent and its save button wrote the initial camera values back as if the
+ *     operator had set them; both now say so on the panel. The fix for the key is in
+ *     the console, not here.
  */
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
@@ -474,6 +478,15 @@ export default function StreetViewPanel({ activeCall }) {
         </div>
       )}
 
+      {/* The SDK failure used to be silent: the embed below looks like the real thing, and
+          the save button kept working on stale values. Say what is shown and why (6.1). */}
+      {sdkError && (
+        <div className="absolute top-2 right-2 z-20 max-w-[60%] bg-amber-950/95 border border-amber-600 text-amber-200 px-2.5 py-1.5 rounded-lg text-[10px] font-mono leading-snug shadow-lg">
+          <span className="font-bold">⚠️ INTERACTIVE VIEW UNAVAILABLE</span> — Google rejected the
+          key for the Maps JavaScript API; a static embed is shown and the camera angle cannot be
+          saved. The error code is in the browser console (punch-list #35a).
+        </div>
+      )}
       {sdkError ? (
         <iframe
           title="Fallback Google Street View Embed"
@@ -520,9 +533,14 @@ export default function StreetViewPanel({ activeCall }) {
         {/* Save Preferred View Button */}
         <button
           onClick={handleSaveView}
-          disabled={saveStatus === 'saving'}
+          // With the SDK down there is no panorama to read a heading from: the save would
+          // write the initial values back and report success (CLAUDE.md 6.1, punch-list #35a).
+          disabled={saveStatus === 'saving' || sdkError}
+          title={sdkError ? 'Interactive Street View is unavailable, so there is no camera angle to save' : undefined}
           className={`px-4 py-1.5 rounded-xl border font-bold text-xs transition shadow flex items-center gap-1.5 ${
-            saveStatus === 'saved'
+            sdkError
+              ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
+              : saveStatus === 'saved'
               ? 'bg-emerald-600 border-emerald-400 text-white'
               : saveStatus === 'error'
               ? 'bg-red-600 border-red-400 text-white'
@@ -531,7 +549,9 @@ export default function StreetViewPanel({ activeCall }) {
         >
           <span>💾</span>
           <span>
-            {saveStatus === 'saving'
+            {sdkError
+              ? 'No interactive view to save'
+              : saveStatus === 'saving'
               ? 'Saving...'
               : saveStatus === 'saved'
               ? '✅ Saved Preferred View!'

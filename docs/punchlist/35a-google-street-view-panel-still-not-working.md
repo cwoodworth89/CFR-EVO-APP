@@ -136,3 +136,46 @@ which is what this item has needed all along.
 Found by running the full backend suite, not by investigating Street View. It is the second
 casualty of the `lat` → `centroid_lat` rename; the first was the parcel import's own
 verification query. Both were invisible because nothing exercised them.
+
+---
+
+## 35a (cause). `ApiTargetBlockedMapError`: the key is not allowed to use the Maps JavaScript API
+
+> **Status**: 🟡 **Cause confirmed 2026-09-06 in the browser. The fix is a setting on the API
+> key in the Google Cloud console, which needs the operator's sign-in (passkey).**
+
+Reproduced in Chrome against the kiosk build (`http://100.95.146.94/`, Explore mode, the
+address search for 3030 Gordon Ave mounts the same `DetailStack` the kiosk uses). The console,
+with `console.error` hooked before the SDK loaded:
+
+```
+Google Maps JavaScript API error: ApiTargetBlockedMapError
+https://developers.google.com/maps/documentation/javascript/error-messages#api-target-blocked-map-error
+Google Maps JS SDK auth failure triggered. Check Google Cloud Console 'Maps JavaScript API' status.
+```
+
+Google's page for that code, read the same day: *"This API key is not authorized to use this
+service or API. Please check the API restrictions settings of your API key in the Google Cloud
+console to ensure that all of the APIs and services you need to use are correctly specified in
+the list of enabled APIs."* Not `ApiNotActivatedMapError` (the API is not enabled on the
+project) and not `RefererNotAllowedMapError` (the kiosk's origin is not an allowed referrer):
+the key exists and is accepted, and its **API restrictions** list leaves out the Maps
+JavaScript API. The Maps **Embed** API is on that list, which is why the `<iframe>` fallback
+renders a panorama and the panel is not blank today; what is lost is the interactive view and
+the operator's *Save Preferred View*, which reads the camera from the SDK panorama.
+
+**The fix, for the operator** (console, signed in as the project owner):
+Google Cloud console → APIs & Services → Credentials → the key ending in `...XRLsY` → *API
+restrictions* → add **Maps JavaScript API** (keep Maps Embed API) → Save. Takes effect within
+minutes. Then reload the kiosk page with a call or a searched address: the amber
+*INTERACTIVE VIEW UNAVAILABLE* strip should be gone and the console clean.
+
+**Done in code the same day** (CLAUDE.md 6.1): the fallback used to be indistinguishable
+from the real panorama, and the save button wrote the initial camera values back and reported
+success. The panel now shows an amber strip naming the failure and disables the save with the
+reason. `loading=async` is not set on the SDK script (a performance warning, not a defect);
+one line, post-freeze.
+
+The in-app browser could not reproduce this: it blocks the page's requests to `:8000` and
+`:9001` (`ERR_BLOCKED_BY_CLIENT`), so no address ever resolves there. Real Chrome did it in
+one search.

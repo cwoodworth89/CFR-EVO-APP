@@ -155,6 +155,26 @@ the new model are clean; the old one is flattering.
 Reference points: base 23.2%; v1 (midpoint cut, 2026-09-01) 2.76%→6.24% depending on
 holdout; v2 (measured boundary, 2026-09-01) 5.28%, 20/44 exact.
 
+**Round 2, scored 2026-09-06 (`whisper-base-cfr-ct2-r2`, 1,022 rows incl. truncated pairs,
+5 epochs, train loss 0.18), through the chain harness, same code and same day as the round-1
+numbers beside it:**
+
+| | Round 1 | Round 2 |
+|:--|--:|--:|
+| Round-1 holdout, 44 clips, neither trained on them: place ok | 90.9% | 88.6% |
+| wrong address / wrong grid | 3 / 0 | 4 / 1 |
+| WER | 5.02% | 6.71% |
+| Round-2 holdout, 50 clips: place ok | 98.0% (trained on some) | 98.0% |
+| WER over all 50 (round 2 vs stock base) | base 7.26% | 4.29% |
+| Phase-1 simulator, round-1 holdout: published / median trigger | 44/44 at 19 s | 43/44 at 22 s |
+| wrong street in the first minute / rule A withholds | 7 / 8 | 4 / 6 |
+
+Per call on the clean holdout: round 2 worse on 11, better on 5, same on 28. Of the 11, most
+are commas, capitals and doubled words the scorer counts; five are real misreads (*999 Laval*
+for 99, *myall stones* for Milestones, *ladder day saints* / *alchemino* for Latter-day Saints
+/ El Camino, *tossess* for Tahsis, *chartwell growth* for Road). Not deployed; the operator's
+call. Why it regressed is not known and was not guessed at.
+
 ## 4. Backtest against production transcripts (SMMR)
 
 `backtest_regression.py` compares the **stored** `raw_transcript` (what production heard at

@@ -58,6 +58,53 @@ def hotword_token_budget(max_length: int = DEFAULT_MAX_LENGTH) -> int:
     return max_length // 2 - 1
 
 
+_INTERSECTION_SPLIT = re.compile(r'\s*(?:&|\band\b|\bat\b|/)\s*', re.IGNORECASE)
+_HOUSE_NUMBER = re.compile(r'^\s*(?:\d+[A-Za-z]?\s*[-/]\s*)?\d+[A-Za-z]?\s+(?=[A-Za-z])')  # "105-3000 Riverbend Dr" too
+
+
+def street_terms(addr_str: str) -> list[str]:
+    """The street name(s) in an address string, as hotword terms: one street per term, house
+    number removed, suffix in the municipal form, title case.
+
+    An intersection gives its two streets. Before 2026-09-05 a verified intersection reached
+    the hotword list whole ("Westwood St & Lougheed Hwy", ~8 tokens): 7 of the 12 HITL terms
+    on the kiosk that day, a quarter of the 223-token budget, for strings the model never
+    needs as a unit. Suffixes are normalised so the hand-typed verified column ("LOUGHEED
+    HIGHWAY") and the parcel layer ("LOUGHEED HWY") count as one street; there were 5 such
+    pairs in the ranking's top 60 (punch-list #71).
+    """
+    if not addr_str:
+        return []
+    try:
+        from gis_service.normalization import normalize_street_name
+    except Exception:  # the sibling service is on sys.path via cfr_dispatch; degrade to identity
+        def normalize_street_name(s): return s.upper()
+    out = []
+    for part in _INTERSECTION_SPLIT.split(addr_str.split(',')[0]):
+        part = _HOUSE_NUMBER.sub('', part or '').strip()
+        if not part or not re.search(r'[A-Za-z]', part):
+            continue
+        norm = normalize_street_name(part).strip()
+        if norm and norm not in out:
+            out.append(norm)
+    return [s.title() for s in out]
+
+
+def dedupe_terms(terms: list[str]) -> list[str]:
+    """Keep the first spelling of each street; later suffix variants of it are dropped."""
+    try:
+        from gis_service.normalization import normalize_street_name
+    except Exception:
+        def normalize_street_name(s): return s.upper()
+    seen, out = set(), []
+    for t in terms:
+        key = normalize_street_name(t).strip() if t else ''
+        if key and key not in seen:
+            seen.add(key)
+            out.append(t)
+    return out
+
+
 def get_hitl_verified_streets() -> list[str]:
     """
     Fetches the most frequently misheard street names that required HITL correction.
@@ -87,19 +134,13 @@ def get_hitl_verified_streets() -> list[str]:
             if not verified_addr:
                 continue
 
-            def clean_street(addr_str):
-                if not addr_str:
-                    return ""
-                match = re.search(r'^\d+\s+(?P<street>.*)', addr_str.split(',')[0].strip())
-                if match:
-                    return match.group('street').strip().title()
-                return addr_str.strip().title()
-
-            v_street = clean_street(verified_addr)
-            sys_street = clean_street(system_addr)
-
-            if v_street and sys_street and v_street != sys_street:
-                tally[v_street] += 1
+            # Each street the operator's correction names that the system's answer did not:
+            # one term per street, suffix-normalised, an intersection split in two (#71).
+            v_streets = street_terms(verified_addr)
+            sys_streets = set(street_terms(system_addr))
+            for street in v_streets:
+                if street not in sys_streets:
+                    tally[street] += 1
 
         sorted_streets = sorted(tally.keys(), key=lambda s: tally[s], reverse=True)
         _cached_hitl_streets = sorted_streets
@@ -147,7 +188,15 @@ def _streets_by_frequency(engine) -> list[str]:
                 WHERE COALESCE(d.street, p.street) <> ''
                 ORDER BY dispatch_n DESC, parcel_n DESC
             """)).fetchall()
-        return [str(r[0]).title() for r in rows if r[0]]
+        # The raw strings carry intersections ("WESTWOOD ST & LOUGHEED HWY") and suffix variants
+        # of one street; each is folded onto its street term(s) before ranking (#71).
+        from collections import defaultdict
+        tally = defaultdict(lambda: [0, 0])
+        for street, dispatch_n, parcel_n in rows:
+            for term in street_terms(str(street or '')):
+                tally[term][0] += int(dispatch_n or 0)
+                tally[term][1] += int(parcel_n or 0)
+        return [t for t, _ in sorted(tally.items(), key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))]
     except Exception as e:
         logging.warning(f"Failed to rank streets by frequency for STT hotwords: {e}")
         return []
@@ -216,9 +265,9 @@ def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None,
 
     # Priority order. Everything after the budget runs out is dropped, so this ordering is
     # the actual policy decision -- see the module docstring.
-    ordered = list(dict.fromkeys(
+    ordered = dedupe_terms(list(dict.fromkeys(
         core_dispatch_terms + unit_terms + hitl_streets + ranked_streets + all_call_types
-    ))
+    )))
 
     # STT_HOTWORDS_EXCLUDE: comma-separated terms removed before the budget is spent, so one
     # term's effect can be measured with tools/harness_chain.py (CLAUDE.md 6.4). First use

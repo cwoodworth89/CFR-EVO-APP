@@ -44,15 +44,27 @@ def incident_search_text(transcript: str, units_vocabulary=None) -> str:
     out and the rest is searched, so a garbled announcement can still yield its call type
     but never one made of its unit list.
     """
-    m = _RESPOND.search(transcript or "")
-    if m:
-        return transcript[m.end():]
     if units_vocabulary is None:
         from cfr_dispatch.config import UNITS_VOCABULARY as units_vocabulary
     names = sorted((str(u) for u in units_vocabulary if str(u).strip()), key=len, reverse=True)
-    if not names:
+    unit_alt = '|'.join(re.escape(n) for n in names) if names else None
+    m = _RESPOND.search(transcript or "")
+    if m:
+        tail = transcript[m.end():]
+        # The slot ends where round 1 ends. The transcript carries round 2 after it, whose
+        # unit list starts with the same apparatus names: DISP-2026-A19179's slot ran on into
+        # "coquitlam engine 1 engine 2 rescue 2" at the end and found "rescue" there.
+        end = re.search(r'\bmap\s+grid\s+\d+', tail, re.IGNORECASE)
+        if end:
+            return tail[:end.end()]
+        if unit_alt:
+            nxt = re.search(r'\bcoquitlam\s+(?:' + unit_alt + r')\s*\d', tail, re.IGNORECASE)
+            if nxt:
+                return tail[:nxt.start()]
+        return tail
+    if not unit_alt:
         return transcript or ""
-    unit_token = re.compile(r'\b(?:' + '|'.join(re.escape(n) for n in names) + r')\s*\d+\b', re.IGNORECASE)
+    unit_token = re.compile(r'\b(?:' + unit_alt + r')\s*\d+\b', re.IGNORECASE)
     return unit_token.sub(' ', transcript or "")
 
 

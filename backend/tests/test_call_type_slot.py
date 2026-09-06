@@ -27,6 +27,23 @@ def test_a_unit_named_rescue_is_not_an_incident():
     assert match(MANGLED) == "Unknown Incident"
 
 
+# The same call as the sanitiser leaves it: "respondents" became "respond", and round 2's unit
+# list follows the grid. The slot must end at round 1's "map grid 82", or "rescue 2" is found again.
+SANITISED = ("coquitlam engine 1 engine 2 rescue 2 respond way near glen drive and atlantic avenue "
+             "use talk group 5 coop map grid 82 coquitlam engine 1 engine 2 rescue 2")
+
+
+def test_the_slot_ends_with_round_1():
+    assert match(SANITISED) == "Unknown Incident"
+    assert "rescue 2" not in incident_search_text(SANITISED, UNITS)
+
+
+def test_a_call_with_no_grid_still_stops_before_round_2():
+    text = "coquitlam rescue 2 respond emergency stove fire 12 elm st use talk group 5 coquitlam rescue 2 respond emergency"
+    assert match(text) == "Stove Fire"
+    assert incident_search_text(text, UNITS).strip().endswith("talk group 5")
+
+
 def test_a_real_rescue_call_is_still_a_rescue():
     assert match("coquitlam engine 1 rescue 2 respond emergency rescue 3030 gordon avenue "
                  "near christmas way use talk group 10") == "Rescue"

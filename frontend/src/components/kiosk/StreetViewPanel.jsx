@@ -524,7 +524,11 @@ export default function StreetViewPanel({ activeCall }) {
         </div>
       )}
 
-      {/* Address & Save Overlay */}
+      {/* Address & Save Overlay -- the expanded view only. On the compact tile it covered a
+          third of the picture and the address is already in the banner; saving a view is
+          something done after looking around, which the tile does not allow (operator,
+          2026-09-06). */}
+      {isModal && (
       <div className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/95 backdrop-blur border border-slate-800 p-2.5 rounded-xl flex items-center justify-between shadow-2xl">
         <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
           <span className="text-amber-400 font-bold">📍 Address:</span>
@@ -567,6 +571,7 @@ export default function StreetViewPanel({ activeCall }) {
           </span>
         </button>
       </div>
+      )}
     </div>
   );
 

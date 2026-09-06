@@ -12,7 +12,19 @@ import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
-function AutoFitBounds({ origin, destination, userPanned, callKey }) {
+// A programmatic fit fires the same zoomstart the user's scroll wheel does, so the
+// RE-CENTER button used to appear on every call before anyone touched the map (operator,
+// 2026-09-06). The fit raises `fittingRef` for its duration and MapInteractivity ignores
+// zoom events while it is up. A drag is always the user.
+function markFitting(map, fittingRef) {
+  if (!fittingRef) return;
+  fittingRef.current = true;
+  map.once('moveend', () => { fittingRef.current = false; });
+  // A fit that changes nothing never fires moveend; release the flag anyway.
+  setTimeout(() => { fittingRef.current = false; }, 800);
+}
+
+function AutoFitBounds({ origin, destination, userPanned, callKey, fittingRef, panelRef }) {
   const map = useMap();
   const lastKeyRef = useRef(null);
 
@@ -41,23 +53,28 @@ function AutoFitBounds({ origin, destination, userPanned, callKey }) {
     const padTop = Math.max(45, Math.round(h * 0.12));
     const padBottom = Math.max(35, Math.round(h * 0.08));
     const padSide = Math.max(35, Math.round(w * 0.08));
+    // The dispatch-details box floats over the top-left of the map; the fit keeps the
+    // whole route to the right of it, so the destination pin is never under the box
+    // (operator, 2026-09-06: "it covers up the destination").
+    const panelWidth = panelRef?.current?.offsetWidth || 0;
 
+    markFitting(map, fittingRef);
     map.fitBounds(bounds, {
-      paddingTopLeft: [padSide, padTop],
+      paddingTopLeft: [padSide + panelWidth, padTop],
       paddingBottomRight: [padSide, padBottom],
       maxZoom: 17,
       animate: true
     });
-  }, [map, origin, destination, userPanned, callKey]);
+  }, [map, origin, destination, userPanned, callKey, fittingRef, panelRef]);
 
   return null;
 }
 
 // Interactivity listener to detect manual pan/zoom
-function MapInteractivity({ onPan }) {
+function MapInteractivity({ onPan, fittingRef }) {
   useMapEvents({
     dragstart: () => onPan && onPan(),
-    zoomstart: () => onPan && onPan()
+    zoomstart: () => { if (fittingRef?.current) return; if (onPan) onPan(); }
   });
   return null;
 }
@@ -121,6 +138,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const fittingRef = useRef(false);
+  const panelRef = useRef(null);
+  // From the hydrant layer, which measures from the destination (punch-list #74).
+  const [nearestHydrants, setNearestHydrants] = useState({ nearestCity: null, nearestPrivate: null, loaded: false });
 
   // Reset view state when the active call changes.
   //
@@ -172,6 +193,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const handleRecenter = () => {
     setUserPanned(false);
     if (mapInstance) {
+      markFitting(mapInstance, fittingRef);
       if (hasValidCoords && destination) {
         const bounds = L.latLngBounds(
           [origin.lat, origin.lng],
@@ -184,9 +206,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         const padTop = Math.max(45, Math.round(h * 0.12));
         const padBottom = Math.max(35, Math.round(h * 0.08));
         const padSide = Math.max(35, Math.round(w * 0.08));
+        const panelWidth = panelRef.current?.offsetWidth || 0;
 
         mapInstance.fitBounds(bounds, {
-          paddingTopLeft: [padSide, padTop],
+          paddingTopLeft: [padSide + panelWidth, padTop],
           paddingBottomRight: [padSide, padBottom],
           maxZoom: 17,
           animate: true
@@ -266,7 +289,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       )}
 
       {/* Option A: Collapsible Left Dispatch Details & ETAs Panel */}
-      <div className="absolute top-3 left-3 z-[1000] w-72 sm:w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+      <div ref={panelRef} className="absolute top-3 left-3 z-[1000] w-72 sm:w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
         {/* Panel Header Toggle Bar */}
         <div 
           onClick={() => setIsPanelOpen(!isPanelOpen)}
@@ -328,8 +351,24 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               <div className="flex items-center gap-2 text-sky-400 font-bold">
                 <span>💧</span>
                 <span className="text-[10.5px] text-slate-200">
-                  {activeCall?.hydrant || activeCall?.target?.hydrant || (
-                    <span className="text-slate-500 italic">Nearest hydrant not computed</span>
+                  {/* Measured by the hydrant layer on this map from the destination point,
+                      straight-line (public.hydrants, NFPA 291 class as rated by the City).
+                      Never from the dispatch record, which carries no hydrant (#24, #74). */}
+                  {!hasValidCoords ? (
+                    <span className="text-slate-500 italic">Awaiting location</span>
+                  ) : nearestHydrants.nearestCity ? (
+                    <>
+                      <span className="text-white font-black">{nearestHydrants.nearestCity.gisId}</span>
+                      <span className="text-slate-400"> · {nearestHydrants.nearestCity.distMeters} m straight-line · </span>
+                      <span className="text-sky-300">{nearestHydrants.nearestCity.flowClass || 'UNRATED'}</span>
+                      {nearestHydrants.nearestPrivate && (
+                        <span className="text-amber-400"> · private {nearestHydrants.nearestPrivate.gisId} {nearestHydrants.nearestPrivate.distMeters} m</span>
+                      )}
+                    </>
+                  ) : nearestHydrants.loaded ? (
+                    <span className="text-amber-300 italic">No operating City hydrant within 800 m</span>
+                  ) : (
+                    <span className="text-slate-500 italic">Hydrant inventory loading…</span>
                   )}
                 </span>
               </div>
@@ -361,8 +400,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         baseStyle="VOYAGER"
         showCadastral
         showFireHalls
+        showHydrants
+        hydrantTargetCoords={hasValidCoords ? [destLat, destLng] : null}
+        onNearestHydrant={setNearestHydrants}
       >
-        <MapInteractivity onPan={() => setUserPanned(true)} />
+        <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
 
         {/* Road closures. A closure matters most when apparatus is being routed through
             it, so the dispatch map shows them too -- they were previously standby-only.
@@ -437,6 +479,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
             destination={destination}
             userPanned={userPanned}
             callKey={`${callKey}-${selectedCandidateIdx}`}
+            fittingRef={fittingRef}
+            panelRef={panelRef}
           />
         )}
       </MapSurface>

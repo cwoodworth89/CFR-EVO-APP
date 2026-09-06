@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-74 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+75 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -19,6 +19,7 @@
 | **55** | 🟠 operational | SUPERSEDED | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **63** | 🔴 crew-visible | CLOSED | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
 | **14** | 🔴 crew-visible | CLOSED | [PA announcements are being captured as dispatches](14-pa-announcements-are-being-captured-as-dispatches.md) |
+| **73** | 🔴 crew-visible | CLOSED | [A near road heard with a suffix word inside its name is cut short](73-a-near-road-heard-with-a-suffix-word-inside-its-name-is-cut-short.md) |
 | **21** | 🔴 crew-visible | CLOSED | [Rail crossing list is hand-entered and probably incomplete](21-rail-crossing-list-is-hand-entered-and-probably-incompl.md) |
 | **70** | 🔴 crew-visible | CLOSED | [A restart during a capture loses the call and its audio](70-a-restart-during-a-capture-loses-the-call-and-its-audio.md) |
 | **65** | ⚪ hygiene | CLOSED | [The admin login accepts three hardcoded passwords besides the configured one](65-the-admin-login-accepts-three-hardcoded-passwords-besides-t.md) |

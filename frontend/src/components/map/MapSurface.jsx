@@ -51,6 +51,11 @@ export default function MapSurface({
   onCadastralError,
   showFireHalls = true,
   showHydrants = false,
+  // [lat, lng] the hydrant layer measures from; with it the layer draws from zoom 12 and
+  // highlights the nearest city and private hydrants, and reports them through
+  // onNearestHydrant ({ nearestCity, nearestPrivate, loaded }). Punch-list #74.
+  hydrantTargetCoords = null,
+  onNearestHydrant,
 
   children,
 }) {
@@ -75,7 +80,7 @@ export default function MapSurface({
       <BaseMap style={baseStyle} useLabelsFallback={false} />
       <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />
       <StationsLayer visible={showFireHalls} />
-      <HydrantsLayer visible={showHydrants} />
+      <HydrantsLayer visible={showHydrants} targetCoords={hydrantTargetCoords} onNearest={onNearestHydrant} />
 
       {showNoTileLegend && (
         <div

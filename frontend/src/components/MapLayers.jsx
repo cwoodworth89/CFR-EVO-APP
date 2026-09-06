@@ -218,7 +218,7 @@ function HydrantDetailCard({ gisId, statusVal, flowClass, label }) {
 }
 
 // 💧 NEW: WATER HYDRANTS GIS LAYER
-export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
+export function HydrantsLayer({ visible, targetCoords, minZoom = 12, onNearest }) {
     const map = useMap();
     const [zoom, setZoom] = React.useState(map.getZoom());
     const [hydrants, setHydrants] = React.useState([]);
@@ -329,6 +329,13 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12 }) {
       }
       return { nearestCity: cBest, nearestPrivate: pBest };
     }, [targetCoords, allHydrants]);
+
+    // The kiosk's details box prints the nearest hydrant; it lives outside the map, so the
+    // layer hands the answer up (punch-list #74). null means none within the thresholds
+    // above, or no target, or the inventory not loaded yet -- the caller shows that as such.
+    React.useEffect(() => {
+      if (onNearest) onNearest({ nearestCity, nearestPrivate, loaded: allHydrants.length > 0 });
+    }, [nearestCity, nearestPrivate, allHydrants.length, onNearest]);
 
     // Custom Icon styling
 

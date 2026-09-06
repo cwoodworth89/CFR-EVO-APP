@@ -25,13 +25,16 @@ cannot be made safe -- distinct Coquitlam streets score up to 96 against each ot
 the fix has to be here (punch-list #15, #18).
 
 SO THE BUDGET IS SPENT DELIBERATELY, IN PRIORITY ORDER
-1. Core dispatch template terms and unit names -- small, and every announcement uses them.
+1. Core dispatch template terms -- small, and every announcement uses them.
 2. Streets the operator has actually corrected in HITL review -- empirically demonstrated
    to be misheard, so the highest value per token available.
 3. Streets ranked by how often they appear in real dispatches (public.dispatches).
 4. Streets ranked by parcel count (public.parcels) -- a proxy for prominence that covers
    streets not yet dispatched to. This is the ranking commit 79808cc used.
-5. Call types.
+5. Unit names. Operator ruling 2026-09-05: the address is what the crew needs from the
+   transcript; the units come second. They used to sit at 1, ahead of every street, and
+   the model in service was fine-tuned on transcripts that all carry them.
+6. Call types.
 
 Terms are then trimmed to the MEASURED token budget rather than to a guessed term count:
 the earlier fix capped at 120 terms, which at ~4.4 tokens per street name is still roughly
@@ -266,7 +269,7 @@ def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None,
     # Priority order. Everything after the budget runs out is dropped, so this ordering is
     # the actual policy decision -- see the module docstring.
     ordered = dedupe_terms(list(dict.fromkeys(
-        core_dispatch_terms + unit_terms + hitl_streets + ranked_streets + all_call_types
+        core_dispatch_terms + hitl_streets + ranked_streets + unit_terms + all_call_types
     )))
 
     # STT_HOTWORDS_EXCLUDE: comma-separated terms removed before the budget is spent, so one

@@ -14,7 +14,8 @@
 
 ## 70. SIGTERM mid-capture: no audio, no address, and a pin from a partial transcript
 
-> **Status**: 🟡 **Code built 2026-09-05; waits on the unit change and a restart.** *(Opened as:
+> **Status**: 🟡 **Built and deployed 2026-09-05 19:48 PDT (`e0b0632`, unit `TimeoutStopSec=150`); closes on
+> the first restart whose journal shows the drain.** *(Opened as:
 > 🔴 Open.)* Crew-visible: a real structure fire reached the kiosk with no address and no
 > recording. The restart was the assistant's, unasked, and is the first cause; the agent's
 > shutdown behaviour is the second.
@@ -84,6 +85,8 @@ and add, then save:
 [Service]
 TimeoutStopSec=150
 ```
-then `sudo systemctl daemon-reload` and a restart, which from then on finishes any capture in
-progress before the process exits. `tools/kiosk_capture_state.sh` stays the pre-restart check
+then `sudo systemctl daemon-reload` and a restart. **Done by the operator at 19:48 PDT**: the
+drop-in is in place, the effective timeout reads 2 min 30 s, and the process started at 19:46
+carries the handler. The next restart is the proof: the journal should show *Stop requested*
+and *Worker drained* rather than an instant deactivation. `tools/kiosk_capture_state.sh` stays the pre-restart check
 until the first restart under the new code proves the drain in the journal.

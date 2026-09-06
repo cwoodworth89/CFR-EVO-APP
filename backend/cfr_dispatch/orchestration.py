@@ -7,6 +7,7 @@ import multiprocessing
 from cfr_dispatch.logging_setup import setup_logging
 from cfr_dispatch.worker import background_worker_loop, get_shared_validator
 from cfr_dispatch.worker_supervisor import WorkerSupervisor
+from cfr_dispatch.shutdown import install_sigterm_handler, drain_and_stop
 from cfr_dispatch.audio_listener import run_audio_listener_loop
 from cfr_dispatch.pipeline import (
     build_dispatch_payload
@@ -18,6 +19,7 @@ from cfr_dispatch.pipeline import (
 def run_dispatch_system():
     """Main program entrypoint. Initiates multiprocessing worker and PortAudio listener loop."""
     setup_logging()
+    install_sigterm_handler()  # a restart finishes the capture in progress first (punch-list #70)
     local_api_url = os.environ.get("LOCAL_API_URL", "http://localhost:8000")
     logging.info(f"CFR EVO Orchestrator initializing. API Gateway: {local_api_url}")
     
@@ -38,8 +40,10 @@ def run_dispatch_system():
     except KeyboardInterrupt:
         logging.info("Listener stopped by user.")
     finally:
-        supervisor.stop()
-        dispatch_queue.put(None)
+        # Graceful stop (punch-list #70): the worker may still be finalising the capture that
+        # just ended. Stop the supervisor respawning, send the pill, and wait for phase 2 to
+        # drain; a daemon child dies with the parent otherwise.
+        drain_and_stop(supervisor, dispatch_queue)
         logging.info("CFR EVO Dispatch System shut down.")
 
 if __name__ == "__main__":

@@ -14,9 +14,10 @@
 
 ## 70. SIGTERM mid-capture: no audio, no address, and a pin from a partial transcript
 
-> **Status**: 🔴 **Open.** Crew-visible: a real structure fire reached the kiosk with no address
-> and no recording. The restart was the assistant's, unasked, and is the first cause; the
-> agent's shutdown behaviour is the second.
+> **Status**: 🟡 **Code built 2026-09-05; waits on the unit change and a restart.** *(Opened as:
+> 🔴 Open.)* Crew-visible: a real structure fire reached the kiosk with no address and no
+> recording. The restart was the assistant's, unasked, and is the first cause; the agent's
+> shutdown behaviour is the second.
 
 ### What happened
 
@@ -61,3 +62,28 @@ Whether a partial phase-1 transcript that ends in the template's tail should pro
 placed pin at all, or the Tier 1 unresolved card. The banner said what the pin was, which is
 the current design (#12); a structure fire pinned at the midpoint of Coquitlam Ave is what
 that design produces from cut audio.
+
+### Built 2026-09-05
+
+`backend/cfr_dispatch/shutdown.py`. The main process turns SIGTERM into a flag; the listener
+returns at the next quiet moment, or after the capture in progress has ended and been queued
+(`audio_listener.py`). The worker ignores SIGTERM and exits on the poison pill, so systemd's
+control-group signal cannot cut phase 2 short (`worker.py`). On the way out the orchestrator
+stops the supervisor respawning, sends the pill and waits up to 60 s for the worker to drain
+(`drain_and_stop`). Tests in `test_shutdown.py`: the flag, the ignore, the order, the timeout.
+
+**Still to do, by the operator, since `tcfire` can restart the unit without a password but
+cannot edit it:** the unit's stop timeout is 90 s, which cuts a 75 s capture plus phase 2
+short. `setup_kiosk.sh` now writes `TimeoutStopSec=150`; on the running kiosk:
+
+```bash
+sudo systemctl edit cfr-agent
+```
+and add, then save:
+```
+[Service]
+TimeoutStopSec=150
+```
+then `sudo systemctl daemon-reload` and a restart, which from then on finishes any capture in
+progress before the process exits. `tools/kiosk_capture_state.sh` stays the pre-restart check
+until the first restart under the new code proves the drain in the journal.

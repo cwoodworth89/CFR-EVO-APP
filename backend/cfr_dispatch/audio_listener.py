@@ -35,6 +35,7 @@ from cfr_dispatch.config.dsp import (
 from cfr_dispatch.config.hardware import DEVICE_ID, AUDIO_SAMPLE_RATE
 from cfr_dispatch.config.runtime import VERBOSITY_LEVEL
 from cfr_dispatch.config.vocab import UNITS_VOCABULARY
+from cfr_dispatch.shutdown import stop_requested
 from audio_service import (
     get_rms,
     analyze_live_audio,
@@ -132,6 +133,13 @@ def run_audio_listener_loop(dispatch_queue):
                     update_listener_heartbeat()
                     last_hb_time = current_time
                     
+                # A stop requested while nothing is being captured is honoured now; during a
+                # tone analysis (3.5 s) or a dispatch capture it is honoured when that ends
+                # (punch-list #70).
+                if stop_requested() and not is_capturing_tone:
+                    logging.info("Stop requested with no capture in progress; listener exiting.")
+                    return
+
                 if is_capturing_tone:
                     pcm, _ = stream.read(blocksize)
                     analysis_buffer.append(pcm)
@@ -254,5 +262,9 @@ def run_audio_listener_loop(dispatch_queue):
                     "tone_name": matched_tone,
                     "units_vocab": UNITS_VOCABULARY
                 })
+
+            if stop_requested():
+                logging.info("Stop requested; the capture in progress has ended and been queued. Listener exiting.")
+                return
 
             logging.debug("Resetting listener to LISTENING_FOR_TONE.")

@@ -66,6 +66,9 @@ while a capture or its phase 2 is running:
 ```bash
 ssh tcfire@100.95.146.94 "bash /home/tcfire/CFR-EVO-APP/tools/kiosk_capture_state.sh"
 ```
+Since 2026-09-05 the agent finishes a capture in progress on SIGTERM and drains phase 2 before
+exiting (punch list #70), provided the unit carries `TimeoutStopSec=150`; the check above is
+still run first until that has been seen working in the journal.
 
 That needs sudo, which needs a password at a prompt. The unit has `Restart=always` with
 `RestartSec=5s` and runs as `tcfire`, so a SIGTERM to the main process is a restart that needs

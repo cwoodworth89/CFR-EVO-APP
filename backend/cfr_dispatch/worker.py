@@ -13,6 +13,7 @@ from cfr_dispatch.pipeline import process_phase_1_check, process_phase_2_finaliz
 from gis_service import CoquitlamDataValidator
 from cfr_dispatch.logging_setup import setup_logging
 from cfr_dispatch.session_store import PostgresSessionStore
+from cfr_dispatch.shutdown import ignore_sigterm_in_worker
 
 class DispatchSessionManager:
     """Two-phase dispatch session state.
@@ -98,6 +99,7 @@ def background_worker_loop(task_queue: multiprocessing.Queue):
     # A separate file from the orchestrator on purpose: a TimedRotatingFileHandler is not
     # safe to share across processes, which would race on the rotation rename.
     setup_logging(log_file='dispatch-worker.log')
+    ignore_sigterm_in_worker()  # exits on the poison pill, after the phase 2 it is on (punch-list #70)
 
     logging.info("Background Dispatch Worker process starting...")
     validator = get_shared_validator()

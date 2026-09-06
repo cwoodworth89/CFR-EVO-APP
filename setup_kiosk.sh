@@ -79,6 +79,10 @@ WorkingDirectory=${PROJECT_DIR}/backend
 ExecStart=${PROJECT_DIR}/.venv/bin/python main.py
 Restart=always
 RestartSec=5
+# A stop finishes the capture in progress and its phase 2 first (punch-list #70): a capture
+# runs at most 75 s (MAX_DISPATCH_DURATION_S) and phase 2 took 6 s on 2026-09-05. The 90 s
+# default cut a capture short. systemd escalates to SIGKILL after this.
+TimeoutStopSec=150
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=cfr-agent

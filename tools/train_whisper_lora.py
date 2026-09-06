@@ -32,8 +32,12 @@ def main():
     # The train split only. metadata_round1_holdout.csv is scored by
     # eval_round1_holdout.py on calls the model never saw; training on everything would
     # leave train-on-test as the only available number.
-    meta_csv = os.path.join(training_dir, "metadata_round1_train.csv")
-    audio_dir = os.path.join(training_dir, "round1_clips")
+    # Round 2 (2026-09-05) trains on metadata_round2_train.csv / round2_clips: the round-1
+    # clips plus the new calls plus truncated pairs (tools/prepare_round2_dataset.py). Both
+    # are chosen by environment so the round-1 defaults stay what they were.
+    meta_csv = os.environ.get("WHISPER_TRAIN_CSV", os.path.join(training_dir, "metadata_round1_train.csv"))
+    audio_dir = os.environ.get("WHISPER_CLIPS_DIR", os.path.join(training_dir, "round1_clips"))
+    logging.info(f"Training set: {meta_csv} with clips from {audio_dir}")
     
     if not os.path.exists(meta_csv):
         logging.error(f"Metadata file not found at: {meta_csv}")

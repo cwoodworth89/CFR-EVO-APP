@@ -200,7 +200,10 @@ export const apiClient = {
 
   // Dispatch REST query builder
   dispatches: {
-    async fetchAll(limit = 500) {
+    // The review screen lists from this. 500 dropped the oldest calls once the table passed
+    // 500 rows (569 on 2026-09-05): two July 13 calls the operator went to correct were not
+    // there. The API allows up to 5000.
+    async fetchAll(limit = 5000) {
       const res = await fetch(`${API_BASE_URL}/api/dispatches?limit=${limit}`, { headers: getHeaders() });
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();

@@ -361,6 +361,15 @@ Hwy`, `4992 Upper Harper Rd`. The full table with the nearest numbers is punch-l
 (strata units, large-site secondary numbers, recent assignments) that carries these? Until
 then the kiosk places them on the block or the street, labelled as such.
 
+## 15. Dispatch says "Chartwell Rd"; the City's layers name it Chartwell Green
+
+**Found 2026-09-05.** DISP-2026-EC4501, verified from the audio as `3305 Chartwell Rd`. The
+parcel and road layers carry `Chartwell Green` (57 parcels, 3255-3325) and `Chartwell Lane`
+(private, 21 parcels), and no Chartwell Rd. The geocoder placed the call on `3305 Chartwell
+Green` by the street name with the suffix relaxed, which is the right parcel. The verified
+column keeps what was spoken. Same family as #64: the dispatcher's street name and the City's
+differ, and the hotword list must carry the spoken one.
+
 ## Closed items
 
 ### `Deer's Leap Pl` — OURS, not a City gap

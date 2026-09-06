@@ -99,14 +99,16 @@ before 2026-09-05 fold *approximate* into *cosmetic* and include the PA pages.
    **Done 2026-09-05 08:28 PDT** on the operator's ruling. The hotwords still list *map grid*; untested.
 2. ~~**Restart `cfr-agent`** to pick up the sanitiser and #44a.~~ **Done**, same restart.
 3. **Verified-column entries to re-review**, the full list from the evening's sweep (every other
-   entry folds onto a City street now that the `Ct` alias is in):
+   entry folds onto a City street now that the `Ct` alias is in). The two July 13 rows were
+   invisible in the review screen, which listed only the newest 500 of 569 calls; fixed the
+   same evening (`apiClient.js`, 5000):
 
    | Dispatch | Now | Change to |
    |:--|:--|:--|
    | DISP-2026-0790E8 (08-28) | 3000 Riverband Dr | 3000 Riverbend Dr |
    | DISP-2026-B5B8DC (08-13) | Pintree Way & Anson Ave | Pinetree Way & Anson Ave |
    | DISP-2026-969223 | 3030 Gordon Ave, map grid 6 | map grid 68; the parcel is 6.3 km from zone 6 |
-   | DISP-2026-EC4501 (08-19) | 3305 Chartwell Rd | the City has no Chartwell Rd: Dr, Ln or Green, from the audio |
+   | DISP-2026-EC4501 (08-19) | 3305 Chartwell Rd | **leave it**: the audio says Chartwell Rd; the City's layer names it Chartwell Green and the geocoder placed it there (register §15) |
    | DISP-2026-D00EC5 (08-25) | 1883 Beaty Pl | no such street in City data, nothing close; the runsheet, possibly out of city |
    | DISP-2026-E89BC5 (07-13) | 2980 Princess Cres 422 | 2980 Princess Cres, unit 422 in the subaddress field |
    | DISP-2026-D106EB (07-13) | 3030 Gordon Avenue Rain City Housing | 3030 Gordon Ave, the building name in the subaddress field |

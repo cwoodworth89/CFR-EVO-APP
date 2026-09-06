@@ -1,6 +1,6 @@
 ---
 name: google-imagery-streetview
-description: Procedures for fetching, caching, orienting, persisting, and rendering Google Street View panoramas in CFR EVO. Not the aerial basemap, which is City orthophotography served offline from ortho.mbtiles (see gis-pipeline-sync).
+description: Procedures for fetching, orienting, and rendering Google Street View panoramas in CFR EVO, and for persisting the operator's preferred view as parameters (never imagery, which the Maps Platform terms forbid storing). Not the aerial basemap, which is City orthophotography served offline from ortho.mbtiles (see gis-pipeline-sync).
 ---
 
 # Satellite Imagery & Street View Enrichment Runbook
@@ -15,7 +15,20 @@ description: Procedures for fetching, caching, orienting, persisting, and render
 > integration only. Do not use it as the reference for the aerial basemap.
 
 
-This skill outlines how to fetch, orient, cache, persist, and display high-resolution **Google Satellite aerial imagery** and **Street View 360° building facade views** for emergency dispatches in **CFR EVO**.
+This skill outlines how to fetch, orient, and display **Street View 360° building facade views** for emergency dispatches in **CFR EVO**, and how the operator's preferred view is persisted.
+
+> [!CAUTION]
+> **No Street View image is ever stored** — not on disk, not in Postgres, not in
+> `localStorage`. Google Maps Platform Terms §3.2.3(a)–(b) forbid pre-fetching, storing or
+> caching Google Maps Content, and the Street View Static API policy says the same, with one
+> exception: **the panorama ID may be stored indefinitely** (Service Specific Terms A.3;
+> Street View Static API Policies, *Exceptions from caching restrictions*). What CFR EVO
+> persists is `pano_id` + heading, pitch, zoom — the operator's choices, re-rendered live on
+> each call. Verbatim clauses: [`docs/standards/google-maps-platform-terms-excerpts.md`](../../../docs/standards/google-maps-platform-terms-excerpts.md).
+> The same document records §3.2.3(e)(ii), *Street View imagery and non-Google Maps on the
+> same screen*, which the kiosk layout does today; that is with the operator, unresolved.
+> The "Local Image Cache" in older versions of this skill was never built and would have
+> breached the terms.
 
 ---
 
@@ -31,7 +44,7 @@ flowchart TD
     B --> C[Fetch Google Street View API]
     A --> D[Fetch High-Res Satellite Static Map]
     
-    C --> E[Local Image Cache & PostgreSQL Database]
+    C --> E[PostgreSQL: pano_id + heading/pitch/zoom only — no imagery stored, Terms 3.2.3]
     D --> E
     
     E --> F[Kiosk UI Split-Screen Display]
@@ -142,3 +155,10 @@ To ensure zero gray error boxes on station kiosks, the Google Maps API Key (`VIT
 1. **Maps JavaScript API** (Required for `StreetViewPanorama` WebGL canvas & `pov_changed` drag events)
 2. **Maps Embed API** (Required for reliable `<iframe>` embed fallback)
 3. **Geocoding API** (Required for address centroid lookups)
+
+**Enabled on the project is not enough: the key's own *API restrictions* list must include
+each one.** Found 2026-09-06 (punch-list #35a): the kiosk key's list held the Embed API but
+not the Maps JavaScript API, so the SDK answered `ApiTargetBlockedMapError`, `gm_authFailure`
+fired, and every kiosk showed the embed fallback, silently, for weeks. The panel now says so
+on screen. If the compact tile moves to a static image rendered from the saved `pano_id`
+(the design under #35a), add **Street View Static API** to the same list.

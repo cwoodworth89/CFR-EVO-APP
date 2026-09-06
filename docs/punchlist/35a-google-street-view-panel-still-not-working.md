@@ -187,3 +187,25 @@ serving the previous build's `index.html` (and so the previous bundle) across a 
 until a cache-busting query forced it. `main.jsx` reloads once when a chunk from a previous
 build fails to load, which covers the kiosk after a build in practice but not by design; one
 line on the backlog.
+
+### The preferred-view design, checked against the terms (2026-09-06)
+
+The operator asked whether a saved view should be stored as an image. The Google Maps
+Platform Terms were read the same day and the clauses vendored to
+[`docs/standards/google-maps-platform-terms-excerpts.md`](../standards/google-maps-platform-terms-excerpts.md):
+
+* **No image storage.** §3.2.3(a) forbids storing or re-hosting Google Maps Content and names
+  "Street View images"; §3.2.3(b) forbids caching except where the Service Specific Terms
+  allow it. The Street View Static API policy repeats it.
+* **The panorama ID may be stored indefinitely** (Service Specific Terms A.3; Static API
+  policy). Heading, pitch and zoom are the operator's own values.
+* **§3.2.3(e)(ii): "display Street View imagery and non-Google Maps on the same screen"** is
+  on the list of things a customer will not do. The kiosk does exactly that. Raised with the
+  operator; the decision (separate screen, full-screen modal with the map hidden, or no
+  Street View) is not made here.
+
+So the design is: persist `pano_id` + heading + pitch + zoom per address (what the save
+button already collects); on a call, render the compact tile from those parameters live
+(Street View Static API, one image request, or the embed); *Expand* opens the interactive
+panorama at the same view, where the operator navigates and re-saves. Nothing is cached, and
+the 3.2.3(e) question decides whether the tile can sit beside the map at all.

@@ -210,3 +210,38 @@ button already collects); on a call, render the compact tile from those paramete
 (Street View Static API, one image request, or the embed); *Expand* opens the interactive
 panorama at the same view, where the operator navigates and re-saves. Nothing is cached, and
 the 3.2.3(e) question decides whether the tile can sit beside the map at all.
+
+---
+
+## Key fixed 2026-09-06; Firefox still black
+
+> **Status**: 🟡 **The key is fixed and the interactive panorama verified in Chrome on a live
+> call. The operator's Firefox shows a black tile and an endless spinner on the same call;
+> its console is the next diagnostic.**
+
+The operator changed the key's API restrictions in the Cloud console. Checked in Chrome
+against the kiosk (`?nocache=2`) while a real call was up, 2573 Diamond Cres, medical aid:
+the Google panorama is mounted in the panel (`.gm-style` with three canvases), no fallback
+`<iframe>`, no amber strip, *Save Preferred View* enabled, and no `MapError` or auth-failure
+line in the console. Two weeks of a blank-then-embedded panel, all of it one checkbox on the
+key. The amber strip and the disabled save stay in the code for the next time the key or the
+billing changes underneath the kiosk.
+
+**Not closed.** Minutes later the operator sent two screenshots from Firefox on the laptop,
+same call: the compact tile black under the address bar, and the expanded modal stuck on
+*Loading Street View Facade...* with no strip and no fallback. The spinner clears on
+`status_changed` or a 3.5 s timer, both set inside `initPanorama`, which runs only once
+`window.google.maps` exists; a spinner that never clears means the SDK never became
+available in that page and `script.onerror` never fired either. Which of a blocked script,
+a WebGL failure, or something else it is, Firefox's console will say; guessing is what this
+item's history is made of. Ask: F12 in Firefox on the kiosk page, Console, anything naming
+google, maps or WebGL.
+
+Also seen on that call and worth its own line: the tile shows *SAVED PREFERRED VIEW (0°)* for
+an address nobody has saved. `parcels.streetview_heading` defaults to 0.0 (the skill's own
+schema), so every parcel presents as a saved view of 0° — a default reading as an operator's
+choice (CLAUDE.md 6.1).
+
+Left open elsewhere: the terms' same-screen clause (standards index, deferred by the
+operator), `index.html` caching and `loading=async` (backlog), and the preferred-view design
+with a static tile (design note above).

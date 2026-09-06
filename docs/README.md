@@ -72,6 +72,7 @@ unless they say so at the top.
 - [`milestones.md`](milestones.md): the roadmap as it stood. Some milestones describe features since removed, such as the recruit training simulator.
 - [`emergency_routing_gis_parcels_standard.md`](emergency_routing_gis_parcels_standard.md): an unadopted routing proposal, kept together with the review that rejected it.
 - [`architecture/unified_map_surface.md`](architecture/unified_map_surface.md): a design proposal for the map layers.
+- [`architecture/progressive_dispatch.md`](architecture/progressive_dispatch.md): the operator's design for a kiosk that fills in as the announcement is heard, with the phones told when a driver can act. Post-freeze; measure first.
 
 ## 6. Ideas
 

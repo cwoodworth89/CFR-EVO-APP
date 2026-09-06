@@ -120,9 +120,17 @@ def clean_location_text(text: str, call_types: List[str], units_vocab: List[str]
     # reaches this function from the announcement path. That rewrite is the actual fix
     # for DISP-2026-AAFDB8 (2026-08-30). This guard exists so the bug does not come back
     # silently if some other caller passes unsanitised text.
-    match = re.search(r'\b(' + street_types + r')\b(?!\s*&|\s+(?:and|near|cross\s+roads|cross\s+street|cross\s+of))\s+(.*)', text, re.IGNORECASE)
-    if match:
+    # Strip at the LAST suffix word, not the first. "Gate" is a suffix (Windsor Gate), so
+    # when the STT hears Agate Place as "a gate place and topas crt" the first-match strip
+    # cut everything after "gate" and the kiosk showed "Near A Gate (as heard)" with Topaz
+    # Court gone entirely: DISP-2026-5317C5, live, 2026-09-06. A suffix word followed by
+    # text that itself holds a suffix word is a street name, not trailing junk.
+    suffix_word = re.compile(r'\b(?:' + street_types + r')\b', re.IGNORECASE)
+    for match in re.finditer(r'\b(' + street_types + r')\b(?!\s*&|\s+(?:and|near|cross\s+roads|cross\s+street|cross\s+of))\s+(.*)', text, re.IGNORECASE):
+        if suffix_word.search(match.group(2)):
+            continue
         text = text[:match.end(1)].strip()
+        break
 
     return text
 

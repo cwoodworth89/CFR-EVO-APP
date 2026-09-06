@@ -45,3 +45,13 @@ def test_every_entry_is_one_street_in_the_municipal_form(streets):
 def test_most_misheard_first(streets):
     # Kensal Pl was wrong on three of its four calls; Thor Crt on both of its two.
     assert streets.index("Kensal Pl") < streets.index("Thor Crt")
+
+
+def test_name_only_drops_the_suffix_word_and_nothing_else():
+    # Experiment 3 of #71; the suffix set comes from public.vocabulary, hence the DB gate.
+    assert bp.name_only("Thor Crt") == "Thor"
+    assert bp.name_only("The High St") == "The High"
+    assert bp.name_only("Dayanee Springs Blvd") == "Dayanee Springs"
+    assert bp.name_only("Port Mann Bridge") == "Port Mann Bridge"
+    assert bp.name_only("Lougheed Hwy On-Ramp") == "Lougheed Hwy On-Ramp"
+    assert bp.name_only("Way") == "Way"

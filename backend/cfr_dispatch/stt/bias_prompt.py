@@ -90,6 +90,29 @@ def street_terms(addr_str: str) -> list[str]:
     return [s.title() for s in out]
 
 
+def name_only(term: str) -> str:
+    """The street without its suffix word: "Thor Crt" -> "Thor", "The High St" -> "The High".
+
+    A term whose last word is not a suffix in the vocabulary is returned whole ("Port Mann
+    Bridge", "Lougheed Hwy On-Ramp"), and a term that is nothing but a suffix stays as it is.
+    Experiment 3 of punch-list #71: with the kiosk's tokenizer the first 60 ranked streets cost
+    216 tokens as full names and 134 as names alone; "Thor Crt" is 3 tokens and "Thor" is 1.
+    Whether the model still benefits without the suffix is what the harness measures; nothing
+    here decides it.
+    """
+    words = (term or '').split()
+    if len(words) < 2:
+        return term
+    try:
+        from gis_service.normalization import get_suffix_mappings
+        suffixes = {k.upper() for k in get_suffix_mappings()} | {v.upper() for v in get_suffix_mappings().values()}
+    except Exception:
+        return term
+    if words[-1].upper() in suffixes:
+        return ' '.join(words[:-1])
+    return term
+
+
 def dedupe_terms(terms: list[str]) -> list[str]:
     """Keep the first spelling of each street; later suffix variants of it are dropped."""
     try:
@@ -293,6 +316,14 @@ def build_stt_bias_words(validator=None, units_vocabulary: list[str] = None,
         all_call_types = [str(ct).title() for ct in CALL_TYPES if len(str(ct).strip()) > 1]
     except Exception:
         pass
+
+    # STT_HOTWORDS_NAMES_ONLY=1: street terms without their suffix word (#71, experiment 3).
+    # A measurement switch for tools/harness_chain.py, set in front of the run, not in the
+    # kiosk's backend/.env until the corpus says so.
+    if os.environ.get("STT_HOTWORDS_NAMES_ONLY", "").strip() in ("1", "true", "yes"):
+        hitl_streets = [name_only(s) for s in hitl_streets]
+        ranked_streets = [name_only(s) for s in ranked_streets]
+        logging.info("STT hotwords: street terms as names only (STT_HOTWORDS_NAMES_ONLY).")
 
     # Priority order. Everything after the budget runs out is dropped, so this ordering is
     # the actual policy decision -- see the module docstring.

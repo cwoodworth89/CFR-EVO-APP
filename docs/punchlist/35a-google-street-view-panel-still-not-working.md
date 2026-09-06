@@ -201,8 +201,9 @@ Platform Terms were read the same day and the clauses vendored to
   policy). Heading, pitch and zoom are the operator's own values.
 * **§3.2.3(e)(ii): "display Street View imagery and non-Google Maps on the same screen"** is
   on the list of things a customer will not do. The kiosk does exactly that. Raised with the
-  operator; the decision (separate screen, full-screen modal with the map hidden, or no
-  Street View) is not made here.
+  operator, who noted it the same day and deferred the ruling (separate screen, full-screen
+  modal with the map hidden, or no Street View). It stays visible in the standards index
+  until it is made.
 
 So the design is: persist `pano_id` + heading + pitch + zoom per address (what the save
 button already collects); on a call, render the compact tile from those parameters live

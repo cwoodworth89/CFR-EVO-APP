@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from cfr_dispatch.parser.call_types import match_incident_type, incident_search_text  # noqa: E402
 
 CALL_TYPES = ["Rescue", "Hazmat 1", "Hazmat 2", "Hazmat 2 - Moderate Risk", "Hazmat 3",
-              "Alarm Activated - High Risk", "Alarm Activated", "Medical Aid - Overdose", "Stove Fire"]
+              "Alarm Activated - High Risk", "Alarm Activated", "Medical Aid - Overdose", "Stove Fire",
+              "Medical Aid", "Medical Aid - Abdominal Pain", "Medical Aid - Collapse"]
 UNITS = ["Engine", "Ladder", "Rescue", "Quint", "Car", "Medic", "Hazmat", "Hazmat Tender", "Squad"]
 
 # DISP-2026-A19179 as the STT wrote it: the incident phrase collapsed into "respondents".
@@ -36,6 +37,20 @@ SANITISED = ("coquitlam engine 1 engine 2 rescue 2 respond way near glen drive a
 def test_the_slot_ends_with_round_1():
     assert match(SANITISED) == "Unknown Incident"
     assert "rescue 2" not in incident_search_text(SANITISED, UNITS)
+
+
+def test_round_2_still_supplies_the_incident_round_1_garbled():
+    # DISP-2026-E792B0 as sanitised: "epidominal" in round 1, "abdominal" in round 2.
+    two_rounds = ("coquitlam medic 1 respond emergency medical aid epidominal pain 2900 barnette highway near "
+                  "turning lane use talk group 10 combined response coquitlam map grid 82 coquitlam medic 1 respond "
+                  "emergency medical aid abdominal pain 2900 barnett highway near turning lane use talk group 10 "
+                  "combined response coquitlam map grid 82")
+    assert match(two_rounds) == "Medical Aid - Abdominal Pain"
+    # DISP-2026-76A4BF: round 1 lost the incident phrase entirely; round 2 has it.
+    lost_r1 = ("coquitlam engine 1 respond 47 lougheed highway near turning lane use talk group 10 combined response "
+               "coquitlam map grid 57 coquitlam engine 1 respond emergency medical aid collapse 2747 low heat highway "
+               "near turning lane use talk group 10 combined response coquitlam map grid 57")
+    assert match(lost_r1) == "Medical Aid - Collapse"
 
 
 def test_a_call_with_no_grid_still_stops_before_round_2():

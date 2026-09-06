@@ -48,20 +48,25 @@ def incident_search_text(transcript: str, units_vocabulary=None) -> str:
         from cfr_dispatch.config import UNITS_VOCABULARY as units_vocabulary
     names = sorted((str(u) for u in units_vocabulary if str(u).strip()), key=len, reverse=True)
     unit_alt = '|'.join(re.escape(n) for n in names) if names else None
-    m = _RESPOND.search(transcript or "")
-    if m:
+    # One slot per round: the text after each "respond [priority]" up to that round's end
+    # (its "map grid N", or the next "coquitlam <unit> N" when the grid was lost). Every round
+    # is searched, because the announcement is read twice and STT damages the two readings
+    # differently: DISP-2026-E792B0 heard "epidominal pain" in round 1 and "abdominal pain" in
+    # round 2, and DISP-2026-76A4BF lost the whole incident phrase from round 1. A slot never
+    # runs on into the next round's unit list: DISP-2026-A19179's did, and found "rescue 2".
+    slots = []
+    for m in _RESPOND.finditer(transcript or ""):
         tail = transcript[m.end():]
-        # The slot ends where round 1 ends. The transcript carries round 2 after it, whose
-        # unit list starts with the same apparatus names: DISP-2026-A19179's slot ran on into
-        # "coquitlam engine 1 engine 2 rescue 2" at the end and found "rescue" there.
         end = re.search(r'\bmap\s+grid\s+\d+', tail, re.IGNORECASE)
         if end:
-            return tail[:end.end()]
-        if unit_alt:
+            tail = tail[:end.end()]
+        elif unit_alt:
             nxt = re.search(r'\bcoquitlam\s+(?:' + unit_alt + r')\s*\d', tail, re.IGNORECASE)
             if nxt:
-                return tail[:nxt.start()]
-        return tail
+                tail = tail[:nxt.start()]
+        slots.append(tail.strip())
+    if slots:
+        return " ; ".join(s for s in slots if s)
     if not unit_alt:
         return transcript or ""
     unit_token = re.compile(r'\b(?:' + unit_alt + r')\s*\d+\b', re.IGNORECASE)

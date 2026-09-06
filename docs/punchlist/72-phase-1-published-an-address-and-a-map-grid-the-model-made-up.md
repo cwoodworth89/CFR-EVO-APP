@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🎙️ Dispatch Pipeline |
 | **Blocks** | 0 |
@@ -14,9 +14,10 @@
 
 ## 72. The completion trigger fired on the model's own "map grid 68", 23 seconds in
 
-> **Status**: 🔴 **Open — the operator's rule is stated: unknown beats a guess.** Crew-visible: a
-> structure fire went to the kiosk with a pin, a grid and six ETAs, none of which came from
-> the broadcast.
+> **Status**: ✅ **Closed 2026-09-05 — option 3 built (`07010bd`), measured on the holdout, live from
+> 17:37 PDT.** *(Opened as: 🔴 Open — the operator's rule is stated: unknown beats a guess.)*
+> Crew-visible: a structure fire went to the kiosk with a pin, a grid and six ETAs, none of
+> which came from the broadcast.
 
 ### What the audio contained, and what the kiosk showed
 
@@ -167,3 +168,32 @@ and reversible. The full-corpus run of the simulator is in `evaluation_history` 
 #12 (the decision to label a fallback pin rather than suppress it, which is what put the
 Coquitlam Ave centroid on the map for a structure fire; the operator's rule above reopens
 that question for phase 1).
+
+### Closed 2026-09-05
+
+Built as option 3 (`07010bd`). Phase 1 ignores the chunk's parsed grid and publishes the placed
+parcel's own zone, marked `map_grid_source: "parcel-zone"`; the kiosk badge reads
+"GRID N · FROM ADDRESS". No parcel, no grid. The parsed grid no longer steers street narrowing
+in phase 1. Phase 2 publishes the spoken grid (`announced`), or the zone containing the point
+when nothing was spoken, never phase 1's parsed grid, and raises `GRID_MISMATCH` when the
+spoken grid differs from the parcel's zone, keeping both on the record. Tests: the 19 s chunk
+of DISP-2026-3E1426 (chunk says 68) yields 3080 Lincoln Ave's own zone; the cut structure-fire
+chunk yields no grid; the flag's arithmetic. 241 pass.
+
+**Measured, the same 44 holdout recordings replayed the same way** (`evaluation_history`,
+baseline = the run on the old rules):
+
+| Grid at the phase-1 chunk, 37 calls with a verified grid | Old rules | New rules |
+|:--|--:|--:|
+| Right | 10 | **28** |
+| Wrong | 26 | **2** |
+| Withheld (no parcel: 3 intersections, 1 block, 3 unplaced) | 1 | 7 |
+
+Of the grids shown, 28 of 30 are right (93 %) against 10 of 36 (28 %). The two wrong are
+`3345 Robson Dr` (parcel zone 103, announced 96) and `1300 Pinetree Way` (87 against 86),
+dispatch assignments across a zone line; phase 2 flags both. The agent was restarted on the
+operator's word at 17:37 PDT after the capture check said SAFE.
+
+Not done here, and now the open question: rule A, the location gate, which on the corpus
+would trade 81 unknown cards per 500 calls for 48 fewer wrong streets in the first minute.
+One line on the backlog; the operator's call.

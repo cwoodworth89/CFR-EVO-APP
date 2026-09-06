@@ -56,6 +56,7 @@ from cfr_dispatch.config import UNITS_VOCABULARY  # noqa: E402
 from cfr_dispatch.parser import split_rounds  # noqa: E402
 from extract_training_data import normalize_transcript_raw  # noqa: E402  the label normaliser round 1 used
 import prepare_training_clips as r1  # noqa: E402  the round-1 cut, reused not copied
+from check_verified_transcripts import run_check  # noqa: E402  the label check round 1 runs first
 
 CUT_TIMES_S = (10.0, 16.0, 22.0)   # phase 1's first check and two later ones (sound_capture.py)
 HOLDOUT2_SIZE = 50
@@ -98,6 +99,7 @@ def main() -> int:
     ap.add_argument("--model", default=os.path.join(str(BACKEND), "models", "whisper-base-cfr-ct2"),
                     help="model for word timestamps (the one in service: its words match the labels best)")
     ap.add_argument("--onset-model", default="base", help="model the round-1 builder used to cut new calls")
+    ap.add_argument("--stop-after-cut", action="store_true", help="cut the new calls and report; no holdout, no truncation")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -120,14 +122,32 @@ def main() -> int:
     seen = {r["file_name"] for r in r1_train} | {r["file_name"] for r in r1_hold}
     logging.info("round 1: %d train, %d holdout (kept aside, unchanged)", len(r1_train), len(r1_hold))
 
-    # ---- 1. the calls verified since round 1, cut exactly as round 1 cut its clips -----------
+    # ---- 0. the label check: a call it blocks is left out, whichever round it came from -------
+    # Round 1's builder refuses to build while anything blocks. Round 2 excludes the blocked
+    # calls instead and says so: three of them are recordings the review notes say were cut
+    # off, and a label longer than its audio teaches the model to invent an ending, the habit
+    # the truncated pairs exist to break (2026-09-05, the first build had them in).
     engine = create_engine(db_url)
+    with engine.connect() as conn:
+        n_block, n_advise, report = run_check(conn)
+    blocked, cur = set(), None
+    for line in report:
+        m = re.match(r"^(DISP-2026-[A-Z0-9]+)\s*$", line.strip())
+        if m:
+            cur = m.group(1)
+        elif cur and line.strip().startswith("BLOCK"):
+            blocked.add(cur)
+    logging.info("label check: %d blocking issue(s) on %d call(s), %d advisory; the blocked calls are left out: %s",
+                 n_block, len(blocked), n_advise, sorted(blocked))
+    r1_train = [r for r in r1_train if r["file_name"][:-4] not in blocked]
+
+    # ---- 1. the calls verified since round 1, cut exactly as round 1 cut its clips -----------
     rows = engine.connect().execute(text(
         "SELECT dispatch_id, verified_transcript FROM public.dispatches "
         "WHERE feedback_submitted AND verified_transcript IS NOT NULL AND btrim(verified_transcript) <> '' "
         "AND COALESCE((target->>'include_in_training')::boolean, TRUE) "
         "AND position('[PA]' in coalesce(target->>'review_notes', '')) = 0 ORDER BY dispatch_id")).fetchall()
-    new_rows = [(d, v) for d, v in rows if f"{d}.wav" not in seen]
+    new_rows = [(d, v) for d, v in rows if f"{d}.wav" not in seen and d not in blocked]
     logging.info("%d calls eligible now, %d not in round 1", len(rows), len(new_rows))
     onset_model = WhisperModel(args.onset_model, device="cpu", compute_type="int8", local_files_only=True)
     new_kept, dropped = [], {}
@@ -162,6 +182,10 @@ def main() -> int:
         new_kept.append({"file_name": f"{did}.wav", "verified_transcript": label})
     logging.info("new calls: %d cut, %d dropped %s", len(new_kept), sum(len(v) for v in dropped.values()),
                  {k: len(v) for k, v in dropped.items()})
+    if args.stop_after_cut:
+        for k, v in dropped.items():
+            logging.info("  dropped for %s: %s", k, " ".join(v))
+        return 0
 
     # ---- 2. the pool, and the second holdout -------------------------------------------------
     for r in r1_train:

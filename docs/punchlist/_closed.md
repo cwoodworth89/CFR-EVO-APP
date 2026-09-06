@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-64 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+70 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -19,6 +19,12 @@
 | **55** | 🟠 operational | SUPERSEDED | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **63** | 🔴 crew-visible | CLOSED | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
 | **14** | 🔴 crew-visible | CLOSED | [PA announcements are being captured as dispatches](14-pa-announcements-are-being-captured-as-dispatches.md) |
+| **34a** | 🔴 crew-visible | CLOSED | [Apparatus names collide with call-type names, turning STT damage into a confident wrong answer](34a-apparatus-names-collide-with-call-type-names-turning-st.md) |
+| **56** | 🔴 crew-visible | CLOSED | [Bring XStreets onto the same resolution path as main addresses](56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
+| **51b** | 🔴 crew-visible | CLOSED | [The kiosk shows the junction field labelled "cross streets", and never reads the real one](51b-the-kiosk-shows-the-junction-field-labelled-cross-stree.md) |
+| **30** | 🔴 crew-visible | CLOSED | ["Code 1 / Code 3" is not Coquitlam terminology, and the border has no warning or review state](30-code-1-code-3-is-not-coquitlam-terminology-and-the-bord.md) |
+| **17** | 🔴 crew-visible | WITHDRAWN | [Grade-separated interchanges have no junction to find](17-grade-separated-interchanges-have-no-junction-to-find.md) |
+| **57** | 🔴 crew-visible | CLOSED | [Candidate-level parse bleed — latent, not live](57-candidate-level-parse-bleed-latent-not-live.md) |
 | **71** | 🔴 crew-visible | CLOSED | [The hotword budget is spent on intersections, suffix duplicates and template words; *Thor* never gets in](71-the-hotword-budget-is-spent-on-intersections-suffix-duplicat.md) |
 | **45a** | ⚪ hygiene | CLOSED | [Geocoder harness needs a review pass before its numbers are trusted again](45a-geocoder-harness-needs-a-review-pass-before-its-numbers.md) |
 | **46a** | ⚪ hygiene | CLOSED | [No STT harness exists — WER is computed for training, never for regression](46a-no-stt-harness-exists-wer-is-computed-for-training-neve.md) |

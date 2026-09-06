@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🏷️ Response Terminology & Status Colour |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 30. "Code 1 / Code 3" is not Coquitlam terminology, and the border has no warning or review state
-> **Status**: ⚠️ **Open — found 2026-08-23.** Reported by the operator from a live kiosk
+> **Status**: ✅ **Closed 2026-09-05 — verified against the tree: no "Code 1 / Code 3" wording remains in the kiosk, and the out-of-city card exists.** *(Opened as: ⚠️ Open — found 2026-08-23. Reported by the operator from a live kiosk)*
 > screenshot (`1347 KENNEY ST`, GRID 88, routine call). The rendering sites below were
 > **confirmed** by reading the working tree; the terminology correction itself is the
 > operator's, and Coquitlam usage is not currently backed by a document in
@@ -184,3 +184,10 @@ right address", i.e. below OPERATIONAL or a poor geocode score — and a re-meas
 > authority, and the authority's ruling is: **`routine` / `emergency`, no numeric code.**
 
 ---
+
+### Closed 2026-09-05
+
+A search of `frontend/src` finds no *Code 1* or *Code 3*; the response type renders as
+ROUTINE / EMERGENCY / UNKNOWN since #31. The border state is the Tier 2 card, *NOT AVAILABLE
+OUTSIDE OF CITY*, in `BlockParcelPanel.jsx` and `PropertySatellitePanel.jsx` (CLAUDE.md section 5).
+Fixed earlier and left open, the pattern the 2026-08-31 sweep named.

@@ -15,24 +15,18 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**19 open** (12 crew-visible) · **64 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**13 open** (6 crew-visible) · **70 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 19
+## Open — 13
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **1** | 🔴 crew-visible | OPEN | [Erratic Routing Loops & Intra-Municipal Path Preference](punchlist/01-erratic-routing-loops-intra-municipal-path-preference.md) |
-| **17** | 🔴 crew-visible | OPEN | [Grade-separated interchanges have no junction to find](punchlist/17-grade-separated-interchanges-have-no-junction-to-find.md) |
 | **19a** | 🔴 crew-visible | OPEN | [Remaining fuzzy-match sites have not been reviewed](punchlist/19a-remaining-fuzzy-match-sites-have-not-been-reviewed.md) |
 | **20** | 🔴 crew-visible | OPEN | [`TALK_GROUPS` duplicates `public.vocabulary`](punchlist/20-talk-groups-duplicates-public-vocabulary.md) |
 | **21** | 🔴 crew-visible | OPEN | [Rail crossing list is hand-entered and probably incomplete](punchlist/21-rail-crossing-list-is-hand-entered-and-probably-incompl.md) |
-| **30** | 🔴 crew-visible | OPEN | ["Code 1 / Code 3" is not Coquitlam terminology, and the border has no warning or review state](punchlist/30-code-1-code-3-is-not-coquitlam-terminology-and-the-bord.md) |
-| **34a** | 🔴 crew-visible | OPEN | [Apparatus names collide with call-type names, turning STT damage into a confident wrong answer](punchlist/34a-apparatus-names-collide-with-call-type-names-turning-st.md) |
-| **51b** | 🔴 crew-visible | OPEN | [The kiosk shows the junction field labelled "cross streets", and never reads the real one](punchlist/51b-the-kiosk-shows-the-junction-field-labelled-cross-stree.md) |
-| **56** | 🔴 crew-visible | OPEN | [Bring XStreets onto the same resolution path as main addresses](punchlist/56-bring-xstreets-onto-the-same-resolution-path-as-main-ad.md) |
-| **57** | 🔴 crew-visible | OPEN | [Candidate-level parse bleed — latent, not live](punchlist/57-candidate-level-parse-bleed-latent-not-live.md) |
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
 | **65** | ⚪ hygiene | OPEN | [The admin login accepts three hardcoded passwords besides the configured one](punchlist/65-the-admin-login-accepts-three-hardcoded-passwords-besides-t.md) |
 | **70** | 🔴 crew-visible | OPEN | [A restart during a capture loses the call and its audio](punchlist/70-a-restart-during-a-capture-loses-the-call-and-its-audio.md) |

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧾 Session batch, 2026-08-29/30 — XStreets, rounds, and the confidence ruling |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 57. Candidate-level parse bleed — latent, not live
-> **Status**: 🔵 **Open, low priority. Explicitly NOT a live defect** — recorded because it was
+> **Status**: ✅ **Closed 2026-09-05 — never observed live; the candidate ranking (#44a) and fill-blanks coalescing make the described bleed unreachable.** *(Opened as: 🔵 Open, low priority. Explicitly NOT a live defect — recorded because it was)*
 > observed and mis-described in conversation before being measured, and the correction belongs
 > in writing (§6.6).
 
@@ -41,3 +41,10 @@ Those candidates never win. The cross-roads segment boundary
 missing or misheard runs the segment on to the end. It is worth a guard and a test — an
 upper bound on plausible cross-street length would catch every example above — but it is
 **not** evidence the parser is producing bad output today, and it should not be cited as one.
+
+### Closed 2026-09-05
+
+Recorded as not-live when written, and not seen since in 565 calls. Since #44a every
+candidate is geocoded and the best-resolving one wins, and phase 2 fills blanks only, so a
+candidate whose near-road field swallowed the talk group loses to the round that parsed
+cleanly rather than being read. Reopen on an observation.

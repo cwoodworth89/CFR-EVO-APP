@@ -28,6 +28,13 @@ MOUNTAIN` 93):
 | `parser/call_types.py:38` | `token_set_ratio(ct.lower(), transcript)` | Different class (classification, not location) — a wrong call type is serious but not a wrong address |
 | `parser/channels.py:42` | `token_set_ratio(raw_clean, chan_clean)` | Radio channel selection |
 
+**2026-09-05:** three of the five are resolved. `address_resolver` scores with `fuzz.ratio`
+(both sites, since #15's follow-up); `location.py`'s fuzzy correction is no longer called by
+the parser, the near roads being resolved against the roads near the placed address instead
+(#56); `call_types.py` searches only the incident slot of each round (#34a), though its fuzzy
+stage still uses `token_set_ratio` on that slot. Remaining: `channels.py` (talk group) and
+that fuzzy stage. Neither places a call.
+
 `token_set_ratio` scoring a short string against a longer one that contains it returns 100
 (#15), so any site comparing a street fragment against a full street name is exposed.
 `sanitize_transcript`'s phonetic corrections are hardcoded regex rather than fuzzy — they

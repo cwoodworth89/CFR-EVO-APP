@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧷 Parcel Import Integrity |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 56. Bring XStreets onto the same resolution path as main addresses
-> **Status**: 🔵 **Improvement — specified, not built.** Operator direction 2026-08-30:
+> **Status**: ✅ **Closed 2026-09-05 — built as the operator directed: near roads resolved against the roads near the placed address, reported never rewritten (`89e25d4`).** *(Opened as: 🔵 Improvement — specified, not built. Operator direction 2026-08-30:)*
 > *"I think it'll be important ALL streets follow the same path."* Reframed from a defect
 > report; the underlying measurement that motivated it is kept below.
 
@@ -208,3 +208,28 @@ Fixed: the system value is now the placeholder — a suggestion behind the box, 
 units/incident/address already do it — and importing it is still one keystroke (click the
 `Sys:` value or `Ctrl+Space`). Deliberate acceptance, not a default. `verified_talkgroup` had
 the same fallback and was corrected with it.
+
+### Closed 2026-09-05
+
+`pipeline/near_roads.py`. The city-wide fuzzy rewrite in the parser is gone; each heard name
+is matched against the roads within 400 m of the placed point (over the 24 verified near
+roads with a placed call, the distance was p50 109 m, p99 167 m), or the roads crossing the
+zone when the point is withheld: exact, then by base name, then by spelling within that set
+with `XSTREET_SUBSTITUTED`, otherwise shown as heard with `XSTREET_UNRESOLVED`. Two suffix
+forms of one name nearby (Chartwell Green and Lane) are reported ambiguous, not picked. Phase
+1 and both phase 2 paths carry `x_streets_heard` and `x_streets_how`.
+
+Measured on the whole corpus, stored transcripts, the chain harness now scoring near roads as
+sets against the verified column (34 calls carry one):
+
+| | Before | After |
+|:--|--:|--:|
+| Near roads exact | 25 | **30** |
+| Partial | 9 | 4 |
+| Wrong | 0 | 0 |
+| Placements moved | | 0 |
+
+The five recovered are suffix forms the old path mangled (*Guildford Dr* for Guildford Way,
+*Pine Tree Way*, *Guildford Quay*). The one that went exact to partial, DISP-2026-298EC2, is
+the verified column's *Gabriela Dr* for the City's Gabriola Drive: the system is right and the
+truth is wrong, and it is on the re-review list. Ten tests, five of them live.

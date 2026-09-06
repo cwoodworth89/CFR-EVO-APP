@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🧷 Parcel Import Integrity |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 51. The kiosk shows the junction field labelled "cross streets", and never reads the real one
-> **Status**: 🔴 **Open — genuine display defect, but NOT the cause of the ratings regression.**
+> **Status**: ✅ **Closed 2026-09-05 — the banner read the near-road fields at the top level of the call, where they never were; it reads the record now (`89e25d4`).** *(Opened as: 🔴 Open — genuine display defect, but NOT the cause of the ratings regression.)*
 > Found 2026-08-29 while auditing XStreets representation end to end.
 >
 > ⚠️ **Correction, same day.** This entry first claimed to be the cause of the PERFECT-rating
@@ -151,3 +151,10 @@ is the remaining display half.
 
 
 ---
+
+### Closed 2026-09-05
+
+`ActiveAlertBanner.jsx` read `activeCall.x_street_1`; the API and the MQTT payload carry the
+fields inside `target`, so the line never rendered. It reads `target` now, labelled *Near*,
+with *(as heard)* on a name that did not resolve and *(?)* on one matched by spelling (#56).
+Built on the kiosk; visible on the next call.

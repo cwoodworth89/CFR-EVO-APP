@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | crew-visible |
 | **Area** | 🏷️ Response Terminology & Status Colour |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 34. Apparatus names collide with call-type names, turning STT damage into a confident wrong answer
-> **Status**: ⚠️ **Open — found 2026-08-23 investigating `DISP-2026-A19179`.** **Confirmed**
+> **Status**: ✅ **Closed 2026-09-05 — the call type is read from the incident slot of each round, never the unit list (`d50e0db`, `c128cb2`, `f2c01a3`).** *(Opened as: ⚠️ Open — found 2026-08-23 investigating `DISP-2026-A19179`. Confirmed)*
 > by re-running current code against the kiosk database. Characterised only; no fix applied.
 
 **`Rescue` is both an apparatus type and a call type.** When STT garbles the incident
@@ -154,3 +154,16 @@ placeholders…" keeps **#33**. Code comments citing "punch-list #33" in `config
 
 Eight items reported by the operator from one review session. Each was characterized
 read-only against the working tree and the running kiosk; what was measured is stated.
+
+### Closed 2026-09-05
+
+`incident_search_text` in `parser/call_types.py`: the text after each "respond [priority]",
+each slot ending where its round ends (its "map grid N", or the next "coquitlam <unit> N"),
+joined; with no "respond" at all, the unit tokens are blanked and the rest searched. Three
+tries to get there, each measured on the whole corpus through the chain harness: the first
+ran on into round 2's unit list (A19179 still *Rescue*); the second stopped at round 1 and
+lost two calls whose good reading was in round 2 (E792B0 *epidominal* / *abdominal*, 76A4BF);
+the third takes every round. Result: DISP-2026-A19179 reads *Unknown Incident* instead of
+*Rescue*, no other incident verdict on 508 calls moved, no place moved. Nine tests, the real
+transcripts among them. The scorer counts an unknown as wrong, so the count is unchanged; what
+changed is that a confident wrong answer became an honest gap.

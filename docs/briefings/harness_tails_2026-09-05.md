@@ -112,4 +112,5 @@ before 2026-09-05 fold *approximate* into *cosmetic* and include the PA pages.
    | DISP-2026-D00EC5 (08-25) | 1883 Beaty Pl | no such street in City data, nothing close; the runsheet, possibly out of city |
    | DISP-2026-E89BC5 (07-13) | 2980 Princess Cres 422 | 2980 Princess Cres, unit 422 in the subaddress field |
    | DISP-2026-D106EB (07-13) | 3030 Gordon Avenue Rain City Housing | 3030 Gordon Ave, the building name in the subaddress field |
+   | DISP-2026-298EC2 | near road *Gabriela Dr* | Gabriola Dr, the City's name (found by the near-road scoring, 22:20) |
 4. **The City question** in register §14, sixteen numbers.

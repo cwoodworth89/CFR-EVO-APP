@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | WITHDRAWN |
 | **Severity** | crew-visible |
 | **Area** | 🔎 Geocoder Substitution |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 17. Grade-separated interchanges have no junction to find
-> **Status**: ⚠️ **Open — one manual row added, needs operational confirmation.**
+> **Status**: ⚪ **Withdrawn 2026-09-05, operator ruling: this came from the Gemini-era "NG911 standards" that were invented, and it is not data a crew arrives with.** *(Opened as: ⚠️ Open — one manual row added, needs operational confirmation.)*
 
 Lougheed Hwy and Mariner Way never meet: closest approach **221.6 m**. The derived table
 correctly holds `HIGHWAY RAMP & LOUGHEED HWY` (3 candidates) and `MARINER WAY & UNITED
@@ -45,3 +45,10 @@ Now that every status is imported, the database holds **4 `Ramp` roads and 67 ra
 junctions** in `public.intersections`. The original problem statement no longer describes the
 data. Re-measure against the actual interchanges before doing any manual work here — the
 manually added row referenced in the original entry may now be redundant or conflicting.
+
+### Withdrawn 2026-09-05
+
+Operator: *"Not sure where #17 came from, and that is not data we can arrive with. It was a
+routing issue when Gemini made up a bunch of NG911 standards."* The one manual row it added
+stays; a junction pair the resolver cannot narrow goes to the candidate selector (#72's rule
+A shows both), which is the real behaviour for the interchanges the dispatcher does name.

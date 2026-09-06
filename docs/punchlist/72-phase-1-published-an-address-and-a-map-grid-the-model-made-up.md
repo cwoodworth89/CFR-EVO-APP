@@ -194,6 +194,7 @@ Of the grids shown, 28 of 30 are right (93 %) against 10 of 36 (28 %). The two w
 dispatch assignments across a zone line; phase 2 flags both. The agent was restarted on the
 operator's word at 17:37 PDT after the capture check said SAFE.
 
-Not done here, and now the open question: rule A, the location gate, which on the corpus
-would trade 81 unknown cards per 500 calls for 48 fewer wrong streets in the first minute.
-One line on the backlog; the operator's call.
+Rule A, the location gate, was built later the same day on the operator's go (`1997c05`): a
+preliminary payload carries a location only for a parcel or a junction, `location_pending`
+otherwise, and phase 2 places the call from the full recording. Holdout replay: 3 of 44
+locations withheld, the parcel and junction placements untouched.

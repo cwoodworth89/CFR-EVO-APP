@@ -79,12 +79,29 @@ Read the summary: the `cut diagnostic` (heard/claimed words) should sit at 1.00;
 `measured boundary vs the retired midpoint formula` line shows how far a two-equal-rounds
 assumption would have missed.
 
+### Round 2 (2026-09-05): the calls verified since, a second holdout, truncated pairs
+
+```bash
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python ../tools/prepare_round2_dataset.py"
+```
+
+Reuses the round-1 cut for the new calls, copies the round-1 train clips, draws a 50-clip
+second holdout (seed 2026) from everything round 1 did not hold out, and adds truncated pairs:
+each train clip cut at 10, 16 and 22 s (phase 1's check times) with the label cut to the words
+that ended before the cut, aligned through the model in service's word timestamps. The round-1
+holdout is never touched. Outputs `round2_clips/`, `metadata_round2_train.csv`,
+`metadata_round2_holdout.csv`. `--limit 3` first. Why: every verified transcript ends in
+"map grid N" and the round-1 model finishes any cut chunk with that tail (punch list #72).
+
 ## 2. Train
 
 ```bash
 ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 OMP_NUM_THREADS=6 WHISPER_CT2_OUT=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN nice -n 15 .venv/bin/python tools/train_whisper_lora.py"
 ```
 
+* Round 2: `WHISPER_TRAIN_CSV=.../metadata_round2_train.csv WHISPER_CLIPS_DIR=.../round2_clips
+  WHISPER_CT2_OUT=.../models/whisper-base-cfr-ct2-r2`. About 1,400 rows against round 1's 388,
+  so hours rather than 50 minutes; run it overnight, `nice -n 15`.
 * **`WHISPER_CT2_OUT` to a fresh directory, always.** The default path is the one the live
   daemon has deployed; training over it fails silently at the next restart.
 * `nice -n 15` and `OMP_NUM_THREADS=6` so a real dispatch preempts training. ~50 min for
@@ -96,6 +113,20 @@ ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR
   notebook and uncited — a §6.3 gap, open.
 
 ## 3. Score on the holdout
+
+Round 2 is scored on both holdouts and on the completion habit, before anything is deployed,
+with the model chosen by environment (`WHISPER_MODEL` is read by `cfr_dispatch.config.runtime`):
+
+```bash
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && XDG_RUNTIME_DIR=/run/user/1000 WHISPER_MODEL=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-r2 .venv/bin/python tools/harness_chain.py --only-csv backend/data/training/metadata_round1_holdout.csv --record --notes 'round 2 on the round-1 holdout'"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && XDG_RUNTIME_DIR=/run/user/1000 WHISPER_MODEL=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-r2 .venv/bin/python tools/harness_chain.py --only-csv backend/data/training/metadata_round2_holdout.csv --record --notes 'round 2 on the round-2 holdout'"
+ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && XDG_RUNTIME_DIR=/run/user/1000 WHISPER_MODEL=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-r2 .venv/bin/python tools/harness_phase1.py --only-csv backend/data/training/metadata_round1_holdout.csv --record --notes 'round 2: does the chunk grid stop being a completion'"
+```
+
+The third is the one the truncated pairs are for: on the round-1 model the grid in the chunk
+that trips phase 1 was a completion on 26 of 37 holdout calls. The same 44 clips against the
+same rows in `evaluation_history` is the comparison.
+
 
 ```bash
 ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP/backend && XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/eval_round1_holdout.py --models base /home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2 /home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN"

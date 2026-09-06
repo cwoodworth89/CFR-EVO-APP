@@ -38,7 +38,12 @@ export default function StreetViewPanel({ activeCall }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
-  const [sdkError, setSdkError] = useState(false);
+  // Google reports an auth failure ONCE per page, when the SDK script first loads. Every
+  // later panel instance (each new call mounts a fresh one) would start clean, find
+  // window.google.maps present, build a panorama the SDK will only ever render black, and
+  // show nothing amiss -- the operator's Firefox on 2026-09-06, hours after the first
+  // failure. So the verdict is kept on the window and read at mount (punch-list #35a).
+  const [sdkError, setSdkError] = useState(() => Boolean(typeof window !== 'undefined' && window.__cfrGmAuthFailed));
   const [isLoading, setIsLoading] = useState(true);
 
   const containerRef = useRef(null);
@@ -153,6 +158,7 @@ export default function StreetViewPanel({ activeCall }) {
   useEffect(() => {
     window.gm_authFailure = () => {
       console.warn("Google Maps JS SDK auth failure triggered. Check Google Cloud Console 'Maps JavaScript API' status.");
+      window.__cfrGmAuthFailed = true;
       setSdkError(true);
       setIsLoading(false);
     };

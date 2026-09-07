@@ -164,6 +164,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   // along the route within 300 ft of arrival first, then around the address, then within
   // the 1,000 ft supply lay, else a warning. Punch-list #74.
   const routeHydrants = useRouteHydrants(destLat, destLng, routeCoords);
+  const hydrantHighlightIds = useMemo(() => new Set(routeHydrants.picks.map(h => h.gisId)), [routeHydrants]);
 
   // Dynamic responding units resolution
   const unitsToRoute = useMemo(() => {
@@ -433,11 +434,17 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         baseStyle="VOYAGER"
         showCadastral
         showFireHalls
+        // Every hydrant, but only once the map is zoomed in to neighbourhood scale: with no
+        // target passed, the layer draws from zoom 16 (operator, 2026-09-07: "show ALL the
+        // hydrants on the main route map, but only at a certain close in zoom"). At the
+        // route's own zoom only the numbered picks show. The picks are also handed to the
+        // layer so it pulses them rather than its own nearest.
+        showHydrants
+        hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
 
-        {/* The recommended hydrants only. The full layer drew every hydrant in the city
-            here on 2026-09-06 and was too much (#74). */}
+        {/* The recommended hydrants as numbered badges, at every zoom (#74). */}
         <PickedHydrantsLayer picks={routeHydrants.picks} />
 
         {/* Road closures. A closure matters most when apparatus is being routed through

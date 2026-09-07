@@ -137,3 +137,13 @@ closest hydrant to the address within 300 ft, if there is one, is listed beside 
 closer option, so the crew weighs relay pumping against the shorter lay themselves. Two more
 tests.
 
+### 2026-09-07: no label boxes, and every hydrant at close zoom
+
+Operator, on the 2573 Diamond Cres replay: *"I don't like the pop up boxes there. It makes it
+hard to understand the route. Also, I think we should show ALL the hydrants on the main route
+map, but only at a certain close in zoom."* Done: the picks are 22 px numbered badges in the
+NFPA class colour with nothing else on the map (id, class and distance on hover and in the
+details box), and the route map now carries the full hydrant layer with no target passed, so
+it draws from zoom 16 — neighbourhood scale — and pulses the picks. At the route's own zoom
+only the badges show.
+

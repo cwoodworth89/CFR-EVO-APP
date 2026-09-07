@@ -39,6 +39,7 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 | *"I thought the PiP mode was going to be static serve, with the expand allowing interactive mode."* | The compact tile is a static image at the saved view; Expand opens the interactive panorama with the save bar | Needs *Street View Static API* on the key; until then the tile falls back to interactive and says so |
 | *"'Saved Preferred View' is taking up a lot of room, and so is the label."* | A green dot and the heading in the tile header; full wording only in the expanded view | — |
 | *"I don't need to see all of those hydrants. Just the recommended ones."* | The dispatch map draws only the picks, numbered, in NFPA 291 colours | — |
+| *"I don't like the pop up boxes there. It makes it hard to understand the route. … show ALL the hydrants on the main route map, but only at a certain close in zoom."* (2026-09-07) | Picks are small numbered badges, no label box; the full hydrant layer draws on the route map from zoom 16 | — |
 | *"Hydrants aren't being calculated or displayed on the main screen anymore."* | Picked by the operator's rule (§4 below), listed in the details box with how each was chosen | — |
 | *"I'd rather have 'unknown' rather than guesses."* (2026-09-05) | The rule behind every empty state on the kiosk: the Tier 1 card, *(as heard)*, *NO HYDRANT WITHIN 1,000 FT*, *Awaiting location* | — |
 

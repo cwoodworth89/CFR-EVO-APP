@@ -98,8 +98,9 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
   *supply lay* on hydrants; *straight-line* on a distance that is one.
 * **The tile is the picture.** A compact panel shows the thing and a small header; controls
   live in the expanded view.
-* **Only the recommended.** The dispatch map draws the picked hydrants, not the inventory;
-  the workstation keeps the full layer behind a toggle.
+* **Only the recommended, until zoomed in.** The dispatch map draws the picked hydrants as
+  numbered badges at every zoom and the whole inventory only from zoom 16; the workstation
+  keeps the full layer behind a toggle. No label boxes on the map: they hide the route.
 * **A failure states itself.** A failed image or SDK load shows a labelled fallback, never a
   black rectangle that looks like a working panel (the weeks of #35a).
 * **The marker is where the truck stops** — the city-to-private transition. Distances to it

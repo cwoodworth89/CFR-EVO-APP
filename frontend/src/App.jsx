@@ -56,19 +56,28 @@ function App() {
     ? MODE.DISPATCH
     : MODE.STANDBY;
 
-  // A live call interrupting a review sends the operator back to the MAP when it is
-  // dismissed, not to the admin panel the review was launched from.
+  // Where the screen goes when a live call ends depends on HOW it ended (punch-list #37,
+  // operator 2026-08-23):
   //
-  // Starting a review sets returnMode to ADMIN_DISPATCHES so closing the replay returns
-  // to the list being worked through. But once a real dispatch has taken over, that
-  // context is gone: the crew responded to an incident, and dropping them into a review
-  // table afterwards is wrong. Decided 2026-08-22.
+  //   * the countdown ran out  -> the map (EXPLORE). A crew responded to an incident and
+  //     nobody is at the keyboard; dropping them into a review table is wrong. This is
+  //     the 2026-08-22 intent, kept for the timeout.
+  //   * the operator pressed Close -> back to whatever they were on, the review list
+  //     included. Until this change a live call clobbered returnMode to EXPLORE the moment
+  //     it arrived, so both paths landed on the map.
   //
   // Synced during render rather than in an effect: an effect renders the stale mode once
   // before correcting itself, which is a visible flash of the admin panel.
   const activeIsLive = !!kioskState.activeCall && !kioskState.activeCall.isReview;
-  if (activeIsLive && returnMode !== 'EXPLORE') {
-    setReturnMode('EXPLORE');
+  const [wasLive, setWasLive] = useState(false);
+  if (activeIsLive && !wasLive) {
+    setWasLive(true);
+  }
+  if (!activeIsLive && wasLive) {
+    setWasLive(false);
+    if (kioskState.lastDismiss?.reason === 'timeout' && returnMode !== 'EXPLORE') {
+      setReturnMode('EXPLORE');
+    }
   }
 
   // Replay a real historical dispatch in Kiosk view exactly as it was received.

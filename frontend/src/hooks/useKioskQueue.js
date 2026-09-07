@@ -55,6 +55,8 @@ export function useKioskQueue() {
   const [activeCall, setActiveCall] = useState(null);
   const [queuedCalls, setQueuedCalls] = useState([]);
   const [isReviewMode, setIsReviewMode] = useState(false);
+  // How the last active call ended: { reason: 'manual' | 'timeout', at } (#37).
+  const [lastDismiss, setLastDismiss] = useState(null);
   const [isTvMode, setIsTvMode] = useState(false);
   const [isRecentlyUpdated, setIsRecentlyUpdated] = useState(false);
   // Which operator-visible fields changed, for the badge tooltip. Empty when idle.
@@ -312,13 +314,16 @@ export function useKioskQueue() {
     });
   }, [activateCall]);
 
-  // Dismiss current active call
-  const dismissActiveCall = useCallback(() => {
+  // Dismiss current active call. `reason` is 'manual' (the Close button) or 'timeout' (the
+  // countdown); App reads the last one to decide where the screen goes afterwards -- the
+  // map after a timeout, back to whatever the operator was doing after a Close (#37).
+  const dismissActiveCall = useCallback((reason = 'manual') => {
     // Record it, or the rehydration on the next reload would put a call the
     // operator has deliberately cleared straight back on the screen. Review
     // replays are excluded -- they are not live incidents.
     const dismissing = activeCallRef.current;
     if (dismissing && !dismissing.isReview) rememberDismissedId(dismissing.dispatch_id);
+    setLastDismiss({ reason: reason === 'timeout' ? 'timeout' : 'manual', at: Date.now() });
 
     setQueuedCalls((prev) => {
       if (prev.length > 0) {
@@ -341,7 +346,7 @@ export function useKioskQueue() {
     timeoutTimerRef.current = setInterval(() => {
       setTimeoutSecondsLeft((prev) => {
         if (prev <= 1) {
-          dismissActiveCall();
+          dismissActiveCall('timeout');
           return DEFAULT_TIMEOUT_SECONDS;
         }
         return prev - 1;
@@ -384,6 +389,7 @@ export function useKioskQueue() {
     activeCall,
     queuedCalls,
     isReviewMode,
+    lastDismiss,
     isTvMode,
     isRecentlyUpdated,
     updatedFields,

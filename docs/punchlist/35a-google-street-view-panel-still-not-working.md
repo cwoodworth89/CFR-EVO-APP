@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | operational |
 | **Area** | 🖥️ Live Operation Batch, 2026-08-23 |
 | **Blocks** | 3 |
@@ -272,4 +272,20 @@ restrictions**, the same screen as the Maps JavaScript API fix.
 
 Also seen: `5000 TESTING WAY`, a row the API test suite writes into the kiosk's live
 `parcels` table when run with `DATABASE_URL` pointing there. One line on the backlog.
+
+---
+
+## Closed 2026-09-06
+
+> **Status**: ✅ **Closed 2026-09-06 — the key fixed, the Firefox black tile explained, the
+> panel seen working in the operator's own browser on a replay the same evening.**
+
+The Firefox tile was black because that tab had loaded before the key change and Google
+judges a key once per page load; a fresh tab (the review) got the fixed key, the old one did
+not. The operator's later screenshots from Firefox (808 Miller Ave replay) show the panorama
+rendered. Left in the code from this item: the auth verdict kept on the window, the amber
+strip and disabled save on a failed SDK, the static compact tile, degrees for fov, the
+panorama id, and NULL for an unsaved view. Left with the operator: Street View Static API on
+the key's restrictions (until then the tile falls back and says so) and the terms'
+same-screen clause (standards index).
 

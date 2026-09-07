@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | hygiene |
 | **Area** | 🖥️ Live Operation Batch, 2026-08-23 |
 | **Blocks** | 1 |
@@ -13,7 +13,7 @@
 ---
 
 ## 37. Close button and timer timeout should not dismiss to the same place
-> **Status**: ⚠️ **Open — noted for change by the operator 2026-08-23.**
+> **Status**: ✅ **Closed 2026-09-06 — a timeout lands on the map, a Close returns to the screen the operator was on.** *(Opened as: Open — noted for change by the operator 2026-08-23.)*
 
 Required behaviour:
 
@@ -45,3 +45,21 @@ on `'manual'` restore what was captured. **Note this touches the live dispatch p
 still lands on the map.
 
 ---
+
+### Closed 2026-09-06
+
+Built as the fix direction said. `dismissActiveCall(reason)` in `useKioskQueue.js` takes
+`'timeout'` from the countdown and `'manual'` from the banner's Close, and records the last
+one as `lastDismiss`. `App.jsx` no longer clobbers `returnMode` when a live call arrives; it
+watches the call end and sets EXPLORE only when the reason was a timeout. So:
+
+| Dismissal | Goes to |
+|:--|:--|
+| countdown ran out | the map, as decided 2026-08-22 |
+| Close pressed | whatever was underneath: the map, or the review list a replay was launched from |
+| EXIT REVIEW on a replay | unchanged, the review list |
+
+Not verified on the kiosk: it needs a live call to close by hand and another to let time
+out, and neither can be staged from here (CLAUDE.md 6.5). The build is on the kiosk; the
+next two calls will show it.
+

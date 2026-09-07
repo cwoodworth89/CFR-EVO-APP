@@ -243,7 +243,7 @@ export default function KioskView({ kioskState }) {
         isTvMode={isTvMode}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
-        onDismiss={dismissActiveCall}
+        onDismiss={() => dismissActiveCall('manual')}
         onExitReview={exitReview}
         onToggleTvMode={toggleTvMode}
         onOpenPrePlan={() => setShowPrePlanModal(true)}

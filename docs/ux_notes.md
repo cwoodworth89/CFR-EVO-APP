@@ -67,19 +67,28 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
 
 1. **The details box.** Three options above. The operator dislikes the current floating box;
    what they want instead has not been said.
-2. **Street View beside the map.** The Google Maps Platform Terms §3.2.3(e)(ii) forbid
+2. **Drop the cadastral tile; snap the route map instead.** Operator, 2026-09-07: *"I'm
+   thinking about getting rid of that cadastral pip in the top right corner, and instead have
+   a 'Zoom to Incident' or 'Zoom to Parcel' button that snaps the main routing window to a
+   close in zoom area. Then they can go back and forth quickly between snap to call and
+   re-centre map."* What that costs to build is small: the route map already draws the
+   cadastral overlay and, from zoom 16, every hydrant, so a *ZOOM TO INCIDENT* button beside
+   RE-CENTER is a `setView` on the destination at about zoom 18, and RE-CENTER is already the
+   way back. The right-hand stack would be two tiles, satellite and Street View, each taller.
+   Not built: a decision for the UX pass, recorded here.
+3. **Street View beside the map.** The Google Maps Platform Terms §3.2.3(e)(ii) forbid
    "Street View imagery and non-Google Maps on the same screen." The kiosk does that today.
    The operator noted it and deferred the ruling. The layouts that satisfy it are a
    full-screen Street View modal with the map hidden while it is open, a separate screen, or
    no Street View. This constrains any redesign of the right-hand stack.
-3. **Progressive dispatch.** The operator's design for the kiosk to pop on the tones and fill
+4. **Progressive dispatch.** The operator's design for the kiosk to pop on the tones and fill
    in layer by layer (units, call type, address, grid, near roads, talk group, spoken grid),
    with the phone push firing once a driver can act. Spec, rulings and the measurement to run
    first: [`architecture/progressive_dispatch.md`](architecture/progressive_dispatch.md).
    Post-freeze.
-4. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
+5. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
    solid and the others translucent. Operator's idea, on the post-freeze backlog.
-5. **The review rating from the kiosk** (#52a) and **the driver station setup** (#60): both
+6. **The review rating from the kiosk** (#52a) and **the driver station setup** (#60): both
    need a spec before design.
 
 ---

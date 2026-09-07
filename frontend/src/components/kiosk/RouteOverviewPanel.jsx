@@ -351,6 +351,15 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               )}
             </div>
 
+            {/* An operator-set arrival point: say so, and why, so the crew reads the pin as a
+                ruling rather than a wrong guess (punch-list #49). */}
+            {(activeCall?.target?.arrival_point === 'entrance') && (
+              <div className="bg-emerald-950/60 border border-emerald-700/70 p-2.5 rounded-xl text-xs font-mono text-emerald-200">
+                <span className="font-black">🚒 ARRIVAL POINT SET BY OPERATOR</span>
+                {activeCall?.target?.entrance_note && <span className="italic"> — {activeCall.target.entrance_note}</span>}
+              </div>
+            )}
+
             {/* Hydrant & Tactical Notes Bar.
                 Previously fell back to the literal string 'City Hydrant: D-165 (42m)'.
                 No dispatch has ever carried a `hydrant` field -- the backend does not emit

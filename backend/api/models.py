@@ -170,8 +170,15 @@ class ParcelModel(Base):
     # Operational (Tactical Property & Pre-Plan Metadata)
     front_lat = Column(Float, nullable=True)
     front_lng = Column(Float, nullable=True)
+    # The operator-verified arrival point (punch-list #49): where the truck stops. NULL on
+    # every parcel until someone sets one; an import never writes these. Outranks front_*
+    # in the resolver. Attribution is required: an unattributed override is just another
+    # unexplained number (CLAUDE.md 6.3).
     entrance_lat = Column(Float, nullable=True)
     entrance_lng = Column(Float, nullable=True)
+    entrance_note = Column(Text, nullable=True)
+    entrance_set_by = Column(Text, nullable=True)
+    entrance_set_at = Column(DateTime(timezone=True), nullable=True)
 
     # Preferred Street View camera, NULL until the operator saves one. The defaults that
     # used to sit here made every parcel read as a saved 0-degree view (#35a, migration

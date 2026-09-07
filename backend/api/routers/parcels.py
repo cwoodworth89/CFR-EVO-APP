@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 try:
     from backend.api.database import get_db
     from backend.api.models import ParcelModel
-    from backend.api.schemas import ParcelCameraOverrideSchema
+    from backend.api.schemas import ParcelCameraOverrideSchema, ParcelEntranceSchema
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import ParcelModel
@@ -76,6 +76,11 @@ def serialize_parcel(p: ParcelModel) -> dict:
         "lng": p.centroid_lng,
         "front_lat": p.front_lat,
         "front_lng": p.front_lng,
+        "entrance_lat": p.entrance_lat,
+        "entrance_lng": p.entrance_lng,
+        "entrance_note": p.entrance_note,
+        "entrance_set_by": p.entrance_set_by,
+        "entrance_set_at": p.entrance_set_at.isoformat() if p.entrance_set_at else None,
         "streetview_heading": p.streetview_heading,
         "streetview_pitch": p.streetview_pitch,
         "streetview_fov": p.streetview_fov,
@@ -296,3 +301,46 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
         "status": "success",
         "parcel": parcel_dict
     }
+
+
+@router.post("/entrance")
+def set_parcel_entrance(payload: ParcelEntranceSchema, db: Session = Depends(get_db)):
+    """Sets, or clears, the operator-verified arrival point of one parcel (punch-list #49).
+
+    One parcel per call, attributed, never bulk: these are per-site human judgements. With
+    lat and lng both null the point is cleared and the note kept as the record of why. The
+    resolver reads entrance -> front -> centroid, so the next dispatch to this address, and
+    every unit behind a base site, arrives here.
+    """
+    from datetime import datetime, timezone
+
+    set_by = (payload.set_by or "").strip()
+    if not set_by:
+        raise HTTPException(status_code=400, detail="set_by is required: every override is attributable")
+    target = (payload.gis_id or payload.address or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="address or gis_id required")
+    if (payload.lat is None) != (payload.lng is None):
+        raise HTTPException(status_code=400, detail="lat and lng go together")
+
+    clean_addr = _clean_streetview_address(target)
+    p = db.query(ParcelModel).filter(
+        (ParcelModel.gis_id == target) |
+        (ParcelModel.address == clean_addr) |
+        (ParcelModel.address == target.upper()) |
+        (ParcelModel.address_normalized == target.lower())
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail=f"No parcel for {target!r}; an arrival point needs a parcel to belong to")
+
+    p.entrance_lat = payload.lat
+    p.entrance_lng = payload.lng
+    p.entrance_note = (payload.note or "").strip() or None
+    p.entrance_set_by = set_by
+    p.entrance_set_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(p)
+    logging.info("Arrival point %s for %s by %s: %s",
+                 "cleared" if payload.lat is None else f"set to {payload.lat:.6f},{payload.lng:.6f}",
+                 p.address, set_by, p.entrance_note or "(no note)")
+    return {"status": "success", "parcel": serialize_parcel(p)}

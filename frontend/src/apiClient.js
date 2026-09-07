@@ -284,6 +284,22 @@ export const apiClient = {
       });
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();
+    },
+
+    // The operator-verified arrival point of one parcel (punch-list #49). lat/lng null
+    // clears it. set_by is required by the API: every override is attributable.
+    async saveEntrance(payload) {
+      const res = await fetch(`${API_BASE_URL}/api/parcels/entrance`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch { /* keep the status */ }
+        throw new Error(detail);
+      }
+      return await res.json();
     }
   },
 

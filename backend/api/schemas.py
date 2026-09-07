@@ -114,6 +114,16 @@ class StreetViewOverrideSchema(BaseModel):
     pano_id: Optional[str] = None
 
 
+class ParcelEntranceSchema(BaseModel):
+    """Set (or clear, with lat/lng null) the operator-verified arrival point of one parcel (#49)."""
+    address: Optional[str] = None
+    gis_id: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    note: Optional[str] = None
+    set_by: str
+
+
 class ParcelCameraOverrideSchema(BaseModel):
     gis_id: Optional[str] = None
     address: Optional[str] = None

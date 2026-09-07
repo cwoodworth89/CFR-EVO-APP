@@ -8,6 +8,7 @@ import L from 'leaflet';
 // Import from your other components
 import { RailroadCrossingsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
+import { CircleMarker, Tooltip } from 'react-leaflet';
 import { Header } from './hud/Header';
 import { LeftSidebar } from './hud/LeftSidebar';
 import { RightSidebar } from './hud/RightSidebar';
@@ -45,7 +46,7 @@ import { sanitizeAddress } from '../utils/addressUtils';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import { useMapInstance } from '../hooks/useMapInstance';
 import { toActiveCall, toMapTarget, isSameDispatch } from '../utils/dispatchModel';
-import { API_BASE_URL } from '../apiClient';
+import { apiClient, API_BASE_URL } from '../apiClient';
 
 // helper for road closure type names from Municipal 511
 
@@ -103,6 +104,11 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   });
   const [targetAddress, setTargetAddress] = useState(null);
   const [targetPolygon, setTargetPolygon] = useState(null);
+  // Arrival point (punch-list #49): the parcel row behind the searched address, the
+  // placement mode, and the draft pin the operator has clicked but not yet saved.
+  const [targetParcel, setTargetParcel] = useState(null);
+  const [placingEntrance, setPlacingEntrance] = useState(false);
+  const [entranceDraft, setEntranceDraft] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const targetMarkerRef = useRef(null);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
@@ -184,6 +190,50 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     // useMapInstance, so the compiler can no longer prove that and bails out of optimizing
     // this component unless it is declared. Listing it changes nothing at runtime.
   }, [setUserPanned]);
+
+  // The parcel row for the searched address: its entrance_* columns drive the arrival
+  // point section of the card. Cleared with the target.
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTargetParcel(null);
+    setPlacingEntrance(false);
+    setEntranceDraft(null);
+    const key = targetAddress?.address;
+    if (!key) return undefined;
+    apiClient.parcels.lookup(key).then((res) => {
+      if (!cancelled && res?.found && res.parcel) setTargetParcel(res.parcel);
+    }).catch(() => { /* the card says the parcel is unknown */ });
+    return () => { cancelled = true; };
+  }, [targetAddress?.address]);
+
+  const handleEntranceMapClick = useCallback((latlng) => {
+    if (!placingEntrance || !latlng) return;
+    setEntranceDraft({ lat: latlng.lat, lng: latlng.lng });
+  }, [placingEntrance]);
+
+  const saveEntrance = useCallback(async ({ lat, lng, note, setBy }) => {
+    if (!targetParcel) throw new Error('No parcel behind this address');
+    const res = await apiClient.parcels.saveEntrance({
+      gis_id: targetParcel.gis_id, address: targetParcel.address,
+      lat, lng, note, set_by: setBy,
+    });
+    const parcel = res?.parcel;
+    setTargetParcel(parcel || null);
+    setPlacingEntrance(false);
+    setEntranceDraft(null);
+    // The map follows the ruling: the route and the hydrant picks measure from the new
+    // point, or from the computed frontage again after a clear.
+    if (parcel) {
+      const nextLat = parcel.entrance_lat ?? parcel.front_lat ?? parcel.lat;
+      const nextLng = parcel.entrance_lng ?? parcel.front_lng ?? parcel.lng;
+      if (nextLat != null && nextLng != null) {
+        setTargetAddress(prev => prev ? { ...prev, lat: nextLat, lng: nextLng, front_lat: nextLat, front_lng: nextLng } : prev);
+        setRouteCoordinates([]);
+      }
+    }
+    return parcel;
+  }, [targetParcel]);
 
   // Auto-open target address popup when targetAddress changes
   useEffect(() => {
@@ -384,6 +434,18 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
               onSelect={setSelectedClosure}
             />
 
+            {appMode === "EXPLORE" && placingEntrance && (
+              <MapClickEvents onMapClick={handleEntranceMapClick} />
+            )}
+            {appMode === "EXPLORE" && entranceDraft && (
+              <CircleMarker
+                center={[entranceDraft.lat, entranceDraft.lng]}
+                radius={10}
+                pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.9, weight: 3, dashArray: '4 3' }}
+              >
+                <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (unsaved)</Tooltip>
+              </CircleMarker>
+            )}
             {appMode === "EXPLORE" && (
               <DispatchTargetLayer
                 targetAddress={targetAddress}
@@ -420,6 +482,12 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
                 targetAddress={targetAddress}
                 nearestHydrants={nearestHydrants}
                 hydrantTier={routeHydrants.tier}
+                parcel={targetParcel}
+                placingEntrance={placingEntrance}
+                entranceDraft={entranceDraft}
+                onStartPlacing={() => { setPlacingEntrance(true); setEntranceDraft(null); }}
+                onCancelPlacing={() => { setPlacingEntrance(false); setEntranceDraft(null); }}
+                onSaveEntrance={saveEntrance}
                 onClose={() => setTargetAddress(null)}
               />
             }

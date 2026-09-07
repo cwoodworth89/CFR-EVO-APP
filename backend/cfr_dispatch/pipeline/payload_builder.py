@@ -146,7 +146,7 @@ def build_dispatch_payload(
             # and warn that it is not a located incident; dropping them here would
             # leave the representative midpoint looking like an exact match.
             for k in ("location_type", "segment", "endpoints", "length_m",
-                      "resolution_note", "requested_address"):
+                      "resolution_note", "requested_address", "arrival_point", "entrance_note"):
                 if res.get(k) is not None:
                     local_geocode_result[k] = res[k]
         
@@ -325,7 +325,7 @@ def build_dispatch_payload(
         "response_type": detected_resp,
     }
     for k in ("location_type", "segment", "endpoints", "length_m",
-              "resolution_note", "requested_address"):
+              "resolution_note", "requested_address", "arrival_point", "entrance_note"):
         if local_geocode_result.get(k) is not None:
             target_payload[k] = local_geocode_result[k]
     if subaddress:

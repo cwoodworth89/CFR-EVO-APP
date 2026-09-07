@@ -1,9 +1,10 @@
 # cfr_dispatch/parser/call_types.py
-# Incident/call type vocabulary loading and matching (substring over the incident slot).
+# Incident/call type vocabulary loading and fuzzy matching.
 
 import logging
 import regex as re
 from typing import List
+from thefuzz import fuzz
 
 def load_call_types(filepath: str = None) -> List[str]:
     """Returns the call-type vocabulary from public.vocabulary via the config layer.
@@ -74,7 +75,7 @@ def incident_search_text(transcript: str, units_vocabulary=None) -> str:
 
 def match_incident_type(transcript: str, call_types: List[str], aliases: dict = None,
                         units_vocabulary=None) -> str:
-    """Matches the incident slot of the transcript to a call type by substring, longest first.
+    """Matches transcript text to incident/call types using exact substring or fuzzy matching.
 
     Returns a CANONICAL term always. `aliases` maps a recognition-only spelling to the
     canonical term it stands for: faster-whisper writes American English while the
@@ -104,11 +105,27 @@ def match_incident_type(transcript: str, call_types: List[str], aliases: dict = 
         if norm_ct in norm_transcript:
             return canonical
 
-    # No fuzzy stage. There was one here -- token_set_ratio >= 80 over the slot -- and on
-    # 2026-09-06 it was measured against every stored transcript (583 dispatches): it
-    # changed the substring answer on none of them. What it could do is the subset trap
-    # (docs/standards/dependency-behaviour.md): a two-word type whose words both appear
-    # anywhere in the slot scores 100, so a misspelled qualifier would have come back as
-    # the generic type. An unmatched phrase is an unknown, reported as one (CLAUDE.md 6.1,
-    # punch-list #19a).
+    # 2. Look for best fuzzy match
+    best_match = None
+    best_score = 0
+    for match_text, canonical in candidates:
+        score = fuzz.token_set_ratio(match_text.lower(), transcript)
+        if score > best_score:
+            best_score = score
+            best_match = canonical
+            
+    # PROVENANCE REQUIRED (CLAUDE.md §6.3): 80 is an inherited fuzzy-match cutoff with
+    # no cited source. Failing it is safe -- the result is the explicit "Unknown
+    # Incident", never a guessed call type -- but the value should be validated against
+    # the HITL correction history rather than left as a magic number.
+    #
+    # Kept on measurement (punch-list #19a, 2026-09-06). This stage was removed and the
+    # whole corpus re-run through the chain harness: three calls lost their call type --
+    # DISP-2026-4C9D76 and 7270E4, "order, unknown source" for Odor - Unknown Source, and
+    # 969223, "Medic, Aid, overdose, arrest" for Medical Aid - Overdose Arrest -- STT
+    # misspellings the substring stage cannot see. token_set_ratio's subset property
+    # (docs/standards/dependency-behaviour.md) means a misspelled qualifier can come back
+    # as the generic type; on 508 verified calls it produced no wrong answer.
+    if best_score >= 80:
+        return best_match
     return "Unknown Incident"

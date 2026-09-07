@@ -286,7 +286,7 @@ class AddressResolver:
             with self.engine.connect() as conn:
                 rows = conn.execute(text("""
                     SELECT id, address, house, street, streettype, centroid_lat, centroid_lng,
-                           front_lat, front_lng, entrance_lat, entrance_lng,
+                           front_lat, front_lng, entrance_lat, entrance_lng, entrance_note,
                            zone_id,
                            ST_AsGeoJSON(geom) as geom_geojson
                     FROM public.parcels
@@ -358,6 +358,10 @@ class AddressResolver:
                     # no frontage point at all.
                     dest_lat = best_row['entrance_lat'] or best_row['front_lat'] or best_row['centroid_lat']
                     dest_lng = best_row['entrance_lng'] or best_row['front_lng'] or best_row['centroid_lng']
+                    # Which of the three answered, so the kiosk can say why the pin is where it
+                    # is when an operator put it there (punch-list #49).
+                    arrival_point = ('entrance' if best_row['entrance_lat'] else
+                                     'front' if best_row['front_lat'] else 'centroid')
                     rings = self._extract_rings(best_row['geom_geojson'])
                     st_type = best_row['streettype'] or ''
                     clean_addr = title_address(f"{best_row['house']} {best_row['street']} {st_type}".strip())
@@ -374,6 +378,8 @@ class AddressResolver:
                         # the announced grid on 96.3 % of exact placements, measured
                         # 2026-09-05 on 736 parcel rows (punch-list #72).
                         "zone_id": (str(best_row['zone_id']).strip() if best_row['zone_id'] is not None else None),
+                        "arrival_point": arrival_point,
+                        "entrance_note": (best_row['entrance_note'] if arrival_point == 'entrance' and 'entrance_note' in best_row.keys() else None),
                     }
         except Exception as e:
             logging.error(f"Error in exact address resolution: {e}", exc_info=True)

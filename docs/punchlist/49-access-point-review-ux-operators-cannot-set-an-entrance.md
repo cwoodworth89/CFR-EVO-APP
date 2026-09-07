@@ -88,7 +88,7 @@ Roughly 30 seconds per site. The top 100 is an afternoon.
 
 ## 49 (update). The review queue is 1,671 sites, not 65,401 parcels
 
-> **Status**: 🔴 **Open — HIGH PRIORITY, and now correctly sized (2026-08-31).**
+> **Status**: 🟡 **Built 2026-09-06 — the operator sets an arrival point from the workstation's search view; the kiosk says when one is in play. Open until the operator has used it on a real site.**
 
 This item has read as "operators must set entrances on 65,401 parcels", which is why it has
 not moved. Under the `base_site` decision it is **1,671 multi-parcel sites**, ranked by
@@ -111,3 +111,37 @@ is that a unit row with no `entrance_lat` falls back to its `base_site` row.
 The UI is still the whole of this item — all 65,401 `entrance_lat` are NULL and there is no
 way to set one without direct SQL. See
 [`briefings/base_site_rows_decision.md`](../briefings/base_site_rows_decision.md).
+
+---
+
+## 49 (built). Set the arrival point where the truck stops, from the search view
+
+> **Status**: 🟡 **Built 2026-09-06 (`API POST /api/parcels/entrance`, workstation card,
+> kiosk note). Live for search after the API rebuild; live for dispatches after the next
+> agent restart. Closes when the operator has set one on a real site.**
+
+The operator's ruling earlier the same day settled what the marker means: *"the truck is
+going to stop at the marker, not the door … that marker point is where we transition from
+city to private."* So the arrival point is an operational fact the operator owns, and the
+UI is the smallest thing that lets them own it:
+
+* **Workstation, Explore mode.** Search an address; the target card gains an *Arrival
+  point* section showing what is in play — *computed frontage* or *OPERATOR-SET · name ·
+  date · "note"*. *Set arrival point* enters placement mode: the next map click drops an
+  amber dashed pin, a note in the officer's words and a name (remembered on the machine)
+  are typed, *Save* writes `entrance_lat/lng`, `entrance_note`, `entrance_set_by`,
+  `entrance_set_at` through `POST /api/parcels/entrance`. *Clear* returns the parcel to the
+  computed frontage and keeps the note as the record. One parcel per save, no bulk, name
+  required: the API refuses an unattributed override.
+* **The map follows the ruling**: after a save the target moves to the new point, the route
+  and the hydrant picks measure from it.
+* **Kiosk.** The resolver now says which of the three points answered (`arrival_point`:
+  entrance / front / centroid) and carries `entrance_note`; the dispatch payload passes both
+  through, and the details box shows *ARRIVAL POINT SET BY OPERATOR — note* when an
+  operator's point is the pin, so a crew reads it as a ruling rather than a wrong guess.
+* **Constraints held**: `import_parcels.py` never writes `entrance_*`; nothing bulk; every
+  override attributed; a unit row with no entrance still falls back to its base site.
+
+Not built: the worst-first review queue as a screen. `docs/complex_sites_for_review.csv`
+still ranks the sites; the operator works it by searching each address. The top hundred
+covers 65 % of the addresses behind complex sites and is an afternoon.

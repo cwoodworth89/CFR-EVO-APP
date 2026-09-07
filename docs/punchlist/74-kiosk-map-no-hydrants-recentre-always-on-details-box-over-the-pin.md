@@ -100,3 +100,10 @@ pass no picks.
 
 Untested live: needs a call. Chrome shows the search view; the route panel needs a dispatch
 or a replay.
+
+Operator, on the marker (2026-09-06): *"That marker point is where we transition from city
+to private so drivers have to take precautions about private hydrants. It's acceptable and a
+good system."* So the marker is the right origin for the 50 ft roll by definition, and a
+hydrant on the private side of it is the case the amber **PRIVATE** label on a pick exists
+for. Accepted as built.
+

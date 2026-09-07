@@ -380,7 +380,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
                           <span className="text-sky-300"> {h.flowClass || 'UNRATED'}</span>
                           {String(h.status || '').toUpperCase() === 'PRIVATE' && <span className="text-amber-400"> PRIVATE</span>}
                           <span className="text-slate-400">
-                            {h.how === TIER.APPROACH
+                            {h.how === TIER.DOORSTEP
+                              ? ` · ${h.distance} m from the address, within a 50 ft roll`
+                              : h.how === TIER.APPROACH
                               ? ` · ${h.distance} m before arrival, on the route`
                               : h.how === TIER.NEAR
                                 ? ` · ${h.distance} m from the address${i === 0 ? (routeHydrants.routeKnown ? ', none on the approach within 300 ft' : ', route pending') : ''}`

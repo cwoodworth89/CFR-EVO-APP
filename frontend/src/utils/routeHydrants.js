@@ -2,9 +2,12 @@
  * Which hydrants to show a driver for a call, in the order the operator asked for
  * (department operational policy, operator 2026-09-06, punch-list #74):
  *
+ *   0. A hydrant within 50 ft of the address marker, any direction, comes first regardless
+ *      of the route: the engines carry short 50 ft supply line rolls (operator, later the
+ *      same day).
  *   1. "Choice #1 and #2": the two hydrants ALONG THE ROUTE OF TRAVEL closest to the call,
  *      within 300 ft of arrival, measured along the route. The last hydrant the apparatus
- *      passes is #1.
+ *      passes is #1. A doorstep hydrant takes #1 and the route supplies the rest.
  *   2. None there: look around the address itself within 300 ft, straight-line --
  *      "sometimes it's just past the address" -- which the route line cannot see because
  *      OSRM ends the route at the address.
@@ -15,6 +18,12 @@
  * projected onto a local metre grid around the destination; at city scale the error is
  * well under one percent of the distances involved.
  */
+
+// 50 ft. Operator 2026-09-06: "if a hydrant is within 50ish ft of the address marker in any
+// direction it should be prioritized, regardless of route. We carry short, 50ft supply line
+// rolls." Measured from the marker (the parcel's front point or centroid), not the door;
+// the falsifier is a call where a "doorstep" hydrant was out of a roll's reach of the door.
+export const DOORSTEP_M = 15.24;
 
 // 300 ft. Operator 2026-09-06: "If there's no hydrant within 300ft of the route, check if
 // there is one (sometimes it's just past the address). If nothing within 300ft warn the driver."
@@ -35,6 +44,7 @@ export const ROUTE_BAND_M = 30;
 export const UNUSABLE_STATUS = new Set(['NOT READY', 'ABANDONED', 'OUT_OF_SERVICE', 'INACTIVE']);
 
 export const TIER = {
+  DOORSTEP: 'doorstep',   // within DOORSTEP_M of the address marker, any direction
   APPROACH: 'approach',   // on the route, within APPROACH_M of arrival
   NEAR: 'near',           // within APPROACH_M of the address, straight-line
   SUPPLY: 'supply',       // within SUPPLY_M of the address, straight-line: a supply lay
@@ -93,6 +103,13 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
 
   const routeKnown = Array.isArray(routeCoords) && routeCoords.length > 1;
 
+  // Tier 0: within a 50 ft roll of the address marker, any direction, before the route.
+  const doorstep = pool.filter(e => e.straight <= DOORSTEP_M)
+    .sort((a, b) => a.straight - b.straight)
+    .slice(0, 2)
+    .map(e => ({ ...e.h, how: TIER.DOORSTEP, distance: Math.round(e.straight) }));
+  const taken = new Set(doorstep.map(h => h.gisId));
+
   // Tier 1: along the route, within APPROACH_M of arrival.
   if (routeKnown) {
     const pts = routeCoords.map(c => project(Number(c.lat), Number(c.lng)));
@@ -103,6 +120,7 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
     const total = cum[cum.length - 1];
     const approach = [];
     for (const e of pool) {
+      if (taken.has(e.h.gisId)) continue;
       let best = null;
       for (let i = 1; i < pts.length; i++) {
         const [d, t] = segmentDistance([e.x, e.y], pts[i - 1], pts[i]);
@@ -121,9 +139,11 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
     }
     if (approach.length) {
       approach.sort((a, b) => a.beforeArrivalM - b.beforeArrivalM);
-      return { tier: TIER.APPROACH, picks: approach.slice(0, 2), routeKnown };
+      const picks = [...doorstep, ...approach].slice(0, 2);
+      return { tier: doorstep.length ? TIER.DOORSTEP : TIER.APPROACH, picks, routeKnown };
     }
   }
+  if (doorstep.length) return { tier: TIER.DOORSTEP, picks: doorstep, routeKnown };
 
   // Tier 2: around the address, straight-line, within APPROACH_M.
   const near = pool.filter(e => e.straight <= APPROACH_M)

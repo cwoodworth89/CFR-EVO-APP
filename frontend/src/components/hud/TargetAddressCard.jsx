@@ -58,7 +58,7 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
               </span>
               <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
                 <span className="text-slate-400">ID / Distance</span>
-                <span className="text-white font-black">{nearest.gisId} ({nearest.distance} m{nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
+                <span className="text-white font-black">{nearest.gisId} ({nearest.distance} m{nearest.how === 'doorstep' ? ', within a 50 ft roll' : nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
               </div>
               {nearest.flowClass && (
                 <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">

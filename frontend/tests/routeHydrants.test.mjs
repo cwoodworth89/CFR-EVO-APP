@@ -1,7 +1,7 @@
 // node --test frontend/tests  (npm run test:node). Pure geometry, no browser.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickRouteHydrants, APPROACH_M, SUPPLY_M, ROUTE_BAND_M, TIER } from '../src/utils/routeHydrants.js';
+import { pickRouteHydrants, APPROACH_M, SUPPLY_M, ROUTE_BAND_M, DOORSTEP_M, TIER } from '../src/utils/routeHydrants.js';
 
 // A straight east-west road at lat 49.30 ending at the address at lng -122.8000.
 // One degree of longitude here is about 72.6 km, so 0.001 deg is ~72.6 m.
@@ -25,6 +25,20 @@ test('choice #1 is the last hydrant passed, #2 the one before it, both within 30
   assert.equal(r.picks[0].beforeArrivalM, 40);
   assert.equal(r.picks[0].offRouteM, 6);
   assert.ok(r.picks.every(p => p.beforeArrivalM <= APPROACH_M && p.offRouteM <= ROUTE_BAND_M));
+});
+
+test('a hydrant within a 50 ft roll of the marker is #1 regardless of the route; the route fills #2', () => {
+  const hydrants = [
+    hyd('H40', north(6), east(-40)),      // on the approach, 40 m out
+    hyd('ROLL', north(-12), east(8)),     // 14 m from the marker, just past the address, off the far side
+    hyd('H80', north(-8), east(-80)),
+  ];
+  const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
+  assert.equal(r.tier, TIER.DOORSTEP);
+  assert.deepEqual(r.picks.map(p => p.gisId), ['ROLL', 'H40']);
+  assert.equal(r.picks[0].how, TIER.DOORSTEP);
+  assert.ok(r.picks[0].distance <= DOORSTEP_M);
+  assert.equal(r.picks[1].how, TIER.APPROACH);
 });
 
 test('nothing on the approach: the one just past the address is found straight-line', () => {

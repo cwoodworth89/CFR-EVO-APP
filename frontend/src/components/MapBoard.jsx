@@ -468,7 +468,12 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
               showCadastral={showLabels && !cadastralError}
               onCadastralError={() => setCadastralError(true)}
               showFireHalls={showFireHalls}
-              showHydrants={showHydrants}
+              // A searched address pops its hydrants whether or not the layer toggle is on:
+              // with a target the layer draws from zoom 12 and pulses the nearest City and
+              // private hydrants (operator, 2026-09-06, punch-list #74).
+              showHydrants={showHydrants || Boolean(targetAddress)}
+              hydrantTargetCoords={targetAddress && targetAddress.lat != null && targetAddress.lng != null
+                ? [Number(targetAddress.lat), Number(targetAddress.lng)] : null}
           >
             <ZonesLayer zones={zones} visible={showZones} currentZoom={currentZoom} />
 

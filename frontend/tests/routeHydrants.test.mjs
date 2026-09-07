@@ -56,7 +56,8 @@ test('a hydrant within a 50 ft roll of the marker is #1 regardless of the route;
 });
 
 test('a long lay on the route is marked, and the closer off-route hydrant is listed beside it', () => {
-  const hydrants = [hyd('FARBACK', north(6), east(-200)), hyd('ACROSS', north(-25), east(10))];
+  // ACROSS is 46 m from the marker but 45 m off the route line, so it is not "on the route".
+  const hydrants = [hyd('FARBACK', north(6), east(-200)), hyd('ACROSS', north(-45), east(10))];
   const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
   assert.equal(r.tier, TIER.APPROACH);
   assert.equal(r.picks[0].gisId, 'FARBACK');

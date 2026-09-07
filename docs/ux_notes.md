@@ -76,19 +76,26 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    RE-CENTER is a `setView` on the destination at about zoom 18, and RE-CENTER is already the
    way back. The right-hand stack would be two tiles, satellite and Street View, each taller.
    Not built: a decision for the UX pass, recorded here.
-3. **Street View beside the map.** The Google Maps Platform Terms §3.2.3(e)(ii) forbid
+3. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
+   Secondary hydrants can be picked by the drivers and officers of the next due trucks."*
+   The picker already orders them; showing one is `picks.slice(0, 1)` on the map and in the
+   details box, and the full layer at zoom 16 is where the next-due crews pick theirs. The
+   one case that still wants a second line is the long lay: a first choice past 500 ft along
+   the route with a closer off-route hydrant beside it is a decision, not a list, and the
+   operator's own rule asked for both to be shown there. Not built; for the UX pass.
+4. **Street View beside the map.** The Google Maps Platform Terms §3.2.3(e)(ii) forbid
    "Street View imagery and non-Google Maps on the same screen." The kiosk does that today.
    The operator noted it and deferred the ruling. The layouts that satisfy it are a
    full-screen Street View modal with the map hidden while it is open, a separate screen, or
    no Street View. This constrains any redesign of the right-hand stack.
-4. **Progressive dispatch.** The operator's design for the kiosk to pop on the tones and fill
+5. **Progressive dispatch.** The operator's design for the kiosk to pop on the tones and fill
    in layer by layer (units, call type, address, grid, near roads, talk group, spoken grid),
    with the phone push firing once a driver can act. Spec, rulings and the measurement to run
    first: [`architecture/progressive_dispatch.md`](architecture/progressive_dispatch.md).
    Post-freeze.
-5. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
+6. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
    solid and the others translucent. Operator's idea, on the post-freeze backlog.
-6. **The review rating from the kiosk** (#52a) and **the driver station setup** (#60): both
+7. **The review rating from the kiosk** (#52a) and **the driver station setup** (#60): both
    need a spec before design.
 
 ---

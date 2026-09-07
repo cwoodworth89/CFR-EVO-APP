@@ -383,8 +383,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
                             {h.how === TIER.DOORSTEP
                               ? ` · ${h.distance} m from the address, within a 50 ft roll`
                               : h.how === TIER.APPROACH
-                              ? ` · ${h.distance} m before arrival, on the route`
-                              : h.how === TIER.NEAR
+                              ? ` · ${h.distance} m before arrival, on the route${h.longLay ? ' — LONG LAY (500 ft+): relay, or the closer one' : ''}`
+                              : h.closerAlternative
+                                ? ` · ${h.distance} m from the address, off route: the closer option`
+                                : h.how === TIER.NEAR
                                 ? ` · ${h.distance} m from the address${i === 0 ? (routeHydrants.routeKnown ? ', none on the approach within 1,000 ft' : ', route pending') : ''}`
                                 : ` · ${h.distance} m, within the 1,000 ft supply lay; none within 300 ft`}
                           </span>

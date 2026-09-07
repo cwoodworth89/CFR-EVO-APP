@@ -55,6 +55,22 @@ test('a hydrant within a 50 ft roll of the marker is #1 regardless of the route;
   assert.equal(r.picks[1].how, TIER.APPROACH);
 });
 
+test('a long lay on the route is marked, and the closer off-route hydrant is listed beside it', () => {
+  const hydrants = [hyd('FARBACK', north(6), east(-200)), hyd('ACROSS', north(-25), east(10))];
+  const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
+  assert.equal(r.tier, TIER.APPROACH);
+  assert.equal(r.picks[0].gisId, 'FARBACK');
+  assert.equal(r.picks[0].longLay, true);
+  assert.equal(r.picks[1].gisId, 'ACROSS');
+  assert.equal(r.picks[1].closerAlternative, true);
+});
+
+test('a lay within 500 ft is not marked long', () => {
+  const hydrants = [hyd('H120', north(6), east(-120))];
+  const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
+  assert.equal(r.picks[0].longLay, false);
+});
+
 test('nothing on the approach within the hose carried: the one just past the address is found straight-line', () => {
   const hydrants = [hyd('PAST', north(3), east(45)), hyd('H400', north(5), east(-400))];
   const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });

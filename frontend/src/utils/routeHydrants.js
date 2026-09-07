@@ -45,6 +45,12 @@ export const SUPPLY_M = 304.8;
 // the operator can tighten it.
 export const ROUTE_WINDOW_M = SUPPLY_M;
 
+// 500 ft. Operator 2026-09-06: "we'd lay 300-500 feet of supply line all day. It's when it
+// gets further we need to think about relay pumping, or finding something closer." An
+// on-route pick beyond this is marked a long lay, and the closest hydrant to the address
+// within 300 ft is listed beside it as the "something closer".
+export const ROUTINE_LAY_M = 152.4;
+
 // How far from the OSRM route line a hydrant can sit and still be "along the route".
 // Measured 2026-09-06 on public.hydrants against public.roads centrelines, 2,837 OPERATING
 // hydrants: p50 8.4 m, p90 11.9 m, p95 35 m. 30 m takes the arterial half-width and the
@@ -147,11 +153,21 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
       approach.push({
         ...e.h, how: TIER.APPROACH, distance: beforeArrivalM,
         beforeArrivalM, offRouteM: Math.round(best.d),
+        longLay: beforeArrivalM > ROUTINE_LAY_M,
       });
     }
     if (approach.length) {
       approach.sort((a, b) => a.beforeArrivalM - b.beforeArrivalM);
-      const picks = [...doorstep, ...approach].slice(0, 2);
+      let picks = [...doorstep, ...approach].slice(0, 2);
+      // A long lay on the route: put the closest hydrant to the address beside it, if there
+      // is one within 300 ft, so the crew can weigh relay pumping against a shorter lay.
+      if (!doorstep.length && approach[0].longLay) {
+        const closer = pool.filter(e => e.straight <= APPROACH_M && e.h.gisId !== approach[0].gisId)
+          .sort((a, b) => a.straight - b.straight)[0];
+        if (closer) {
+          picks = [approach[0], { ...closer.h, how: TIER.NEAR, distance: Math.round(closer.straight), closerAlternative: true }];
+        }
+      }
       return { tier: doorstep.length ? TIER.DOORSTEP : TIER.APPROACH, picks, routeKnown };
     }
   }

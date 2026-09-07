@@ -130,3 +130,10 @@ case is a test (`808 Miller Ave` in `frontend/tests/routeHydrants.test.mjs`). If
 back along the route is too far to prefer over a hydrant across the street, the operator
 names the number and it is one constant.
 
+Operator, on the window (2026-09-06): *"we'd lay 300-500 feet of supply line all day. It's
+when it gets further we need to think about relay pumping, or finding something closer."*
+Built as: an on-route pick beyond 500 ft (`ROUTINE_LAY_M`) is marked **LONG LAY**, and the
+closest hydrant to the address within 300 ft, if there is one, is listed beside it as the
+closer option, so the crew weighs relay pumping against the shorter lay themselves. Two more
+tests.
+

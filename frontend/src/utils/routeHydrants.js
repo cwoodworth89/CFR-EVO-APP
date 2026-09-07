@@ -6,8 +6,12 @@
  *      of the route: the engines carry short 50 ft supply line rolls (operator, later the
  *      same day).
  *   1. "Choice #1 and #2": the two hydrants ALONG THE ROUTE OF TRAVEL closest to the call,
- *      within 300 ft of arrival, measured along the route. The last hydrant the apparatus
- *      passes is #1. A doorstep hydrant takes #1 and the route supplies the rest.
+ *      within the 1,000 ft supply lay of arrival, measured along the route. The last hydrant
+ *      the apparatus passes is #1. A doorstep hydrant takes #1 and the route supplies the
+ *      rest. The window was 300 ft until DISP-2026-A92117 (808 Miller Ave, 2026-09-06): the
+ *      operator named I-029 at Grant & Miller, 95 m (312 ft) before arrival on the route,
+ *      as the hydrant of choice over two off-route hydrants at 64 m and 73 m straight-line.
+ *      An on-route hydrant beats an off-route one, so the route window is the hose carried.
  *   2. None there: look around the address itself within 300 ft, straight-line --
  *      "sometimes it's just past the address" -- which the route line cannot see because
  *      OSRM ends the route at the address.
@@ -29,11 +33,17 @@ export const DOORSTEP_M = 15.24;
 
 // 300 ft. Operator 2026-09-06: "If there's no hydrant within 300ft of the route, check if
 // there is one (sometimes it's just past the address). If nothing within 300ft warn the driver."
+// Applied to the straight-line look around the address once the route has nothing.
 export const APPROACH_M = 91.44;
 
 // 1,000 ft. Operator 2026-09-06: "Our trucks carry 1000ft of supply hose, but there aren't
 // many places in the city that would be needed."
 export const SUPPLY_M = 304.8;
+
+// How far back along the route a hydrant still counts as "along the route of travel": the
+// hose carried. Set from the 808 Miller Ave ruling above (I-029 at 312 ft was the choice);
+// the operator can tighten it.
+export const ROUTE_WINDOW_M = SUPPLY_M;
 
 // How far from the OSRM route line a hydrant can sit and still be "along the route".
 // Measured 2026-09-06 on public.hydrants against public.roads centrelines, 2,837 OPERATING
@@ -47,7 +57,7 @@ export const UNUSABLE_STATUS = new Set(['NOT READY', 'ABANDONED', 'OUT_OF_SERVIC
 
 export const TIER = {
   DOORSTEP: 'doorstep',   // within DOORSTEP_M of the address marker, any direction
-  APPROACH: 'approach',   // on the route, within APPROACH_M of arrival
+  APPROACH: 'approach',   // on the route, within ROUTE_WINDOW_M of arrival
   NEAR: 'near',           // within APPROACH_M of the address, straight-line
   SUPPLY: 'supply',       // within SUPPLY_M of the address, straight-line: a supply lay
   NONE: 'none',           // nothing within SUPPLY_M
@@ -112,7 +122,7 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
     .map(e => ({ ...e.h, how: TIER.DOORSTEP, distance: Math.round(e.straight) }));
   const taken = new Set(doorstep.map(h => h.gisId));
 
-  // Tier 1: along the route, within APPROACH_M of arrival.
+  // Tier 1: along the route, within ROUTE_WINDOW_M of arrival.
   if (routeKnown) {
     const pts = routeCoords.map(c => project(Number(c.lat), Number(c.lng)));
     const cum = [0];
@@ -133,7 +143,7 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
       }
       if (!best || best.d > ROUTE_BAND_M) continue;
       const beforeArrivalM = Math.round(total - best.along);
-      if (beforeArrivalM > APPROACH_M) continue;
+      if (beforeArrivalM > ROUTE_WINDOW_M) continue;
       approach.push({
         ...e.h, how: TIER.APPROACH, distance: beforeArrivalM,
         beforeArrivalM, offRouteM: Math.round(best.d),

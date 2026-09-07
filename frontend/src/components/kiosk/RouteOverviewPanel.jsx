@@ -11,6 +11,7 @@ import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
+import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
 import { TIER } from '../../utils/routeHydrants';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
@@ -163,7 +164,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   // along the route within 300 ft of arrival first, then around the address, then within
   // the 1,000 ft supply lay, else a warning. Punch-list #74.
   const routeHydrants = useRouteHydrants(destLat, destLng, routeCoords);
-  const hydrantHighlightIds = useMemo(() => new Set(routeHydrants.picks.map(h => h.gisId)), [routeHydrants]);
 
   // Dynamic responding units resolution
   const unitsToRoute = useMemo(() => {
@@ -385,7 +385,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
                               : h.how === TIER.APPROACH
                               ? ` · ${h.distance} m before arrival, on the route`
                               : h.how === TIER.NEAR
-                                ? ` · ${h.distance} m from the address${i === 0 ? (routeHydrants.routeKnown ? ', none on the approach within 300 ft' : ', route pending') : ''}`
+                                ? ` · ${h.distance} m from the address${i === 0 ? (routeHydrants.routeKnown ? ', none on the approach within 1,000 ft' : ', route pending') : ''}`
                                 : ` · ${h.distance} m, within the 1,000 ft supply lay; none within 300 ft`}
                           </span>
                         </span>
@@ -422,11 +422,12 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         baseStyle="VOYAGER"
         showCadastral
         showFireHalls
-        showHydrants
-        hydrantTargetCoords={hasValidCoords ? [destLat, destLng] : null}
-        hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
+
+        {/* The recommended hydrants only. The full layer drew every hydrant in the city
+            here on 2026-09-06 and was too much (#74). */}
+        <PickedHydrantsLayer picks={routeHydrants.picks} />
 
         {/* Road closures. A closure matters most when apparatus is being routed through
             it, so the dispatch map shows them too -- they were previously standby-only.

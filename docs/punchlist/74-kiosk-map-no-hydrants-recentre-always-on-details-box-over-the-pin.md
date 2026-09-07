@@ -79,8 +79,8 @@ implementation for both views, `frontend/src/utils/routeHydrants.js`:
 | Tier | Rule | Shown as |
 |:--|:--|:--|
 | 0 | A hydrant within 50 ft (15.2 m) of the address marker, any direction, comes first regardless of the route: *"we carry short, 50ft supply line rolls"* (operator, later the same evening). The route then supplies #2. Measured from the marker, which is where the truck stops (operator: *"the truck is going to stop at the marker, not the door"*); the assumption is that the marker is the arrival point on the street, and a large parcel placed at its centroid (#49) is the case that breaks it | *N m from the address, within a 50 ft roll* |
-| 1 | Hydrants within 30 m of the OSRM route line and within 300 ft (91.4 m) of arrival, measured along the route; the last one passed is #1, the one before it #2 | *N m before arrival, on the route* |
-| 2 | None there: hydrants within 300 ft of the address, straight-line, any direction (the one "just past the address") | *N m from the address, none on the approach within 300 ft* |
+| 1 | Hydrants within 30 m of the OSRM route line and within the 1,000 ft (304.8 m) supply lay of arrival, measured along the route; the last one passed is #1, the one before it #2. **Was 300 ft** until the 808 Miller Ave replay the same evening (below) | *N m before arrival, on the route* |
+| 2 | None there: hydrants within 300 ft of the address, straight-line, any direction (the one "just past the address") | *N m from the address, none on the approach within 1,000 ft* |
 | 3 | None there: the nearest within 1,000 ft (304.8 m), the supply hose carried | *N m, within the 1,000 ft supply lay* |
 | — | Nothing within 1,000 ft | **⚠️ NO HYDRANT WITHIN 1,000 FT** |
 
@@ -106,4 +106,27 @@ to private so drivers have to take precautions about private hydrants. It's acce
 good system."* So the marker is the right origin for the 50 ft roll by definition, and a
 hydrant on the private side of it is the case the amber **PRIVATE** label on a pick exists
 for. Accepted as built.
+
+### 1c. 808 Miller Ave: the window was too tight, and the map was drawing every hydrant
+
+Replay of DISP-2026-A92117 (report of smoke, high risk), 2026-09-06 evening. Two things on
+the operator's screenshot:
+
+*"I don't need to see all of those hydrants. Just the recommended ones."* The full layer
+with a target set draws from zoom 12, which at a city-wide route is every hydrant in
+Coquitlam. The dispatch map now draws only the picks, numbered and pulsing
+(`map/PickedHydrantsLayer.jsx`); the workstation keeps the full layer behind its toggle and
+its target layer draws the picks as before.
+
+*"The recommended ones are not on the route of travel. I-029 on the corner of Grant and
+Miller would have been the hydrant of choice."* Measured: the OSRM route reaches the marker
+down Grant St and east on Miller; I-029 sits 19 m off that line and **95 m (312 ft) before
+arrival** along it, four metres outside the 300 ft window. The two picks, I-030 (64 m, past
+the address on the far side) and I-074 (73 m, down Adiron), were off-route hydrants measured
+straight-line. The operator's choice says an on-route hydrant beats an off-route one beyond
+300 ft, so the along-route window is now the 1,000 ft supply lay (`ROUTE_WINDOW_M`), with
+300 ft kept for the straight-line look around the address once the route has nothing. The
+case is a test (`808 Miller Ave` in `frontend/tests/routeHydrants.test.mjs`). If 1,000 ft
+back along the route is too far to prefer over a hydrant across the street, the operator
+names the number and it is one constant.
 

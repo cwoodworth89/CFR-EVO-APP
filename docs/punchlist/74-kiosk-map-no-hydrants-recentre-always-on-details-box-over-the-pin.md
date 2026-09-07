@@ -78,7 +78,7 @@ implementation for both views, `frontend/src/utils/routeHydrants.js`:
 
 | Tier | Rule | Shown as |
 |:--|:--|:--|
-| 0 | A hydrant within 50 ft (15.2 m) of the address marker, any direction, comes first regardless of the route: *"we carry short, 50ft supply line rolls"* (operator, later the same evening). The route then supplies #2. Measured from the marker, not the door | *N m from the address, within a 50 ft roll* |
+| 0 | A hydrant within 50 ft (15.2 m) of the address marker, any direction, comes first regardless of the route: *"we carry short, 50ft supply line rolls"* (operator, later the same evening). The route then supplies #2. Measured from the marker, which is where the truck stops (operator: *"the truck is going to stop at the marker, not the door"*); the assumption is that the marker is the arrival point on the street, and a large parcel placed at its centroid (#49) is the case that breaks it | *N m from the address, within a 50 ft roll* |
 | 1 | Hydrants within 30 m of the OSRM route line and within 300 ft (91.4 m) of arrival, measured along the route; the last one passed is #1, the one before it #2 | *N m before arrival, on the route* |
 | 2 | None there: hydrants within 300 ft of the address, straight-line, any direction (the one "just past the address") | *N m from the address, none on the approach within 300 ft* |
 | 3 | None there: the nearest within 1,000 ft (304.8 m), the supply hose carried | *N m, within the 1,000 ft supply lay* |

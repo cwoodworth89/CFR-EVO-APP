@@ -21,8 +21,10 @@
 
 // 50 ft. Operator 2026-09-06: "if a hydrant is within 50ish ft of the address marker in any
 // direction it should be prioritized, regardless of route. We carry short, 50ft supply line
-// rolls." Measured from the marker (the parcel's front point or centroid), not the door;
-// the falsifier is a call where a "doorstep" hydrant was out of a roll's reach of the door.
+// rolls." Measured from the marker because that is where the truck stops (operator: "the
+// truck is going to stop at the marker, not the door"). The assumption underneath is that
+// the marker IS the arrival point on the street; a large parcel placed at its centroid
+// (punch-list #49) would put the truck somewhere else, and that is the falsifier.
 export const DOORSTEP_M = 15.24;
 
 // 300 ft. Operator 2026-09-06: "If there's no hydrant within 300ft of the route, check if

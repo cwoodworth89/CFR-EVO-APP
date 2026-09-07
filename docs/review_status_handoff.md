@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **83 items, 25 open (17 crew-visible), 58 closed** as of 2026-09-05 evening. The live work queue
+  **86 items, 7 open (3 crew-visible), 79 closed** as of 2026-09-06 night. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -16,6 +16,93 @@ Companion documents:
 * [`docs/standards/dependency-behaviour.md`](./standards/dependency-behaviour.md) — **verified library semantics; read this before trusting any API name**
 * [`docs/architecture/unified_map_surface.md`](./architecture/unified_map_surface.md) — frontend architecture, implemented
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
+
+---
+
+## Update, 2026-09-06 — the operator drove; read this before the next session
+
+**Punch list: 86 items, 7 open, 3 crew-visible, 79 closed.** The operator sat with the kiosk all
+day and ruled on things as they came up; nearly every change below carries a quoted ruling in
+its item. If you are the next agent, start at [Open, and whose](#open-and-whose-2026-09-06)
+at the end of this section.
+
+### Live on the kiosk (pulled, frontend built, API rebuilt)
+
+| Change | Item |
+|:--|:--|
+| Admin password is `ADMIN_PASSWORD` and nothing else, from the **root** `.env` compose reads — the API container had never read `backend/.env` | #65 |
+| Talk groups in the review sidebar come from the vocabulary | #20 |
+| Rail crossings: the operator's four confirmed against OSM (`tools/osm_level_crossings.py`), the United Blvd spurs ruled out | #21 |
+| Graceful stop proven in the journal at the 13:54 restart | #70 |
+| Street View: `ApiTargetBlockedMapError` was the whole story; the key's API restrictions fixed by the operator. Compact tile is a **static image** at the saved view (needs *Street View Static API* on the key, falls back and says so), interactive behind Expand; fov stored in degrees (was the zoom level); `streetview_pano_id`; unsaved parcels hold NULL (71,210 rows were reading as a saved 0° view — migration applied); the SDK auth verdict is kept on the window | #35a |
+| Kiosk map: hydrants by the **operator's rule** (utils/routeHydrants.js, ten node tests); only the picks drawn; RE-CENTER only on a real pan; the route fit keeps clear of the details box; Street View tile lost its bar | #74 |
+| A flag is ruled by the verified column that answers it; ruled flags stop counting | #75 |
+| Timeout → map, Close → the screen underneath | #37 |
+| Arrival point set from the workstation's search view, attributed (`POST /api/parcels/entrance`) | #49 |
+| The talk-group matcher names a channel by its digit or a unique word, no fuzzy stage (zero flips on the corpus); the call-type fuzzy stage **kept** because removing it lost three calls | #19a |
+| `cfr_dispatch/__init__.py`: the process environment now wins over `backend/.env`. Until then `WHISPER_MODEL=<other>` in front of a harness was silently ignored — five "round 2" rows in `evaluation_history` are marked MISRECORDED | — |
+| Training script runs hub-offline (`HF_HUB_OFFLINE=1`) | external calls |
+
+### Needs the next agent restart (the operator picks the moment; run `tools/kiosk_capture_state.sh` first)
+
+* #73: *Agate Place* heard as *a gate place* was cut at "gate" (a suffix word); the trailing-junk strip now cuts at the last suffix word. Corpus unchanged, the live call keeps both roads.
+* #49's kiosk half: the resolver reports `arrival_point` and `entrance_note`, the details box shows *ARRIVAL POINT SET BY OPERATOR — note*.
+
+### Round 2 of the model: scored, not deployed
+
+Same code, same day, chain harness (the skill's §3 has the full table):
+
+| Round-1 holdout, 44 clips | Round 1 | Round 2 |
+|:--|--:|--:|
+| place ok | 90.9 % | 88.6 % |
+| wrong address | 3 | 4 |
+| WER | 5.02 % | 6.71 % |
+
+Phase-1 simulator: 43/44 published at 22 s (was 44/44 at 19 s), wrong streets 4 (was 7). Per
+call: worse on 11, better on 5. Why it regressed is not known and was not guessed. The model is
+at `backend/models/whisper-base-cfr-ct2-r2`; deploying is the operator's call and nobody has
+recommended it.
+<!-- audit-ok: backend/models/whisper-base-cfr-ct2-r2 -- git-ignored model directory, exists on the kiosk only -->
+
+### Rulings recorded today, so nobody re-derives them
+
+* **Hydrants**: a hydrant within 50 ft of the marker first ("we carry short, 50ft supply line
+  rolls"); then along the route of travel within the 1,000 ft supply lay, last passed first, a
+  lay past 500 ft marked long with the closer off-route option beside it; then within 300 ft
+  of the address; then anything within 1,000 ft; else warn. Standards index row.
+* **The marker is where the truck stops**, the city-to-private transition; private hydrants
+  beyond it are the driver's precaution.
+* **Google Maps Platform terms** read and vendored: no Street View imagery may be stored,
+  the panorama id may; §3.2.3(e)(ii) forbids Street View beside a non-Google map on one
+  screen, which the kiosk does — the operator noted it and deferred the ruling.
+* Westwood and Kingsway crossings stay (crossed en route to 3000 Riverbend Dr); spurs out.
+
+### Traps found today (each is recorded where it bit)
+
+* The env override that never worked (above). **Check the harness's own `model <path>;` line.**
+* The API container reads compose's root `.env`, not `backend/.env`.
+* A deploy chain that reads test *output* instead of the *exit code* shipped a failing test once.
+* Browser checks: real Chrome, not the in-app pane (it blocks `:8000`); reload with a cache-busting
+  query, nginx sends `index.html` without `Cache-Control`.
+* The API test suite writes `5000 TESTING WAY` into the live `parcels` table.
+
+### Open, and whose {#open-and-whose-2026-09-06}
+
+| Item | Who | What |
+|:--|:--|:--|
+| #74 | operator | where the dispatch-details box should live |
+| #64 | operator | the civic-number checklist, at work |
+| #49 | operator | set an arrival point on a real site, then close |
+| #1 | both | routing loops not re-observed since stock OSRM; the profile has no held documentation (standards index) — reproduce a named call first |
+| #52a | operator | review rating from the kiosk, no spec yet |
+| #60, #32 | operator | deferred |
+| — | operator | agent restart; round 2; Street View Static API on the key; the same-screen clause |
+
+**Future development the operator named for a fresh agent**: an OSM routing plan — the
+self-hosted street basemap from the extract the kiosk already routes on (replaces the
+watermarked Carto tiles, #47b), and the apparatus routing profile (#1), which starts at the
+standards index and CLAUDE.md §7.2. Every responding hall's route on one map and hydrants
+along the route are on the post-freeze backlog with the operator's design notes.
 
 ---
 

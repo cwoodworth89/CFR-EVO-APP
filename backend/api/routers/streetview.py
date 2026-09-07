@@ -36,7 +36,8 @@ def get_all_streetview_overrides(db: Session = Depends(get_db)):
                 "lng": r.front_lng or r.centroid_lng,
                 "heading": r.streetview_heading,
                 "pitch": r.streetview_pitch,
-                "fov": r.streetview_fov
+                "fov": r.streetview_fov,
+                "pano_id": r.streetview_pano_id
             }
     return out
 
@@ -69,6 +70,7 @@ def get_streetview_override(address: str, db: Session = Depends(get_db)):
         "heading": p.streetview_heading,
         "pitch": p.streetview_pitch,
         "fov": p.streetview_fov,
+        "pano_id": p.streetview_pano_id,
         "lat": p.front_lat or p.centroid_lat or 0.0,
         "lng": p.front_lng or p.centroid_lng or 0.0
     }
@@ -86,7 +88,8 @@ def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = De
             front_lng=payload.front_lng,
             heading=payload.heading,
             pitch=payload.pitch,
-            fov=payload.fov
+            fov=payload.fov,
+            pano_id=payload.pano_id
         ),
         db=db
     )

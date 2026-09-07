@@ -79,6 +79,7 @@ def serialize_parcel(p: ParcelModel) -> dict:
         "streetview_heading": p.streetview_heading,
         "streetview_pitch": p.streetview_pitch,
         "streetview_fov": p.streetview_fov,
+        "streetview_pano_id": p.streetview_pano_id,
         "lock_box_notes": p.lock_box_notes,
         "hazard_notes": p.hazard_notes,
         "pre_plan_pdf_url": p.pre_plan_pdf_url,
@@ -231,13 +232,15 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
                 # centroid is never reached (CLAUDE.md §6.1).
                 streetview_heading=payload.heading,
                 streetview_pitch=payload.pitch,
-                streetview_fov=payload.fov
+                streetview_fov=payload.fov,
+                streetview_pano_id=payload.pano_id or None
             )
             db.add(p)
         else:
             p.streetview_heading = payload.heading
             p.streetview_pitch = payload.pitch
             p.streetview_fov = payload.fov
+            p.streetview_pano_id = payload.pano_id or None
             if payload.front_lat is not None:
                 p.front_lat = payload.front_lat
             if payload.front_lng is not None:

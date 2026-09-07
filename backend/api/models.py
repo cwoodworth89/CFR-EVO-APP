@@ -173,10 +173,16 @@ class ParcelModel(Base):
     entrance_lat = Column(Float, nullable=True)
     entrance_lng = Column(Float, nullable=True)
 
-    # Preferred Street View Camera Angle
-    streetview_heading = Column(Float, server_default="0.0", default=0.0, nullable=True)
-    streetview_pitch = Column(Float, server_default="5.0", default=5.0, nullable=True)
-    streetview_fov = Column(Float, server_default="80.0", default=80.0, nullable=True)
+    # Preferred Street View camera, NULL until the operator saves one. The defaults that
+    # used to sit here made every parcel read as a saved 0-degree view (#35a, migration
+    # 2026-09-06_streetview_override_is_null_until_saved.sql). fov is degrees.
+    streetview_heading = Column(Float, nullable=True)
+    streetview_pitch = Column(Float, nullable=True)
+    streetview_fov = Column(Float, nullable=True)
+    # The panorama the operator was looking at when they saved: pins the camera position,
+    # not just the heading. Storable indefinitely under the Maps Platform Service Specific
+    # Terms A.3 (docs/standards/google-maps-platform-terms-excerpts.md).
+    streetview_pano_id = Column(Text, nullable=True)
 
     lock_box_notes = Column(Text, nullable=True)
     hazard_notes = Column(Text, nullable=True)

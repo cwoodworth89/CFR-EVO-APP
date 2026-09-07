@@ -160,5 +160,7 @@ To ensure zero gray error boxes on station kiosks, the Google Maps API Key (`VIT
 each one.** Found 2026-09-06 (punch-list #35a): the kiosk key's list held the Embed API but
 not the Maps JavaScript API, so the SDK answered `ApiTargetBlockedMapError`, `gm_authFailure`
 fired, and every kiosk showed the embed fallback, silently, for weeks. The panel now says so
-on screen. If the compact tile moves to a static image rendered from the saved `pano_id`
-(the design under #35a), add **Street View Static API** to the same list.
+on screen. The compact tile IS a static image since 2026-09-06 (`maps/api/streetview`, pano_id or
+location + heading/pitch/fov at the saved view), so **Street View Static API** must be on the
+same list; without it the tile falls back to the interactive panorama with an amber note.
+The database holds fov in degrees; the SDK's zoom converts as fov = 180 / 2^zoom.

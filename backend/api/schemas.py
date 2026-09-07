@@ -110,7 +110,8 @@ class StreetViewOverrideSchema(BaseModel):
     front_lng: float
     heading: float = 0.0
     pitch: float = 5.0
-    fov: float = 80.0
+    fov: float = 90.0   # degrees; the SDK's zoom 1 (#35a)
+    pano_id: Optional[str] = None
 
 
 class ParcelCameraOverrideSchema(BaseModel):
@@ -119,8 +120,9 @@ class ParcelCameraOverrideSchema(BaseModel):
     clean_address: Optional[str] = None
     heading: float = 0.0
     pitch: float = 5.0
-    fov: float = 80.0
+    fov: float = 90.0   # degrees
     front_lat: Optional[float] = None
     front_lng: Optional[float] = None
+    pano_id: Optional[str] = None
 
 

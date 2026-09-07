@@ -31,11 +31,23 @@ import { apiClient } from '../../apiClient';
  *     operator had set them; both now say so on the panel. The fix for the key is in
  *     the console, not here.
  */
+// Google's relation between the panorama's zoom and its field of view: fov = 180 / 2^zoom
+// (Maps JavaScript API StreetViewPanorama docs; zoom 1 is 90 degrees). The database holds
+// degrees; the SDK speaks zoom; the Static API takes degrees, 10..120.
+const fovToZoom = (fov) => Math.log2(180 / Math.min(Math.max(Number(fov) || 90, 10), 180));
+const zoomToFov = (zoom) => Math.round(180 / Math.pow(2, Number(zoom) || 0));
+const clampStaticFov = (fov) => Math.min(Math.max(Math.round(Number(fov) || 90), 10), 120);
+
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
   const [isExpanded, setIsExpanded] = useState(false);
+  // The compact tile is a Street View Static API image at the saved view; the interactive
+  // panorama (and the save) live behind Expand (operator, 2026-09-06). When the image fails
+  // -- the key not allowed for the Static API, no imagery, offline -- the tile falls back to
+  // the interactive panorama and says so.
+  const [staticFailed, setStaticFailed] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [dbOverride, setDbOverride] = useState(null);
   // Google reports an auth failure ONCE per page, when the SDK script first loads. Every
@@ -80,14 +92,20 @@ export default function StreetViewPanel({ activeCall }) {
       .then((res) => {
         if (isMounted && res?.found && res?.parcel) {
           const p = res.parcel;
-          if (p.heading != null || p.streetview_heading != null || p.front_lat != null) {
+          // An override exists only when a heading was saved. Since the 2026-09-06
+          // migration an unsaved parcel holds NULL here; before it every parcel carried
+          // the column defaults and read as a saved 0-degree view (#35a).
+          const savedHeading = p.streetview_heading ?? p.heading;
+          if (savedHeading != null) {
+            const fov = p.streetview_fov ?? p.fov ?? 90;
             setDbOverride({
               lat: p.front_lat ?? p.lat,
               lng: p.front_lng ?? p.lng,
-              heading: p.streetview_heading ?? p.heading ?? 0,
+              heading: savedHeading,
               pitch: p.streetview_pitch ?? p.pitch ?? 5,
-              fov: p.streetview_fov ?? p.fov ?? 80,
-              zoom: p.zoom
+              fov,
+              zoom: fovToZoom(fov),
+              pano_id: p.streetview_pano_id ?? p.pano_id ?? ''
             });
           }
         }
@@ -135,8 +153,8 @@ export default function StreetViewPanel({ activeCall }) {
   }
 
   const initialPitch = activeOverride ? parseFloat(activeOverride.pitch ?? activeOverride.streetview_pitch ?? 5) : 5;
-  const initialFov = activeOverride ? parseFloat(activeOverride.fov ?? activeOverride.streetview_fov ?? 80) : 80;
-  const initialZoom = activeOverride ? parseFloat(activeOverride.zoom ?? 1) : 1;
+  const initialFov = activeOverride ? parseFloat(activeOverride.fov ?? activeOverride.streetview_fov ?? 90) : 90;
+  const initialZoom = activeOverride ? parseFloat(activeOverride.zoom ?? fovToZoom(initialFov)) : 1;
   const initialPanoId = activeOverride?.pano_id || '';
 
   // Initialize camera vector in ref
@@ -418,7 +436,7 @@ export default function StreetViewPanel({ activeCall }) {
       if (typeof panoramaRef.current.getZoom === 'function') {
         const z = panoramaRef.current.getZoom();
         if (z !== undefined && !isNaN(z)) {
-          currentZoom = Math.round(z || 1);
+          currentZoom = Math.round((z || 1) * 100) / 100;
         }
       }
       if (typeof panoramaRef.current.getPano === 'function') {
@@ -445,7 +463,10 @@ export default function StreetViewPanel({ activeCall }) {
       front_lng: saveLng,
       heading: currentHeading,
       pitch: currentPitch,
-      fov: currentZoom,
+      // Degrees. This used to send the zoom level (0-4) and the database held "fov 1" for
+      // a 90-degree view (#35a, 2026-09-06).
+      fov: zoomToFov(currentZoom),
+      zoom: currentZoom,
       pano_id: currentPanoId
     };
 
@@ -466,6 +487,23 @@ export default function StreetViewPanel({ activeCall }) {
     }
   };
 
+  // Reset the static-image verdict for each new address.
+  const [staticKey, setStaticKey] = useState(cleanAddrKey);
+  if (staticKey !== cleanAddrKey) {
+    setStaticKey(cleanAddrKey);
+    setStaticFailed(false);
+  }
+
+  // maps.googleapis.com/maps/api/streetview -- registered in docs/external_calls.md 4.1.
+  // return_error_code makes a miss an HTTP error the <img> reports, not a grey placeholder.
+  const staticStreetViewUrl = hasCoords && apiKey
+    ? `https://maps.googleapis.com/maps/api/streetview?size=640x400`
+      + (initialPanoId ? `&pano=${encodeURIComponent(initialPanoId)}` : `&location=${frontLat},${frontLng}`)
+      + `&heading=${Math.round(initialHeading)}&pitch=${Math.round(initialPitch)}&fov=${clampStaticFov(initialFov)}`
+      + `&return_error_code=true&key=${apiKey}`
+    : '';
+  const useStaticTile = Boolean(staticStreetViewUrl) && !staticFailed;
+
   const embedStreetViewUrl = hasCoords
     ? (apiKey
         ? `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${frontLat},${frontLng}&heading=${initialHeading}&pitch=${initialPitch}`
@@ -474,8 +512,21 @@ export default function StreetViewPanel({ activeCall }) {
 
   const renderContent = (isModal = false) => (
     <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
+      {!isModal && useStaticTile && (
+        <img
+          src={staticStreetViewUrl}
+          alt={`Street View of ${activeCall?.address || 'the target'}`}
+          className="w-full h-full object-cover"
+          onError={() => setStaticFailed(true)}
+        />
+      )}
+      {!isModal && staticFailed && (
+        <div className="absolute top-12 left-2 z-20 bg-amber-950/90 border border-amber-700 text-amber-200 px-2 py-1 rounded text-[10px] font-mono">
+          Static image unavailable; showing the interactive view
+        </div>
+      )}
       {/* Sleek Dark HUD Skeleton Loader */}
-      {isLoading && isOnline && !sdkError && (
+      {isLoading && isOnline && !sdkError && (isModal || !useStaticTile) && (
         <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3 transition-opacity duration-300">
           <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider animate-pulse">
@@ -493,7 +544,7 @@ export default function StreetViewPanel({ activeCall }) {
           saved. The error code is in the browser console (punch-list #35a).
         </div>
       )}
-      {sdkError ? (
+      {(!isModal && useStaticTile) ? null : sdkError ? (
         <iframe
           title="Fallback Google Street View Embed"
           width="100%"
@@ -600,16 +651,17 @@ export default function StreetViewPanel({ activeCall }) {
   return (
     <>
       <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
-        {/* Header Title Bar with High-Visibility SAVED PREFERRED VIEW Badge */}
-        <div className="absolute top-2 left-2 z-20 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-indigo-400 flex items-center gap-2 shadow">
+        {/* Header: small. The tile is the picture (operator, 2026-09-06). A saved view is a
+            green dot with its heading; the wording lives in the expanded view. */}
+        <div className="absolute top-2 left-2 z-20 bg-slate-900/80 backdrop-blur px-2 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 shadow">
           <span>📷</span>
-          <span>Google Street View 360°</span>
+          <span>Street View</span>
           {activeOverride && (
-            <span className="bg-emerald-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black tracking-wider shadow animate-pulse">
-              [SAVED PREFERRED VIEW]
+            <span className="text-emerald-400 font-mono text-[10px]" title="Saved preferred view">
+              ● {Math.round(initialHeading)}°
             </span>
           )}
-          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline Mode</span>}
+          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline</span>}
         </div>
 
         {/* Custom Expand Button (Sitting cleanly in top right corner!) */}

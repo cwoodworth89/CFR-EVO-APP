@@ -245,3 +245,31 @@ choice (CLAUDE.md 6.1).
 Left open elsewhere: the terms' same-screen clause (standards index, deferred by the
 operator), `index.html` caching and `loading=async` (backlog), and the preferred-view design
 with a static tile (design note above).
+
+### Saving confirmed; two defects beside it; the tile goes static (2026-09-06 evening)
+
+The operator set a view on 3030 Gordon Ave and asked whether the save works. It does:
+`public.parcels` holds heading 214, pitch 13, front point 49.27043/-122.79163, saved
+21:08 PDT. Found while checking:
+
+* **Every parcel read as saved.** The column DEFAULTs (0 / 5 / 80) meant 71,210 rows had a
+  "preferred view" nobody set, hence *SAVED PREFERRED VIEW (0°)* on every call. Migration
+  `2026-09-06_streetview_override_is_null_until_saved.sql`: untouched defaults to NULL,
+  defaults dropped, the model no longer supplies them. Measured before running: 71,210 untouched,
+  0 touched, 3 real rows.
+* **The saved "fov" was the zoom level.** The panel wrote the SDK's zoom (1) into
+  `streetview_fov`, so the two real saves read *fov 1*. The relation is fov = 180 / 2^zoom;
+  the migration converts the stored rows (1 → 90) and the panel now saves degrees.
+* **The panorama id was dropped** by the API schema, so a save pinned only a heading from a
+  point, not the exact camera. `streetview_pano_id` added end to end; the terms allow it.
+
+**The tile is static now**, as the operator understood the design: one Street View Static
+API image at the saved view (pano id when there is one), no interaction, small header
+(*Street View ● 214°*); *Expand* opens the interactive panorama with the save bar. If the
+image request fails, the tile falls back to the interactive view and says *Static image
+unavailable*. **Needs the operator: add Street View Static API to the key's API
+restrictions**, the same screen as the Maps JavaScript API fix.
+
+Also seen: `5000 TESTING WAY`, a row the API test suite writes into the kiosk's live
+`parcels` table when run with `DATABASE_URL` pointing there. One line on the backlog.
+

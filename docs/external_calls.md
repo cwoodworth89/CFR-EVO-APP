@@ -97,7 +97,7 @@ as inline data URIs.
 
 | File | Line | Use |
 |:--|:--|:--|
-| `frontend/src/components/kiosk/StreetViewPanel.jsx` | 325, 461, 462 | Maps JS API, Street View embed |
+| `frontend/src/components/kiosk/StreetViewPanel.jsx` | SDK script, embed iframe, **Static API image** | Maps JS API (interactive, behind Expand), Maps Embed API (fallback), and since 2026-09-06 `maps.googleapis.com/maps/api/streetview` for the compact tile: one JPEG at the saved view per call, no interaction. Added on the operator's word ("I thought the PiP mode was going to be static serve"); needs *Street View Static API* on the key's API restrictions, else the tile falls back to the interactive view and says so. |
 | `frontend/src/components/hud/ActiveDispatchPanel.jsx` | 21, 158 | static Street View thumbnail, pano link |
 | `frontend/src/components/hud/LeftSidebar.jsx` | 324 | external directions link |
 

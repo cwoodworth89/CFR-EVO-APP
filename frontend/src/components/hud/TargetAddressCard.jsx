@@ -11,7 +11,7 @@ import React from 'react';
  * (CLAUDE.md §6.1 — this is the same defect that had 853 unrated hydrants presented as
  * NFPA 291 class AA).
  */
-export default function TargetAddressCard({ targetAddress, nearestHydrants = [], onClose }) {
+export default function TargetAddressCard({ targetAddress, nearestHydrants = [], hydrantTier = null, onClose }) {
   if (!targetAddress) return null;
   const nearest = nearestHydrants[0];
 
@@ -48,6 +48,9 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
             </p>
           )}
           
+          {hydrantTier === 'none' && (
+            <div className="text-[10px] font-mono font-black text-amber-300">⚠️ NO HYDRANT WITHIN 1,000 FT</div>
+          )}
           {nearest && (
             <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col gap-1.5">
               <span className="text-[9.5px] text-sky-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
@@ -55,7 +58,7 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
               </span>
               <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
                 <span className="text-slate-400">ID / Distance</span>
-                <span className="text-white font-black">{nearest.gisId} ({nearest.distance}m)</span>
+                <span className="text-white font-black">{nearest.gisId} ({nearest.distance} m{nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
               </div>
               {nearest.flowClass && (
                 <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">

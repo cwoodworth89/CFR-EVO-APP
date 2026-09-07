@@ -22,11 +22,55 @@ export const FLAG_LABELS = {
   RESPONSE_TYPE_UNKNOWN: 'Response type not announced or not transcribed',
 };
 
-/** Flags on a record, from either the flattened call or the raw target. */
-export function getReviewFlags(call) {
+/**
+ * The verified column whose value rules each flag. A flag is the system saying "look at
+ * this"; once the operator has written the answer into the verified column, the look has
+ * happened and the flag is ruled -- it stops counting, and the review shows it struck
+ * through with the ruling beside it (operator, 2026-09-06: "Can I rule one way or another
+ * and the system won't flag anymore?"). The notes for the ruling go in review_notes as
+ * before. The flags themselves are never rewritten: they record what the system saw.
+ */
+export const FLAG_RULED_BY = {
+  GRID_MISMATCH: 'verified_map_grid',
+  NO_MAP_GRID: 'verified_map_grid',
+  XSTREET_UNRESOLVED: 'verified_x_street_1',
+  XSTREET_SUBSTITUTED: 'verified_x_street_1',
+  NO_TALK_GROUP: 'verified_talkgroup',
+  RESPONSE_TYPE_UNKNOWN: 'verified_response_type',
+  NO_UNITS: 'verified_units',
+  UNKNOWN_CALL_TYPE: 'verified_incident',
+  LOCATION_UNRESOLVED: 'verified_address',
+  LOCATION_SUBSTITUTED: 'verified_address',
+  STREET_SECTION_ONLY: 'verified_address',
+};
+
+function rulingFor(call, flag) {
+  const field = FLAG_RULED_BY[flag];
+  if (!field) return null;
+  const value = call?.[field] ?? call?.target?.[field];
+  if (value == null) return null;
+  if (Array.isArray(value)) return value.length ? value.join(', ') : null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+/** Every flag the system raised on a record, ruled or not. */
+export function getAllReviewFlags(call) {
   if (!call) return [];
   const flags = call.review_flags ?? call.target?.review_flags;
   return Array.isArray(flags) ? flags : [];
+}
+
+/** Flags still open: raised by the system and not yet ruled by a verified value. */
+export function getReviewFlags(call) {
+  return getAllReviewFlags(call).filter(f => rulingFor(call, f) == null);
+}
+
+/** Flags the operator has ruled, with the ruling: [{ flag, ruling }]. */
+export function getRuledFlags(call) {
+  return getAllReviewFlags(call)
+    .map(flag => ({ flag, ruling: rulingFor(call, flag) }))
+    .filter(x => x.ruling != null);
 }
 
 /** Operator-facing label, falling back to the raw key so drift is visible. */

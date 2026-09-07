@@ -10,7 +10,8 @@
     "deploy": "gh-pages -d dist",
     "lint": "eslint .",
     "preview": "vite preview",
-    "lint:crash": "eslint src -c eslint.crash.config.js --quiet"
+    "lint:crash": "eslint src -c eslint.crash.config.js --quiet",
+    "test:node": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@turf/turf": "^7.3.1",

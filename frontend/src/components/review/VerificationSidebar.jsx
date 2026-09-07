@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { toTitleCase } from './verificationConstants';
-import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
+import { getReviewFlags, getRuledFlags, flagLabel } from '../../utils/reviewFlags';
 
 // Shown only when the parser produced nothing for a field. These placeholders used to carry
 // worked examples ("e.g. 2648 Sandstone Cres", "e.g. Structure Fire", "e.g. E1, L1"), which
@@ -181,10 +181,24 @@ export default function VerificationSidebar({
                 correctness with metadata completeness and showed neither. */}
             {(() => {
               const flags = getReviewFlags(selectedCall);
+              // A flag whose verified column now holds the operator's answer is ruled: shown
+              // struck through with the ruling, no longer counted (utils/reviewFlags.js).
+              const ruled = getRuledFlags(selectedCall);
+              const ruledList = ruled.length > 0 ? (
+                <ul className="mt-1 space-y-0.5">
+                  {ruled.map(({ flag, ruling }) => (
+                    <li key={flag} className="text-[10px] font-mono text-slate-500 leading-snug">
+                      <span className="line-through">{flagLabel(flag)}</span>
+                      <span className="text-emerald-400"> — ruled: {ruling}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null;
               if (flags.length === 0) {
                 return (
                   <div className="mt-1 text-[10px] font-mono text-emerald-400">
-                    ✓ No system flags
+                    ✓ No open system flags
+                    {ruledList}
                   </div>
                 );
               }
@@ -200,6 +214,7 @@ export default function VerificationSidebar({
                       </li>
                     ))}
                   </ul>
+                  {ruledList}
                 </div>
               );
             })()}

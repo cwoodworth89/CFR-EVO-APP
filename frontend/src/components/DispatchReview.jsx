@@ -6,6 +6,7 @@ import ReviewTable from './review/ReviewTable';
 import { getCallTones } from './review/reviewFormat';
 import VerificationSidebar from './review/VerificationSidebar';
 import { toTitleCase } from './review/verificationConstants';
+import { getReviewFlags } from '../utils/reviewFlags';
 
 export default function DispatchReview({ onClose, onReviewCall }) {
   const [calls, setCalls] = useState([]);
@@ -328,8 +329,9 @@ export default function DispatchReview({ onClose, onReviewCall }) {
     if (statusFilter === 'fine_tuned' && !c.feedback_submitted) return false;
     // 'flagged' = the system named at least one reason to look. Replaces the
     // low_confidence filter, which keyed off a score that no longer exists (#45).
-    if (statusFilter === 'flagged'
-        && (c.review_flags ?? c.target?.review_flags ?? []).length === 0) return false;
+    // A flag the operator has ruled (the verified column holds the answer) no longer
+    // counts as flagged -- see FLAG_RULED_BY in utils/reviewFlags.js.
+    if (statusFilter === 'flagged' && getReviewFlags(c).length === 0) return false;
 
     // Tone Filter
     if (toneFilter !== 'all') {

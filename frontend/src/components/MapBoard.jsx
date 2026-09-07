@@ -3,7 +3,6 @@
 // SUPERSEDED -- hydrants/zones now come from PostGIS via the API, not public/data/*.json.
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
 import 'leaflet/dist/leaflet.css';
-import * as turf from '@turf/turf';
 import L from 'leaflet';
 
 // Import from your other components
@@ -13,7 +12,8 @@ import { Header } from './hud/Header';
 import { LeftSidebar } from './hud/LeftSidebar';
 import { RightSidebar } from './hud/RightSidebar';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
-import { getAlphaSegment, enrichAddressWithBuilding } from './map/mapGeometry';
+import { enrichAddressWithBuilding } from './map/mapGeometry';
+import { pickRouteHydrants } from '../utils/routeHydrants';
 import RoadClosureMarker from './map/RoadClosureMarker';
 import ZonesLayer from './map/ZonesLayer';
 import MapViewControls from './map/MapViewControls';
@@ -103,7 +103,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   });
   const [targetAddress, setTargetAddress] = useState(null);
   const [targetPolygon, setTargetPolygon] = useState(null);
-  const [allNearbyHydrants, setAllNearbyHydrants] = useState([]);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const targetMarkerRef = useRef(null);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
@@ -180,7 +179,6 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     } else {
       setTargetPolygon(null);
     }
-    setAllNearbyHydrants([]);
     setRouteCoordinates([]);
     // setUserPanned is a useState setter and therefore stable, but it now arrives through
     // useMapInstance, so the compiler can no longer prove that and bails out of optimizing
@@ -254,123 +252,23 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
     }
   });
 
-  // Query Nearby Hydrants on targetAddress change (using local in-memory dataset)
-  useEffect(() => {
-    if (!targetAddress || allHydrantsData.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAllNearbyHydrants(prev => prev.length > 0 ? [] : prev);
-      return;
-    }
-
-    const lat = targetAddress.lat;
-    const lng = targetAddress.lng;
-    const centerPoint = turf.point([lng, lat]);
-
-    try {
-      // Filter hydrants within 300m (0.3 km)
-      const nearby = allHydrantsData
-        .map(h => {
-          const hydPoint = turf.point([h.lng, h.lat]);
-          const distKm = turf.distance(centerPoint, hydPoint, { units: 'kilometers' });
-          const distM = Math.round(distKm * 1000);
-          return { ...h, distM };
-        })
-        .filter(h => h.distM <= 300)
-        .map(h => ({
-          gisId: h.gisId,
-          lat: h.lat,
-          lng: h.lng,
-          flowClass: h.flowClass,
-          status: h.status
-        }));
-
-      setAllNearbyHydrants(nearby);
-    } catch (e) {
-      console.warn("Failed to filter nearby hydrants locally:", e);
-      setAllNearbyHydrants(prev => prev.length > 0 ? [] : prev);
-    }
-  }, [targetAddress, allHydrantsData]);
-
-  // Filter and sort nearby hydrants dynamically with Alpha-segment logic
-  const nearestHydrants = useMemo(() => {
-    if (allNearbyHydrants.length === 0 || !targetAddress) return [];
-
-    const targetLat = targetAddress.front_lat || targetAddress.lat;
-    const targetLng = targetAddress.front_lng || targetAddress.lng;
-    const fromPoint = turf.point([targetLng, targetLat]);
-
-    // Try to construct parcel boundary components
-    let parcelLine = null;
-    let ringCoords = null;
-    if (targetAddress.rings && targetAddress.rings.length > 0) {
-      try {
-        ringCoords = targetAddress.rings[0];
-        if (ringCoords.length >= 2) {
-          parcelLine = turf.lineString(ringCoords);
-        }
-      } catch (e) {
-        console.warn("Could not construct parcel boundary line for hydrant calculations:", e);
-      }
-    }
-
-    // Determine target frontage reference point if route is loaded
-    let commonFrontagePt = null;
-    if (routeCoordinates && routeCoordinates.length > 0) {
-      const lastRouteCoord = routeCoordinates[routeCoordinates.length - 1];
-      commonFrontagePt = [lastRouteCoord.lng, lastRouteCoord.lat];
-    }
-
-    // Process each hydrant to compute distances to Alpha line
-    const hydrantsWithDistances = allNearbyHydrants.map(hyd => {
-      const toPoint = turf.point([hyd.lng, hyd.lat]);
-      let distance;
-
-      if (ringCoords && ringCoords.length >= 2) {
-        // Find Alpha segment closest to either the common frontage (route end) or this hydrant itself
-        const refPt = commonFrontagePt || [hyd.lng, hyd.lat];
-        const alphaSeg = getAlphaSegment(ringCoords, refPt);
-        
-        if (alphaSeg) {
-          distance = Math.round(turf.pointToLineDistance(toPoint, alphaSeg, { units: 'meters' }));
-        } else if (parcelLine) {
-          distance = Math.round(turf.pointToLineDistance(toPoint, parcelLine, { units: 'meters' }));
-        } else {
-          distance = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
-        }
-      } else {
-        distance = Math.round(turf.distance(fromPoint, toPoint, { units: 'kilometers' }) * 1000);
-      }
-
-      return {
-        ...hyd,
-        distance
-      };
+  // The hydrants to show for the searched address, by the operator's rule
+  // (utils/routeHydrants.js): along the route within 300 ft of arrival first, then around
+  // the address, then within the 1,000 ft supply lay. Replaces the Alpha-segment version
+  // (2026-09-06, punch-list #74). Picks carry `distance` in metres and `how`.
+  const routeHydrants = useMemo(() => {
+    if (!targetAddress || allHydrantsData.length === 0) return { tier: 'no_target', picks: [], routeKnown: false };
+    const lat = targetAddress.front_lat ?? targetAddress.lat;
+    const lng = targetAddress.front_lng ?? targetAddress.lng;
+    if (lat == null || lng == null) return { tier: 'no_target', picks: [], routeKnown: false };
+    return pickRouteHydrants({
+      hydrants: allHydrantsData,
+      routeCoords: routeCoordinates || [],
+      destination: { lat: Number(lat), lng: Number(lng) },
     });
-
-    // Sort by Alpha distance
-    hydrantsWithDistances.sort((a, b) => a.distance - b.distance);
-
-    // Filter by route line if available
-    if (routeCoordinates && routeCoordinates.length > 1) {
-      try {
-        const routeLine = turf.lineString(routeCoordinates.map(c => [c.lng, c.lat]));
-        const onRouteHydrants = hydrantsWithDistances.map(hyd => {
-          const pt = turf.point([hyd.lng, hyd.lat]);
-          const distanceToRoute = turf.pointToLineDistance(pt, routeLine, { units: 'meters' });
-          return { ...hyd, distanceToRoute };
-        }).filter(hyd => hyd.distanceToRoute <= 25); // 25m threshold along route
-
-        if (onRouteHydrants.length > 0) {
-          onRouteHydrants.sort((a, b) => a.distance - b.distance);
-          return onRouteHydrants.slice(0, 3); // Return up to 3 hydrants on route
-        }
-      } catch (e) {
-        console.error("Error filtering hydrants by route line:", e);
-      }
-    }
-
-    return hydrantsWithDistances.slice(0, 3); // Return up to 3 closest hydrants
-  }, [allNearbyHydrants, targetAddress, routeCoordinates]);
+  }, [allHydrantsData, targetAddress, routeCoordinates]);
+  const nearestHydrants = routeHydrants.picks;
+  const hydrantHighlightIds = useMemo(() => new Set(nearestHydrants.map(h => h.gisId)), [nearestHydrants]);
 
   const targetCoords = useMemo(() => {
     if (!targetAddress) return null;
@@ -474,6 +372,7 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
               showHydrants={showHydrants || Boolean(targetAddress)}
               hydrantTargetCoords={targetAddress && targetAddress.lat != null && targetAddress.lng != null
                 ? [Number(targetAddress.lat), Number(targetAddress.lng)] : null}
+              hydrantHighlightIds={hydrantHighlightIds}
           >
             <ZonesLayer zones={zones} visible={showZones} currentZoom={currentZoom} />
 
@@ -522,6 +421,7 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
               <TargetAddressCard
                 targetAddress={targetAddress}
                 nearestHydrants={nearestHydrants}
+                hydrantTier={routeHydrants.tier}
                 onClose={() => setTargetAddress(null)}
               />
             }

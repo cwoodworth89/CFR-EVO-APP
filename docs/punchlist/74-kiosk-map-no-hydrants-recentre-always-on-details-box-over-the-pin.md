@@ -12,8 +12,8 @@
 
 ---
 
-> **Status**: 🟡 **Four of the operator's notes built 2026-09-06; the fifth, where the
-> dispatch-details box should live, is a layout decision that is the operator's.**
+> **Status**: 🟡 **Built 2026-09-06, including the operator's hydrant rule (along the route
+> first); open on one thing only, where the dispatch-details box should live.**
 
 The operator's notes, verbatim in substance:
 
@@ -64,3 +64,38 @@ it to be the only save.
 
 The cadastral and satellite tiles' headers and *Expand* buttons, which the note also called
 busy: no specific change was asked for, and the freeze says wait for one.
+
+### 1b. Hydrants by the operator's rule — built the same evening
+
+Operator, 2026-09-06, after the straight-line version above: *"what matters most is choice
+#1 and #2. Ideally along the route picked. So just go with that. If there's no hydrant within
+300ft of the route, check if there is one (sometimes it's just past the address). If nothing
+within 300ft warn the driver."* And: *"Our trucks carry 1000ft of supply hose, but there
+aren't many places in the city that would be needed."*
+
+That is department operational policy (CLAUDE.md 6.3, provenance 4) and is now the one
+implementation for both views, `frontend/src/utils/routeHydrants.js`:
+
+| Tier | Rule | Shown as |
+|:--|:--|:--|
+| 1 | Hydrants within 30 m of the OSRM route line and within 300 ft (91.4 m) of arrival, measured along the route; the last one passed is #1, the one before it #2 | *N m before arrival, on the route* |
+| 2 | None there: hydrants within 300 ft of the address, straight-line, any direction (the one "just past the address") | *N m from the address, none on the approach within 300 ft* |
+| 3 | None there: the nearest within 1,000 ft (304.8 m), the supply hose carried | *N m, within the 1,000 ft supply lay* |
+| — | Nothing within 1,000 ft | **⚠️ NO HYDRANT WITHIN 1,000 FT** |
+
+`NOT READY` hydrants (the City's status) never count. The 30 m band is measured, not
+chosen: 2,837 OPERATING hydrants sit p50 8.4 m, p90 11.9 m, p95 35 m from the nearest
+`public.roads` centreline (2026-09-06), the p95 tail being lanes the roads table lacks.
+Assumption stated (7.6): the hydrants a crew would call "along the route" lie within 30 m of
+the route line; the falsifier is a call whose crew caught a hydrant farther off it.
+
+Wired: the kiosk's route panel takes the drawn route from `RoutingOverlay` and lists the
+picks in the details box; the workstation's search view uses the same picker (its
+Alpha-segment version with three unsourced constants is gone) and its target card says how
+each pick was chosen; the map layer pulses exactly the picks. Six `node --test` cases
+(`npm run test:node`) cover the four tiers, the NOT READY exclusion and the no-route case.
+The previous 800 m / 400 m thresholds remain only in the layer's fallback for callers that
+pass no picks.
+
+Untested live: needs a call. Chrome shows the search view; the route panel needs a dispatch
+or a replay.

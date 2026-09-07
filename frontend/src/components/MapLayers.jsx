@@ -218,7 +218,7 @@ function HydrantDetailCard({ gisId, statusVal, flowClass, label }) {
 }
 
 // 💧 NEW: WATER HYDRANTS GIS LAYER
-export function HydrantsLayer({ visible, targetCoords, minZoom = 12, onNearest }) {
+export function HydrantsLayer({ visible, targetCoords, minZoom = 12, highlightIds = null }) {
     const map = useMap();
     const [zoom, setZoom] = React.useState(map.getZoom());
     const [hydrants, setHydrants] = React.useState([]);
@@ -330,13 +330,6 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12, onNearest }
       return { nearestCity: cBest, nearestPrivate: pBest };
     }, [targetCoords, allHydrants]);
 
-    // The kiosk's details box prints the nearest hydrant; it lives outside the map, so the
-    // layer hands the answer up (punch-list #74). null means none within the thresholds
-    // above, or no target, or the inventory not loaded yet -- the caller shows that as such.
-    React.useEffect(() => {
-      if (onNearest) onNearest({ nearestCity, nearestPrivate, loaded: allHydrants.length > 0 });
-    }, [nearestCity, nearestPrivate, allHydrants.length, onNearest]);
-
     // Custom Icon styling
 
     // Tactical Highlight Icons for Nearest City & Private Hydrants
@@ -357,9 +350,14 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12, onNearest }
           const gisId = h.attributes.gis_id || "Unknown";
           const flowClass = h.attributes.flow_class || "";
           
-          const isNearestCity = nearestCity && nearestCity.gisId === gisId;
-          const isNearestPrivate = nearestPrivate && nearestPrivate.gisId === gisId;
-          const isNearest = isNearestCity || isNearestPrivate;
+          // With `highlightIds` the caller has already chosen (utils/routeHydrants.js, the
+          // operator's along-the-route rule) and the layer only draws; without it the layer
+          // falls back to its own nearest-city / nearest-private pick.
+          const isNearestCity = highlightIds ? false : Boolean(nearestCity && nearestCity.gisId === gisId);
+          const isNearestPrivate = highlightIds
+            ? (highlightIds.has(gisId) && statusVal === 'PRIVATE')
+            : Boolean(nearestPrivate && nearestPrivate.gisId === gisId);
+          const isNearest = highlightIds ? highlightIds.has(gisId) : (isNearestCity || isNearestPrivate);
 
           let label = "OPERATING";
           if (statusVal === "PRIVATE") label = "PRIVATE";

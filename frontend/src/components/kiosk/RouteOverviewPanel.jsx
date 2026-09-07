@@ -10,6 +10,8 @@ import { BASE_LAYERS } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
+import { useRouteHydrants } from '../../hooks/useRouteHydrants';
+import { TIER } from '../../utils/routeHydrants';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 // A programmatic fit fires the same zoomstart the user's scroll wheel does, so the
@@ -140,8 +142,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const fittingRef = useRef(false);
   const panelRef = useRef(null);
-  // From the hydrant layer, which measures from the destination (punch-list #74).
-  const [nearestHydrants, setNearestHydrants] = useState({ nearestCity: null, nearestPrivate: null, loaded: false });
+  // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
+  const [routeCoords, setRouteCoords] = useState([]);
 
   // Reset view state when the active call changes.
   //
@@ -154,7 +156,14 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     setPrevCallKey(callKey);
     setUserPanned(false);
     setSelectedCandidateIdx(0);
+    setRouteCoords([]);
   }
+
+  // The hydrants a driver should see, by the operator's rule (utils/routeHydrants.js):
+  // along the route within 300 ft of arrival first, then around the address, then within
+  // the 1,000 ft supply lay, else a warning. Punch-list #74.
+  const routeHydrants = useRouteHydrants(destLat, destLng, routeCoords);
+  const hydrantHighlightIds = useMemo(() => new Set(routeHydrants.picks.map(h => h.gisId)), [routeHydrants]);
 
   // Dynamic responding units resolution
   const unitsToRoute = useMemo(() => {
@@ -351,24 +360,35 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               <div className="flex items-center gap-2 text-sky-400 font-bold">
                 <span>💧</span>
                 <span className="text-[10.5px] text-slate-200">
-                  {/* Measured by the hydrant layer on this map from the destination point,
-                      straight-line (public.hydrants, NFPA 291 class as rated by the City).
-                      Never from the dispatch record, which carries no hydrant (#24, #74). */}
+                  {/* From public.hydrants around the destination, by the operator's rule
+                      (utils/routeHydrants.js); NFPA 291 class as rated by the City. Never
+                      from the dispatch record, which carries no hydrant (#24, #74). */}
                   {!hasValidCoords ? (
                     <span className="text-slate-500 italic">Awaiting location</span>
-                  ) : nearestHydrants.nearestCity ? (
-                    <>
-                      <span className="text-white font-black">{nearestHydrants.nearestCity.gisId}</span>
-                      <span className="text-slate-400"> · {nearestHydrants.nearestCity.distMeters} m straight-line · </span>
-                      <span className="text-sky-300">{nearestHydrants.nearestCity.flowClass || 'UNRATED'}</span>
-                      {nearestHydrants.nearestPrivate && (
-                        <span className="text-amber-400"> · private {nearestHydrants.nearestPrivate.gisId} {nearestHydrants.nearestPrivate.distMeters} m</span>
-                      )}
-                    </>
-                  ) : nearestHydrants.loaded ? (
-                    <span className="text-amber-300 italic">No operating City hydrant within 800 m</span>
-                  ) : (
+                  ) : routeHydrants.failed ? (
+                    <span className="text-red-400 italic">Hydrant lookup failed</span>
+                  ) : routeHydrants.loading ? (
                     <span className="text-slate-500 italic">Hydrant inventory loading…</span>
+                  ) : routeHydrants.tier === TIER.NONE ? (
+                    <span className="text-amber-300 font-black">⚠️ NO HYDRANT WITHIN 1,000 FT</span>
+                  ) : (
+                    <span className="flex flex-col gap-0.5">
+                      {routeHydrants.picks.map((h, i) => (
+                        <span key={h.gisId}>
+                          <span className="text-slate-500">{i + 1}. </span>
+                          <span className="text-white font-black">{h.gisId}</span>
+                          <span className="text-sky-300"> {h.flowClass || 'UNRATED'}</span>
+                          {String(h.status || '').toUpperCase() === 'PRIVATE' && <span className="text-amber-400"> PRIVATE</span>}
+                          <span className="text-slate-400">
+                            {h.how === TIER.APPROACH
+                              ? ` · ${h.distance} m before arrival, on the route`
+                              : h.how === TIER.NEAR
+                                ? ` · ${h.distance} m from the address${i === 0 ? (routeHydrants.routeKnown ? ', none on the approach within 300 ft' : ', route pending') : ''}`
+                                : ` · ${h.distance} m, within the 1,000 ft supply lay; none within 300 ft`}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
                   )}
                 </span>
               </div>
@@ -402,7 +422,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         showFireHalls
         showHydrants
         hydrantTargetCoords={hasValidCoords ? [destLat, destLng] : null}
-        onNearestHydrant={setNearestHydrants}
+        hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
 
@@ -424,6 +444,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           <RoutingOverlay
             from={[origin.lat, origin.lng]}
             to={[destLat, destLng]}
+            onRouteCalculated={setRouteCoords}
           />
         )}
 

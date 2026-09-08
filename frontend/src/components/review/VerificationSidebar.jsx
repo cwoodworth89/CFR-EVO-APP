@@ -253,11 +253,28 @@ export default function VerificationSidebar({
                   <span className="text-slate-500 font-bold">{selectedCall.audio_duration.toFixed(1)}s</span>
                 )}
               </div>
+              {/* src is audioSignedUrl only -- never selectedCall.audio_url.
+                *
+                * The database stores audio_url host-relative ("/api/audio/DISP-....wav"),
+                * and DispatchReview resolves it against API_BASE_URL. That resolution
+                * happens in an effect, so it lands one render late; until 2026-09-08 this
+                * element fell back to the raw value for that first render and the browser
+                * went straight out and fetched it. A relative /api/ path resolves against
+                * the page origin, port 80, where nginx serves the SPA rather than proxying
+                * to the API on :8000 -- so the player got index.html and reported
+                * "No decoders for requested formats: text/html" on every call opened.
+                * CLAUDE.md s1: frontend requests go through API_BASE_URL, never a relative
+                * path. Verified on the kiosk 2026-09-08: :8000 returns 200 audio/x-wav,
+                * :80 returns 200 text/html for the same path.
+                *
+                * Rendering no src for that one frame is correct: there is nothing to play
+                * until the URL is resolved, and the key change remounts the element with
+                * it. */}
               <audio
-                key={audioSignedUrl || selectedCall.audio_url || 'no-audio'}
+                key={audioSignedUrl || 'no-audio'}
                 ref={audioRef}
                 controls
-                src={audioSignedUrl || selectedCall.audio_url}
+                src={audioSignedUrl || undefined}
                 className="w-full h-8 rounded accent-sky-500 bg-slate-900"
               />
             </div>

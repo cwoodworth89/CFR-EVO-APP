@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiClient, API_BASE_URL } from '../apiClient';
+import { apiClient, resolveApiUrl } from '../apiClient';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import SystemMetricsPanel from './admin/SystemMetricsPanel';
 import ReviewTable from './review/ReviewTable';
@@ -67,7 +67,6 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const [audioSignedUrl, setAudioSignedUrl] = useState(null);
   const prevSelectedCallIdRef = useRef(null);
   const prevAudioUrlRef = useRef(null);
-  const audioRef = useRef(null);
   const formContainerRef = useRef(null);
 
   // Load calls from local FastAPI gateway
@@ -242,10 +241,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
           return;
         }
         
-        let path = selectedCall.audio_url;
-        if (!path.startsWith('http')) {
-          path = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-        }
+        const path = resolveApiUrl(selectedCall.audio_url);
         if (prevAudioUrlRef.current !== path) {
           prevAudioUrlRef.current = path;
           setAudioSignedUrl(path);
@@ -685,7 +681,6 @@ export default function DispatchReview({ onClose, onReviewCall }) {
           <VerificationSidebar
             selectedCall={selectedCall}
             audioSignedUrl={audioSignedUrl}
-            audioRef={audioRef}
             verifiedTranscript={verifiedTranscript}
             setVerifiedTranscript={setVerifiedTranscript}
             verifiedAddress={verifiedAddress}

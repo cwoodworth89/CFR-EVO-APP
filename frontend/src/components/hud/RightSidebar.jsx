@@ -1,5 +1,17 @@
 import React from 'react';
 
+/** Hall labels and their badge classes. Static, so it lives at module scope: as a literal
+ *  inside the component it was rebuilt every render and read by the useMemo below without
+ *  being in its dependency list, which is what react-hooks/preserve-manual-memoization was
+ *  reporting -- the compiler could not preserve a memo whose inputs it could not see. */
+const GROUP_DEFS = {
+  "1": { label: "Town Centre (Hall 1)", color: "border-rose-500/80 text-rose-400 bg-rose-950/40" },
+  "2": { label: "Mariner (Hall 2)", color: "border-blue-500/80 text-blue-400 bg-blue-950/40" },
+  "3": { label: "Austin Heights (Hall 3)", color: "border-emerald-500/80 text-emerald-400 bg-emerald-950/40" },
+  "4": { label: "Burke Mountain (Hall 4)", color: "border-purple-500/80 text-purple-400 bg-purple-950/40" },
+  "OTHER": { label: "Regional Corridors / Other", color: "border-slate-600 text-slate-400 bg-slate-800/30" }
+};
+
 export function RightSidebar({ 
   rightSidebarOpen, 
   setRightSidebarOpen, 
@@ -24,14 +36,6 @@ export function RightSidebar({
       ...prev,
       [groupId]: !prev[groupId]
     }));
-  };
-
-  const groupDefs = {
-    "1": { label: "Town Centre (Hall 1)", color: "border-rose-500/80 text-rose-400 bg-rose-950/40" },
-    "2": { label: "Mariner (Hall 2)", color: "border-blue-500/80 text-blue-400 bg-blue-950/40" },
-    "3": { label: "Austin Heights (Hall 3)", color: "border-emerald-500/80 text-emerald-400 bg-emerald-950/40" },
-    "4": { label: "Burke Mountain (Hall 4)", color: "border-purple-500/80 text-purple-400 bg-purple-950/40" },
-    "OTHER": { label: "Regional Corridors / Other", color: "border-slate-600 text-slate-400 bg-slate-800/30" }
   };
 
   const groupedClosures = React.useMemo(() => {
@@ -117,10 +121,16 @@ export function RightSidebar({
       .map(hallKey => ({
         unit: hallKey,
         closures: groups[hallKey],
-        ...groupDefs[hallKey]
+        ...GROUP_DEFS[hallKey]
       }))
       .filter(g => g.closures.length > 0);
-  }, [roadClosures, zones, homeHall, filterNoAccess, filterAccessOnly, filterCaution]);
+    // showActiveNow / showNext24h / showNext7d were read by the filter above and missing
+    // from this list. Nothing has ever called their setters -- useMapLayerPreferences
+    // returns them but no control is wired -- so the values never changed and the stale
+    // grouping never showed. Latent, not live, and listed now so that wiring a timeframe
+    // toggle is a UI change rather than a UI change plus a silent bug.
+  }, [roadClosures, zones, homeHall, filterNoAccess, filterAccessOnly, filterCaution,
+      showActiveNow, showNext24h, showNext7d]);
 
   const isExplore = appMode === "EXPLORE";
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode

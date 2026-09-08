@@ -12,6 +12,29 @@ const getApiBaseUrl = () => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+/**
+ * Resolve a server-relative path against the API origin. Absolute URLs pass through.
+ *
+ * The database stores media paths host-relative ("/api/audio/DISP-....wav"). Handed to the
+ * browser as-is, such a path resolves against the *page* origin -- on the kiosk that is
+ * nginx on port 80, which serves the SPA and proxies no /api/ route at all, so the caller
+ * silently receives index.html with a 200. That is how the review panel's audio player came
+ * to report "No decoders for requested formats: text/html" (2026-09-08): measured on the
+ * kiosk, :8000 returned 200 audio/x-wav and :80 returned 200 text/html for the same path.
+ *
+ * This existed three times over -- here in spirit, in dispatchModel.toActiveCall, and
+ * inline in DispatchReview -- and the bug was in the one place that had no copy at all.
+ * CLAUDE.md s1: frontend requests go through API_BASE_URL, never a relative path.
+ *
+ * @param base override for the API origin; the injection seam toActiveCall relies on.
+ */
+export const resolveApiUrl = (path, base = API_BASE_URL) => {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  if (!base) return path;
+  return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 // Dynamic Tile Server Base URL resolution (port 8081 for local containerized PMTiles/MBTiles server)
 const getTileBaseUrl = () => {
   if (import.meta.env.VITE_TILE_BASE_URL) {

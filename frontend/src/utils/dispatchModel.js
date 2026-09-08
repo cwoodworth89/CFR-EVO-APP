@@ -15,6 +15,7 @@
  * between fields that are actually present, never a default that stands in for missing
  * data (CLAUDE.md §6.1).
  */
+import { API_BASE_URL, resolveApiUrl } from '../apiClient';
 
 /** Units, preferring the operator's verified list over what the parser heard. */
 export function resolveUnits(record) {
@@ -31,16 +32,17 @@ export function resolveUnits(record) {
  *
  * Accepts either a raw row or an MQTT payload wrapper (`{ rawRecord }`).
  */
-export function toActiveCall(input, { apiBaseUrl = '' } = {}) {
+// apiBaseUrl defaults to the real origin rather than ''. It is still injectable, but four
+// call sites (App.jsx's review replay and MapBoard's three MQTT handlers) omitted it, and
+// with the old '' default those silently produced an unresolved relative audio_url -- the
+// same defect the review panel's player hit on 2026-09-08, waiting for a second player.
+export function toActiveCall(input, { apiBaseUrl = API_BASE_URL } = {}) {
   if (!input) return null;
   const record = input.rawRecord || input;
   const target = record.target || {};
 
   // Audio is stored as a server-relative path; the kiosk may be a different origin.
-  let audioUrl = record.audio_url || '';
-  if (audioUrl && !audioUrl.startsWith('http') && apiBaseUrl) {
-    audioUrl = `${apiBaseUrl}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
-  }
+  const audioUrl = resolveApiUrl(record.audio_url, apiBaseUrl) || '';
 
   return {
     ...record,

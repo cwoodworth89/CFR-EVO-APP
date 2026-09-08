@@ -16,7 +16,6 @@ import { API_BASE_URL } from '../../apiClient';
 export default function VerificationSidebar({
   selectedCall,
   audioSignedUrl,
-  audioRef,
   verifiedTranscript,
   setVerifiedTranscript,
   verifiedAddress,
@@ -272,7 +271,6 @@ export default function VerificationSidebar({
                 * it. */}
               <audio
                 key={audioSignedUrl || 'no-audio'}
-                ref={audioRef}
                 controls
                 src={audioSignedUrl || undefined}
                 className="w-full h-8 rounded accent-sky-500 bg-slate-900"

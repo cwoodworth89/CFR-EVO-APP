@@ -1,4 +1,5 @@
 import * as turf from '@turf/turf';
+import polylabel from '@mapbox/polylabel';
 import { KNOWN_BUILDINGS } from '../MapConstants';
 
 /**
@@ -8,20 +9,46 @@ import { KNOWN_BUILDINGS } from '../MapConstants';
  * values from a component file is what `react-refresh/only-export-components` flags.
  */
 
-/** Centre of a zone's bounding box, as [lat, lng]. Null when the geometry is unusable. */
-export const getZoneCentroid = (zone) => {
+/**
+ * Where a zone's map-grid number is drawn: the polygon's pole of inaccessibility, as
+ * [lat, lng]. Null when the geometry is unusable.
+ *
+ * This was a bounding-box centre until 2026-09-08, named `getZoneCentroid` but computing
+ * neither a centroid nor anything that stays inside the shape. Measured over all 134 zones
+ * in public/data/zones.json: two labels (126, 134) landed outside their own polygon, 126 by
+ * 2.0 km, and the median label sat 139 m from the shape's visual centre. The zones are
+ * long and bent along the valley, which is exactly the case a bbox centre gets wrong.
+ *
+ * The pole of inaccessibility is the interior point furthest from any edge -- the
+ * cartographic convention for polygon labels, and the only one of the candidates that is
+ * guaranteed inside a concave shape.
+ *
+ * Longitude is scaled by cos(latitude) before the search and unscaled after, because
+ * polylabel measures distance in whatever units it is handed: at 49.3 degrees N a degree of
+ * longitude is 0.65 of a degree of latitude on the ground, so running it on raw degrees
+ * finds the pole of a shape stretched 1.5x east-west.
+ */
+const zoneLabelPointCache = new WeakMap(); // zones are fetched once and never mutated
+
+export const getZoneLabelPoint = (zone) => {
   if (!zone || !zone.geometry || !zone.geometry.coordinates || !zone.geometry.coordinates[0]) return null;
-  const coords = zone.geometry.coordinates[0];
-  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-  coords.forEach(pt => {
-    const lng = pt[0];
-    const lat = pt[1];
-    if (lat < minLat) minLat = lat;
-    if (lat > maxLat) maxLat = lat;
-    if (lng < minLng) minLng = lng;
-    if (lng > maxLng) maxLng = lng;
-  });
-  return [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
+  if (zoneLabelPointCache.has(zone)) return zoneLabelPointCache.get(zone);
+
+  const ring = zone.geometry.coordinates[0];
+  if (ring.length < 3) return null;
+
+  const meanLat = ring.reduce((sum, pt) => sum + pt[1], 0) / ring.length;
+  const k = Math.cos((meanLat * Math.PI) / 180);
+  if (!Number.isFinite(k) || k <= 0) return null;
+
+  // 1e-5 scaled degrees is ~1.1 m on the ground here; the labels are drawn at zoom 13-15,
+  // where 1 m is well under a screen pixel, so tightening it further buys nothing visible.
+  const [x, y] = polylabel([ring.map(pt => [pt[0] * k, pt[1]])], 1e-5);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  const point = [y, x / k];
+  zoneLabelPointCache.set(zone, point);
+  return point;
 };
 
 /**

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Polygon, Marker } from 'react-leaflet';
-import { getZoneCentroid } from './mapGeometry';
+import { getZoneLabelPoint } from './mapGeometry';
 import { createSoftZoneNumberIcon } from './mapIcons';
 
 /**
@@ -62,7 +62,7 @@ export default function ZonesLayer({ zones, visible, currentZoom }) {
       ))}
 
       {showLabels && zones.map((zone) => {
-        const center = getZoneCentroid(zone);
+        const center = getZoneLabelPoint(zone);
         if (!center) return null;
         return (
           <Marker

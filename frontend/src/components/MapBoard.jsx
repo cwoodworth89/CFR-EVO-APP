@@ -51,7 +51,7 @@ import { apiClient, API_BASE_URL } from '../apiClient';
 // helper for road closure type names from Municipal 511
 
 // 🚧 Barricade Icon for Road Closures
-export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "EXPLORE" }) {
+export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   const {
     map, setMap, currentZoom, isOffDefault, userPanned, setUserPanned,
     fitTo, invalidateSoon,
@@ -346,19 +346,13 @@ export default function MapBoard({ onReviewCall, onLaunchKiosk, initialMode = "E
   }, [invalidateSoon, leftSidebarOpen, rightSidebarOpen]);
 
   const startMode = useCallback((mode) => {
-      if (mode === "KIOSK_VIEW") {
-        if (typeof onLaunchKiosk === 'function') {
-          onLaunchKiosk();
-        }
-        return;
-      }
       setAppMode(mode);
       setActiveDispatch(null);
       setTargetAddress(null);
       applyModeDefaults(mode);
       setLeftSidebarOpen(true);
       setRightSidebarOpen(false);
-  }, [onLaunchKiosk, applyModeDefaults]);
+  }, [applyModeDefaults]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">

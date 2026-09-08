@@ -114,7 +114,6 @@ export const OVERLAY_LAYERS = {
 
 export const MODE_DEFAULTS = {
   EXPLORE: "GREY",
-  KIOSK_VIEW: "DARK",
   DRIVER_SETUP: "GREY",
   ADMIN_DISPATCHES: "GREY"
 };

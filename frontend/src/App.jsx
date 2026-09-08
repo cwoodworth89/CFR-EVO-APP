@@ -35,9 +35,14 @@ const ViewLoadingFallback = () => (
 /**
  * The two things this app can be showing.
  *
- * DISPATCH is entered by any of three routes, which is why it was previously three
- * booleans OR'd together at the point of use: a live call arrives, a historical call is
- * replayed for review, or the operator opens the kiosk deliberately from the console.
+ * DISPATCH is entered by either of two routes: a live call arrives, or a historical call
+ * is replayed for review.
+ *
+ * There was a third -- the operator picking "KIOSK: IN-STATION MODE" from the console's
+ * mode select, which showed the kiosk with no call on it. Removed 2026-09-08 (operator):
+ * STANDBY is already the console, and in a real hall the display sleeps between calls
+ * rather than showing an idle screen. The no-call branch in KioskView is kept as a guard,
+ * not a destination.
  */
 // Not exported: App.jsx also exports a component, and a non-component export here trips
 // react-refresh/only-export-components. Move this to its own module when a second file
@@ -49,10 +54,9 @@ const MODE = {
 
 function App() {
   const kioskState = useKioskQueue();
-  const [explicitKioskMode, setExplicitKioskMode] = useState(false);
   const [returnMode, setReturnMode] = useState('EXPLORE');
 
-  const mode = (explicitKioskMode || kioskState.activeCall || kioskState.isReviewMode)
+  const mode = (kioskState.activeCall || kioskState.isReviewMode)
     ? MODE.DISPATCH
     : MODE.STANDBY;
 
@@ -95,27 +99,15 @@ function App() {
     kioskState.triggerReviewCall({ ...toActiveCall(call), isReview: true });
   };
 
-  const extendedKioskState = {
-    ...kioskState,
-    exitReview: () => {
-      kioskState.exitReview();
-      setExplicitKioskMode(false);
-    }
-  };
-
   return (
     <div className="App w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 relative">
       <Suspense fallback={<ViewLoadingFallback />}>
         {mode === MODE.DISPATCH ? (
-          <KioskView kioskState={extendedKioskState} />
+          <KioskView kioskState={kioskState} />
         ) : (
           <MapBoard
             initialMode={returnMode}
             onReviewCall={handleReviewCall}
-            onLaunchKiosk={() => {
-              setReturnMode('EXPLORE');
-              setExplicitKioskMode(true);
-            }}
           />
         )}
       </Suspense>

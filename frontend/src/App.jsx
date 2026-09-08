@@ -56,9 +56,11 @@ function App() {
   const kioskState = useKioskQueue();
   const [returnMode, setReturnMode] = useState('EXPLORE');
 
-  const mode = (kioskState.activeCall || kioskState.isReviewMode)
-    ? MODE.DISPATCH
-    : MODE.STANDBY;
+  // Keyed on activeCall alone. isReviewMode used to be OR'd in here, which meant a review
+  // replay could hold the screen on KioskView with nothing to draw; that state rendered the
+  // idle screen, and the idle screen is gone (operator 2026-09-08: a finished call drops
+  // back to Explore). triggerReviewCall sets both in one event, so a replay still shows.
+  const mode = kioskState.activeCall ? MODE.DISPATCH : MODE.STANDBY;
 
   // Where the screen goes when a live call ends depends on HOW it ended (punch-list #37,
   // operator 2026-08-23):

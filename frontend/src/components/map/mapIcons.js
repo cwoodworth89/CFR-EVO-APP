@@ -56,9 +56,12 @@ export const targetIcon = L.divIcon({
 });
 
 /** Unobtrusive numeric label for an emergency response zone. */
-export const createSoftZoneNumberIcon = (zoneId) => L.divIcon({
+/** @param onImagery true when the base layer is the City orthophoto, which is dark and
+ *  busy enough that near-black text disappears into it (operator, 2026-09-08). The street
+ *  basemaps are pale, so the number stays dark there. */
+export const createSoftZoneNumberIcon = (zoneId, onImagery = false) => L.divIcon({
   className: 'soft-zone-number-marker',
-  html: `<div style="display:flex;align-items:center;justify-content:center;color:#0f172a;font-weight:800;font-size:12px;font-family:ui-monospace, SFMono-Regular, monospace;pointer-events:none;user-select:none;opacity:0.85;white-space:nowrap;line-height:1;">${zoneId}</div>`,
+  html: `<div style="display:flex;align-items:center;justify-content:center;color:${onImagery ? '#ffffff' : '#0f172a'};text-shadow:${onImagery ? '0 1px 3px rgba(0,0,0,.9)' : 'none'};font-weight:800;font-size:12px;font-family:ui-monospace, SFMono-Regular, monospace;pointer-events:none;user-select:none;opacity:0.85;white-space:nowrap;line-height:1;">${zoneId}</div>`,
   iconSize: [32, 16],
   iconAnchor: [16, 8]
 });

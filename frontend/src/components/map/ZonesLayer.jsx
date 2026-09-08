@@ -45,7 +45,7 @@ function getZoneStyle(zone) {
   };
 }
 
-export default function ZonesLayer({ zones, visible, currentZoom }) {
+export default function ZonesLayer({ zones, visible, currentZoom, onImagery = false }) {
   if (!visible || !Array.isArray(zones) || currentZoom >= 16) return null;
 
   const showLabels = currentZoom >= 13;
@@ -68,7 +68,7 @@ export default function ZonesLayer({ zones, visible, currentZoom }) {
           <Marker
             key={`zone-num-${zone.zone_id}`}
             position={center}
-            icon={createSoftZoneNumberIcon(zone.zone_id)}
+            icon={createSoftZoneNumberIcon(zone.zone_id, onImagery)}
             interactive={false}
             pane="labelsPane"
           />

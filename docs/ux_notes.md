@@ -18,7 +18,7 @@ decide from.
 | **Kiosk view** | the crew, for the minutes between the tones and rolling out | `frontend/src/components/kiosk/KioskView.jsx`: banner, route map with a floating details box, a three-panel stack on the right |
 | **Workstation / Explore** | the operator at a desk: searching an address, setting an arrival point, a Street View | `MapBoard.jsx` with the left controls and the `DetailStack` on the right |
 | **Review screen** | the operator verifying calls, which feeds the training data and the hotwords | `DispatchReview.jsx`, `review/*` |
-| **Driver station setup** | nobody yet (#60, deferred pending redesign) | `DriverStationSetup.jsx` |
+| **Mobile setup** | nobody yet (#60, deferred pending redesign) | `DriverStationSetup.jsx`, reached only from the console's **MOBILE SETUP** button since 2026-09-08 |
 
 The kiosk runs snap Chromium in kiosk mode on Wayland on the hall machine; the operator also
 opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day are
@@ -42,6 +42,7 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 | *"I don't like the pop up boxes there. It makes it hard to understand the route. … show ALL the hydrants on the main route map, but only at a certain close in zoom."* (2026-09-07) | Picks are small numbered badges, no label box; the full hydrant layer draws on the route map from zoom 16 | — |
 | *"Hydrants aren't being calculated or displayed on the main screen anymore."* | Picked by the operator's rule (§4 below), listed in the details box with how each was chosen | — |
 | *"I'd rather have 'unknown' rather than guesses."* (2026-09-05) | The rule behind every empty state on the kiosk: the Tier 1 card, *(as heard)*, *NO HYDRANT WITHIN 1,000 FT*, *Awaiting location* | — |
+| *"I'm not sure the value of a dedicated Kiosk Mode. I think the standby situation should be what is currently called Notifications/Explore."* … *"Calls should drop back down to the homepage explore/notifications."* (2026-09-08) | The kiosk's no-call idle screen is deleted and `KIOSK: IN-STATION MODE` is off the mode select. `App.jsx` now keys on `activeCall` alone, so a finished, closed or timed-out call lands on Explore. The idle screen's *DB Sync: Connected* and *Audio Card: Listening (UCA202)* badges were hardcoded strings that would have read green with the agent stopped (§6.1); they went with it | The hall display's between-calls behaviour is now a deployment question, not a screen — §3.8 |
 
 ### Review screen
 
@@ -57,6 +58,9 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 |:--|:--|:--|
 | *"It would be nice to see hydrants to a given address."* | A searched address shows its picks and the arrival-point section | — |
 | Arrival points could only be set by SQL (#49) | *Set arrival point* on the target card: click the map, note, name, save; attributed | The worst-first review queue is a CSV, not a screen |
+| *"we can get rid of driver push setups from the dropdown menu. It's handled by the button Driver Alerts. But I think the name of that button needs to change to be more intuitive. Mobile Alerting? Mobile Setup?"* (2026-09-08) | `MOBILE: DRIVER PUSH SETUP` is off the mode select; the button is **📱 MOBILE SETUP**. The screen is a one-time QR pairing page, not a live alert feed, which is what *DRIVER ALERTS* read like. The select is now two entries, Explore and Admin | The screen behind it is still the #60 placeholder, still publishing the wrong ntfy topic |
+| *"the emergency zone numbers as rendered are not very centred of their polygon outline"* (2026-09-08) | They were placed by `getZoneCentroid`, which computed a bounding-box centre despite the name. Over the 134 zones that put two labels (126, 134) **outside their own polygon**, 126 by 2.0 km, the median 139 m off. Now the pole of inaccessibility (`@mapbox/polylabel`), longitude scaled by cos(lat) first so the search is not run on a shape stretched 1.5× east–west. Verified through the shipped path: 0 outside, median label moves 121 m, zone 126 moves 1.77 km | — |
+| *"when I switch to aerial map view, the black labels are difficult to see"* (2026-09-08) | Zone numbers turn white with a soft shadow when the base layer is the City orthophoto, and stay near-black on the pale street basemaps. One `baseStyle` expression in `MapBoard.jsx` feeds both the basemap and the overlay, so they cannot disagree | The picked-hydrant badges are also near-black, but on a filled NFPA-coloured circle with a white ring, so they read on any base. Not raised |
 
 Observed, not yet raised with the operator: in the address search, **Enter does not pick the
 suggestion**; the row has to be clicked. Every automated run of the search hit this.
@@ -95,8 +99,15 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    Post-freeze.
 6. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
    solid and the others translucent. Operator's idea, on the post-freeze backlog.
-7. **The review rating from the kiosk** (#52a) and **the driver station setup** (#60): both
+7. **The review rating from the kiosk** (#52a) and **the mobile setup screen** (#60): both
    need a spec before design.
+8. **What the hall display does between calls.** Operator, 2026-09-08: *"In real deployment,
+   I would probably have the TV go to a sleep/standby, with CEC wakeup or some other
+   method."* Removing the kiosk idle screen settled the software half — the browser sits on
+   Explore — and left the hardware half open. CEC wake on a dispatch is a kiosk-machine
+   concern (`cec-utils` against the snap Chromium session), not a React one, and nothing has
+   been measured: how long the TV takes to wake, and whether that delay lands before or after
+   the phase-1 publish at 16–19 s, decides whether it is usable at all. Not built.
 
 ---
 

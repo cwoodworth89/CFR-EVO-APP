@@ -4,7 +4,6 @@ import BlockParcelPanel from './BlockParcelPanel';
 import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
-import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { STATIONS } from '../MapConstants';
 
 // Color coding tone matching: Engine = Orange, Rescue = Red, Ladder = Cyan, Chief = Gold, Medic = Emerald
@@ -22,7 +21,6 @@ function getUnitIcon(unit) {
 }
 
 export default function KioskView({ kioskState }) {
-  const isOnline = useOnlineStatus();
 
   const {
     activeCall,
@@ -42,53 +40,13 @@ export default function KioskView({ kioskState }) {
 
   const [showPrePlanModal, setShowPrePlanModal] = useState(false);
 
-  // Station Idle Monitor Screen
-  if (!activeCall) {
-    return (
-      <div className="fixed inset-0 bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 z-50 select-none">
-        <div className="flex flex-col items-center gap-5 text-center max-w-lg">
-          <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-4xl shadow-inner">
-            🚒
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Coquitlam Fire Rescue Kiosk</h1>
-          <p className="text-sm text-slate-400 font-medium">In-Station Dispatch Monitor Active • Listening for Radio Feed & Database Events...</p>
-          
-          {/* Centered Vertically Stacked System Health Indicators */}
-          <div className="flex flex-col items-center justify-center gap-2 w-full mt-2">
-            {/* DB Real-Time Sync Badge */}
-            <div className="flex items-center justify-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-4 py-1.5 rounded-full shadow-sm w-72">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>DB Sync: Connected</span>
-            </div>
-
-            {/* Audio Card Listener Status Badge */}
-            <div className="flex items-center justify-center gap-2 text-xs font-mono text-sky-400 bg-sky-950/60 border border-sky-800/60 px-4 py-1.5 rounded-full shadow-sm w-72">
-              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-              <span>🎙️ Audio Card: Listening (UCA202)</span>
-            </div>
-
-            {/* WAN Connection Status Badge */}
-            <div className={`flex items-center justify-center gap-2 text-xs font-mono px-4 py-1.5 rounded-full shadow-sm border w-72 ${
-              isOnline
-                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'
-                : 'text-amber-300 bg-amber-950/80 border-amber-600/80 animate-pulse'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span>🌐 WAN: {isOnline ? 'Connected' : 'Offline (Failsafe)'}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={exitReview}
-            className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-semibold text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
-          >
-            <span>🚪</span>
-            <span>Exit Kiosk View</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // There is no no-call branch here on purpose. KioskView is only ever mounted with a
+  // call on it: App.jsx sends the screen back to STANDBY (the console) the moment
+  // activeCall clears, whether the countdown ran out, the operator closed it, or a review
+  // replay ended. The idle screen this replaced was reachable only from the mode select
+  // that was removed the same day, and it reported "DB Sync: Connected" and "Audio Card:
+  // Listening" as hardcoded strings, which would have read green with the agent stopped
+  // (CLAUDE.md s6.1). Operator, 2026-09-08: calls drop back to Explore.
 
   // Response classification. Coquitlam transmits "respond routine" / "respond
   // emergency"; those two strings are what the parser emits and what

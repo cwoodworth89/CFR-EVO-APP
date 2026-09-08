@@ -354,6 +354,14 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
       setRightSidebarOpen(false);
   }, [applyModeDefaults]);
 
+  // One expression for which base layer is actually drawn, so the overlays that have to
+  // read against it -- the zone numbers -- cannot disagree with it.
+  const baseStyle = (appMode === "EXPLORE" && mapStyle === "SATELLITE")
+    ? "SATELLITE"
+    : (showLabels && currentZoom >= 16) ? "GREY"
+    : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER"
+    : "GREY";
+
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
       
@@ -406,7 +414,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
               maxBounds={OPERATIONAL_BOUNDS}
               maxBoundsViscosity={1.0}
               mapRef={setMap}
-              baseStyle={(appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : (showLabels && currentZoom >= 16) ? "GREY" : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER" : "GREY"}
+              baseStyle={baseStyle}
               showCadastral={showLabels && !cadastralError}
               onCadastralError={() => setCadastralError(true)}
               showFireHalls={showFireHalls}
@@ -416,7 +424,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
               showHydrants={showHydrants}
               hydrantHighlightIds={hydrantHighlightIds}
           >
-            <ZonesLayer zones={zones} visible={showZones} currentZoom={currentZoom} />
+            <ZonesLayer zones={zones} visible={showZones} currentZoom={currentZoom} onImagery={baseStyle === "SATELLITE"} />
 
             {/* AT-GRADE RAILROAD CROSSINGS LAYER */}
             <RailroadCrossingsLayer visible={showRailroadCrossings} />

@@ -19,6 +19,12 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
     if (dispatches && dispatches.length > 0 && !selectedCall) {
       setSelectedCall(dispatches[0]);
     }
+    // Intentional: seeds a default selection when the list first arrives. selectedCall is
+    // read only as the "nothing chosen yet" guard, never as an input. Listing it is a
+    // no-op today -- setSelectedCall is called nowhere else, so the value never returns to
+    // null -- but it would turn a later "clear selection" control into an immediate
+    // re-seed back to dispatches[0]. Verified 2026-09-08.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatches]);
 
   const fetchMetrics = async () => {

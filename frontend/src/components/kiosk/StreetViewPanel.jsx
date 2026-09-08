@@ -84,7 +84,6 @@ export default function StreetViewPanel({ activeCall }) {
     // Intentional: clear the previous address's override before the new lookup
     // resolves, so a stale Street View heading is never shown against a new
     // incident. The cascading render is the point, not an oversight.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDbOverride(null);
     if (!cleanAddrKey) return;
 
@@ -191,7 +190,6 @@ export default function StreetViewPanel({ activeCall }) {
 
     // Intentional: the panorama mounts asynchronously via the Google SDK and this
     // marks the loading state before that begins.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
 
     const initPanorama = () => {
@@ -381,6 +379,18 @@ export default function StreetViewPanel({ activeCall }) {
       if (targetContainer) targetContainer.innerHTML = '';
       panoramaRef.current = null;
     };
+    // Intentional: this effect CONSTRUCTS the panorama, so it must not re-run when the
+    // saved view changes -- that would tear down and rebuild the panorama under the
+    // operator, which is the failure the separate effect below was written to avoid. That
+    // effect owns frontLat, frontLng, initialHeading, initialPitch and initialPanoId and
+    // pushes them onto the live panorama instead.
+    //
+    // Known gap, recorded rather than fixed (CLAUDE.md s6.6): initialZoom is the sixth
+    // name in this warning and is the one the update effect does NOT carry. It is applied
+    // at construction and reaches currentPovRef, so a saved zoom is preserved on save and
+    // on any later remount, but a zoom override arriving while the panorama is already
+    // mounted is not applied to what the operator sees. Verified 2026-09-08.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleanAddrKey, isExpanded, apiKey, isOnline, sdkError]);
 
   // Smooth POV & Location update when dbOverride arrives

@@ -254,6 +254,13 @@ export default function DispatchReview({ onClose, onReviewCall }) {
       prevAudioUrlRef.current = null;
       prevSelectedCallIdRef.current = null;
     }
+    // Intentional: keyed on the call's identity and its audio, not on the whole
+    // selectedCall object. This effect drives ~15 setVerified* setters from the stored
+    // record. Listing selectedCall would re-run it whenever the parent re-renders with a
+    // new object identity -- mid-review, that overwrites whatever the reviewer has typed
+    // with the values they were correcting. The isDifferentCall ref guard inside exists
+    // for the same reason, at a finer grain. Verified 2026-09-08.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCall?.id, selectedCall?.audio_url]);
 
   const handleSelectCall = (call) => {

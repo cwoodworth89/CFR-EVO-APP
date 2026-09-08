@@ -124,13 +124,42 @@ Install Nginx:
 sudo apt update
 sudo apt install nginx -y
 ```
-Configure Nginx to serve the build on port 80. Edit `/etc/nginx/sites-available/default`:
+Configure Nginx to serve the build on port 80. On the current kiosk the enabled site is
+`/etc/nginx/sites-available/cfr-evo`, symlinked from `sites-enabled/default` — check with
+`ls -la /etc/nginx/sites-enabled/` before editing, because the filename is not `default`:
+
 ```nginx
 server {
     listen 80 default_server;
     root /home/YOUR_USERNAME/CFR-EVO-APP/frontend/dist;
     index index.html;
     server_name _;
+
+    # FastAPI gateway on :8000.
+    #
+    # Without this block a relative /api/... request served from port 80 falls through to
+    # the SPA rule below and is answered with index.html and a 200 -- not a 404, so nothing
+    # reports a failure. That is how the review panel's audio player came to be handed HTML
+    # and asked to decode it as audio (2026-09-08). The frontend reaches :8000 directly via
+    # API_BASE_URL and does not depend on this block; it is here so the silent-HTML failure
+    # mode cannot come back.
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;   # no URI part: the original path passes through
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Recordings are streamed and seeked within by the review player; buffering the
+        # whole response before sending defeats range requests.
+        proxy_buffering off;
+
+        # Measured on the kiosk 2026-09-08: recordings are 16 kHz mono 16-bit PCM
+        # (32 kB/s), largest of 609 stored files 2.40 MB / 74.9 s. 16m is 8m32s of audio.
+        # nginx's 1 MB default would reject a median 48-second call at /api/audio/upload.
+        client_max_body_size 16m;
+    }
 
     location / {
         try_files $uri $uri/ /index.html;
@@ -139,9 +168,9 @@ server {
 ```
 *(Replace `YOUR_USERNAME` with your actual Ubuntu/Lubuntu username).*
 
-Restart Nginx:
+Validate and reload — `reload` rather than `restart`, so in-flight requests finish:
 ```bash
-sudo systemctl restart nginx
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ### 2. Configure the Python Agent Service

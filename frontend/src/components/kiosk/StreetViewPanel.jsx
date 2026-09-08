@@ -37,6 +37,11 @@ import { apiClient } from '../../apiClient';
 const fovToZoom = (fov) => Math.log2(180 / Math.min(Math.max(Number(fov) || 90, 10), 180));
 const zoomToFov = (zoom) => Math.round(180 / Math.pow(2, Number(zoom) || 0));
 const clampStaticFov = (fov) => Math.min(Math.max(Math.round(Number(fov) || 90), 10), 120);
+// Zoom bounds for the interactive panorama, derived from clampStaticFov above rather than
+// picked: zoomToFov(1) is 90 degrees and zoomToFov(4) is 11, both inside the Static API's
+// 10..120, so the compact tile and the expanded panorama can render the same saved view.
+// Zoom 0 would be 180 degrees, which the Static API cannot express.
+const clampPanoZoom = (zoom) => Math.min(Math.max(Number(zoom) || 1, 1), 4);
 
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
@@ -201,7 +206,7 @@ export default function StreetViewPanel({ activeCall }) {
       try {
         const panoOptions = {
           pov: { heading: initialHeading, pitch: initialPitch },
-          zoom: Math.min(Math.max(initialZoom, 1), 4),
+          zoom: clampPanoZoom(initialZoom),
           fullscreenControl: false,
           addressControl: false,
           panControl: false,
@@ -385,11 +390,10 @@ export default function StreetViewPanel({ activeCall }) {
     // effect owns frontLat, frontLng, initialHeading, initialPitch and initialPanoId and
     // pushes them onto the live panorama instead.
     //
-    // Known gap, recorded rather than fixed (CLAUDE.md s6.6): initialZoom is the sixth
-    // name in this warning and is the one the update effect does NOT carry. It is applied
-    // at construction and reaches currentPovRef, so a saved zoom is preserved on save and
-    // on any later remount, but a zoom override arriving while the panorama is already
-    // mounted is not applied to what the operator sees. Verified 2026-09-08.
+    // All six names in this warning are owned by that effect, initialZoom included. It was
+    // the one exception until 2026-09-08: applied at construction and carried in
+    // currentPovRef, so a saved zoom survived a save and a remount, but a zoom arriving
+    // while the panorama was already mounted never reached what the operator saw.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleanAddrKey, isExpanded, apiKey, isOnline, sdkError]);
 
@@ -397,11 +401,22 @@ export default function StreetViewPanel({ activeCall }) {
   useEffect(() => {
     if (!panoramaRef.current || !window.google || !window.google.maps) return;
 
+    // Zoom is not part of StreetViewPov -- the SDK carries it separately, which is why
+    // setPov above cannot deliver it and why the save path reads it back through getZoom.
+    // Feature-guarded like that getZoom call: this is a runtime SDK, so nothing pins the
+    // surface we are calling (CLAUDE.md s7.3a).
+    const applyZoom = () => {
+      if (typeof panoramaRef.current?.setZoom === 'function') {
+        panoramaRef.current.setZoom(clampPanoZoom(initialZoom));
+      }
+    };
+
     try {
       const svService = new window.google.maps.StreetViewService();
       if (initialPanoId) {
         panoramaRef.current.setPano(initialPanoId);
         panoramaRef.current.setPov({ heading: initialHeading, pitch: initialPitch });
+        applyZoom();
         panoramaRef.current.setVisible(true);
       } else {
         svService.getPanorama({
@@ -413,6 +428,7 @@ export default function StreetViewPanel({ activeCall }) {
           if (status === window.google.maps.StreetViewStatus.OK && data && data.location && panoramaRef.current) {
             panoramaRef.current.setPano(data.location.pano);
             panoramaRef.current.setPov({ heading: initialHeading, pitch: initialPitch });
+            applyZoom();
             panoramaRef.current.setVisible(true);
           }
         });
@@ -420,7 +436,7 @@ export default function StreetViewPanel({ activeCall }) {
     } catch (e) {
       console.warn("Failed to update active panorama POV:", e);
     }
-  }, [frontLat, frontLng, initialHeading, initialPitch, initialPanoId]);
+  }, [frontLat, frontLng, initialHeading, initialPitch, initialPanoId, initialZoom]);
 
   // Save Preferred View handler reading camera vector from currentPovRef.current
   const handleSaveView = async () => {

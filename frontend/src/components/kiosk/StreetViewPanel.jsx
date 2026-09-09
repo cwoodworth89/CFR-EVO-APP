@@ -458,6 +458,25 @@ export default function StreetViewPanel({ activeCall }) {
       }
     };
 
+    // Re-applying a view the panorama already holds is a visible jolt for no gain: every
+    // save re-enters this effect (the payload becomes dbOverride), and setPano/setPov then
+    // reload and re-aim a camera that is already exactly there. The operator sees that as a
+    // snap right when they press Save. This effect exists to push a view that ARRIVED from
+    // the database onto the panorama, so when the panorama is already showing it, there is
+    // nothing to push. Heading and pitch are stored as whole degrees, hence the 0.5
+    // tolerance; zoom is stored at full precision.
+    const alreadyShowing = () => {
+      const p = panoramaRef.current;
+      if (!p || typeof p.getPov !== 'function' || typeof p.getZoom !== 'function') return false;
+      if (initialPanoId && typeof p.getPano === 'function' && p.getPano() !== initialPanoId) return false;
+      const pov = p.getPov();
+      if (!pov || !Number.isFinite(pov.heading)) return false;
+      return Math.abs(pov.heading - initialHeading) < 0.5
+          && Math.abs(pov.pitch - initialPitch) < 0.5
+          && Math.abs(p.getZoom() - initialZoom) < 1e-6;
+    };
+    if (alreadyShowing()) return;
+
     try {
       const svService = new window.google.maps.StreetViewService();
       if (initialPanoId) {
@@ -544,25 +563,26 @@ export default function StreetViewPanel({ activeCall }) {
       // Degrees, and degrees only. This used to send the zoom level (0-4) and the database
       // held "fov 1" for a 90-degree view (#35a, 2026-09-06).
       //
-      // clampStaticFov here means THE STORED ANGLE IS ONE BOTH SURFACES CAN DRAW. The SDK
-      // lets the operator frame wider than the Static API can render -- 180 degrees in
-      // Firefox, 127 in Chrome, against the tile's 120 maximum -- and storing that produced
-      // a tile 60 degrees narrower than the panel it was saved from (2026-09-08).
+      // NOT clamped, and that is an operator ruling rather than an oversight (2026-09-08).
       //
-      // This is a clamp at SAVE, which is the one place it works. Clamping the wheel fought
-      // the SDK forever (see the header). Clamping on LOAD rewrites a stored view behind
-      // the operator's back. Clamping once, here, settles the panorama onto the value the
-      // tile will actually request -- so the view left on screen after a save is the view
-      // the crew will see, and reopening the panel reproduces it exactly.
+      // The SDK lets the operator frame wider than the Static API can render -- 180 degrees
+      // in Firefox, 127 in Chrome, against the tile's 120 maximum. Both resolutions were
+      // built and tried the same evening, so the losing one is recorded here too:
       //
-      // The rounding is the same reason: the tile's URL takes whole degrees, so storing
-      // anything finer would store a number the tile cannot honour.
+      //   Clamp at save, so the stored angle is one both surfaces can draw and the panorama
+      //   settles onto the tile's framing. REJECTED -- "snapping closer than acceptable".
+      //   Pulling a 180-degree framing back to 120 discards the width being zoomed out for,
+      //   which for fitting a whole building is the point of the exercise.
+      //
+      //   Store what was framed, which is this. ACCEPTED. Above 120 degrees the tile is
+      //   narrower than the panel it was saved from; the expanded panel is the framing tool
+      //   and is trusted, the tile is a thumbnail doing its best.
       //
       // A `zoom` key rode alongside until 2026-09-08 and was never stored -- neither
       // public.parcels nor ParcelCameraOverrideSchema has such a field, so Pydantic dropped
       // it. Removing it also makes the state right after a save identical to the state
       // after a reload, since both now derive zoom from the one saved angle.
-      fov: clampStaticFov(zoomToFov(currentZoom)),
+      fov: zoomToFov(currentZoom),
       pano_id: currentPanoId
     };
 

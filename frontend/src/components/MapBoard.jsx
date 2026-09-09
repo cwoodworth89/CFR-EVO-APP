@@ -466,6 +466,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 targetPolygon={targetPolygon}
                 targetCoords={targetCoords}
                 nearestHydrants={nearestHydrants}
+                currentZoom={currentZoom}
                 originStation={STATIONS[homeHall]}
                 onRouteCalculated={setRouteCoordinates}
               />

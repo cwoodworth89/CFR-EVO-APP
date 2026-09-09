@@ -1,6 +1,8 @@
 import React from 'react';
-import { Polygon, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
+import { Polygon, Polyline, CircleMarker } from 'react-leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
+import PickedHydrantsLayer from './PickedHydrantsLayer';
+import { CADASTRAL_MIN_ZOOM } from '../MapConstants';
 
 /**
  * Everything the map draws for an active dispatch target: the parcel outline, the
@@ -19,6 +21,7 @@ export default function DispatchTargetLayer({
   targetPolygon,
   targetCoords,
   nearestHydrants = [],
+  currentZoom = 0,
   originStation,
   onRouteCalculated,
 }) {
@@ -45,7 +48,7 @@ export default function DispatchTargetLayer({
             }}
           />
         ))}
-      {targetPolygon && (
+      {targetPolygon && currentZoom >= CADASTRAL_MIN_ZOOM && (
         <Polygon 
           positions={targetPolygon} 
           pathOptions={{ 
@@ -74,37 +77,10 @@ export default function DispatchTargetLayer({
           marks the arrival point on the street (operator, 2026-09-08: "we can get rid of that
           target emoji"). */}
 
-      {/* Highlight Top 3 closest hydrants (No tracer line) */}
-      {nearestHydrants.map((hyd, idx) => {
-        const isPrimary = idx === 0;
-        return (
-          <CircleMarker 
-            key={`${hyd.gisId}-${idx}`}
-            center={[hyd.lat, hyd.lng]} 
-            radius={isPrimary ? 16 : 12} 
-            pathOptions={{ 
-              color: isPrimary ? '#06b6d4' : '#c084fc', // Cyan for closest, Lavender for others
-              fillColor: isPrimary ? '#22d3ee' : '#e9d5ff', 
-              fillOpacity: isPrimary ? 0.15 : 0.1, 
-              weight: isPrimary ? 2 : 1.5,
-              className: isPrimary ? 'animate-pulse' : '' 
-            }} 
-          >
-            <Tooltip direction="top" className="font-bold text-xs bg-slate-950 text-white border border-slate-800 p-2 shadow-xl">
-              <div className="flex flex-col gap-0.5" style={{ minWidth: '120px' }}>
-                <span className={`text-[9px] uppercase font-mono tracking-wider ${isPrimary ? 'text-cyan-400' : 'text-purple-400'}`}>
-                  {isPrimary ? 'NEAREST HYDRANT' : `HYDRANT OPTION #${idx + 1}`}
-                </span>
-                <span className="text-white text-sm font-bold">{hyd.gisId}</span>
-                <span className="text-slate-400 text-[10px] mt-1 font-mono">Distance: {hyd.distance}m</span>
-                {hyd.flowClass && (
-                  <span className="text-sky-400 text-xs font-semibold">Flow Class: {hyd.flowClass}</span>
-                )}
-              </div>
-            </Tooltip>
-          </CircleMarker>
-        );
-      })}
+      {/* The picked hydrants as solid numbered dots, the same badges the kiosk draws. The
+          translucent rings that were here read as clutter at city zoom (operator,
+          2026-09-08: "keep them the solid dots"). */}
+      <PickedHydrantsLayer picks={nearestHydrants} />
 
       {originStation && (
         <RoutingOverlay 

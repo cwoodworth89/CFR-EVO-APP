@@ -6,7 +6,7 @@ import { RoutingOverlay } from '../RoutingOverlay';
 import MapSurface from '../map/MapSurface';
 import RoadClosuresLayer from '../map/RoadClosuresLayer';
 import { useRoadClosures } from '../../hooks/useRoadClosures';
-import { BASE_LAYERS } from '../MapConstants';
+import { BASE_LAYERS, CADASTRAL_MIN_ZOOM } from '../MapConstants';
 import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
@@ -71,6 +71,19 @@ function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef }) {
     });
   }, [map, origin, destination, callKey, fittingRef, panelRef]);
 
+  return null;
+}
+
+// Reports the map's zoom to the panel, for the layers that only make sense once the
+// cadastral lines are on screen.
+function ZoomWatcher({ onZoom }) {
+  const map = useMap();
+  useEffect(() => {
+    const sync = () => onZoom(map.getZoom());
+    map.on('zoomend', sync);
+    sync();
+    return () => map.off('zoomend', sync);
+  }, [map, onZoom]);
   return null;
 }
 
@@ -150,6 +163,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const panelRef = useRef(null);
   // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
   const [routeCoords, setRouteCoords] = useState([]);
+  const [mapZoom, setMapZoom] = useState(13);
 
   // Reset view state when the active call changes.
   //
@@ -511,11 +525,12 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
+        <ZoomWatcher onZoom={setMapZoom} />
 
         {/* The parcel outline, soft blue, as the workstation draws it: rings of [lng, lat]
             from the resolver (operator, 2026-09-08: "the target parcel had a soft blue
             shading"). No rings, no outline -- a junction or a withheld location draws none. */}
-        {parcelRings && (
+        {parcelRings && mapZoom >= CADASTRAL_MIN_ZOOM && (
           <Polygon
             positions={parcelRings}
             pathOptions={{ color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.15, weight: 2, dashArray: '4,4' }}

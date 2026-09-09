@@ -11,6 +11,13 @@ export const OPERATIONAL_BOUNDS = [
 
 // 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps via mbtileserver on port 8081)
 // Serves directly from containerized local MBTiles server (cfr_tiles) with zero WAN dependencies
+// Where the cadastral tile set begins: read from the tile server's own metadata
+// (`/services/cadastral`: minzoom 14, maxzoom 20, checked 2026-09-08), not chosen. Below
+// it there are no parcel lines on the map, so the target parcel's soft shading, which is
+// meant to sit inside those lines, is not drawn either (operator, 2026-09-08: "the soft
+// shading should only appear when the cadastral layer kicks on. That looks messy").
+export const CADASTRAL_MIN_ZOOM = 14;
+
 export const BASE_LAYERS = {
   // THE street basemap. There is one, and this is it.
   //

@@ -36,6 +36,7 @@ is to make routing **right for fire apparatus and right for this city**, on evid
 |:--|:--|
 | Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend`, `osrm-routed --algorithm mld /data/vancouver.osrm`), port 5000 |
 | Data | kiosk `backend/data/osrm/`: `vancouver.osm.pbf` (a BBBike extract, map data of 2026-08-07, file of 2026-08-14, git-ignored) and the `.osrm` graph built from it by OSRM v26.8.0 with the stock `car.lua` — answered 2026-09-08, below |
+| Profile | `backend/osrm/profiles/apparatus.lua`, the vendored `car.lua` (`docs/standards/osrm/`) with the operator's rulings, each hunk cited; `backend/scripts/build_osrm_graph.sh` builds a graph beside the served one and records what built it |
 | Service code | `services/gis/src/gis_service/routing_engine.py` (OSRM client, hall apron departure, staged `APPARATUS_TIERS` — staged, not applied, §6.4) |
 | API | `backend/api/routers/routing.py`; the frontend's `RoutingOverlay.jsx` calls `/api/route` |
 | Frontend | `frontend/src/components/RoutingOverlay.jsx`, `frontend/src/utils/EVORoutingEngine.js` (ETAs per unit from OSRM metrics), the kiosk's `RouteOverviewPanel.jsx` and the workstation's `DispatchTargetLayer.jsx` consume the route |
@@ -119,10 +120,14 @@ is to make routing **right for fire apparatus and right for this city**, on evid
    the Pinetree/Guildford junction above. The operator ruled on it the same day: the sign is
    no right on red, the relation is mistagged, and the fix is upstream in OSM. Their rulings
    on what the profile may change are quoted in punch-list #1, turn restrictions included
-   (ignored: the turns are made under lights and siren). The rule set is fully specified and
-   not yet applied; the speed table is the one thing still unsourced. The item stays open on
-   the measured profile change, and on any other dispatch id they name with a route they
-   would not drive.
+   (ignored: the turns are made under lights and siren). `backend/osrm/profiles/apparatus.lua`
+   is that rule set on the vendored `car.lua`, built beside the served graph by
+   `backend/scripts/build_osrm_graph.sh` and **measured 2026-09-09 against the baseline: 820 of
+   2,248 routes moved, 562 of them the Hall 2 apron (a fire lane in OSM), all 24 loops gone,
+   nothing slower by more than 11 s** — the second `routing` row, and the table in punch-list
+   #1. Not deployed; the deploy steps are there too. The speed table is the one thing still
+   unsourced. The item stays open on the operator's deploy decision, and on any other dispatch
+   id they name with a route they would not drive.
 
 ## First hour, as originally written
 

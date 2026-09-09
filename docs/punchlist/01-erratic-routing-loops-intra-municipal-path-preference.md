@@ -136,11 +136,61 @@ not to make one; it is no longer forbidden to.
 lines 169–188, OSRM's own figures, not measured for this city or these vehicles), which is a
 measurement, not a ruling.
 
-Sequence from here: derive `apparatus.lua` from the vendored `car.lua` with each change cited
-to a line above; rebuild the graph on the kiosk at an announced moment (the brief, *The kiosk,
-shared with another agent*); route the corpus against the 2026-09-09 baseline with
-`tools/route_corpus_baseline.py --baseline`; the operator sees every route that moved before
-it goes live.
+### Measured, 2026-09-09: `apparatus.lua` against the baseline
+
+[`backend/osrm/profiles/apparatus.lua`](../../backend/osrm/profiles/apparatus.lua) is the
+vendored `car.lua` with the four hunks above, each citing its ruling
+(`diff docs/standards/osrm/car.lua backend/osrm/profiles/apparatus.lua`). Built on the kiosk as
+`apparatus.osrm` beside the served graph by
+[`backend/scripts/build_osrm_graph.sh`](../../backend/scripts/build_osrm_graph.sh) (ten seconds
+on this extract; `apparatus.build.txt` records the image digest, profile md5 and command) and
+served on port 5001 by the container `cfr_osrm_trial`. The corpus was routed against it and
+diffed against the stock baseline with `tools/route_corpus_baseline.py --baseline`; the second
+`routing` row in `evaluation_history` (git `afa05f2`) is the record. **Not deployed.**
+
+| | stock `car.lua` | `apparatus.lua` |
+|:--|--:|--:|
+| routes returned | 2,248 of 2,248 | 2,248 of 2,248 |
+| routes that pass a node twice | 24 | **0** |
+| routes with a U-turn step (from a hall that responded) | 180 (48) | 185 (44) |
+| dispatched median | 2.39 km, 3.9 min | 2.39 km, 3.8 min |
+| routes that moved | | 820 (216 from a hall that responded) |
+
+What the 820 are:
+
+* **562 are every Hall 2 route, and they are the fire-lane ruling at the hall's own door.** OSM
+  maps Hall 2's apron as way 1271180042, `service=emergency_access` with `access=no`. The car
+  profile could not use it, so every Hall 2 route began 9.6 m away on the nearest routable way;
+  the apparatus profile departs from the apron itself onto Mariner Way (snap 0.6 m). 544 of the
+  562 differ only in that first step, at +3.9 s.
+* **The Pinetree/Guildford right turn.** With relation 6812366 no longer applied, 26 dispatched
+  Hall 1 routes to Johnson St and Pacific St run Pinetree → Guildford instead of Pinetree → Glen
+  Dr, and every lap of the junction box is gone.
+* **The turnarounds.** 3100 Ozada Ave no longer turns around in a driveway off Inlet St (−48 s
+  from Hall 1 and from Hall 4); 1163 Pinetree Way no longer circles Lincoln Ave (−27 s); 2986
+  Guildford Way no longer detours by Town Centre Blvd (−26 s); 2601 Lougheed Hwy from Hall 3 no
+  longer turns around by Colony Farm Rd (−21 s), and from Hall 2 −20 s. U-turns on Barnet Hwy
+  and Lougheed Hwy move to the nearer break on 31 dispatched routes.
+* **One fire lane beyond the hall.** Way 640030541, between Mary Hill Bypass and United Blvd,
+  now carries three routes to 39 and 1550 United Blvd (−43 s from Hall 4). Whether an apparatus
+  drives that lane is the operator's to confirm on the ground.
+* **Nothing got slower by more than 11 s.** Six routes to 3007 Glen Dr take the direct turn at
+  Pinetree Way and Glen Dr instead of the slip lane they used before, 11 s slower by duration:
+  OSRM chooses by weight, and a penalised way is cheap in time and dear in weight
+  ([`../standards/dependency-behaviour.md`](../standards/dependency-behaviour.md), *routes are
+  chosen by weight*). The remaining +4 s are the Hall 2 apron.
+
+Duration change over the 820, in seconds: min −48, median +4, p90 +4, max +11. Distance: min
+−1,996 m, median +9 m, max +88 m. The full list, largest change first with the road sequence
+before and after, went to the operator on 2026-09-09 and is reproducible from the two recorded
+rows.
+
+**To deploy**, at a moment the operator picks (restarting `osrm` drops routing on every kiosk for
+the seconds the graph takes to load): in `docker-compose.yml` the `osrm` command's
+`/data/vancouver.osrm` becomes `/data/apparatus.osrm`; `git pull` on the kiosk; `docker compose
+up -d osrm`; then one route on port 5000 and one on the kiosk. `vancouver.osrm.*` stays on disk
+as the rollback, the same edit reversed. Remove `cfr_osrm_trial` afterwards. Until then the trial
+container keeps running on 5001 and nothing a crew sees has changed.
 
 ---
 

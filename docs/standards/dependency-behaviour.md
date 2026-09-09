@@ -444,12 +444,24 @@ OSM relation.
   through one of them (Clarke Rd → Chapman Ave, `no_right_turn @ (Mo-Fr 07:00-09:00)`, via
   49.26909, −122.88056) at the first rebuild, when the command is recorded.
 
+### OSRM v26.8.0 — routes are chosen by weight and reported in duration, and the two diverge on penalised ways
+
+**Measured 2026-09-09** on the kiosk, stock `car.lua` against `apparatus.lua`, 2,248 routes
+each. A route response's `distance` and `duration` are the metres and seconds along the route
+returned; they are not the quantity the router minimised. With `weight_name = 'routability'`
+(car.lua line 21) the router minimises weight, and `WayHandlers.penalties`
+([`osrm/lib/way_handlers.lua`](osrm/lib/way_handlers.lua) lines 466–474) sets a way's *rate* to
+speed × the smallest of the service, width, alternating, side-road and priority penalties,
+while its duration comes from the speed alone. A penalised way is therefore cheap in time and
+dear in weight. Seen: once turn restrictions came off, six routes to 3007 Glen Dr left the slip
+lane for the direct turn at Pinetree Way, 11 s *slower* by duration and lighter by weight.
+Consequences: an ETA taken from `duration` is the true time along the route shown, so §6.2
+holds; and a route that got slower after a profile change is not by itself a defect, it may be
+the lighter route. The earlier unverified entry for this is closed.
+
 ## Unverified — assumptions still resting on names
 
 Recorded so they are visible (§7.5). None of these have been checked.
 
-* **OSRM** — whether `distance`/`duration` in the response are affected by the profile's
-  `weight` versus being true metres/seconds. Punch-list #1 depends on this and the profile
-  has not been tuned.
 * **Silero VAD** (`vad_filter=True` in `transcriber.py`) — what it removes, and whether it
   can clip the leading tones or the first unit name of a dispatch.

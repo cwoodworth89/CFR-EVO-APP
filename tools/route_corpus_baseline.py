@@ -406,8 +406,9 @@ def compare(routes: dict, summary: dict, baseline: dict) -> None:
         did, h = k.split("|")
         flag = "*" if c.get("x") else " "
         if "d" in b and "d" in c:
+            # ASCII only: this line reaches a cp1252 console when run from the laptop.
             print(f" {flag}{did} hall {h}  {c.get('a', '')}: {b['d']/1000:.2f} -> {c['d']/1000:.2f} km  "
-                  f"{b['t']/60:.1f} -> {c['t']/60:.1f} min  ({why}; Δ {c['d']-b['d']:+.0f} m, {c['t']-b['t']:+.0f} s)")
+                  f"{b['t']/60:.1f} -> {c['t']/60:.1f} min  ({why}; {c['d']-b['d']:+.0f} m, {c['t']-b['t']:+.0f} s)")
             if why == "geometry":
                 print(f"     was: {b.get('roads', '?')}")
                 print(f"     now: {c.get('roads', '?')}")

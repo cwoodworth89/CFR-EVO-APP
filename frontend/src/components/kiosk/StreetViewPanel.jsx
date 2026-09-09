@@ -34,14 +34,52 @@ import { apiClient } from '../../apiClient';
 // Google's relation between the panorama's zoom and its field of view: fov = 180 / 2^zoom
 // (Maps JavaScript API StreetViewPanorama docs; zoom 1 is 90 degrees). The database holds
 // degrees; the SDK speaks zoom; the Static API takes degrees, 10..120.
-const fovToZoom = (fov) => Math.log2(180 / Math.min(Math.max(Number(fov) || 90, 10), 180));
-const zoomToFov = (zoom) => Math.round(180 / Math.pow(2, Number(zoom) || 0));
-const clampStaticFov = (fov) => Math.min(Math.max(Math.round(Number(fov) || 90), 10), 120);
-// Zoom bounds for the interactive panorama, derived from clampStaticFov above rather than
-// picked: zoomToFov(1) is 90 degrees and zoomToFov(4) is 11, both inside the Static API's
-// 10..120, so the compact tile and the expanded panorama can render the same saved view.
-// Zoom 0 would be 180 degrees, which the Static API cannot express.
-const clampPanoZoom = (zoom) => Math.min(Math.max(Number(zoom) || 1, 1), 4);
+//
+// THE STORED VALUE IS THE ANGLE, at full precision. public.parcels.streetview_fov is
+// double precision, so there is nothing to round for, and zoom is derived on the way to
+// the SDK rather than kept beside the angle -- one value cannot disagree with itself.
+//
+// FOV_MIN..FOV_MAX is the Street View Static API's documented `fov` range, and it is the
+// only limit in this file. WHERE it is applied is the whole point (operator, 2026-09-08:
+// "we save what the user sees and don't offer an option that's not available"):
+//
+//   * At the INTERACTION -- the wheel stops at 120 degrees, the way any map stops at its
+//     minimum zoom. The operator cannot frame a view the compact tile could not draw, so
+//     nothing they save ever needs adjusting afterwards.
+//   * NOT on load. A clamp there rewrites a stored view behind the operator's back, which
+//     is exactly what the old zoom 1..4 clamp did: anything wider than 90 degrees was
+//     pulled back to 90 every time the panel mounted, so a zoomed-out framing never
+//     survived a reload.
+//
+// Same numbers, opposite honesty: bounding what can be created preserves the saved value,
+// bounding what can be displayed destroys it.
+const FOV_MIN = 10;    // Street View Static API `fov` parameter, documented range
+const FOV_MAX = 120;   // 10..120 degrees
+
+const fovToZoom = (fov) => {
+  const f = Number(fov);
+  return Math.log2(180 / (Number.isFinite(f) && f > 0 ? f : 90));
+};
+const zoomToFov = (zoom) => {
+  const z = Number(zoom);
+  return 180 / Math.pow(2, Number.isFinite(z) ? z : 1);
+};
+// Derived, not written down twice: fov 120 -> zoom 0.585 (widest the operator can reach),
+// fov 10 -> zoom 4.17 (tightest). Deriving them is what keeps the panorama and the tile
+// from drifting apart, which is how they disagreed before.
+const ZOOM_MIN = fovToZoom(FOV_MAX);
+const ZOOM_MAX = fovToZoom(FOV_MIN);
+const clampPanoZoom = (zoom) => {
+  const z = Number(zoom);
+  return Math.min(Math.max(Number.isFinite(z) ? z : 1, ZOOM_MIN), ZOOM_MAX);
+};
+/** Degrees for the Static API URL. Rounded because the parameter's accepted number format
+ *  is not something this project has verified, and a sub-degree difference on a 640x400
+ *  thumbnail is invisible; the stored angle keeps its full precision either way. */
+const clampStaticFov = (fov) => {
+  const f = Number(fov);
+  return Math.min(Math.max(Math.round(Number.isFinite(f) ? f : 90), FOV_MIN), FOV_MAX);
+};
 
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
@@ -66,7 +104,7 @@ export default function StreetViewPanel({ activeCall }) {
   const containerRef = useRef(null);
   const modalContainerRef = useRef(null);
   const panoramaRef = useRef(null);
-  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1, fov: 80, lat: null, lng: null, pano_id: '' });
+  const currentPovRef = useRef({ heading: 0, pitch: 5, zoom: 1, fov: 90, lat: null, lng: null, pano_id: '' });
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
 
@@ -108,7 +146,6 @@ export default function StreetViewPanel({ activeCall }) {
               heading: savedHeading,
               pitch: p.streetview_pitch ?? p.pitch ?? 5,
               fov,
-              zoom: fovToZoom(fov),
               pano_id: p.streetview_pano_id ?? p.pano_id ?? ''
             });
           }
@@ -158,7 +195,8 @@ export default function StreetViewPanel({ activeCall }) {
 
   const initialPitch = activeOverride ? parseFloat(activeOverride.pitch ?? activeOverride.streetview_pitch ?? 5) : 5;
   const initialFov = activeOverride ? parseFloat(activeOverride.fov ?? activeOverride.streetview_fov ?? 90) : 90;
-  const initialZoom = activeOverride ? parseFloat(activeOverride.zoom ?? fovToZoom(initialFov)) : 1;
+  // Always derived from the stored angle; there is no second stored unit to disagree.
+  const initialZoom = fovToZoom(initialFov);
   const initialPanoId = activeOverride?.pano_id || '';
 
   // Initialize camera vector in ref
@@ -206,7 +244,7 @@ export default function StreetViewPanel({ activeCall }) {
       try {
         const panoOptions = {
           pov: { heading: initialHeading, pitch: initialPitch },
-          zoom: clampPanoZoom(initialZoom),
+          zoom: initialZoom,
           fullscreenControl: false,
           addressControl: false,
           panControl: false,
@@ -319,13 +357,34 @@ export default function StreetViewPanel({ activeCall }) {
         // 4. zoom_changed: Continuous zoom tracking
         pano.addListener('zoom_changed', () => {
           const z = pano.getZoom();
-          if (z !== undefined && !isNaN(z)) {
-            currentPovRef.current = {
-              ...currentPovRef.current,
-              zoom: Math.round(z || 1),
-              fov: Math.round(z || 1)
-            };
+          // `Number.isFinite`, not `z || 1`: zoom 0 is fully zoomed out and is falsy, so
+          // the old guard rewrote the widest view the SDK offers as zoom 1 (90 degrees) --
+          // the operator's entire reason for zooming out.
+          //
+          // fov carries DEGREES and was being assigned the zoom level. That is #35a in the
+          // tracking listener: the save path was corrected on 2026-09-06 and this was
+          // missed, so the ref reported "fov 1" for a 90-degree view.
+          //
+          // No rounding: the wheel is continuous and every framing between whole levels is
+          // a framing the operator chose.
+          if (!Number.isFinite(z)) return;
+
+          // Hold the wheel inside what the Static API can render. Pushing the panorama
+          // back is what makes the limit visible: it simply stops, the way a map stops at
+          // its minimum zoom, instead of letting the operator frame something that would
+          // be quietly altered on the way to the tile. setZoom re-enters this listener
+          // with the clamped value, which then falls through and is recorded.
+          const bounded = clampPanoZoom(z);
+          if (Math.abs(bounded - z) > 1e-9) {
+            pano.setZoom(bounded);
+            return;
           }
+
+          currentPovRef.current = {
+            ...currentPovRef.current,
+            zoom: z,
+            fov: zoomToFov(z)
+          };
         });
 
         // 5. status_changed: Monitor panorama status & update loading skeleton
@@ -390,10 +449,7 @@ export default function StreetViewPanel({ activeCall }) {
     // effect owns frontLat, frontLng, initialHeading, initialPitch and initialPanoId and
     // pushes them onto the live panorama instead.
     //
-    // All six names in this warning are owned by that effect, initialZoom included. It was
-    // the one exception until 2026-09-08: applied at construction and carried in
-    // currentPovRef, so a saved zoom survived a save and a remount, but a zoom arriving
-    // while the panorama was already mounted never reached what the operator saw.
+    // All six names in this warning are owned by that effect, initialZoom included.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleanAddrKey, isExpanded, apiKey, isOnline, sdkError]);
 
@@ -407,7 +463,7 @@ export default function StreetViewPanel({ activeCall }) {
     // surface we are calling (CLAUDE.md s7.3a).
     const applyZoom = () => {
       if (typeof panoramaRef.current?.setZoom === 'function') {
-        panoramaRef.current.setZoom(clampPanoZoom(initialZoom));
+        panoramaRef.current.setZoom(initialZoom);
       }
     };
 
@@ -446,7 +502,9 @@ export default function StreetViewPanel({ activeCall }) {
     const curr = currentPovRef.current || {};
     let currentHeading = curr.heading ?? initialHeading;
     let currentPitch = curr.pitch ?? initialPitch;
-    let currentZoom = curr.zoom ?? curr.fov ?? 1;
+    // No `?? curr.fov` fallback: curr.fov is degrees and curr.zoom is a zoom level, so
+    // that fallback fed an angle into a zoom variable.
+    let currentZoom = curr.zoom ?? 1;
     let currentPanoId = curr.pano_id || '';
     let saveLat = curr.lat ?? frontLat;
     let saveLng = curr.lng ?? frontLng;
@@ -461,8 +519,11 @@ export default function StreetViewPanel({ activeCall }) {
       }
       if (typeof panoramaRef.current.getZoom === 'function') {
         const z = panoramaRef.current.getZoom();
-        if (z !== undefined && !isNaN(z)) {
-          currentZoom = Math.round((z || 1) * 100) / 100;
+        // `(z || 1)` turned a fully-zoomed-out panorama into zoom 1 here too, which is what
+        // actually reached the database: fov 90 recorded for a 180-degree view. Kept at
+        // full precision -- the old 2-decimal rounding discarded framing for nothing.
+        if (Number.isFinite(z)) {
+          currentZoom = z;
         }
       }
       if (typeof panoramaRef.current.getPano === 'function') {
@@ -489,10 +550,14 @@ export default function StreetViewPanel({ activeCall }) {
       front_lng: saveLng,
       heading: currentHeading,
       pitch: currentPitch,
-      // Degrees. This used to send the zoom level (0-4) and the database held "fov 1" for
-      // a 90-degree view (#35a, 2026-09-06).
+      // Degrees, and degrees only. This used to send the zoom level (0-4) and the database
+      // held "fov 1" for a 90-degree view (#35a, 2026-09-06).
+      //
+      // A `zoom` key rode alongside until 2026-09-08 and was never stored -- neither
+      // public.parcels nor ParcelCameraOverrideSchema has such a field, so Pydantic dropped
+      // it. Removing it also makes the state right after a save identical to the state
+      // after a reload, since both now derive zoom from the one saved angle.
       fov: zoomToFov(currentZoom),
-      zoom: currentZoom,
       pano_id: currentPanoId
     };
 

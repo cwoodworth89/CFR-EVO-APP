@@ -65,6 +65,10 @@ export const setToken = (token) => {
     localStorage.removeItem('cfr_auth_token');
     document.cookie = 'cfr_auth_token=; path=/; max-age=0; SameSite=Lax';
   }
+  // Same-tab listeners (the header padlock, the review screen). The browser's 'storage'
+  // event fires only in OTHER tabs, so without this a LOCK in one place left the other
+  // showing admin controls until a reload.
+  try { window.dispatchEvent(new Event('cfr-auth-change')); } catch { /* not a browser */ }
 };
 
 const getHeaders = () => {
@@ -79,35 +83,28 @@ const getHeaders = () => {
 export const apiClient = {
   // Auth methods for local FastAPI
   auth: {
+    // The admin session: the stored token, verified by the API, and nothing else.
+    //
+    // Until 2026-09-09 this logged every browser in by itself, with the admin password
+    // written into this file, and invented an admin session when the API was unreachable.
+    // So there was no locked state anywhere: the kiosk's own browser held a 30-day admin
+    // token from the moment it loaded. The operator's design: the admin controls sit behind
+    // the padlock in the header, unlock with the password, and stay unlocked for 30 days
+    // unless LOCK is pressed (auto-lock is a production feature, not built).
     async getSession() {
-      let token = getToken();
-      if (!token) {
-        // Auto-authenticate station devices on local network
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: 'cfradmin', password: 'rescue' })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setToken(data.access_token);
-            return { data: { session: { user: data.user, access_token: data.access_token } }, error: null };
-          }
-        } catch { /* non-fatal: caller handles the absent value */ }
-        return { data: { session: null }, error: null };
-      }
+      const token = getToken();
+      if (!token) return { data: { session: null }, error: null };
       try {
         const res = await fetch(`${API_BASE_URL}/api/auth/session`, { headers: getHeaders() });
-        const data = await res.json();
-        if (data && data.session) {
-          return { data: { session: data.session }, error: null };
-        } else {
-          setToken(null);
-          return this.getSession();
-        }
-      } catch {
-        return { data: { session: { user: { username: 'cfradmin', role: 'admin' } } }, error: null };
+        const data = res.ok ? await res.json() : null;
+        if (data?.session) return { data: { session: data.session }, error: null };
+        // Expired, or signed with a key the server no longer uses: forget it.
+        setToken(null);
+        return { data: { session: null }, error: null };
+      } catch (err) {
+        // The API is unreachable. The token is kept for when it is back; the answer now is
+        // "not verified", never a session invented on the client (CLAUDE.md 6.1).
+        return { data: { session: null }, error: err instanceof Error ? err : new Error(String(err)) };
       }
     },
 
@@ -148,19 +145,22 @@ export const apiClient = {
     },
 
     onAuthStateChange(callback) {
-      // Simple auth state change subscriber
-      const listener = (e) => {
-        if (e.key === 'cfr_auth_token') {
-          apiClient.auth.getSession().then(({ data }) => {
-            callback(e.newValue ? 'SIGNED_IN' : 'SIGNED_OUT', data.session);
-          });
-        }
+      // Fires for a token change in this tab (setToken) or another (the storage event).
+      const notify = () => {
+        apiClient.auth.getSession().then(({ data }) => {
+          callback(data.session ? 'SIGNED_IN' : 'SIGNED_OUT', data.session);
+        });
       };
-      window.addEventListener('storage', listener);
+      const onStorage = (e) => { if (e.key === 'cfr_auth_token') notify(); };
+      window.addEventListener('storage', onStorage);
+      window.addEventListener('cfr-auth-change', notify);
       return {
         data: {
           subscription: {
-            unsubscribe: () => window.removeEventListener('storage', listener)
+            unsubscribe: () => {
+              window.removeEventListener('storage', onStorage);
+              window.removeEventListener('cfr-auth-change', notify);
+            }
           }
         }
       };

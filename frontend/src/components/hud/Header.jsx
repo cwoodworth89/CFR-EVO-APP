@@ -1,5 +1,6 @@
 import React from 'react';
 import { STATIONS as STATIONS_LIST } from '../MapConstants';
+import { AdminLock } from './AdminLock';
 
 export function Header({ 
   appMode, 
@@ -8,7 +9,8 @@ export function Header({
   setRightSidebarOpen,
   setShowRoadClosures,
   alertsCount,
-  gisOffline
+  gisOffline,
+  admin
 }) {
   const isExplore = appMode === "EXPLORE";
 
@@ -58,7 +60,8 @@ export function Header({
               }}
             >
               <option value="EXPLORE">🧭 Notifications / Explore</option>
-              <option value="ADMIN_DISPATCHES">🛡️ ADMIN: DISPATCH REVIEW</option>
+              {/* Admin controls show only while the padlock is unlocked (operator, 2026-09-08). */}
+              {admin?.unlocked && <option value="ADMIN_DISPATCHES">🛡️ ADMIN: DISPATCH REVIEW</option>}
             </select>
           </div>
         </div>
@@ -88,6 +91,8 @@ export function Header({
           >
             🚧 ROAD CLOSURES {alertsCount > 0 && <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full ml-1">{alertsCount}</span>}
           </button>
+
+          {admin && <AdminLock admin={admin} />}
         </div>
     </div>
   );

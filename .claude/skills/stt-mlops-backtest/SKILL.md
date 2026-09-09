@@ -172,8 +172,9 @@ numbers beside it:**
 Per call on the clean holdout: round 2 worse on 11, better on 5, same on 28. Of the 11, most
 are commas, capitals and doubled words the scorer counts; five are real misreads (*999 Laval*
 for 99, *myall stones* for Milestones, *ladder day saints* / *alchemino* for Latter-day Saints
-/ El Camino, *tossess* for Tahsis, *chartwell growth* for Road). Not deployed; the operator's
-call. Why it regressed is not known and was not guessed at.
+/ El Camino, *tossess* for Tahsis, *chartwell growth* for Road). **Not deployed: the operator
+ruled *leave it* on 2026-09-08. Round 1 (`whisper-base-cfr-ct2`) stays live; the r2 directory
+stays on the kiosk as the record.** Why it regressed is not known and was not guessed at.
 
 ## 4. Backtest against production transcripts (SMMR)
 

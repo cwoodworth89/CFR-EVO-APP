@@ -44,6 +44,24 @@ export const FLAG_RULED_BY = {
   STREET_SECTION_ONLY: 'verified_address',
 };
 
+/** The box on the review form whose value rules a flag, in the operator's words. */
+const RULED_BY_LABEL = {
+  verified_map_grid: 'the map grid box',
+  verified_x_street_1: 'the near roads',
+  verified_talkgroup: 'the talk group',
+  verified_response_type: 'the response type',
+  verified_units: 'the units',
+  verified_incident: 'the incident type',
+  verified_address: 'the address',
+};
+
+/** "ruled by the map grid box", or '' for a flag nothing rules. Shown beside each open
+ *  flag so the operator knows which box to fill (ux_notes, review screen, 2026-09-08). */
+export function flagRuledByLabel(flag) {
+  const field = FLAG_RULED_BY[flag];
+  return field && RULED_BY_LABEL[field] ? `ruled by ${RULED_BY_LABEL[field]}` : '';
+}
+
 function rulingFor(call, flag) {
   const field = FLAG_RULED_BY[flag];
   if (!field) return null;

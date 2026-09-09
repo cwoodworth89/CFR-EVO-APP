@@ -124,6 +124,7 @@ as they are.
 | `backend/scripts/crawl_cadastral_tiles.py`, `compile_mbtiles.py` | `basemaps.cartocdn.com` — see the §1 licence caution before touching |
 | `tools/extract_training_data.py`, `backtest_regression.py`, `clean_old_dispatches.py` | local API only |
 | `tools/train_whisper_lora.py` | `huggingface.co` — `transformers` loading `openai/whisper-base` sends `HEAD` revision checks for the cached files at the start of a run (seen in `/tmp/round2.log` 2026-09-05 21:38, three requests, all answered from the cache afterwards). Training only, never the agent. **Fixed 2026-09-06** on the operator's word: the script sets `HF_HUB_OFFLINE=1` before importing `transformers`, verified on the kiosk (all four loads from the cache, no request); seed a new machine once with `HF_HUB_OFFLINE=0`. |
+| Planetiler vector-tile build (trial, by hand on the kiosk 2026-09-09; a script under `backend/scripts/` is next) | `ghcr.io` for the image, then with `--download`: `osmdata.openstreetmap.de` (water polygons, 929 MB), `naturalearthdata.com` (434 MB), `github.com` (lake centrelines, 81 MB, and the Noto Sans glyph release, 62 MB). **Once**: the sources are cached in the trial directory on the kiosk and every rebuild reads them from disk; the OSM extract itself is the one routing already holds. Never on the dispatch path; the kiosk serves the finished archive offline like every other layer. Licences in `standards/basemap/README.md`. |
 
 ---
 

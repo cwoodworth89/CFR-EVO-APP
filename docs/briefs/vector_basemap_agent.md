@@ -5,6 +5,12 @@
 starting facts, the rules of the road on the shared kiosk, and the boundary with the other
 stream running at the same time ([`osrm_routing_agent.md`](osrm_routing_agent.md)).
 
+> **State, 2026-09-09: the first hour is done.** The trial build, what it looks like, what
+> is left running on the kiosk and the decisions waiting on the operator are in
+> [`../briefings/vector_basemap_trial_2026-09-09.md`](../briefings/vector_basemap_trial_2026-09-09.md);
+> the licences are vendored under [`../standards/basemap/`](../standards/basemap/README.md).
+> Nothing in the app is touched yet.
+
 ## What this stream is for
 
 The street basemap is **Carto's raster rendering of OpenStreetMap, crawled and served

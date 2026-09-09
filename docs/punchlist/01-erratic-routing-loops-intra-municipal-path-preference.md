@@ -51,6 +51,41 @@ answer, not a setting.
 The original report's own path, Hall 1 → 428 Nelson St, routes clean: 9.78 km, 15.1 min,
 Pinetree → Barnet → Mariner → Como Lake → Linton → Austin → Nelson, no node twice, no U-turn.
 
+### Operator ruling, 2026-09-09
+
+> "No rights on red, but you're allowed to make a right."
+
+So relation 6812366 is mistagged. The sign is *no right turn on red*, whose OSM tag is
+`no_right_turn_on_red`, and OSRM v26.8.0 **ignores every restriction value ending `_on_red`**
+(`RestrictionParser::TryParse` at the pinned tag, recorded in
+[`../standards/dependency-behaviour.md`](../standards/dependency-behaviour.md)). Retagging the
+relation upstream removes the loop at the next extract with no profile change. Until then the
+kiosk draws the loop on every westbound Hall 1 response.
+
+The operator's framing, and the question it leaves: some restrictions are physical (islands,
+barriers) and bind an apparatus; some are legal and an apparatus responding emergency may set
+aside (a right on red); some are legal and still not to be broken (the wrong way on Highway 1).
+What the router is applying inside the City box (49.20–49.39, −122.92 … −122.70), read from
+the extract on 2026-09-09:
+
+| Layer | In the City | What `car.lua` does with it | The apparatus question |
+|:--|:--|:--|:--|
+| Physical: a divided road is two one-way ways; no connecting way, no turn | 4,294 one-way ways of 49,344 highway ways | geometry — no setting involved | none; a median is a median |
+| Physical: barrier nodes | 707 gates, 707 bollards (155 `removable`, 45 `fixed`, 365 untagged), 26 jersey barriers, 14 height restrictors | bollard, block, jersey barrier: impassable; gate: 60 s; only `bollard=rising` is excepted, `removable` is not (car.lua `process_node`) | which bollards a crew drops or holds a key for |
+| Legal: turn-restriction relations | 1,080 — 381 no left, 230 no right, 209 no U-turn, 141 only straight, 58 only right, 23 only left, 16 no straight; 21 conditional (weekday peaks); 22 `except` (psv, bicycle, bus, hgv, police, staff — none `emergency`); 30 `implicit` | all applied to the car, except where `except` names motorcar / motor_vehicle / vehicle; `_on_red` values ignored; conditionals only if the graph was built parsing them (unknown) | which classes an apparatus sets aside under lights and siren, and which never. A `no_u_turn` across a painted median and one at a concrete median carry the same tag |
+| Legal: access on ways | 2,003 private, 1,411 `access=no`, 257 customers, 20 destination, 18 delivery, 16 permit; 22 emergency-only (13 `service=emergency_access`, 9 footway/steps) | private, customers, delivery, destination, permit: routable with a penalty; `access=no` and the emergency-only ways: unroutable | the fire lanes (`emergency_access`) are exactly the ways an apparatus may use and a car may not |
+| Legal: one-way | 4,294 ways | never driven against | none proposed — the operator's Highway 1 rule |
+| Dimensions | 114 ways carry `maxheight` (75 `default`; the rest 1.95 m to 8.4 m, six of them under 4.6 m); 1 `maxweight` (Gaglardi Way, 15 t) | compared with a 2.0 m, 1.9 m, 4.8 m, 2,000 kg car, so nothing is ever too low or too light | the one place the car profile is *too permissive*: a ladder's height and weight are the operator's to supply (CLAUDE.md §7.2) |
+
+Also found: relation 17957326 has its time window written into the plain `restriction` tag
+(`no_right_turn @ (Mo-Fr 07:00-09:00,16:00-18:00)`, via 49.25084, −122.86907); the value starts
+with `no_`, so OSRM applies it all day. A second upstream retag.
+
+**Operator**: of the legal classes above, which does an apparatus set aside on an emergency
+response, and which never? That list is the specification the profile work has been missing;
+nothing in `car.lua` moves until it exists (§7.2). The right-on-red case needs no ruling: it is
+a mapping error, and the fix is in OSM.
+
 ---
 
 ## 1. Erratic Routing Loops & Intra-Municipal Path Preference

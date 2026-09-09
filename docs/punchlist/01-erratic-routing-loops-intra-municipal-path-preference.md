@@ -171,9 +171,15 @@ What the 820 are:
   Guildford Way no longer detours by Town Centre Blvd (−26 s); 2601 Lougheed Hwy from Hall 3 no
   longer turns around by Colony Farm Rd (−21 s), and from Hall 2 −20 s. U-turns on Barnet Hwy
   and Lougheed Hwy move to the nearer break on 31 dispatched routes.
-* **One fire lane beyond the hall.** Way 640030541, between Mary Hill Bypass and United Blvd,
-  now carries three routes to 39 and 1550 United Blvd (−43 s from Hall 4). Whether an apparatus
-  drives that lane is the operator's to confirm on the ground.
+* **No fire lane beyond the hall is used.** A first check said the emergency access off Mary
+  Hill Bypass (ways 640030541/3/5, 49.22623 −122.80855 to 49.22841 −122.80962) carried three
+  routes to United Blvd; it did not. That check matched route coordinates against the lane's
+  nodes, and the lane's first node is on the bypass itself, so a route driving past on the
+  highway matched. The steps show the route leaving the bypass at the off-ramp 450 m west. The
+  −43 s to 39 United Blvd is the U-turn on United Blvd moving from 374 m past the address to
+  76 m past it. The Hall 2 apron above was checked the same way and is real: the trial route
+  departs on the apron way for 10 m and turns onto Mariner Way. Corrected 2026-09-09, the same
+  day, after the operator asked for the lane's coordinates.
 * **Nothing got slower by more than 11 s.** Six routes to 3007 Glen Dr take the direct turn at
   Pinetree Way and Glen Dr instead of the slip lane they used before, 11 s slower by duration:
   OSRM chooses by weight, and a penalised way is cheap in time and dear in weight

@@ -13,7 +13,7 @@ import { MODE_DEFAULTS } from '../components/MapConstants';
  * lines of pass-through.
  */
 export function useMapLayerPreferences() {
-  const [mapStyle, setMapStyle] = useState('GREY');
+  const [mapStyle, setMapStyle] = useState('STREET');
   const [showLabels, setShowLabels] = useState(true);
   const [showHydrants, setShowHydrants] = useState(true);
   const [showZones, setShowZones] = useState(true);
@@ -40,7 +40,7 @@ export function useMapLayerPreferences() {
    * left them.
    */
   const applyModeDefaults = useCallback((mode) => {
-    setMapStyle(MODE_DEFAULTS[mode] || 'GREY');
+    setMapStyle(MODE_DEFAULTS[mode] || 'STREET');
     setShowLabels(mode === 'EXPLORE');
     if (mode === 'EXPLORE') {
       setShowZones(true);

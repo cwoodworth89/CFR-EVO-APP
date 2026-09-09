@@ -33,8 +33,8 @@ export function BaseMap({ style, useLabelsFallback }) {
         cleanup();
 
         const disableWan = String(import.meta.env.VITE_DISABLE_WAN_FALLBACK || 'false').toLowerCase() === 'true';
-        const config = BASE_LAYERS[style] || BASE_LAYERS.GREY;
-        let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.GREY.url || `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`);
+        const config = BASE_LAYERS[style] || BASE_LAYERS.STREET;
+        let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.STREET.url);
         let fallbackUrl = disableWan ? null : (typeof config === 'object' ? config.fallbackUrl : null);
 
         if (useLabelsFallback && url && url.includes('_nolabels')) {

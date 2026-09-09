@@ -101,7 +101,7 @@ export default function BlockParcelPanel({ activeCall }) {
       zoomControl={true}
     >
       {/* Offline-First Cadastral Basemap (Prioritizes local :8081 tile server with graceful online fallback) */}
-      <BaseMap style="GREY" />
+      <BaseMap style="STREET" />
 
       <CoquitlamOverlays visible={true} />
 

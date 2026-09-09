@@ -46,7 +46,8 @@ export default function MapSurface({
   showNoTileLegend = false,
 
   // always-on layers
-  baseStyle = 'VOYAGER',
+  baseStyle = 'STREET',
+  streetLabels = false,
   showCadastral = false,
   onCadastralError,
   showFireHalls = true,
@@ -77,7 +78,7 @@ export default function MapSurface({
       <Pane name="underlayPane" style={{ zIndex: PANE_Z.underlay }} />
       <Pane name="labelsPane" style={{ zIndex: PANE_Z.labels }} />
 
-      <BaseMap style={baseStyle} useLabelsFallback={false} />
+      <BaseMap style={baseStyle} useLabelsFallback={streetLabels} />
       <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />
       <StationsLayer visible={showFireHalls} />
       <HydrantsLayer visible={showHydrants} targetCoords={hydrantTargetCoords} highlightIds={hydrantHighlightIds} />

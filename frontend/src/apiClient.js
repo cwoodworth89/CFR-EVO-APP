@@ -46,25 +46,6 @@ const getTileBaseUrl = () => {
 
 export const TILE_BASE_URL = getTileBaseUrl();
 
-/**
- * Returns a configured tile URL endpoint or standard template.
- * @param {string|number} z - Zoom level or template placeholder '{z}'
- * @param {string|number} x - X coordinate or template placeholder '{x}'
- * @param {string|number} y - Y coordinate or template placeholder '{y}'
- * @param {string} [style='SATELLITE'] - Basemap style ('SATELLITE', 'VOYAGER', 'OSM', 'GREY', 'DARK')
- * @returns {string} Fully resolved tile URL
- */
-export const getTileUrl = (style = 'SATELLITE', z = 12, x = 0, y = 0) => {
-  const s = (style || 'SATELLITE').toUpperCase();
-  if (s === 'SATELLITE') {
-    // City of Coquitlam 7.5cm orthophotos only -- see BASE_LAYERS.SATELLITE.
-    return `${TILE_BASE_URL}/services/ortho/tiles/${z}/${x}/${y}.jpg`;
-  }
-  if (s === 'GREY' || s === 'DARK' || s === 'LIGHT') {
-    return `${TILE_BASE_URL}/services/street_nolabels/tiles/${z}/${x}/${y}.png`;
-  }
-  return `${TILE_BASE_URL}/services/street/tiles/${z}/${x}/${y}.png`;
-};
 
 
 

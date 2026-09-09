@@ -205,7 +205,7 @@ export function LeftSidebar({
                         <div className="grid grid-cols-2 gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
                            <button
                               type="button"
-                              onClick={() => setMapStyle && setMapStyle("GREY")}
+                              onClick={() => setMapStyle && setMapStyle("STREET")}
                               className={`py-1.5 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                                  mapStyle !== "SATELLITE"
                                     ? "bg-slate-800 text-sky-400 shadow-sm border border-slate-700 font-black"

@@ -356,11 +356,18 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
 
   // One expression for which base layer is actually drawn, so the overlays that have to
   // read against it -- the zone numbers -- cannot disagree with it.
-  const baseStyle = (appMode === "EXPLORE" && mapStyle === "SATELLITE")
-    ? "SATELLITE"
-    : (showLabels && currentZoom >= 16) ? "GREY"
-    : (showLabels || targetAddress || currentZoom <= 15) ? "VOYAGER"
-    : "GREY";
+  const baseStyle = (appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : "STREET";
+
+  // Whether the street tiles carry their own labels. This used to be smuggled inside the
+  // choice between two BASE_LAYERS names ("GREY" meant no labels, "VOYAGER" meant labels),
+  // which read as a style preference rather than the decision it is. The rule is unchanged.
+  //
+  // Note the middle clause is not a typo: turning "Road Names & Addresses" ON at zoom 16+
+  // takes labels OFF the basemap, because that same toggle draws the cadastral overlay,
+  // which carries its own road names -- two sets of labels on one map is worse than none.
+  const streetLabels = baseStyle === "STREET"
+    && !(showLabels && currentZoom >= 16)
+    && Boolean(showLabels || targetAddress || currentZoom <= 15);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
@@ -415,6 +422,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
               maxBoundsViscosity={1.0}
               mapRef={setMap}
               baseStyle={baseStyle}
+              streetLabels={streetLabels}
               showCadastral={showLabels && !cadastralError}
               onCadastralError={() => setCadastralError(true)}
               showFireHalls={showFireHalls}

@@ -431,7 +431,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         className="w-full h-full z-0"
         mapRef={setMapInstance}
         zoomControl
-        baseStyle="VOYAGER"
+        baseStyle="STREET"
+        streetLabels
         showCadastral
         showFireHalls
         // Every hydrant, but only once the map is zoomed in to neighbourhood scale: with no

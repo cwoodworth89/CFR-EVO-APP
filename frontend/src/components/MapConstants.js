@@ -12,20 +12,15 @@ export const OPERATIONAL_BOUNDS = [
 // 🗺️ BASE LAYERS (100% Offline Local Pre-Cached Basemaps via mbtileserver on port 8081)
 // Serves directly from containerized local MBTiles server (cfr_tiles) with zero WAN dependencies
 export const BASE_LAYERS = {
-  GREY: {
-    type: 'tile',
-    url: `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
-    subdomains: ['a', 'b', 'c'],
-    // z18: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
-    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
-    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 18,
-    maxZoom: 22,
-  },
-  DARK: {
+  // THE street basemap. There is one, and this is it.
+  //
+  // There were five names for two tile sets: GREY and DARK both pointed at
+  // street_nolabels, OSM and VOYAGER both at street. Callers picked a name and
+  // inherited a labels decision they were not making on purpose, and the labels
+  // decision is the only thing that ever actually differed. It is now a boolean --
+  // BaseMap's `useLabelsFallback` swaps the `_nolabels` segment out of the URL below --
+  // so switching what "street" means is this one entry (operator, 2026-09-08).
+  STREET: {
     type: 'tile',
     url: `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
@@ -66,32 +61,6 @@ export const BASE_LAYERS = {
     maxNativeZoom: 20,
     maxZoom: 22
   },
-  OSM: {
-    type: 'tile',
-    url: `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: '© OpenStreetMap contributors (100% Offline Local Cache)',
-    subdomains: ['a', 'b', 'c'],
-    // z18: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
-    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
-    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 18,
-    maxZoom: 22
-  },
-  VOYAGER: {
-    type: 'tile',
-    url: `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: null, // 100% pure offline local pre-cached tiles
-    attribution: '© OpenStreetMap contributors & Carto (100% Offline Local Cache)',
-    subdomains: ['a', 'b', 'c'],
-    // z18: the deepest zoom crawled for the Carto street styles (operator
-    // decision 2026-08-30, punch-list #47). Leaflet upscales past this, so the
-    // map still zooms to maxZoom 22 -- it just stops requesting new tiles. Must
-    // match "max_zoom" for street/street_nolabels in compile_mbtiles.py.
-    maxNativeZoom: 18,
-    maxZoom: 22
-  },
   CADASTRAL: {
     type: 'tile',
     url: `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
@@ -104,9 +73,9 @@ export const BASE_LAYERS = {
 };
 
 export const MODE_DEFAULTS = {
-  EXPLORE: "GREY",
-  DRIVER_SETUP: "GREY",
-  ADMIN_DISPATCHES: "GREY"
+  EXPLORE: "STREET",
+  DRIVER_SETUP: "STREET",
+  ADMIN_DISPATCHES: "STREET"
 };
 
 // Emergency Unit Colors

@@ -24,7 +24,7 @@ test('the Static API request is bounded, the stored angle is not', () => {
   const url = staticStreetViewUrl({ lat: 49.27, lng: -122.79, heading: 214.4, pitch: 13, fov: 180, panoId: '' }, 'KEY');
   assert.match(url, /fov=120/);
   assert.match(url, /heading=214&pitch=13/);
-  assert.match(url, /location=49\.27,-122\.79/);
+  assert.match(url, /location=49\.27,-122\.79&radius=100&source=outdoor/);   // the SDK's reach, not the API's 50 m default
   assert.match(url, /return_error_code=true/);
   const byPano = staticStreetViewUrl({ lat: 1, lng: 2, heading: 0, pitch: 0, fov: 90, panoId: 'abc def' }, 'KEY');
   assert.match(byPano, /pano=abc%20def/);

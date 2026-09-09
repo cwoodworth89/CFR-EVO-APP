@@ -122,11 +122,18 @@ export const viewsMatch = (live, view) => {
  *  maps.googleapis.com/maps/api/streetview is registered in docs/external_calls.md 4.1;
  *  return_error_code turns a miss into an HTTP error the <img> reports rather than a grey
  *  placeholder that looks like imagery. */
+// How far from the point the Static API may look for imagery when no panorama id is
+// saved. Its default is 50 m; the interactive SDK searches 50 m then 100 m
+// (hooks/useStreetViewPanorama.js), and on 2026-09-08 the tile 404'd on 2865 Glen Dr
+// while the panorama found imagery -- the two searched different distances. Same reach,
+// same answer. `source=outdoor` matches the SDK's search too.
+export const STATIC_SEARCH_RADIUS_M = 100;
+
 export const staticStreetViewUrl = (view, apiKey, size = '640x400') => {
   if (!view || !apiKey) return '';
   const where = view.panoId
     ? `pano=${encodeURIComponent(view.panoId)}`
-    : `location=${view.lat},${view.lng}`;
+    : `location=${view.lat},${view.lng}&radius=${STATIC_SEARCH_RADIUS_M}&source=outdoor`;
   return `https://maps.googleapis.com/maps/api/streetview?size=${size}&${where}`
     + `&heading=${Math.round(view.heading)}&pitch=${Math.round(view.pitch)}&fov=${clampStaticFov(view.fov)}`
     + `&return_error_code=true&key=${apiKey}`;

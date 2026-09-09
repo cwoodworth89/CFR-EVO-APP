@@ -151,11 +151,10 @@ export default function StreetViewPanel({ activeCall }) {
             onError={() => setStaticFailed(true)}
           />
         )}
-        {!isModal && staticFailed && (
-          <div className="absolute top-12 left-2 z-20 bg-amber-950/90 border border-amber-700 text-amber-200 px-2 py-1 rounded text-[10px] font-mono">
-            Static image unavailable (Street View Static API not allowed on the key?); showing the interactive view
-          </div>
-        )}
+        {/* A static miss is not a failure the crew needs to read about: the interactive view
+            takes over and the header says "live". An <img> error carries no status, so a
+            key problem and "no imagery here" look the same from this side; the console has
+            the code either way (operator, 2026-09-08: the amber box was in the picture). */}
         {!showStatic && !showEmbed && pano.status === 'loading' && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -261,6 +260,9 @@ export default function StreetViewPanel({ activeCall }) {
           )}
           {lookupFailed && (
             <span className="text-amber-300 font-mono text-[10px]" title="The parcel lookup failed; a saved view may exist and not be shown">saved view unknown</span>
+          )}
+          {staticFailed && !sdkDown && (
+            <span className="text-slate-400 font-mono text-[10px]" title="No static image within 100 m of this point; the interactive panorama is shown instead">live</span>
           )}
           {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline</span>}
         </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { Marker, Popup, Polygon, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
 import { RoutingOverlay } from '../RoutingOverlay';
@@ -168,6 +168,16 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   // along the route within 300 ft of arrival first, then around the address, then within
   // the 1,000 ft supply lay, else a warning. Punch-list #74.
   const routeHydrants = useRouteHydrants(destLat, destLng, routeCoords);
+
+  // The parcel outline for the map, [lat, lng] rings from the call's [lng, lat] rings.
+  const parcelRings = useMemo(() => {
+    const rings = activeCall?.rings?.length ? activeCall.rings : activeCall?.target?.rings;
+    if (!Array.isArray(rings) || rings.length === 0) return null;
+    const asLatLng = Array.isArray(rings[0]?.[0])
+      ? rings.map(ring => ring.map(([lng, lat]) => [lat, lng]))
+      : [rings.map(([lng, lat]) => [lat, lng])];
+    return asLatLng;
+  }, [activeCall]);
   const hydrantHighlightIds = useMemo(() => new Set(routeHydrants.picks.map(h => h.gisId)), [routeHydrants]);
 
   // Dynamic responding units resolution
@@ -499,6 +509,17 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
+
+        {/* The parcel outline, soft blue, as the workstation draws it: rings of [lng, lat]
+            from the resolver (operator, 2026-09-08: "the target parcel had a soft blue
+            shading"). No rings, no outline -- a junction or a withheld location draws none. */}
+        {parcelRings && (
+          <Polygon
+            positions={parcelRings}
+            pathOptions={{ color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.15, weight: 2, dashArray: '4,4' }}
+            interactive={false}
+          />
+        )}
 
         {/* The recommended hydrants as numbered badges, at every zoom (#74). */}
         <PickedHydrantsLayer picks={routeHydrants.picks} />

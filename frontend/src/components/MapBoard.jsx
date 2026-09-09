@@ -1,7 +1,7 @@
 /* global __BUILD_DATE__ */
 // NOTE: Map layout config is in docs/gis_endpoints.md, but its local-JSON sections are
 // SUPERSEDED -- hydrants/zones now come from PostGIS via the API, not public/data/*.json.
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
+import React, { useEffect, useState, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -110,7 +110,6 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   const [placingEntrance, setPlacingEntrance] = useState(false);
   const [entranceDraft, setEntranceDraft] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
-  const targetMarkerRef = useRef(null);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
 
   // EVO Routing Engine Configuration State
@@ -202,10 +201,26 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     const key = targetAddress?.address;
     if (!key) return undefined;
     apiClient.parcels.lookup(key).then((res) => {
-      if (!cancelled && res?.found && res.parcel) setTargetParcel(res.parcel);
+      if (cancelled || !res?.found || !res.parcel) return;
+      setTargetParcel(res.parcel);
+      // The parcel outline, drawn on the map and in the satellite tile the way a dispatch
+      // draws it (operator, 2026-09-08: "good for checking out how the screen will look
+      // during a dispatch event and for pre-planning"). The search result carries no
+      // geometry; the lookup does.
+      if (Array.isArray(res.parcel.rings) && res.parcel.rings.length > 0) {
+        setTargetPolygon(res.parcel.rings.map(ring => ring.map(coord => [coord[1], coord[0]])));
+      }
     }).catch(() => { /* the card says the parcel is unknown */ });
     return () => { cancelled = true; };
   }, [targetAddress?.address]);
+
+  // What the detail stack sees: the searched target with the parcel's rings from the
+  // lookup, so the satellite tile outlines the parcel as it does on a dispatch.
+  const stackCall = useMemo(() => {
+    if (!targetAddress) return null;
+    const rings = targetParcel?.rings?.length ? targetParcel.rings : (targetAddress.rings || []);
+    return { ...targetAddress, rings };
+  }, [targetAddress, targetParcel]);
 
   const handleEntranceMapClick = useCallback((latlng) => {
     if (!placingEntrance || !latlng) return;
@@ -235,17 +250,6 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     return parcel;
   }, [targetParcel]);
 
-  // Auto-open target address popup when targetAddress changes
-  useEffect(() => {
-    if (targetAddress && targetMarkerRef.current) {
-      const timer = setTimeout(() => {
-        if (targetMarkerRef.current) {
-          targetMarkerRef.current.openPopup();
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [targetAddress]);
 
   useEffect(() => {
     localStorage.setItem('home_hall', homeHall);
@@ -461,7 +465,6 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 targetAddress={targetAddress}
                 targetPolygon={targetPolygon}
                 targetCoords={targetCoords}
-                targetMarkerRef={targetMarkerRef}
                 nearestHydrants={nearestHydrants}
                 originStation={STATIONS[homeHall]}
                 onRouteCalculated={setRouteCoordinates}
@@ -489,7 +492,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
         {/* Right 1/3 Spatial Inspection Stack Panel (Target Address, 3D Satellite, Street View) */}
         {appMode === "EXPLORE" && targetAddress && (
           <DetailStack
-            call={targetAddress}
+            call={stackCall}
             className="w-[380px] bg-slate-950 border-l border-slate-800 p-3 z-[1000] flex-shrink-0 shadow-2xl animate-in slide-in-from-right duration-300"
             topCard={
               <TargetAddressCard

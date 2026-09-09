@@ -1,11 +1,10 @@
 import React from 'react';
-import { Marker, Polygon, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
-import { targetIcon } from './mapIcons';
+import { Polygon, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
 import { RoutingOverlay } from '../RoutingOverlay';
 
 /**
- * Everything the map draws for an active dispatch target: the parcel outline, the target
- * marker, the highlighted street section, the nearest-hydrant rings, and the route line.
+ * Everything the map draws for an active dispatch target: the parcel outline, the
+ * highlighted street section, the nearest-hydrant rings, and the route line.
  *
  * Extracted from MapBoard.jsx. Unlike ZonesLayer and RoadClosuresLayer this is not a pure
  * lift — it is the layer coupled to routing, because `RoutingOverlay` both renders the
@@ -19,7 +18,6 @@ export default function DispatchTargetLayer({
   targetAddress,
   targetPolygon,
   targetCoords,
-  targetMarkerRef,
   nearestHydrants = [],
   originStation,
   onRouteCalculated,
@@ -72,11 +70,9 @@ export default function DispatchTargetLayer({
           }}
         />
       )}
-      <Marker 
-        ref={targetMarkerRef}
-        position={[targetAddress.lat, targetAddress.lng]} 
-        icon={targetIcon}
-      />
+      {/* No marker at the centroid: the parcel outline is the target, and the route's end
+          marks the arrival point on the street (operator, 2026-09-08: "we can get rid of that
+          target emoji"). */}
 
       {/* Highlight Top 3 closest hydrants (No tracer line) */}
       {nearestHydrants.map((hyd, idx) => {

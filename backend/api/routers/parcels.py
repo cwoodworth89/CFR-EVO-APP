@@ -4,9 +4,11 @@ Provides municipal property lookups, autocomplete search, bounding-box spatial q
 and Street View camera overrides on Coquitlam cadastral parcels.
 """
 import re
+import json
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -48,9 +50,40 @@ def _clean_streetview_address(addr: str) -> str:
     return s.strip(' ,.-')
 
 
-def serialize_parcel(p: ParcelModel) -> dict:
+def _rings_from_geojson(geojson) -> list:
+    """The parcel outline as rings of [lng, lat] from a GeoJSON string; [] when absent.
+
+    The same shape the dispatch resolver puts in a call's `target.rings`
+    (address_resolver._extract_rings), so the workstation search can draw the parcel the
+    way the kiosk does (operator, 2026-09-08). The geometry is PostGIS `geom`, not a model
+    column, so the caller fetches it with ST_AsGeoJSON.
+    """
+    try:
+        geom = json.loads(geojson) if isinstance(geojson, str) else geojson
+        if not geom:
+            return []
+        gtype = geom.get("type")
+        if gtype == "Polygon":
+            return geom.get("coordinates", [])
+        if gtype == "MultiPolygon":
+            return [ring for poly in geom.get("coordinates", []) for ring in poly]
+    except Exception:  # noqa: BLE001 -- a malformed geometry draws nothing; it does not break the lookup
+        pass
+    return []
+
+
+def _parcel_geojson(db: Session, parcel_id) -> str | None:
+    try:
+        return db.execute(text("SELECT ST_AsGeoJSON(geom) FROM public.parcels WHERE id = :id"), {"id": parcel_id}).scalar()
+    except Exception as e:  # noqa: BLE001
+        logging.warning("Parcel geometry unavailable for id %s: %s", parcel_id, e)
+        return None
+
+
+def serialize_parcel(p: ParcelModel, rings=None) -> dict:
     """Serializes ParcelModel SQLAlchemy instance to dictionary."""
     return {
+        "rings": rings or [],
         "id": p.id,
         "parcel_uuid": str(p.parcel_uuid) if p.parcel_uuid else None,
         "gis_id": p.gis_id,
@@ -122,7 +155,7 @@ def lookup_parcel(query: str, db: Session = Depends(get_db)):
     if p:
         return {
             "found": True,
-            "parcel": serialize_parcel(p)
+            "parcel": serialize_parcel(p, rings=_rings_from_geojson(_parcel_geojson(db, p.id)))
         }
 
     return {"found": False, "parcel": None}

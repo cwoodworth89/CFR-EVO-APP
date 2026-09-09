@@ -35,7 +35,7 @@ is to make routing **right for fire apparatus and right for this city**, on evid
 | | |
 |:--|:--|
 | Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend`, `osrm-routed --algorithm mld /data/vancouver.osrm`), port 5000 |
-| Data | kiosk `backend/data/osrm/`: `vancouver.osm.pbf` (2026-08-14, git-ignored) and the `.osrm` graph built from it. **Find out which profile built the current graph before anything else**; the compose file does not say |
+| Data | kiosk `backend/data/osrm/`: `vancouver.osm.pbf` (a BBBike extract, map data of 2026-08-07, file of 2026-08-14, git-ignored) and the `.osrm` graph built from it by OSRM v26.8.0 with the stock `car.lua` — answered 2026-09-08, below |
 | Service code | `services/gis/src/gis_service/routing_engine.py` (OSRM client, hall apron departure, staged `APPARATUS_TIERS` — staged, not applied, §6.4) |
 | API | `backend/api/routers/routing.py`; the frontend's `RoutingOverlay.jsx` calls `/api/route` |
 | Frontend | `frontend/src/components/RoutingOverlay.jsx`, `frontend/src/utils/EVORoutingEngine.js` (ETAs per unit from OSRM metrics), the kiosk's `RouteOverviewPanel.jsx` and the workstation's `DispatchTargetLayer.jsx` consume the route |
@@ -79,7 +79,47 @@ is to make routing **right for fire apparatus and right for this city**, on evid
   often. Pull `main` into the branch daily; the basemap stream's merges do not touch the
   files above.
 
-## First hour
+## First hour — answered 2026-09-08
+
+1. **The profile.** The graph was built by OSRM **v26.8.0** (the fingerprint inside
+   `vancouver.osrm.properties`), the version in the image the kiosk runs
+   (`ghcr.io/project-osrm/osrm-backend@sha256:3ac496ff…`, created 2026-08-01), with the **stock
+   `car.lua` shipped in that image**, unmodified as far as the evidence reaches. The text is
+   vendored with its md5 sums, the evidence, and what it does not prove, at
+   [`../standards/osrm/README.md`](../standards/osrm/README.md); the standards index row is
+   HELD as text and still NOT HELD as a fire-apparatus authority. No build command was recorded
+   anywhere and the build container is gone. The extract is a BBBike custom extract whose
+   header says the map data is from **2026-08-07T23:00Z**; the file is dated 2026-08-14.
+2. **The baseline** is `tools/route_corpus_baseline.py`: every verified dispatch, the arrival
+   point resolved as production resolves it, routed from all four hall aprons with production's
+   query; `--json` before, `--baseline` after, `--record` as the `routing` stage. Recorded
+   2026-09-09 as the `routing` row labelled *stock car.lua, osrm v26.8.0, extract 2026-08-14*
+   (`tools/harness_history.py --stage routing`): **571 calls, 562 placed, 9 unresolved,
+   2,248 of 2,248 routes returned; the dispatched routes' median is 2.39 km / 3.9 min.** Per
+   hall, median and p90: Hall 1 2.24 / 4.30 km, Hall 2 3.74 / 6.62 km, Hall 3 8.58 / 11.51 km,
+   Hall 4 5.52 / 6.88 km. Two things the geometry reports, for the operator to rule on before
+   anyone touches the profile:
+   * **24 routes pass a node twice.** 22 of them are the same place: every Hall 1 route that
+     turns west onto Guildford Way from Pinetree Way loops 50 m around the four nodes of that
+     junction and leaves through the node it entered, because OSM relation 6812366 forbids the
+     right turn there (`no_right_turn`, Pinetree southbound → Guildford westbound via node
+     12376791632). One junction, in the map data, not the profile; the evidence and the question
+     for the operator are in punch-list #1. The other two are 3100 Ozada Ave from Halls 1 and 4:
+     the route turns around in an unnamed way off Inlet St to come back along Ozada on the
+     other side.
+   * **180 routes carry a U-turn step** (48 of them from a hall that responded). 135 are in
+     the last two steps: the arrival point sits on one carriageway of a divided road (Barnet,
+     Lougheed, Guildford, Mariner) and OSRM turns at the next break to be on it. 20 are in the
+     first two steps, 19 of them Hall 2, which drives up Mariner Way and turns back. Whether a
+     crew does either is the operator's answer; neither is a profile setting.
+3. **Punch-list #1's named path**, Hall 1 apron → 428 Nelson St front point, routed
+   2026-09-08 on the kiosk: 9.78 km, 15.1 min, Pinewood Ave → Pinetree Way → Barnet Hwy →
+   Mariner Way → Como Lake Ave → Linton St → Austin Ave → Nelson St; no node passed twice, no
+   U-turn step. The loops the item describes are not on that path; the one place they are is
+   the Pinetree/Guildford junction above. The item stays open on the operator's answer about
+   that junction, and on any other dispatch id they name with a route they would not drive.
+
+## First hour, as originally written
 
 1. On the kiosk: `docker exec cfr_osrm ls /data`, the `.osrm.timestamp`, and which profile
    built it (the `.osrm.properties` file records it). Write the answer into this brief.

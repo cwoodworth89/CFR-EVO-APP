@@ -67,6 +67,12 @@ export const BASE_LAYERS = {
     fallbackUrl: null, // 100% pure offline local pre-cached tiles
     attribution: 'City of Coquitlam Cadastral (100% Offline Local Cache)',
     subdomains: ['a', 'b', 'c'],
+    // z14 is where this tile set begins -- read from the server's own metadata
+    // (`/services/cadastral`: "minzoom": 14, "maxzoom": 20, checked 2026-09-08), not
+    // chosen. It is also the zoom at which the basemap's street labels are turned off,
+    // because from here up the cadastral tiles carry their own road names and addresses
+    // and two sets on one map is worse than none. MapSurface owns that swap.
+    minZoom: 14,
     maxNativeZoom: 20,
     maxZoom: 22
   }

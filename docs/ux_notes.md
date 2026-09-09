@@ -37,6 +37,8 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 | *"The pip windows are VERY busy. The worst offender is the streetview one."* | Street View tile: lower bar removed, header shrunk to *Street View ● 214°* | The cadastral and satellite tiles keep their header pill, a *100% Local* badge and *Expand*. Nothing specific was asked; they are the next candidates |
 | *"The option to save a view should only be inside the expanded window."* | Done | — |
 | *"I thought the PiP mode was going to be static serve, with the expand allowing interactive mode."* | The compact tile is a static image at the saved view; Expand opens the interactive panorama with the save bar | Needs *Street View Static API* on the key; until then the tile falls back to interactive and says so |
+| *"I can get to the FoV I want and I can save it… hit save it snaps back to zoom 1. If I leave and come back, the setting is lost."* (2026-09-08) | Three faults on one value, all fixed. `z \|\| 1` in two places rewrote zoom 0 — fully zoomed out — as zoom 1, because 0 is falsy; that is what reached the database. The tracking listener wrote the *zoom level* into the *degrees* field (#35a, corrected in the save path 2026-09-06 and missed here). A zoom 1..4 clamp pulled anything wider than 90° back on every mount, so even a correct save could not survive a reload | §3.9 records the platform limit that cannot be resolved |
+| *"When I switch to aerial the black labels are difficult to see."* (2026-09-08) | Zone numbers turn white with a soft shadow on the orthophoto, and stay dark on the street basemap | — |
 | *"'Saved Preferred View' is taking up a lot of room, and so is the label."* | A green dot and the heading in the tile header; full wording only in the expanded view | — |
 | *"I don't need to see all of those hydrants. Just the recommended ones."* | The dispatch map draws only the picks, numbered, in NFPA 291 colours | — |
 | *"I don't like the pop up boxes there. It makes it hard to understand the route. … show ALL the hydrants on the main route map, but only at a certain close in zoom."* (2026-09-07) | Picks are small numbered badges, no label box; the full hydrant layer draws on the route map from zoom 16 | — |
@@ -108,6 +110,28 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    concern (`cec-utils` against the snap Chromium session), not a React one, and nothing has
    been measured: how long the TV takes to wake, and whether that delay lands before or after
    the phase-1 publish at 16–19 s, decides whether it is usable at all. Not built.
+9. **Street View field of view: settled 2026-09-08, and worth not re-opening.** The stored
+   value is the **angle in degrees**, at full precision, in `parcels.streetview_fov`. Zoom is
+   derived on the way to the SDK (`fov = 180 / 2^zoom`), never stored beside it. Nothing is
+   clamped on **load** — that was the original defect, a saved framing rewritten every mount.
+
+   The awkward part is a platform contradiction rather than a preference. The Street View
+   **Static API** will not draw wider than **120°**; the **JS SDK** will not go narrower than
+   its own minimum, which is **viewport-dependent** — measured at 127.31° in Chrome at 971px
+   and 180° in Firefox. The two limits do not nest, so at the wide end the panel and the tile
+   *cannot* agree. Three resolutions were built and tried the same evening:
+
+   | Tried | Outcome |
+   |:--|:--|
+   | Clamp the wheel at 120° | **Broken.** Our listener and the SDK alternated forever — `setZoom` re-fires `zoom_changed`, so neither yields. Visible only with devtools *closed*, because a docked console narrows the pane and raises the SDK's floor above ours |
+   | Clamp at save, so both surfaces draw one angle | **Rejected.** *"Snapping closer than acceptable"* — pulling a 180° framing back to 120° discards the width being zoomed out for |
+   | Store what was framed | **Accepted.** Above 120° the tile is narrower than the panel it was saved from |
+
+   The asymmetry is deliberate: **the expanded panel is the framing tool and is trusted; the
+   tile is a thumbnail doing its best.** The SDK behaviour is recorded with its stack traces
+   in [`standards/dependency-behaviour.md`](standards/dependency-behaviour.md). Open only if
+   it ever grates: showing the FoV number in the save bar, so the tile being narrower is
+   visible rather than puzzling.
 
 ---
 
@@ -130,6 +154,14 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
   keeps the full layer behind a toggle. No label boxes on the map: they hide the route.
 * **A failure states itself.** A failed image or SDK load shows a labelled fallback, never a
   black rectangle that looks like a working panel (the weeks of #35a).
+* **A saved view is applied as saved.** Nothing clamps or rounds a stored camera on the way
+  back in. Where a platform limit genuinely bites it is applied at the point of use — the
+  Static API's 10..120° lives on the tile's URL and nowhere else.
+* **One basemap, named for what it is.** `BASE_LAYERS` is `STREET`, `SATELLITE`, `CADASTRAL`.
+  It held five names for two tile sets, and callers inherited a labels decision by picking a
+  style name; labels are now a boolean, so changing what "street" means is one entry
+  (2026-09-08). Turning *Road Names & Addresses* on at zoom 16+ deliberately takes labels
+  **off** the basemap, because that toggle draws the cadastral overlay and its own names.
 * **The marker is where the truck stops** — the city-to-private transition. Distances to it
   are distances the crew will walk or lay hose.
 

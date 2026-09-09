@@ -38,6 +38,7 @@ Quotes are the operator's. Each one changed the plan; the change is stated besid
 | Does the hall display keep reading without a login? | *"yeah that sounds like a good plan"* | **Ruled: reads stay open from the LAN and Tailscale, where `is_allowed_network` already draws the line, and a device token is required only from outside it.** The hall display never signs in and cannot log itself out mid-call. Phase 4 item 3 is built to this. |
 | The in-cab tablet | *"it'll probably be an iPad, but this is theory."* | **Deferred.** Phase 3's tablet breakpoint and the in-truck type-size measurement wait until there is a tablet. The layout below `lg` already serves an iPad held upright (§7). |
 | The freeze | *"right now I want to get my android phone working"* | **The phone surface is promoted; Phases 1 to 3 built the same day** (§7). Android Chrome is the bench as ruled; the iOS checks in §7 are still to run on a real iPhone. |
+| Who reads the dash phone, and when (§8) | *"Driver before rolling."* | **The phone is read stationary, at arm's length, by the driver, in the seconds between the tones and rolling.** So: the alert is a confirmation screen, not a glance from across a cab, and normal reading sizes hold; the order of the choices is the driver's order, route first, then the parcel and its hydrants, which are the pump operator's business at the hydrant; nothing on it needs to be legible while moving, so no in-truck type-size measurement is owed for the phone. What is still open is whether the call stays on the phone until dismissed, since the same driver is at the hydrant on arrival. |
 
 ---
 
@@ -619,9 +620,14 @@ way back. Four of the five exist as components today; the frame and the alert ar
    endpoint (Phase 4, §3.6). The design can be built and tested on the operator's phone
    before that exists.
 
-**Open, in order:** who reads the dash phone and when (the driver before rolling, the
-officer while rolling), which sets the type size and how much a view may ask of a glance;
-whether the call stays until dismissed or times out like the hall display; the current call
-only or recent calls too (§6).
+**Ruled 2026-09-09: the driver, before rolling** (the rulings table). So the alert is read
+stationary at arm's length and may ask for a read, not a glance; the choices are in the
+driver's order, Route first, then Parcel, whose hydrant pick is the same person's business at
+the hydrant on arrival.
+
+**Open, in order:** whether the call stays on the phone until dismissed or the next call
+(the hall display times out after five minutes, which on a phone would clear the hydrant
+pick before the driver reaches it); whether satellite and parcel are one view or two; the
+current call only or recent calls too (§6).
 
 <!-- audit-ok: frontend/src/App.css -- deleted 2026-09-09; the text above records the deletion -->

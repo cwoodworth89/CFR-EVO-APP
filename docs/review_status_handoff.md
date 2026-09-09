@@ -36,6 +36,7 @@ revert), and this one, which reviewed that work and then took the operator's not
 | The cadastral tile is gone from the kiosk stack; two taller tiles | #74 |
 | The searched parcel is outlined on the workstation map and satellite tile; the kiosk route map shades the parcel soft blue; both only from the cadastral zoom (14); no centroid target icon; hydrant picks are solid numbered dots everywhere | #74 |
 | The route auto-fit runs once per call, so nothing undoes a snap or a pan | #74 |
+| Snap, parcel shading and the hydrant picks **confirmed on the kiosk by the operator** (not only on the workstation) | #74 |
 | Arrival points set by the operator on two real sites; the card scrolls | #49 closed |
 | Test suite no longer leaves `5000 TESTING WAY` in the live parcels table; the review sidebar names the box that rules each flag | — |
 

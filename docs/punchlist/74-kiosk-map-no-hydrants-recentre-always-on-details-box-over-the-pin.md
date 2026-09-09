@@ -185,4 +185,7 @@ blinks like it should do something but it doesn't move at all."* Two causes, bot
    workstation it sometimes never started. A snap is a cut now (`animate: false`) on both
    maps. Verified on the workstation: zoom 18 held for fifteen seconds with the street and
    cadastral tiles loaded, the parcel shaded and the two picks badged.
+   **Confirmed on the kiosk by the operator, 2026-09-08**: *"Snap and shading look good on the
+   kiosk."* The snap, the parcel shading from the cadastral zoom and the picked hydrants are
+   all crew-visible now, seen on the screen the crew reads.
 

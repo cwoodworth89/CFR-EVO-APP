@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **86 items, 7 open (3 crew-visible), 79 closed** as of 2026-09-06 night. The live work queue
+  **86 items, 6 open (3 crew-visible), 80 closed** as of 2026-09-08 night. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -18,6 +18,42 @@ Companion documents:
 * [`docs/briefs/osrm_routing_agent.md`](./briefs/osrm_routing_agent.md) and [`docs/briefs/vector_basemap_agent.md`](./briefs/vector_basemap_agent.md) — **the two post-freeze streams, one brief each**: scope, where things are, the rules on the shared kiosk, the file boundary between them, and the first hour
 * [`docs/ux_notes.md`](./ux_notes.md) — **the brief for the next UX pass**: what the operator said on 2026-09-06, what was done, the open design decisions, and the conventions the screens have settled into
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
+
+---
+
+## Update, 2026-09-08 — hardening, the operator's UX pass, and two streams spun out
+
+**Punch list: 6 open, 3 crew-visible, 80 closed.** Two sessions worked this day: one on UX
+(kiosk mode removed, zone labels, the Street View zoom saga, the basemap collapse and its
+revert), and this one, which reviewed that work and then took the operator's notes live.
+
+### Live on the kiosk
+
+| Change | Where |
+|:--|:--|
+| Street View hardened: one view object, pure tested arithmetic (`utils/streetViewGeometry.js`, 15 tests), one SDK loader (`utils/googleMapsLoader.js`), one hook owning the panorama (`hooks/useStreetViewPanorama.js`); the database is the only saved view; a failed save says so; the static tile searches the same 100 m the SDK does | #35a, skill §3 |
+| SNAP TO CALL / RESET VIEW (kiosk) and SNAP TO CALL / SHOW ROUTE (workstation): the parcel and the picked hydrants, capped at zoom 18, instant | #74 |
+| The cadastral tile is gone from the kiosk stack; two taller tiles | #74 |
+| The searched parcel is outlined on the workstation map and satellite tile; the kiosk route map shades the parcel soft blue; both only from the cadastral zoom (14); no centroid target icon; hydrant picks are solid numbered dots everywhere | #74 |
+| The route auto-fit runs once per call, so nothing undoes a snap or a pan | #74 |
+| Arrival points set by the operator on two real sites; the card scrolls | #49 closed |
+| Test suite no longer leaves `5000 TESTING WAY` in the live parcels table; the review sidebar names the box that rules each flag | — |
+
+### Decisions recorded, not built
+
+Interactive Street View stays (the slider alternative declined); admin-gating the two saves
+is the operator's design for the UX pass; one hydrant versus two, and the details box's
+home, are still theirs. All in [`ux_notes.md`](ux_notes.md).
+
+### Two streams, two worktrees
+
+The operator lifted the freeze for two streams and they run in parallel in their own
+worktrees and branches: [`briefs/osrm_routing_agent.md`](briefs/osrm_routing_agent.md)
+(`../CFR-EVO-APP-routing`, branch `routing`) and
+[`briefs/vector_basemap_agent.md`](briefs/vector_basemap_agent.md)
+(`../CFR-EVO-APP-basemap`, branch `basemap`). This folder stays on `main`, which is what
+the kiosk pulls. The file boundary between them is in the briefs; the routing stream must
+not touch the map layers, the basemap stream must not touch routing.
 
 ---
 

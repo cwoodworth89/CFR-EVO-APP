@@ -200,6 +200,14 @@ class TestAPIRouters(unittest.TestCase):
         self.assertEqual(del_res["status"], "success")
 
     def test_parcels_and_streetview_router(self):
+        # The row this test writes lands in the only Postgres there is -- the kiosk's live
+        # parcels table -- and it was found there as a real-looking address with a saved
+        # Street View (2026-09-06). Remove it when the test ends, pass or fail.
+        def _remove_test_parcel():
+            self.db.query(ParcelModel).filter(ParcelModel.address == "5000 TESTING WAY").delete(synchronize_session=False)
+            self.db.commit()
+        self.addCleanup(_remove_test_parcel)
+
         # 1. Save parcel streetview
         save_res = save_parcel_streetview(
             ParcelCameraOverrideSchema(

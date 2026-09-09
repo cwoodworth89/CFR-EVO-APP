@@ -544,11 +544,25 @@ export default function StreetViewPanel({ activeCall }) {
       // Degrees, and degrees only. This used to send the zoom level (0-4) and the database
       // held "fov 1" for a 90-degree view (#35a, 2026-09-06).
       //
+      // clampStaticFov here means THE STORED ANGLE IS ONE BOTH SURFACES CAN DRAW. The SDK
+      // lets the operator frame wider than the Static API can render -- 180 degrees in
+      // Firefox, 127 in Chrome, against the tile's 120 maximum -- and storing that produced
+      // a tile 60 degrees narrower than the panel it was saved from (2026-09-08).
+      //
+      // This is a clamp at SAVE, which is the one place it works. Clamping the wheel fought
+      // the SDK forever (see the header). Clamping on LOAD rewrites a stored view behind
+      // the operator's back. Clamping once, here, settles the panorama onto the value the
+      // tile will actually request -- so the view left on screen after a save is the view
+      // the crew will see, and reopening the panel reproduces it exactly.
+      //
+      // The rounding is the same reason: the tile's URL takes whole degrees, so storing
+      // anything finer would store a number the tile cannot honour.
+      //
       // A `zoom` key rode alongside until 2026-09-08 and was never stored -- neither
       // public.parcels nor ParcelCameraOverrideSchema has such a field, so Pydantic dropped
       // it. Removing it also makes the state right after a save identical to the state
       // after a reload, since both now derive zoom from the one saved angle.
-      fov: zoomToFov(currentZoom),
+      fov: clampStaticFov(zoomToFov(currentZoom)),
       pano_id: currentPanoId
     };
 

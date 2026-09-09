@@ -191,6 +191,21 @@ Duration change over the 820, in seconds: min −48, median +4, p90 +4, max +11.
 before and after, went to the operator on 2026-09-09 and is reproducible from the two recorded
 rows.
 
+### Operator rulings, 2026-09-09, on the two places above
+
+> On the emergency access off Mary Hill Bypass (ways 640030541/3/5): "That's an emergency fire
+> access to the Colony Farm psychiatric facility. We would never use that."
+>
+> On the Hall 2 apron way: "Yes, that's the end of the Hall 2 apron. Funny enough for the
+> longest time the routing CAD software that E-Comm used refused to recognize the trucks could
+> make a left turn there. So they were penalized heavily when they were determining the nearest
+> unit, and heat mapping the city. I think it's been fixed or overwritten now."
+
+The Colony Farm lane is on no route today, so nothing changes now; it is the first candidate
+for a per-way exclusion if a route ever reaches for it. The Hall 2 apron departure is confirmed
+as the truck leaving from its own door, and the E-Comm history is the same defect on the other
+system: a rule at one node penalising a whole hall.
+
 **To deploy**, at a moment the operator picks (restarting `osrm` drops routing on every kiosk for
 the seconds the graph takes to load): in `docker-compose.yml` the `osrm` command's
 `/data/vancouver.osrm` becomes `/data/apparatus.osrm`; `git pull` on the kiosk; `docker compose

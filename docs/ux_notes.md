@@ -102,7 +102,9 @@ automated runs hit was pressing it before the suggestions had loaded.
    session is `hooks/useAdminSession.js`, the gate is `require_admin` in the auth router
    on the two saves and the two older Street View override routes; reads stay open. Found
    on the way: the client logged every browser in by itself with the password in the source,
-   so there had been no locked state anywhere; gone. **Open**: the auto-lock, for production.
+   so there had been no locked state anywhere; gone. Confirmed by the operator the same day:
+   *"Unlocked it, review dropdown and save buttons are back."* **Open**: the auto-lock, for
+   production.
 4. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
    Secondary hydrants can be picked by the drivers and officers of the next due trucks."*
    The picker already orders them; showing one is `picks.slice(0, 1)` on the map and in the

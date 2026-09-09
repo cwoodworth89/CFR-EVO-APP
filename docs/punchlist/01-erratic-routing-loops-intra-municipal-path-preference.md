@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN — apparatus profile **deployed 2026-09-09 12:30 PDT**; closes on the operator's word, the speed table stays unsourced |
+| **Status** | CLOSED 2026-09-09 (operator: "Close #1 and put the speed table on the backlog") — apparatus profile deployed 12:30 PDT; the speed table is a post-freeze backlog line |
 | **Severity** | crew-visible |
 | **Area** | 🧭 Routing Engine & Pathfinding Anomalies |
 | **Blocks** | 1 |
@@ -237,7 +237,11 @@ container `cfr_osrm_trial` was then removed. **Rollback**: the same compose edit
 ---
 
 ## 1. Erratic Routing Loops & Intra-Municipal Path Preference
-> **Status**: ⚠️ **Still open — re-examined 2026-09-09, above: one junction, in the map data.** Turn-by-turn
+> **Status**: ✅ **CLOSED 2026-09-09.** The loop as reported was one mistagged OSM relation at
+> Pinetree Way and Guildford Way; the apparatus profile deployed the same day ignores turn
+> restrictions by the operator's ruling and the corpus shows no route passing a node twice. The
+> speed table remains OSRM's stock figures and is a post-freeze backlog line, not an open
+> defect. What follows is the original report. Turn-by-turn
 > routing functions, but the OSRM Lua profile arterial-vs-alleyway weighting has not been
 > re-tuned. No new evidence was gathered this pass; the description below is as originally
 > reported and the loops have **not** been re-observed since routing moved to stock OSRM.

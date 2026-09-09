@@ -79,7 +79,22 @@ def calculate_streetview_heading(street_lat: float, street_lng: float, parcel_la
 
 ---
 
-## 3. Real-Time POV Drag Synchronization Pattern (React + Google JS SDK)
+## 3. How the panel is built (hardened 2026-09-08)
+
+Three modules, one view object `{ lat, lng, heading, pitch, fov, panoId }`:
+
+| Module | Owns |
+|:--|:--|
+| `frontend/src/utils/streetViewGeometry.js` | the arithmetic, pure and tested (`npm run test:node`): fov ⇄ zoom, the Static and Embed URLs, the saved view from a parcel row, the default view for a call, `viewsMatch` |
+| `frontend/src/utils/googleMapsLoader.js` | loading the SDK once per page the documented way (`loading=async` + callback) and keeping Google's per-page auth verdict |
+| `frontend/src/hooks/useStreetViewPanorama.js` | the panorama's life: build in a container, apply a changed view without rebuilding, read the camera back for a save, tear down |
+| `frontend/src/components/kiosk/StreetViewPanel.jsx` | layout only: static tile, expanded interactive view, save bar |
+
+The saved view comes from `public.parcels` and nowhere else; the localStorage copy that
+used to shadow it is gone. A failed save reports as failed. The pattern below is what the
+hook does inside; do not reintroduce it in a component.
+
+### 3a. The listener pattern the hook implements (reference)
 
 In interactive 360° mode, cross-origin Security (`same-origin` policy) prevents `<iframe>` elements from leaking user touch/mouse camera rotation angles back to React. To capture the exact angle a user drags to when tapping **"Save Preferred View"**, use `window.google.maps.StreetViewPanorama` with a real-time `pov_changed` listener:
 

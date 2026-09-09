@@ -39,20 +39,27 @@ import { apiClient } from '../../apiClient';
 // double precision, so there is nothing to round for, and zoom is derived on the way to
 // the SDK rather than kept beside the angle -- one value cannot disagree with itself.
 //
-// FOV_MIN..FOV_MAX is the Street View Static API's documented `fov` range, and it is the
-// only limit in this file. WHERE it is applied is the whole point (operator, 2026-09-08:
-// "we save what the user sees and don't offer an option that's not available"):
+// FOV_MIN..FOV_MAX is the Street View Static API's documented `fov` range. It bounds the
+// TILE URL and nothing else, and that is not a preference -- it is forced.
 //
-//   * At the INTERACTION -- the wheel stops at 120 degrees, the way any map stops at its
-//     minimum zoom. The operator cannot frame a view the compact tile could not draw, so
-//     nothing they save ever needs adjusting afterwards.
-//   * NOT on load. A clamp there rewrites a stored view behind the operator's back, which
-//     is exactly what the old zoom 1..4 clamp did: anything wider than 90 degrees was
-//     pulled back to 90 every time the panel mounted, so a zoomed-out framing never
-//     survived a reload.
+// Bounding the wheel at 120 degrees was tried on 2026-09-08 and had to be reverted the
+// same day. The JS SDK enforces its own minimum zoom, that minimum depends on the
+// container's size, and at the expanded panel's 971px it is zoom 0.4996 -- 127.31 degrees,
+// WIDER than the Static API's 120 degree maximum. So the two limits are not nested and the
+// SDK wins: our zoom_changed listener pushed to 0.5849625, `_.Vm.set` inside the SDK pushed
+// straight back to 0.4996017, and the two alternated forever. Measured from the operator's
+// own console, which is also why it only misbehaved with devtools CLOSED -- the sidebar
+// narrows the container, which raises the SDK's minimum above our floor and the fight never
+// starts. Recorded in docs/standards/dependency-behaviour.md.
 //
-// Same numbers, opposite honesty: bounding what can be created preserves the saved value,
-// bounding what can be displayed destroys it.
+// What that costs, and it is the honest trade: at the widest end the panorama can show
+// about 127 degrees while the tile draws 120. Roughly 6% narrower on the tile, and the
+// alternative is a clamp the platform will not honour.
+//
+// The one rule that still holds absolutely: nothing clamps on LOAD. A clamp there rewrites
+// a stored view behind the operator's back, which is what the old zoom 1..4 clamp did --
+// anything wider than 90 degrees was pulled back to 90 on every mount, so a zoomed-out
+// framing never survived a reload.
 const FOV_MIN = 10;    // Street View Static API `fov` parameter, documented range
 const FOV_MAX = 120;   // 10..120 degrees
 
@@ -63,15 +70,6 @@ const fovToZoom = (fov) => {
 const zoomToFov = (zoom) => {
   const z = Number(zoom);
   return 180 / Math.pow(2, Number.isFinite(z) ? z : 1);
-};
-// Derived, not written down twice: fov 120 -> zoom 0.585 (widest the operator can reach),
-// fov 10 -> zoom 4.17 (tightest). Deriving them is what keeps the panorama and the tile
-// from drifting apart, which is how they disagreed before.
-const ZOOM_MIN = fovToZoom(FOV_MAX);
-const ZOOM_MAX = fovToZoom(FOV_MIN);
-const clampPanoZoom = (zoom) => {
-  const z = Number(zoom);
-  return Math.min(Math.max(Number.isFinite(z) ? z : 1, ZOOM_MIN), ZOOM_MAX);
 };
 /** Degrees for the Static API URL. Rounded because the parameter's accepted number format
  *  is not something this project has verified, and a sub-degree difference on a 640x400
@@ -369,17 +367,10 @@ export default function StreetViewPanel({ activeCall }) {
           // a framing the operator chose.
           if (!Number.isFinite(z)) return;
 
-          // Hold the wheel inside what the Static API can render. Pushing the panorama
-          // back is what makes the limit visible: it simply stops, the way a map stops at
-          // its minimum zoom, instead of letting the operator frame something that would
-          // be quietly altered on the way to the tile. setZoom re-enters this listener
-          // with the clamped value, which then falls through and is recorded.
-          const bounded = clampPanoZoom(z);
-          if (Math.abs(bounded - z) > 1e-9) {
-            pano.setZoom(bounded);
-            return;
-          }
-
+          // Records what the SDK settled on; never argues with it. Correcting the zoom
+          // from inside this listener is what produced the 2026-09-08 fight described
+          // above -- the SDK re-fires zoom_changed with its own minimum and neither side
+          // yields.
           currentPovRef.current = {
             ...currentPovRef.current,
             zoom: z,

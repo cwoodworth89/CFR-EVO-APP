@@ -8,6 +8,44 @@ Both categories caused real defects in the 2026-08-21/22 review, but the library
 more dangerous, because a domain gap feels like a gap while a library assumption feels
 like knowledge.
 
+## `StreetViewPanorama` minimum zoom is viewport-dependent, and can be wider than the Static API allows
+
+**Measured 2026-09-08**, from the operator's own browser console on the kiosk.
+
+| | |
+|:--|:--|
+| Street View **Static API** `fov` | documented 10..120 degrees |
+| Street View **JS SDK** minimum zoom | not documented as a number; **enforced**, and it varies with the container's size |
+
+At the expanded panel's 971x622 container the SDK refused to go narrower than zoom
+`0.4996017945373167` -- **127.31 degrees**, wider than the Static API's 120 degree maximum.
+The two limits are therefore **not nested**, and any attempt to hold the panorama inside the
+Static API's range fights the SDK and loses:
+
+```
+setZoom -> 0.5849625007211562   at _.Os.<anonymous>  (our zoom_changed listener, 120 deg)
+setZoom -> 0.4996017945373167   at _.Vm.set          (the SDK, 127.31 deg)
+setZoom -> 0.5849625007211562   at _.Os.<anonymous>
+setZoom -> 0.4996017945373167   at _.Vm.set
+...
+```
+
+The loop is unbounded: `setZoom` re-fires `zoom_changed`, and neither side yields.
+
+The size dependency is what made it look intermittent. With devtools open the sidebar
+narrows the container, which raises the SDK's minimum above our floor, so the clamp never
+engages and the panel behaves perfectly. Closing devtools widens the container, lowers the
+SDK's minimum below our floor, and the fight resumes. Any bug that "only happens with the
+console closed" should be suspected of depending on the viewport.
+
+**Consequence for CFR EVO**: the panorama is never clamped. It records whatever zoom the SDK
+settles on, and only the tile's URL is bounded, so at the widest end the expanded panorama
+shows about 127 degrees where the compact tile draws 120.
+
+**The general shape**: two limits from the same vendor, for the same quantity, that do not
+nest -- and only one of them is written down.
+
+
 ## The pattern: the API name is not the contract
 
 Every library defect found so far had the same shape — **the name described the intent,

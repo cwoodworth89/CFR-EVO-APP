@@ -62,6 +62,8 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 |:--|:--|:--|
 | *"It would be nice to see hydrants to a given address."* | A searched address shows its picks and the arrival-point section | — |
 | Arrival points could only be set by SQL (#49) | *Set arrival point* on the target card: click the map, note, name, save; attributed | The worst-first review queue is a CSV, not a screen |
+| *"The box gets a little clipped and I can't get to what I assume is save button at the bottom."* (2026-09-08) | The card scrolls and the frontage explanation gives way to the form while placing | — |
+| *"I'm not sure I want this, or the street view save button to be crew facing, only admin unlocked."* (2026-09-08, "doesn't need to change or secure at this moment") | Not changed | **Design decision for the UX pass**: gate the two saves (arrival point, Street View) behind the existing admin login, in the UI and at the API. See §3 |
 | *"we can get rid of driver push setups from the dropdown menu. It's handled by the button Driver Alerts. But I think the name of that button needs to change to be more intuitive. Mobile Alerting? Mobile Setup?"* (2026-09-08) | `MOBILE: DRIVER PUSH SETUP` is off the mode select; the button is **📱 MOBILE SETUP**. The screen is a one-time QR pairing page, not a live alert feed, which is what *DRIVER ALERTS* read like. The select is now two entries, Explore and Admin | The screen behind it is still the #60 placeholder, still publishing the wrong ntfy topic |
 | *"the emergency zone numbers as rendered are not very centred of their polygon outline"* (2026-09-08) | They were placed by `getZoneCentroid`, which computed a bounding-box centre despite the name. Over the 134 zones that put two labels (126, 134) **outside their own polygon**, 126 by 2.0 km, the median 139 m off. Now the pole of inaccessibility (`@mapbox/polylabel`), longitude scaled by cos(lat) first so the search is not run on a shape stretched 1.5× east–west. Verified through the shipped path: 0 outside, median label moves 121 m, zone 126 moves 1.77 km | — |
 | *"when I switch to aerial map view, the black labels are difficult to see"* (2026-09-08) | Zone numbers turn white with a soft shadow when the base layer is the City orthophoto, and stay near-black on the pale street basemaps. One `baseStyle` expression in `MapBoard.jsx` feeds both the basemap and the overlay, so they cannot disagree | The picked-hydrant badges are also near-black, but on a filled NFPA-coloured circle with a white ring, so they read on any base. Not raised |
@@ -87,26 +89,32 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    (the parcel plus the picked hydrants, close in, capped at zoom 18) and *RESET VIEW* (the
    whole route). The cadastral tile was dropped the same day; the stack is two taller
    tiles, satellite and Street View.
-3. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
+3. **Who may save.** The arrival point and the Street View view are operator rulings, and
+   the workstation is a shared screen. The operator's instinct (2026-09-08) is that neither
+   save should be crew-facing. Recommendation: an *unlock* that reuses the review screen's
+   admin login (the JWT already exists), the two save controls rendered only while unlocked,
+   and the two endpoints (`POST /api/parcels/entrance`, `POST /api/parcels/streetview`)
+   requiring the token. About an hour once the freeze lifts; reading stays open to all.
+4. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
    Secondary hydrants can be picked by the drivers and officers of the next due trucks."*
    The picker already orders them; showing one is `picks.slice(0, 1)` on the map and in the
    details box, and the full layer at zoom 16 is where the next-due crews pick theirs. The
    one case that still wants a second line is the long lay: a first choice past 500 ft along
    the route with a closer off-route hydrant beside it is a decision, not a list, and the
    operator's own rule asked for both to be shown there. Not built; for the UX pass.
-4. **Street View beside the map.** The Google Maps Platform Terms §3.2.3(e)(ii) forbid
+5. **Street View beside the map.** The Google Maps Platform Terms §3.2.3(e)(ii) forbid
    "Street View imagery and non-Google Maps on the same screen." The kiosk does that today.
    The operator noted it and deferred the ruling. The layouts that satisfy it are a
    full-screen Street View modal with the map hidden while it is open, a separate screen, or
    no Street View. This constrains any redesign of the right-hand stack.
-5. **Progressive dispatch.** The operator's design for the kiosk to pop on the tones and fill
+6. **Progressive dispatch.** The operator's design for the kiosk to pop on the tones and fill
    in layer by layer (units, call type, address, grid, near roads, talk group, spoken grid),
    with the phone push firing once a driver can act. Spec, rulings and the measurement to run
    first: [`architecture/progressive_dispatch.md`](architecture/progressive_dispatch.md).
    Post-freeze.
-6. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
+7. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
    solid and the others translucent. Operator's idea, on the post-freeze backlog.
-7. **The review rating from the kiosk** (#52a) and **the mobile setup screen** (#60): both
+8. **The review rating from the kiosk** (#52a) and **the mobile setup screen** (#60): both
    need a spec before design.
 8. **What the hall display does between calls.** Operator, 2026-09-08: *"In real deployment,
    I would probably have the TV go to a sleep/standby, with CEC wakeup or some other

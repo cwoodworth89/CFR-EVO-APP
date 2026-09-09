@@ -58,12 +58,15 @@ function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave
       <span className="text-[9.5px] text-amber-400 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
         🚒 Arrival point
       </span>
+      {/* The explanation gives way to the form while placing: the card is a third of the
+          stack's height and the form's save button was clipped below it (operator,
+          2026-09-08). The card also scrolls now, so nothing in it is unreachable. */}
       {hasEntrance ? (
         <div className="text-[10px] font-mono bg-emerald-950/50 border border-emerald-800/60 rounded-lg px-2.5 py-1.5 text-emerald-200">
           <div className="font-black">OPERATOR-SET · {parcel.entrance_set_by}{parcel.entrance_set_at ? ` · ${String(parcel.entrance_set_at).slice(0, 10)}` : ''}</div>
           {parcel.entrance_note && <div className="text-emerald-100/90 italic mt-0.5">"{parcel.entrance_note}"</div>}
         </div>
-      ) : (
+      ) : !placing && (
         <div className="text-[10px] font-mono text-slate-400 bg-slate-950/80 border border-slate-800/80 rounded-lg px-2.5 py-1.5">
           Computed frontage: the closest point on the addressed road to the parcel. Set one only if the truck should stop somewhere else.
         </div>
@@ -117,7 +120,7 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
 
   return (
       <div className="flex-1 min-h-0 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-xl backdrop-blur relative overflow-hidden">
-        <div>
+        <div className="min-h-0 overflow-y-auto pr-1">
           <div className="flex justify-between items-center gap-2 pb-2.5 border-b border-slate-800">
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">SEARCH TARGET</span>

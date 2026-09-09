@@ -116,8 +116,11 @@ is to make routing **right for fire apparatus and right for this city**, on evid
    2026-09-08 on the kiosk: 9.78 km, 15.1 min, Pinewood Ave → Pinetree Way → Barnet Hwy →
    Mariner Way → Como Lake Ave → Linton St → Austin Ave → Nelson St; no node passed twice, no
    U-turn step. The loops the item describes are not on that path; the one place they are is
-   the Pinetree/Guildford junction above. The item stays open on the operator's answer about
-   that junction, and on any other dispatch id they name with a route they would not drive.
+   the Pinetree/Guildford junction above. The operator ruled on it the same day: the sign is
+   no right on red, the relation is mistagged, and the fix is upstream in OSM. Their rulings
+   on what the profile may change are quoted in punch-list #1, with the one class still open,
+   posted turn restrictions. The item stays open on that answer, and on any other dispatch id
+   they name with a route they would not drive.
 
 ## First hour, as originally written
 

@@ -86,6 +86,45 @@ response, and which never? That list is the specification the profile work has b
 nothing in `car.lua` moves until it exists (§7.2). The right-on-red case needs no ruling: it is
 a mapping error, and the fix is in OSM.
 
+### Operator rulings, 2026-09-09, on the table above
+
+> "We have some bollards, but those would be picked as a secondary route."
+>
+> "We can assume all fire vehicles can ignore the same rules, and for routing we can assume
+> emergency response."
+>
+> "Fire lanes a car can definitely use, but not park."
+>
+> "One-way restrictions would be an operator choice at the time of driving, not offered."
+>
+> "We don't have weight or height restrictions in emergency responses."
+
+What each one does to the profile, against the vendored text
+([`../standards/osrm/car.lua`](../standards/osrm/car.lua)); nothing below is applied yet:
+
+| Ruling | Consequence | `car.lua` line |
+|:--|:--|:--|
+| One rule set for every apparatus; emergency response assumed | **One profile, one graph.** No per-unit or per-mode variant, so the engine question closes on OSRM as it stands. `APPARATUS_TIERS` stays staged and unapplied (§6.4) | — |
+| Bollards are not offered; a crew may choose one on the day | No change. Bollards stay impassable: `barrier_whitelist` does not list them and only `bollard=rising` is excepted in `process_node`. A "secondary route" through them is not built and is not planned here | 71–80 |
+| Fire lanes are drivable | `service=emergency_access` becomes routable: drop `emergency_access` from `service_tag_forbidden`, and `emergency` and `emergency_vehicle` from `access_tag_blacklist`. 13 City ways, at service speed (15 km/h) with no extra penalty, like any other service road. The 9 footways and steps tagged `access=emergency` stay unroutable: they are not roads | 96, 103, 137–139, 184 |
+| One-way is never offered | No change: `oneway_handling = true` | 35 |
+| No weight or height limits on an emergency response | No change to the code, and no apparatus dimensions to enter. The car's 2.0 m / 2,000 kg check binds one City way (a 1.95 m `maxheight`) and nothing else; if that one matters it is a data question. Recorded as the operator's ruling, not a measurement | 54–59 |
+
+**Still open, and the only thing that is**: the turn-restriction relations — no left, no
+right, no U-turn, only straight (`use_turn_restrictions`, line 29, all or nothing at graph
+build). Under lights and siren, does a crew make a posted no-left-turn? A posted no-U-turn? The
+tag does not say whether the median is painted or concrete, so "ignore them all" drives through
+concrete at some junctions and "obey them all" is today's behaviour. On dispatched routes:
+`no_u_turn` on Dewdney Trunk Rd (relation 8151060), `no_left_turn` Genest Way → David Ave
+(9239096), `no_right_turn` Pinetree Way → David Ave (6850061), `only_straight_on` on Chilko Dr
+(17449481).
+
+Sequence once that is answered: derive `apparatus.lua` from the vendored `car.lua` with each
+change cited to a line above; rebuild the graph on the kiosk at an announced moment (the brief,
+*The kiosk, shared with another agent*); route the corpus against the 2026-09-09 baseline with
+`tools/route_corpus_baseline.py --baseline`; the operator sees every route that moved before
+it goes live.
+
 ---
 
 ## 1. Erratic Routing Loops & Intra-Municipal Path Preference

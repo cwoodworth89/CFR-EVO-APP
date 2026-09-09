@@ -83,7 +83,10 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    cadastral overlay and, from zoom 16, every hydrant, so a *ZOOM TO INCIDENT* button beside
    RE-CENTER is a `setView` on the destination at about zoom 18, and RE-CENTER is already the
    way back. The right-hand stack would be two tiles, satellite and Street View, each taller.
-   Not built: a decision for the UX pass, recorded here.
+   **Built 2026-09-08** as one button on the route map that flips between *SNAP TO CALL*
+   (the parcel plus the picked hydrants, close in, capped at zoom 18) and *RESET VIEW* (the
+   whole route). The cadastral tile is still there; dropping it is the layout half of the
+   decision and is still open.
 3. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
    Secondary hydrants can be picked by the drivers and officers of the next due trucks."*
    The picker already orders them; showing one is `picks.slice(0, 1)` on the map and in the

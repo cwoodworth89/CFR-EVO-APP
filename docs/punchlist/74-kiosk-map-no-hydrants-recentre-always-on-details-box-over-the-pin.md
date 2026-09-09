@@ -147,3 +147,15 @@ details box), and the route map now carries the full hydrant layer with no targe
 it draws from zoom 16 — neighbourhood scale — and pulses the picks. At the route's own zoom
 only the badges show.
 
+### 2026-09-08: SNAP TO CALL / RESET VIEW
+
+Operator: *"it should centre on the parcel, fairly close to show that final approach, and
+the hydrants. It can flip back and forth from being 'Snap to Call' and 'Reset View'."* One
+button on the route map, always shown while the call has a location: **SNAP TO CALL** fits
+the destination and every picked hydrant with the details box padded out of the way, capped
+at zoom 18 (the street tiles' deepest crawl; cadastral and hydrants both draw there), or
+zoom 18 on the destination when there are no picks; **RESET VIEW** is the whole route from
+the hall. A new call returns to the route view. The RE-CENTER ROUTE button still appears
+under it after a manual pan in route view. The labels are the operator's first words for
+them and can change.
+

@@ -141,6 +141,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+  // 'route': the whole run from the hall; 'call': the final approach, close in, with the
+  // parcel and the picked hydrants. One button flips between them (operator, 2026-09-08).
+  const [viewMode, setViewMode] = useState('route');
   const fittingRef = useRef(false);
   const panelRef = useRef(null);
   // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
@@ -158,6 +161,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     setUserPanned(false);
     setSelectedCandidateIdx(0);
     setRouteCoords([]);
+    setViewMode('route');
   }
 
   // The hydrants a driver should see, by the operator's rule (utils/routeHydrants.js):
@@ -202,6 +206,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
   const handleRecenter = () => {
     setUserPanned(false);
+    setViewMode('route');
     if (mapInstance) {
       markFitting(mapInstance, fittingRef);
       if (hasValidCoords && destination) {
@@ -227,6 +232,38 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       } else {
         mapInstance.setView([origin.lat, origin.lng], 13, { animate: true });
       }
+    }
+  };
+
+  // Snap to the call: the parcel and the picked hydrants, close in, so the final approach
+  // reads at a glance. The bounds are the destination plus every pick, so a hydrant 300 m
+  // back on the approach is still on screen; with no picks it is the destination at zoom 18.
+  // Capped at 18: the deepest zoom the street tiles were crawled to, and the cadastral and
+  // hydrant layers both draw there. The details box's width pads the left edge, as the
+  // route fit does, so the parcel is never under it.
+  const snapToCall = () => {
+    if (!mapInstance || !hasValidCoords || !destination) return;
+    setUserPanned(false);
+    setViewMode('call');
+    markFitting(mapInstance, fittingRef);
+    const points = [[destination.lat, destination.lng]];
+    for (const h of routeHydrants.picks) {
+      if (h.lat != null && h.lng != null) points.push([Number(h.lat), Number(h.lng)]);
+    }
+    const containerSize = mapInstance.getSize();
+    const w = containerSize.x || 800;
+    const h = containerSize.y || 600;
+    const pad = Math.max(40, Math.round(Math.min(w, h) * 0.1));
+    const panelWidth = panelRef.current?.offsetWidth || 0;
+    if (points.length === 1) {
+      mapInstance.setView(points[0], 18, { animate: true });
+    } else {
+      mapInstance.fitBounds(L.latLngBounds(points), {
+        paddingTopLeft: [pad + panelWidth, pad],
+        paddingBottomRight: [pad, pad],
+        maxZoom: 18,
+        animate: true
+      });
     }
   };
 
@@ -414,11 +451,29 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         )}
       </div>
 
-      {/* Floating Re-Center Button when user pans or zooms */}
-      {userPanned && (
+      {/* One button, two states: SNAP TO CALL brings the final approach in close; RESET VIEW
+          returns to the whole route. Always shown while the call has a location
+          (operator, 2026-09-08: "it can flip back and forth"). */}
+      {hasValidCoords && (
+        <button
+          onClick={viewMode === 'call' ? handleRecenter : snapToCall}
+          title={viewMode === 'call' ? 'Back to the whole route from the hall' : 'Close in on the parcel and the picked hydrants'}
+          className={`absolute top-3 right-14 z-[1000] font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border flex items-center gap-1.5 cursor-pointer ${
+            viewMode === 'call'
+              ? 'bg-slate-900/95 hover:bg-slate-800 text-sky-300 border-sky-700'
+              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300'
+          }`}
+        >
+          <span>{viewMode === 'call' ? '🗺️' : '🎯'}</span>
+          <span>{viewMode === 'call' ? 'RESET VIEW' : 'SNAP TO CALL'}</span>
+        </button>
+      )}
+
+      {/* Floating Re-Center Button when the user pans or zooms away from the route */}
+      {userPanned && viewMode === 'route' && (
         <button
           onClick={handleRecenter}
-          className="absolute top-3 right-14 z-[1000] bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border border-sky-400 flex items-center gap-1.5 cursor-pointer animate-pulse"
+          className="absolute top-14 right-14 z-[1000] bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border border-sky-400 flex items-center gap-1.5 cursor-pointer animate-pulse"
         >
           <span>🎯</span>
           <span>RE-CENTER ROUTE</span>

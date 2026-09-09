@@ -56,6 +56,12 @@ The offline basemap pipeline. See the `mbtiles-tile-server` skill before touchin
 | `export_tile_coverage.py` | Regenerates `coquitlam_tile_coverage.geojson`. |
 | `inspect_loose_tiles.py` | Inspects loose tile directories under `backend/data/tiles/`. |
 
+## Routing graph
+
+| Script | Purpose |
+|:--|:--|
+| `build_osrm_graph.sh` | Builds an OSRM graph on the kiosk from the shared extract with a named profile (`backend/osrm/profiles/`), beside the graph being served, and writes `<name>.build.txt` recording the image digest, the profile md5 and the command. Minutes of every core: check `tools/kiosk_capture_state.sh`, never during a tile generation, and announce it. Does not touch the served graph; the header shows how to serve the result on port 5001 for measurement with `tools/route_corpus_baseline.py`. |
+
 ## Audio and DSP
 
 Run when investigating the capture pipeline or calibrating hardware.

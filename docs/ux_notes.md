@@ -79,7 +79,9 @@ automated runs hit was pressing it before the suggestions had loaded.
 ## 3. Open design decisions
 
 1. **The details box.** Three options above. The operator dislikes the current floating box;
-   what they want instead has not been said.
+   what they want instead has not been said. 2026-09-08: the operator is working the design
+   out with Claude Design, and #74 is shelved until it lands. Build to that design, not to
+   the three options.
 2. **Drop the cadastral tile; snap the route map instead.** Operator, 2026-09-07: *"I'm
    thinking about getting rid of that cadastral pip in the top right corner, and instead have
    a 'Zoom to Incident' or 'Zoom to Parcel' button that snaps the main routing window to a

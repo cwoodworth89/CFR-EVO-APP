@@ -42,8 +42,10 @@ revert), and this one, which reviewed that work and then took the operator's not
 ### Decisions recorded, not built
 
 Interactive Street View stays (the slider alternative declined); admin-gating the two saves
-is the operator's design for the UX pass; one hydrant versus two, and the details box's
-home, are still theirs. All in [`ux_notes.md`](ux_notes.md).
+is the operator's design for the UX pass; one hydrant versus two is still theirs. **Round 2
+of the model: leave it** (operator, 2026-09-08); round 1 stays live. **#74 is shelved**: the
+operator is designing the details box's home with Claude Design, and the item waits for that
+design rather than for code. All in [`ux_notes.md`](ux_notes.md).
 
 ### Two streams, two worktrees
 
@@ -98,8 +100,8 @@ Same code, same day, chain harness (the skill's §3 has the full table):
 
 Phase-1 simulator: 43/44 published at 22 s (was 44/44 at 19 s), wrong streets 4 (was 7). Per
 call: worse on 11, better on 5. Why it regressed is not known and was not guessed. The model is
-at `backend/models/whisper-base-cfr-ct2-r2`; deploying is the operator's call and nobody has
-recommended it.
+at `backend/models/whisper-base-cfr-ct2-r2`. **Operator, 2026-09-08: leave it.** Round 1 stays
+live; the four round-2 rows in `evaluation_history` carry the verdict in their notes.
 <!-- audit-ok: backend/models/whisper-base-cfr-ct2-r2 -- git-ignored model directory, exists on the kiosk only -->
 
 ### Rulings recorded today, so nobody re-derives them
@@ -128,13 +130,13 @@ recommended it.
 
 | Item | Who | What |
 |:--|:--|:--|
-| #74 | operator | where the dispatch-details box should live |
+| #74 | operator | where the dispatch-details box should live (shelved 2026-09-08, being designed outside the code) |
 | #64 | operator | the civic-number checklist, at work |
 | #49 | operator | set an arrival point on a real site, then close |
 | #1 | both | routing loops not re-observed since stock OSRM; the profile has no held documentation (standards index) — reproduce a named call first |
 | #52a | operator | review rating from the kiosk, no spec yet |
 | #60, #32 | operator | deferred |
-| — | operator | agent restart; round 2; Street View Static API on the key; the same-screen clause |
+| — | operator | agent restart; round 2 (ruled *leave it* 2026-09-08); Street View Static API on the key; the same-screen clause |
 
 **Future development the operator named for a fresh agent**: an OSM routing plan — the
 self-hosted street basemap from the extract the kiosk already routes on (replaces the

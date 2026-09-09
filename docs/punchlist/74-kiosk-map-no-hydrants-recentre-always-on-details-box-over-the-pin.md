@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | DEFERRED |
 | **Severity** | crew-visible |
 | **Area** | 🖥️ Kiosk view |
 | **Blocks** | — |
@@ -12,8 +12,10 @@
 
 ---
 
-> **Status**: 🟡 **Built 2026-09-06, including the operator's hydrant rule (along the route
-> first); open on one thing only, where the dispatch-details box should live.**
+> **Status**: 🕓 **Deferred by the operator 2026-09-08.** Everything in this item is built and
+> live except where the dispatch-details box should live, and the operator is designing that
+> with Claude Design rather than in the code. The item reopens when the design arrives;
+> nothing here is waiting on an engineering decision.
 
 The operator's notes, verbatim in substance:
 

@@ -471,6 +471,9 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
             targetCoords={targetCoords}
             homeStation={STATIONS[homeHall]}
             buildTime={buildTime}
+            mapStyle={mapStyle}
+            setMapStyle={setMapStyle}
+            defaultMapStyle={MODE_DEFAULTS.EXPLORE}
           />
         </div>
 

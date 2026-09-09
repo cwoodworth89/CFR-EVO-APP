@@ -36,9 +36,20 @@ export default function MapViewControls({
   targetCoords,
   homeStation,
   buildTime,
+  mapStyle,
+  setMapStyle,
+  defaultMapStyle,
 }) {
+  // The basemap is part of "the view" (operator, 2026-09-08): leaving the aerial layer on
+  // after a reset meant the map came back to the default position but not the default
+  // picture, so the button only half did what it says. defaultMapStyle comes from
+  // MODE_DEFAULTS.EXPLORE, the same value the sidebar's "Street Map" button sets, so there
+  // is one definition of the default rather than a second copy here.
+  const styleIsOffDefault = Boolean(defaultMapStyle) && mapStyle !== defaultMapStyle;
+
   const resetView = () => {
     setUserPanned(false);
+    if (styleIsOffDefault && setMapStyle) setMapStyle(defaultMapStyle);
     if (map) {
       map.flyTo(COQUITLAM_CENTER, 12, { animate: true, duration: 0.8 });
     }
@@ -65,7 +76,9 @@ export default function MapViewControls({
         {isOffDefault && (
           <button
             onClick={resetView}
-            title="Reset view to Coquitlam City Center (Zoom 12)"
+            title={styleIsOffDefault
+              ? 'Reset view to Coquitlam City Center (Zoom 12) and back to the street basemap'
+              : 'Reset view to Coquitlam City Center (Zoom 12)'}
             className="px-3 py-1.5 rounded-lg bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 group animate-in fade-in slide-in-from-top-1 duration-200"
           >
             <svg className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">

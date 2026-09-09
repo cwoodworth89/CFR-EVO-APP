@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import RouteOverviewPanel from './RouteOverviewPanel';
-import BlockParcelPanel from './BlockParcelPanel';
 import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
@@ -215,14 +214,13 @@ export default function KioskView({ kioskState }) {
         </section>
 
         {/* Right ~1/3 Equal-Height 3-Panel Detail Stack */}
+        {/* Two panels, satellite and Street View, each taller. The cadastral block tile that
+            sat above them is gone (operator, 2026-09-08): SNAP TO CALL on the route map
+            shows the parcel outline, the addresses and the hydrants at the same zoom, on the
+            map the crew is already reading, so the tile was a second copy of it. */}
         <DetailStack
           call={activeCall}
           className="col-span-4"
-          topCard={
-            <div className="flex-1 min-h-0 relative">
-              <BlockParcelPanel activeCall={activeCall} />
-            </div>
-          }
         />
       </main>
 

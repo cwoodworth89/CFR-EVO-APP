@@ -85,8 +85,8 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    way back. The right-hand stack would be two tiles, satellite and Street View, each taller.
    **Built 2026-09-08** as one button on the route map that flips between *SNAP TO CALL*
    (the parcel plus the picked hydrants, close in, capped at zoom 18) and *RESET VIEW* (the
-   whole route). The cadastral tile is still there; dropping it is the layout half of the
-   decision and is still open.
+   whole route). The cadastral tile was dropped the same day; the stack is two taller
+   tiles, satellite and Street View.
 3. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
    Secondary hydrants can be picked by the drivers and officers of the next due trucks."*
    The picker already orders them; showing one is `picks.slice(0, 1)` on the map and in the

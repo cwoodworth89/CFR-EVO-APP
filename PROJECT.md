@@ -19,7 +19,7 @@
 | 5 | `cfr_tiles` Container Service | Local tile server container on port 8081 serving Metro Vancouver basemap tiles | Milestone 2 | Survey 2 & 3 |
 | 6 | Dynamic `TILE_BASE_URL` Resolution | `apiClient.js` resolves `http://${window.location.hostname}:8081` for seamless remote kiosk & local access | Milestone 2 | Survey 2 |
 | 7 | Offline Leaflet Basemap Integration | `MapConstants.js` & `MapLayers.jsx` consume `TILE_BASE_URL` with graceful fallback | Milestone 2 | Survey 2 |
-| 8 | Kiosk Panels Offline Tile Integration | `RouteOverviewPanel.jsx` & `BlockParcelPanel.jsx` consume local tile layers | Milestone 2 | Survey 2 |
+| 8 | Kiosk Panels Offline Tile Integration | `RouteOverviewPanel.jsx` & `BlockParcelPanel.jsx` (removed 2026-09-08) consume local tile layers | Milestone 2 | Survey 2 |
 | 9 | Container Health Checks & Interdependence | Docker health checks on `cfr_postgres`, `cfr_mosquitto`, `cfr_osrm`, `cfr_tiles` with `depends_on: condition: service_healthy` | Milestone 3 | Survey 3 |
 | 10 | Frontend Build & Local Integration QA | Clean Vite build (`npm run build`) and Python backend test suite verification | Milestone 3 | Survey 3 |
 | 11 | Remote Kiosk Deploy & Full-Stack Verification | Git push -> pull on `tcfire@100.95.146.94`, container rebuild, frontend build, service restart, and live dispatch simulation | Milestone 3 | Survey 3 |
@@ -73,5 +73,6 @@
 - `frontend/src/components/MapConstants.js` — Base layer definitions and styling
 - `frontend/src/components/MapLayers.jsx` — Leaflet base map and vector overlay components
 - `frontend/src/components/kiosk/RouteOverviewPanel.jsx` — Kiosk route overview panel
-- `frontend/src/components/kiosk/BlockParcelPanel.jsx` — Kiosk block/parcel mapping panel
 - `backend/tests/test_routing_engine.py` — Routing engine test suite
+
+<!-- audit-ok: frontend/src/components/kiosk/BlockParcelPanel.jsx -- milestone history; the kiosk's cadastral tile was removed 2026-09-08 -->

@@ -69,7 +69,7 @@ export const createSoftZoneNumberIcon = (zoneId, onImagery = false) => L.divIcon
 // ---------------------------------------------------------------------------
 // Pin markers for the dispatch target and its alternate candidates.
 //
-// These were three duplicated `new L.Icon({...})` literals in BlockParcelPanel,
+// These were three duplicated `new L.Icon({...})` literals in BlockParcelPanel (removed 2026-09-08),
 // PropertySatellitePanel and RouteOverviewPanel, each loading its image from
 // raw.githubusercontent.com and its shadow from cdnjs.cloudflare.com -- six
 // external requests on the kiosk map. With the link down the fetches failed and

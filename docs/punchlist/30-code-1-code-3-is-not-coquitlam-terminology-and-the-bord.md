@@ -191,3 +191,5 @@ A search of `frontend/src` finds no *Code 1* or *Code 3*; the response type rend
 ROUTINE / EMERGENCY / UNKNOWN since #31. The border state is the Tier 2 card, *NOT AVAILABLE
 OUTSIDE OF CITY*, in `BlockParcelPanel.jsx` and `PropertySatellitePanel.jsx` (CLAUDE.md section 5).
 Fixed earlier and left open, the pattern the 2026-08-31 sweep named.
+
+<!-- audit-ok: frontend/src/components/kiosk/BlockParcelPanel.jsx -- named as history; the kiosk's cadastral tile was removed 2026-09-08 -->

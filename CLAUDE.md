@@ -112,7 +112,9 @@ crew-visible (§7.1), which promotes immediately.
   `lat < 49.20 || lat > 49.39 || lng < -122.92 || lng > -122.70` via `isWithinCoquitlam(lat, lng)`,
   show `🌐 NOT AVAILABLE OUTSIDE OF CITY`. **These bounds are depended on by the
   `gis-pipeline-sync` skill — keep them in sync.** Rendering lives in
-  `frontend/src/components/kiosk/BlockParcelPanel.jsx` and `PropertySatellitePanel.jsx`.
+  `frontend/src/components/kiosk/PropertySatellitePanel.jsx` (the cadastral block tile that
+  also carried them was removed from the kiosk on 2026-09-08; SNAP TO CALL on the route
+  map shows the parcel instead).
 * **Ambiguity**: when `activeCall.is_ambiguous` or `candidates.length > 1`, show the tactical
   candidate selector, plot every candidate (active gold, alternates sky blue), and recalculate
   OSRM routes on one touch.

@@ -159,3 +159,8 @@ the hall. A new call returns to the route view. The RE-CENTER ROUTE button still
 under it after a manual pan in route view. The labels are the operator's first words for
 them and can change.
 
+Operator, later the same day: *"Now get rid of the cadastral pip."* Done: `BlockParcelPanel`
+is deleted, the stack is satellite and Street View at half the height each. The parcel
+outline, the addresses and the hydrants it showed are on the route map at the SNAP TO CALL
+zoom, which is the map the crew is already reading.
+

@@ -113,7 +113,7 @@ DispatchProvider                     one MQTT listener, one target model
     │   ├── ZonesLayer, RailroadCrossingsLayer                        standby
     │   └── AutoFitBounds, CandidateSelector                           dispatch
     └── detail stack
-        ├── TargetAddressCard (standby) | BlockParcelPanel (dispatch)
+        ├── TargetAddressCard (standby) | nothing (dispatch; the BlockParcelPanel tile was dropped 2026-09-08 for SNAP TO CALL on the route map)
         ├── PropertySatellitePanel                                     both
         └── StreetViewPanel                                            both
 ```
@@ -227,3 +227,5 @@ state — not an unfinished one.
 * Changing the 10-foot ergonomics of the kiosk.
 * Merging `LeftSidebar` and `ActiveAlertBanner`.
 * Touching `DispatchReview`, beyond it eventually consuming the shared listener.
+
+<!-- audit-ok: frontend/src/components/kiosk/BlockParcelPanel.jsx -- removed 2026-09-08; named here as the panel the stack used to carry -->

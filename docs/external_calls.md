@@ -166,3 +166,5 @@ supposed to be reachable.
 An unknown dependency is tracked the same way an unknown value is (§6.1, §7.5): **visibly.**
 
 <!-- audit-ok: backend/tests/test_variables.py -- deleted 2026-09-03; the row in section 1 records the removal -->
+
+<!-- audit-ok: frontend/src/components/kiosk/BlockParcelPanel.jsx -- named as history; the kiosk's cadastral tile was removed 2026-09-08 -->

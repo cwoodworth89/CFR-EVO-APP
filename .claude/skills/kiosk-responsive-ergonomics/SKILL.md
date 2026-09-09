@@ -34,7 +34,7 @@ call or a review replay.
 ```
 ActiveAlertBanner  (header: address, units, incident, timers)
 ├── RouteOverviewPanel   col-span-8   main route map
-└── detail stack         col-span-4   BlockParcelPanel
+└── detail stack         col-span-4   PropertySatellitePanel (the cadastral block tile was dropped 2026-09-08; SNAP TO CALL on the route map replaces it)
                                       PropertySatellitePanel
                                       StreetViewPanel
 ```

@@ -164,3 +164,23 @@ is deleted, the stack is satellite and Street View at half the height each. The 
 outline, the addresses and the hydrants it showed are on the route map at the SNAP TO CALL
 zoom, which is the map the crew is already reading.
 
+### 2026-09-08, later: the same button on the workstation, and why it is a cut
+
+Operator: *"Can we add the 'snap to call' button on the explore mode, when an address has
+been entered? I feel like that is how I am going to go around updating arrival points and
+street view changes."* Built in `map/MapViewControls.jsx`: SNAP TO CALL / SHOW ROUTE beside
+the zoom badge whenever an address is searched, same bounds rule as the kiosk (parcel plus
+the picked hydrants, capped at zoom 18, padded for the two sidebars).
+
+Then, on DISP-2026-CE3851: *"The snap to call button doesn't actually do anything. The map
+blinks like it should do something but it doesn't move at all."* Two causes, both fixed:
+
+1. On the kiosk the route auto-fit effect re-ran on every render, because `destination`
+   was a new object each time, and refitted whenever the map had not been dragged by hand.
+   It now fits once per call; every later move is the operator's.
+2. The snap was an animated four-level zoom. Leaflet schedules that on
+   requestAnimationFrame at the edge of its animation threshold, and measured on the
+   workstation it sometimes never started. A snap is a cut now (`animate: false`) on both
+   maps. Verified on the workstation: zoom 18 held for fifteen seconds with the street and
+   cadastral tiles loaded, the parcel shaded and the two picks badged.
+

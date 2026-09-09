@@ -87,7 +87,7 @@ suggestion**; the row has to be clicked. Every automated run of the search hit t
    cadastral overlay and, from zoom 16, every hydrant, so a *ZOOM TO INCIDENT* button beside
    RE-CENTER is a `setView` on the destination at about zoom 18, and RE-CENTER is already the
    way back. The right-hand stack would be two tiles, satellite and Street View, each taller.
-   **Built 2026-09-08** as one button on the route map that flips between *SNAP TO CALL*
+   **Built 2026-09-08** on both maps as one button that flips between *SNAP TO CALL*
    (the parcel plus the picked hydrants, close in, capped at zoom 18) and *RESET VIEW* (the
    whole route). The cadastral tile was dropped the same day; the stack is two taller
    tiles, satellite and Street View.

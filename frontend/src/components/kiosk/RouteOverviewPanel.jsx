@@ -281,14 +281,17 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     const h = containerSize.y || 600;
     const pad = Math.max(40, Math.round(Math.min(w, h) * 0.1));
     const panelWidth = panelRef.current?.offsetWidth || 0;
+    // Instant, not animated: a snap is a cut, and an animated four-level zoom sits at
+    // Leaflet's animation threshold and is scheduled on requestAnimationFrame, which is
+    // where it can fail to start (measured on the workstation, 2026-09-08).
     if (points.length === 1) {
-      mapInstance.setView(points[0], 18, { animate: true });
+      mapInstance.setView(points[0], 18, { animate: false });
     } else {
       mapInstance.fitBounds(L.latLngBounds(points), {
         paddingTopLeft: [pad + panelWidth, pad],
         paddingBottomRight: [pad, pad],
         maxZoom: 18,
-        animate: true
+        animate: false
       });
     }
   };

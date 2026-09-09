@@ -73,10 +73,14 @@ export default function MapViewControls({
     // operator from here, and the SHOW ROUTE side of this button is the way back.
     setUserPanned(true);
     setViewMode('call');
+    // A snap is a cut, not a flight: instant, so it cannot be interrupted. Leaflet's animated
+    // zoom is scheduled on requestAnimationFrame and a four-level jump sits right at its
+    // animation threshold; measured 2026-09-08, the animated version sometimes never
+    // started at all.
     if (points.length === 1) {
-      map.setView(points[0], 18, { animate: true });
+      map.setView(points[0], 18, { animate: false });
     } else {
-      map.fitBounds(points, { paddingTopLeft: [340, 80], paddingBottomRight: [400, 80], maxZoom: 18, animate: true });
+      map.fitBounds(points, { paddingTopLeft: [340, 80], paddingBottomRight: [400, 80], maxZoom: 18, animate: false });
     }
   };
 

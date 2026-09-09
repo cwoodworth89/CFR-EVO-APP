@@ -39,6 +39,7 @@ revert), and this one, which reviewed that work and then took the operator's not
 | Snap, parcel shading and the hydrant picks **confirmed on the kiosk by the operator** (not only on the workstation) | #74 |
 | Arrival points set by the operator on two real sites; the card scrolls | #49 closed |
 | Test suite no longer leaves `5000 TESTING WAY` in the live parcels table; the review sidebar names the box that rules each flag | — |
+| **2026-09-09, the admin unlock**: a padlock at the right of the workstation header; the review entry, the arrival-point controls and the Street View save exist only while unlocked; the four save routes answer 401 without the token; 30 days unless locked. The client's silent self-login (password in the source) is gone and the signing key lives in the root `.env`, so every browser starts locked | ux_notes §3 |
 
 ### Decisions recorded, not built
 

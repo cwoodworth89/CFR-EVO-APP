@@ -19,7 +19,7 @@ const SET_BY_KEY = 'cfr_entrance_set_by';
  * lobby round the back -- the operator clicks where it should be and says why. Saved with a
  * name and a time; the kiosk shows the note on the next call there.
  */
-function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave }) {
+function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave, canEdit }) {
   const [note, setNote] = useState('');
   const [setBy, setSetBy] = useState(() => {
     try { return localStorage.getItem(SET_BY_KEY) || ''; } catch { return ''; }
@@ -72,7 +72,10 @@ function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave
         </div>
       )}
 
-      {!placing ? (
+      {/* The controls are an operator ruling, not a crew control: shown only while the
+          header padlock is unlocked (operator, 2026-09-08). Locked, the card still says who
+          set the point and when. */}
+      {canEdit && (!placing ? (
         <div className="flex gap-1.5">
           <button onClick={onStart} className="flex-1 text-[10px] font-bold font-mono px-2 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 cursor-pointer">
             {hasEntrance ? 'Move arrival point' : 'Set arrival point'}
@@ -107,14 +110,15 @@ function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave
             </button>
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
 
 export default function TargetAddressCard({ targetAddress, nearestHydrants = [], hydrantTier = null, parcel = null,
                                             placingEntrance = false, entranceDraft = null,
-                                            onStartPlacing, onCancelPlacing, onSaveEntrance, onClose }) {
+                                            onStartPlacing, onCancelPlacing, onSaveEntrance, onClose,
+                                            adminUnlocked = false }) {
   if (!targetAddress) return null;
   const nearest = nearestHydrants[0];
 
@@ -158,6 +162,7 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
             onStart={onStartPlacing}
             onCancel={onCancelPlacing}
             onSave={onSaveEntrance}
+            canEdit={adminUnlocked}
           />
 
           {hydrantTier === 'none' && (

@@ -63,7 +63,7 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 | *"It would be nice to see hydrants to a given address."* | A searched address shows its picks and the arrival-point section | — |
 | Arrival points could only be set by SQL (#49) | *Set arrival point* on the target card: click the map, note, name, save; attributed | The worst-first review queue is a CSV, not a screen |
 | *"The box gets a little clipped and I can't get to what I assume is save button at the bottom."* (2026-09-08) | The card scrolls and the frontage explanation gives way to the form while placing | — |
-| *"I'm not sure I want this, or the street view save button to be crew facing, only admin unlocked."* (2026-09-08, "doesn't need to change or secure at this moment") | Not changed | **Design decision for the UX pass**: gate the two saves (arrival point, Street View) behind the existing admin login, in the UI and at the API. See §3 |
+| *"I'm not sure I want this, or the street view save button to be crew facing, only admin unlocked."* (2026-09-08, "doesn't need to change or secure at this moment") | **Built 2026-09-09**: a padlock at the right end of the workstation header; unlocked with the admin password it reveals the review screen entry, the arrival-point controls and the Street View save, and the four save routes answer 401 without the token. Stays unlocked 30 days unless locked (operator). | An auto-lock is a production feature, not built. See §3 |
 | *"we can get rid of driver push setups from the dropdown menu. It's handled by the button Driver Alerts. But I think the name of that button needs to change to be more intuitive. Mobile Alerting? Mobile Setup?"* (2026-09-08) | `MOBILE: DRIVER PUSH SETUP` is off the mode select; the button is **📱 MOBILE SETUP**. The screen is a one-time QR pairing page, not a live alert feed, which is what *DRIVER ALERTS* read like. The select is now two entries, Explore and Admin | The screen behind it is still the #60 placeholder, still publishing the wrong ntfy topic |
 | *"the emergency zone numbers as rendered are not very centred of their polygon outline"* (2026-09-08) | They were placed by `getZoneCentroid`, which computed a bounding-box centre despite the name. Over the 134 zones that put two labels (126, 134) **outside their own polygon**, 126 by 2.0 km, the median 139 m off. Now the pole of inaccessibility (`@mapbox/polylabel`), longitude scaled by cos(lat) first so the search is not run on a shape stretched 1.5× east–west. Verified through the shipped path: 0 outside, median label moves 121 m, zone 126 moves 1.77 km | — |
 | *"when I switch to aerial map view, the black labels are difficult to see"* (2026-09-08) | Zone numbers turn white with a soft shadow when the base layer is the City orthophoto, and stay near-black on the pale street basemaps. One `baseStyle` expression in `MapBoard.jsx` feeds both the basemap and the overlay, so they cannot disagree | The picked-hydrant badges are also near-black, but on a filled NFPA-coloured circle with a white ring, so they read on any base. Not raised |
@@ -94,12 +94,15 @@ automated runs hit was pressing it before the suggestions had loaded.
    (the parcel plus the picked hydrants, close in, capped at zoom 18) and *RESET VIEW* (the
    whole route). The cadastral tile was dropped the same day; the stack is two taller
    tiles, satellite and Street View.
-3. **Who may save.** The arrival point and the Street View view are operator rulings, and
-   the workstation is a shared screen. The operator's instinct (2026-09-08) is that neither
-   save should be crew-facing. Recommendation: an *unlock* that reuses the review screen's
-   admin login (the JWT already exists), the two save controls rendered only while unlocked,
-   and the two endpoints (`POST /api/parcels/entrance`, `POST /api/parcels/streetview`)
-   requiring the token. About an hour once the freeze lifts; reading stays open to all.
+3. **Who may save.** Built 2026-09-09 to the operator's design: *"I like the lock/unlock
+   button, somewhere discreet. That would then unhide all admin controls including the
+   review panel selector dropbox option. I want it to use a simple password, but also to
+   carry a 30 days unlock state unless specifically locked. When I move to production,
+   it'll probably have an auto-lock feature."* The padlock is `hud/AdminLock.jsx`, the one
+   session is `hooks/useAdminSession.js`, the gate is `require_admin` in the auth router
+   on the two saves and the two older Street View override routes; reads stay open. Found
+   on the way: the client logged every browser in by itself with the password in the source,
+   so there had been no locked state anywhere; gone. **Open**: the auto-lock, for production.
 4. **One hydrant, not two.** Operator, 2026-09-07: *"just showing the one best hydrant.
    Secondary hydrants can be picked by the drivers and officers of the next due trucks."*
    The picker already orders them; showing one is `picks.slice(0, 1)` on the map and in the

@@ -16,10 +16,12 @@ try:
     from backend.api.database import get_db
     from backend.api.models import ParcelModel
     from backend.api.schemas import ParcelCameraOverrideSchema, ParcelEntranceSchema
+    from backend.api.routers.auth import require_admin
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import ParcelModel
     from api.schemas import ParcelCameraOverrideSchema
+    from api.routers.auth import require_admin
 
 router = APIRouter(prefix="/api/parcels", tags=["parcels"])
 
@@ -230,8 +232,11 @@ def get_parcel_by_id(parcel_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/streetview")
-def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = Depends(get_db)):
-    """Saves or updates Street View camera orientation parameters for a municipal parcel."""
+def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = Depends(get_db),
+                           _admin: dict = Depends(require_admin)):
+    """Saves or updates Street View camera orientation parameters for a municipal parcel.
+
+    Admin-gated over HTTP (require_admin): an operator ruling, not a crew control."""
     raw_target = (payload.address or payload.clean_address or payload.gis_id or "").strip()
     if not raw_target:
         raise HTTPException(status_code=400, detail="address or gis_id required")
@@ -337,8 +342,10 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
 
 
 @router.post("/entrance")
-def set_parcel_entrance(payload: ParcelEntranceSchema, db: Session = Depends(get_db)):
+def set_parcel_entrance(payload: ParcelEntranceSchema, db: Session = Depends(get_db),
+                        _admin: dict = Depends(require_admin)):
     """Sets, or clears, the operator-verified arrival point of one parcel (punch-list #49).
+    Admin-gated over HTTP (require_admin): an operator ruling, not a crew control.
 
     One parcel per call, attributed, never bulk: these are per-site human judgements. With
     lat and lng both null the point is cleared and the note kept as the record of why. The

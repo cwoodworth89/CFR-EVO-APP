@@ -158,9 +158,10 @@ ADD COLUMN IF NOT EXISTS lock_box_notes TEXT,
 ADD COLUMN IF NOT EXISTS pre_plan_pdf_url TEXT;
 ```
 
-When a user taps **"Save Preferred View"**:
-1. Post payload `{ clean_address, front_lat, front_lng, heading, pitch, fov }` to `/api/parcels/streetview`.
-2. Cache payload in `localStorage` under `cfr_sv_override_${cleanAddress}` for zero-latency client retrieval.
+When the operator taps **"Save Preferred View"** (the button exists only while the header
+padlock is unlocked, 2026-09-09; the route answers 401 without the admin token):
+1. Post payload `{ clean_address, front_lat, front_lng, heading, pitch, fov, pano_id }` to `/api/parcels/streetview`.
+2. Nothing is cached on the client: the `localStorage` copy that used to shadow the database was removed 2026-09-08 (a laptop's week-old save out-voted the kiosk's).
 
 ---
 

@@ -5,7 +5,10 @@ Tests auth, dispatches, parcels, streetview, routing, road closures, evaluations
 import os
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
+
+import jwt
 
 # Add project root and backend dir to sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,6 +18,10 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
+
+# The token signing key is read from the environment per call (auth.py); unset, login answers
+# 503. A test key, not a secret: it signs nothing outside this process.
+os.environ.setdefault("JWT_SECRET", "unit-test-signing-key")
 
 try:
     from api.server import app, health_check
@@ -256,6 +263,40 @@ class TestAPIRouters(unittest.TestCase):
             min_lat=49.0, min_lng=-123.0, max_lat=50.0, max_lng=-122.0, limit=10, db=self.db
         )
         self.assertIn("parcels", bbox_res)
+
+    def test_admin_gate_on_operator_saves(self):
+        """The arrival point and the Street View saves answer 401 without an admin token, on
+        every route that reaches them; reads stay open; a valid token passes the gate and a
+        forged one does not (operator, 2026-09-08: the two saves are admin-only)."""
+        from fastapi.testclient import TestClient
+        client = TestClient(app)   # no `with`: the lifespan (listener, watchdog) is not started
+        sv = {"address": "5000 TESTING WAY", "front_lat": 49.285, "front_lng": -122.805, "heading": 1.0}
+        for path, body in [
+            ("/api/parcels/entrance", {"address": "5000 TESTING WAY", "set_by": "test"}),
+            ("/api/parcels/streetview", sv),
+            ("/api/streetview-overrides", sv),
+            ("/api/streetview/override", sv),
+        ]:
+            res = client.post(path, json=body)
+            self.assertEqual(res.status_code, 401, f"{path} answered {res.status_code} with no token")
+        self.assertEqual(client.get("/api/parcels/lookup", params={"query": "5000 TESTING WAY"}).status_code, 200)
+
+        forged = jwt.encode({"sub": "cfradmin", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+                            "not-the-configured-key", algorithm="HS256")
+        res = client.post("/api/parcels/entrance", json={"address": "5000 TESTING WAY", "set_by": "test"},
+                          headers={"Authorization": f"Bearer {forged}"})
+        self.assertEqual(res.status_code, 401)
+
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+        if not admin_password:
+            self.skipTest("ADMIN_PASSWORD is not set; the unlocked half needs a real login")
+        login = client.post("/api/auth/login", json={"username": "cfradmin", "password": admin_password})
+        self.assertEqual(login.status_code, 200)
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        # Through the gate: a parcel that does not exist answers 404 from the handler, not 401
+        # from the gate, and nothing is written.
+        res = client.post("/api/parcels/entrance", json={"address": "NO SUCH PARCEL 0", "set_by": "test"}, headers=headers)
+        self.assertEqual(res.status_code, 404)
 
     def test_evaluations_router(self):
         evals = get_evaluations(db=self.db)

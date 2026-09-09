@@ -102,7 +102,11 @@ services:
       OSRM_BACKEND_URL: http://osrm:5000
       TILE_SERVER_URL: http://tiles:8080
       DISABLE_WAN_FALLBACK: ${DISABLE_WAN_FALLBACK:-false}
-      JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
+      # Signs the admin unlock tokens (backend/api/routers/auth.py). Root .env, like
+      # ADMIN_PASSWORD below; unset leaves login answering 503. It used to default to a
+      # literal that is in git history, so every clone could mint admin tokens for this
+      # deployment (2026-09-09).
+      JWT_SECRET: ${JWT_SECRET:-}
       # Admin login for the review screen (punch-list #65). Compose interpolates ${...} from
       # the shell or a root .env, never from backend/.env, and the image excludes every .env
       # (.dockerignore) -- so put ADMIN_PASSWORD in <repo>/.env. Unset leaves login answering

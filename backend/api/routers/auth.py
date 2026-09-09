@@ -22,8 +22,22 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 TAILSCALE_SUBNET = ipaddress.ip_network("100.64.0.0/10")
 
 # JWT configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "cfr_secret_key_change_in_prod_2026")
 JWT_ALGORITHM = "HS256"
+# The unlock lasts this long unless LOCK is pressed (operator, 2026-09-08: "carry a 30 days
+# unlock state unless specifically locked"; an auto-lock is a production feature, not built).
+TOKEN_LIFETIME = timedelta(days=30)
+
+
+def _jwt_secret() -> str:
+    """The token signing key, from the environment and nowhere else.
+
+    This was a literal in this file with an env override, so every clone of the repository
+    could mint admin tokens for every deployment, and the kiosk ran on the literal. Read per
+    call, not at import, so a test or a restart with a new value takes effect. Unset is a
+    configuration error and login says so (CLAUDE.md 6.1; the same rule as ADMIN_PASSWORD,
+    punch-list #65): compose passes ${JWT_SECRET} from the root .env.
+    """
+    return os.environ.get("JWT_SECRET", "").strip()
 
 
 def get_client_ip(request: Request) -> str:
@@ -69,15 +83,19 @@ def login(req: LoginRequest, request: Request):
     # Unset is a configuration error, reported as such, never a default (CLAUDE.md 6.1, #61).
     expected_pass = os.environ.get("ADMIN_PASSWORD", "").strip()
     if not expected_pass:
-        logging.error("ADMIN_PASSWORD is not set; admin login is disabled until it is (backend/.env).")
+        logging.error("ADMIN_PASSWORD is not set; admin login is disabled until it is (root .env, read by compose).")
+        raise HTTPException(status_code=503, detail="Admin login is not configured on this server.")
+    secret = _jwt_secret()
+    if not secret:
+        logging.error("JWT_SECRET is not set; admin login is disabled until it is (root .env, read by compose).")
         raise HTTPException(status_code=503, detail="Admin login is not configured on this server.")
 
     if user_pass and user_pass == expected_pass:
         token_payload = {
             "sub": user_id,
-            "exp": datetime.now(timezone.utc) + timedelta(days=30)
+            "exp": datetime.now(timezone.utc) + TOKEN_LIFETIME
         }
-        token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        token = jwt.encode(token_payload, secret, algorithm=JWT_ALGORITHM)
         return {
             "access_token": token,
             "token_type": "bearer",
@@ -97,11 +115,29 @@ def get_session(request: Request, authorization: Optional[str] = None):
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"session": None}
     token = auth_header.split(" ")[1]
+    secret = _jwt_secret()
+    if not secret:
+        return {"session": None}
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
         return {"session": {"user": {"username": payload.get("sub"), "role": "admin"}}}
     except Exception:
         return {"session": None}
+
+
+def require_admin(request: Request) -> dict:
+    """FastAPI dependency: the user behind a valid admin token, or 401.
+
+    Gates the operator rulings a shared screen must not offer to crews, the arrival point
+    and the Street View saves (operator, 2026-09-08: "only admin unlocked"). Reads stay
+    open. The unlock is the padlock in the workstation header; the token it stores is the
+    one login issues, 30 days unless LOCK is pressed. Direct Python callers (the tests, the
+    override alias) pass the user themselves; only HTTP traffic goes through here.
+    """
+    session = get_session(request, None).get("session")
+    if not session:
+        raise HTTPException(status_code=401, detail="Admin unlock required for this change.")
+    return session["user"]
 
 
 @router.get("/me")

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useAdminSession } from '../../hooks/useAdminSession';
 import { useStreetViewPanorama } from '../../hooks/useStreetViewPanorama';
 import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
@@ -39,6 +40,7 @@ import {
  */
 export default function StreetViewPanel({ activeCall }) {
   const isOnline = useOnlineStatus();
+  const admin = useAdminSession();   // the save is an operator ruling: unlocked only
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
   const cleanAddrKey = sanitizeAddress(activeCall?.address || '').toUpperCase();
@@ -204,6 +206,7 @@ export default function StreetViewPanel({ activeCall }) {
                 </span>
               )}
             </div>
+            {admin.unlocked && (
             <button
               onClick={handleSaveView}
               disabled={saveStatus === 'saving' || sdkDown || pano.status !== 'ready'}
@@ -227,6 +230,7 @@ export default function StreetViewPanel({ activeCall }) {
                   : 'Save Preferred View'}
               </span>
             </button>
+            )}
           </div>
         )}
       </div>

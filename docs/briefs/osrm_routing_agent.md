@@ -56,7 +56,12 @@ is to make routing **right for fire apparatus and right for this city**, on evid
   did not ask to move is a regression until they say otherwise.
 * **The OSM extract is shared** with the basemap stream. Do not replace or re-download it
   without telling the other agent and the operator; a newer extract changes both the
-  routing graph and the tiles at once, and that should be one deliberate event.
+  routing graph and the tiles at once, and that should be one deliberate event. Measured
+  2026-09-09 by both streams: the graph rebuilds in 10 s (`backend/scripts/build_osrm_graph.sh`),
+  the vector tiles in about 55 s plus a tile-server restart. The basemap stream works from its
+  own copy of the extract under `/home/tcfire/basemap-trial/` and its trial containers on
+  8082–8084; routing's trial router is `cfr_osrm_trial` on 5001. Once the vector layer is live
+  under `cfr_tiles`, an extract swap needs both rebuilt in the same window.
 
 ## The kiosk, shared with another agent
 

@@ -22,9 +22,10 @@ is to make routing **right for fire apparatus and right for this city**, on evid
    roads are weighted for an engine or a ladder cites the line it changes and the reason
    from the operator or a measurement. The standards index row *Apparatus routing profile*
    is NOT HELD until that text is vendored under `docs/standards/`.
-3. **Operator designs waiting** (`../post_freeze_backlog.md`): every responding hall's route
-   on one map in hall colours; hydrants along the route are already built on the frontend
-   from the route geometry and need nothing from this stream unless the geometry changes.
+3. **Operator designs** (`../post_freeze_backlog.md`): every responding hall's route on one
+   map in hall colours — **built 2026-09-09** (`../ux_notes.md` §3 item 7, the rulings quoted
+   there); hydrants along the route are already built on the frontend from the route geometry
+   and need nothing from this stream unless the geometry changes.
 4. **Arrival points.** The resolver sends OSRM the operator-verified arrival point when one
    exists (`entrance → front → centroid`). Snapping the destination to the road that the
    address names, not the nearest road, is the open question from

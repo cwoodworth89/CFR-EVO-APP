@@ -481,6 +481,8 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 nearestHydrants={nearestHydrants}
                 currentZoom={currentZoom}
                 originStation={STATIONS[homeHall]}
+                homeHall={homeHall}
+                routingMetrics={activeDispatch?.routing_metrics || []}
                 onRouteCalculated={setRouteCoordinates}
               />
             )}

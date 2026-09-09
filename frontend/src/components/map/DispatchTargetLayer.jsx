@@ -1,6 +1,6 @@
 import React from 'react';
 import { Polygon, Polyline, CircleMarker } from 'react-leaflet';
-import { RoutingOverlay } from '../RoutingOverlay';
+import HallRoutesOverlay from './HallRoutesOverlay';
 import PickedHydrantsLayer from './PickedHydrantsLayer';
 import { CADASTRAL_MIN_ZOOM } from '../MapConstants';
 
@@ -23,6 +23,8 @@ export default function DispatchTargetLayer({
   nearestHydrants = [],
   currentZoom = 0,
   originStation,
+  homeHall = '1',
+  routingMetrics = [],
   onRouteCalculated,
 }) {
   if (!targetAddress) return null;
@@ -82,11 +84,14 @@ export default function DispatchTargetLayer({
           2026-09-08: "keep them the solid dots"). */}
       <PickedHydrantsLayer picks={nearestHydrants} />
 
-      {originStation && (
-        <RoutingOverlay 
-          from={originStation} 
-          to={targetCoords} 
-          onRouteCalculated={onRouteCalculated}
+      {/* Every responding hall's route when the target is a dispatch with routing_metrics;
+          on an address search there are no metrics and only the home hall's route draws. */}
+      {originStation && targetCoords && (
+        <HallRoutesOverlay
+          dest={targetCoords}
+          homeHall={homeHall}
+          routingMetrics={routingMetrics}
+          onHomeRouteCalculated={onRouteCalculated}
         />
       )}
     </>

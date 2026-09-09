@@ -123,7 +123,15 @@ automated runs hit was pressing it before the suggestions had loaded.
    first: [`architecture/progressive_dispatch.md`](architecture/progressive_dispatch.md).
    Post-freeze.
 7. **Every responding hall's route on one map**, each in its hall's colour, the home hall's
-   solid and the others translucent. Operator's idea, on the post-freeze backlog.
+   solid and the others translucent. Operator's idea; **built 2026-09-09** after four rulings
+   (the hall is hard-coded per kiosk in `.env`; four colours, judged on the kiosk; chiefs
+   respond from Hall 1 for now; fit the home route only, the others "approach from off
+   screen"; the others at about half opacity). `map/HallRoutesOverlay.jsx` draws one route per
+   hall named in the dispatch's `routing_metrics`, ordered by `utils/hallRoutes.js` (home on
+   top, next-arriving above later), colours from `MapConstants.HALL_COLOURS`, the same table
+   the zones use; the ETA list's dots take the hall colour. The hydrant picker and the fit
+   follow the home route only. Same layer on the workstation. The kiosk's hall now comes from
+   `VITE_DEFAULT_HALL`; until then nothing passed it and the route always left Hall 1.
 8. **The review rating from the kiosk** (#52a) and **the mobile setup screen** (#60): both
    need a spec before design.
 8. **What the hall display does between calls.** Operator, 2026-09-08: *"In real deployment,

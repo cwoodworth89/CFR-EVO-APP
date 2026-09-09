@@ -27,7 +27,13 @@ function markFitting(map, fittingRef) {
   setTimeout(() => { fittingRef.current = false; }, 800);
 }
 
-function AutoFitBounds({ origin, destination, userPanned, callKey, fittingRef, panelRef }) {
+// Fits the route ONCE per call. Every later move of the map is the operator's: a drag, the
+// RE-CENTER button, or SNAP TO CALL, and this effect must not undo them. Until 2026-09-08 it
+// re-ran on every render (`destination` was a fresh object each time) and refitted whenever
+// `userPanned` was false, so SNAP TO CALL flew to the parcel and was flown straight back --
+// "the map blinks like it should do something but it doesn't move" (operator,
+// DISP-2026-CE3851).
+function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef }) {
   const map = useMap();
   const lastKeyRef = useRef(null);
 
@@ -35,13 +41,8 @@ function AutoFitBounds({ origin, destination, userPanned, callKey, fittingRef, p
     if (!map || !origin || !destination || destination.lat == null || destination.lng == null) return;
 
     const currentKey = callKey || `${destination.lat},${destination.lng}`;
-    const callChanged = lastKeyRef.current !== currentKey;
-    if (callChanged) {
-      lastKeyRef.current = currentKey;
-    }
-
-    // Don't auto-fit if user manually panned on the SAME call, but ALWAYS auto-fit when active call changes!
-    if (userPanned && !callChanged) return;
+    if (lastKeyRef.current === currentKey) return;
+    lastKeyRef.current = currentKey;
 
     const bounds = L.latLngBounds(
       [origin.lat, origin.lng],
@@ -68,7 +69,7 @@ function AutoFitBounds({ origin, destination, userPanned, callKey, fittingRef, p
       maxZoom: 17,
       animate: true
     });
-  }, [map, origin, destination, userPanned, callKey, fittingRef, panelRef]);
+  }, [map, origin, destination, callKey, fittingRef, panelRef]);
 
   return null;
 }
@@ -130,7 +131,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
   const destLat = hasValidCoords ? Number(rawDestLat) : null;
   const destLng = hasValidCoords ? Number(rawDestLng) : null;
-  const destination = hasValidCoords ? { lat: destLat, lng: destLng } : null;
+  // Stable identity: a fresh object every render re-ran every effect that lists it.
+  const destination = useMemo(() => (hasValidCoords ? { lat: destLat, lng: destLng } : null), [hasValidCoords, destLat, destLng]);
 
   // All severities, active now. No filter controls on the dispatch map by design.
   const { activeClosures } = useRoadClosures({
@@ -596,7 +598,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           <AutoFitBounds
             origin={origin}
             destination={destination}
-            userPanned={userPanned}
             callKey={`${callKey}-${selectedCandidateIdx}`}
             fittingRef={fittingRef}
             panelRef={panelRef}

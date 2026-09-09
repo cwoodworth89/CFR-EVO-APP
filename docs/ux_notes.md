@@ -19,6 +19,7 @@ decide from.
 | **Workstation / Explore** | the operator at a desk: searching an address, setting an arrival point, a Street View | `MapBoard.jsx` with the left controls and the `DetailStack` on the right |
 | **Review screen** | the operator verifying calls, which feeds the training data and the hotwords | `DispatchReview.jsx`, `review/*` |
 | **Mobile setup** | nobody yet (#60, deferred pending redesign) | `DriverStationSetup.jsx`, reached only from the console's **MOBILE SETUP** button since 2026-09-08 |
+| **The crew's phone** | crews, for the call's details and for looking up a property (operator, 2026-09-09: *"it critical"*) | the same two surfaces below Tailwind's `lg` line (1024 px): sheets and tabs instead of columns. Built 2026-09-09; the plan, the rulings and what was checked are in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md) |
 
 The kiosk runs snap Chromium in kiosk mode on Wayland on the hall machine; the operator also
 opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day are

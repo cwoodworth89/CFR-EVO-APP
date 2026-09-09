@@ -25,7 +25,7 @@ import AdminSessionProvider from './components/AdminSessionProvider';
 const MapBoard = lazy(() => import('./components/MapBoard'));
 
 const ViewLoadingFallback = () => (
-  <div className="w-screen h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm select-none">
+  <div className="w-screen h-dvh bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm select-none">
     <div className="flex flex-col items-center gap-3 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl">
       <div className="w-10 h-10 rounded-full border-2 border-sky-400 border-t-transparent animate-spin"></div>
       <span className="text-xs font-bold uppercase tracking-widest text-sky-400">Loading CFR EVO Station Console...</span>
@@ -103,7 +103,7 @@ function App() {
   };
 
   return (
-    <div className="App w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 relative">
+    <div className="App w-screen h-dvh overflow-hidden bg-slate-950 text-slate-100 relative">
       {/* The admin unlock is one state for both surfaces: the kiosk's Street View save bar
           and the console's arrival point read the same padlock. */}
       <AdminSessionProvider>

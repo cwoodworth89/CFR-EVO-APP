@@ -6,6 +6,10 @@ import { API_BASE_URL } from '../../apiClient';
 import ActiveDispatchPanel from './ActiveDispatchPanel';
 
 export function LeftSidebar({ 
+  // A phone (below `lg`): a sheet over the bottom of the map with a handle, instead of a
+  // column beside it. Collapses to the handle once an address is picked, so the map and the
+  // parcel are the screen (docs/briefings/mobile_accessibility_review.md, Phase 2).
+  compact = false,
   leftSidebarOpen, 
   setLeftSidebarOpen, 
   appMode, 
@@ -147,7 +151,9 @@ export function LeftSidebar({
     setSearchQuery("");
     setShowSuggestions(false);
     setActiveIndex(-1);
-  }, [setTargetAddress]);
+    // On a phone the sheet gives the map back: the parcel and its hydrants are the point.
+    if (compact) setLeftSidebarOpen(false);
+  }, [setTargetAddress, compact, setLeftSidebarOpen]);
 
   // Keyboard navigation handler for autocomplete list
   const handleKeyDown = React.useCallback((e) => {
@@ -174,10 +180,34 @@ export function LeftSidebar({
 
   const sidebarWidthClass = activeDispatch ? 'w-[400px]' : 'w-80';
 
+  // Two frames for one body. Beside the map, the column animates its width open and shut.
+  // Over the map, it is a sheet anchored to the bottom: the handle always showing, the
+  // body below it when open, at most 60 % of the screen so the parcel stays visible above.
+  const rootClass = compact
+    ? 'absolute inset-x-0 bottom-0 z-[1000] flex flex-col w-full max-h-[60dvh]'
+    : `relative h-full flex flex-row transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${leftSidebarOpen ? `${sidebarWidthClass} border-r border-slate-800` : 'w-0'}`;
+  const bodyClass = compact
+    ? `bg-slate-900 flex-col overflow-hidden min-h-0 ${leftSidebarOpen ? 'flex flex-1' : 'hidden'}`
+    : `h-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${leftSidebarOpen ? sidebarWidthClass : 'w-0'}`;
+  const innerClass = compact
+    ? 'w-full min-h-0 flex flex-col overflow-y-auto overflow-x-hidden'
+    : 'w-80 h-full flex flex-col overflow-y-auto overflow-x-hidden';
+
   return (
-    <div className={`relative h-full flex flex-row transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${leftSidebarOpen ? `${sidebarWidthClass} border-r border-slate-800` : 'w-0'}`}>
+    <div className={rootClass}>
+       {/* The sheet's handle: a finger's height, the whole width, always visible on a phone. */}
+       {compact && (
+         <button
+           type="button"
+           onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+           className="w-full min-h-11 bg-slate-900 border-t border-slate-800 rounded-t-2xl text-[11px] font-black font-mono tracking-wider text-slate-300 flex items-center justify-center gap-2 cursor-pointer select-none shadow-2xl"
+           aria-expanded={leftSidebarOpen}
+         >
+           {leftSidebarOpen ? '▼ HIDE CONTROLS' : (activeDispatch ? '▲ DISPATCH DETAILS' : '▲ SEARCH & MAP CONTROLS')}
+         </button>
+       )}
        {/* Sidebar Body Wrapper (animates width and uses overflow-hidden to prevent contents sticking out when collapsed) */}
-       <div className={`h-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${leftSidebarOpen ? sidebarWidthClass : 'w-0'}`}>
+       <div className={bodyClass}>
           {activeDispatch ? (
              <ActiveDispatchPanel 
                activeDispatch={activeDispatch} 
@@ -187,15 +217,15 @@ export function LeftSidebar({
              />
           ) : (
              /* Fixed width inner container to prevent squishing during collapse */
-             <div className="w-80 h-full flex flex-col overflow-y-auto overflow-x-hidden">
-                {/* Header Title */}
-                <div className="bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0">
+             <div className={innerClass}>
+                {/* Header Title. The sheet's handle already says what this is. */}
+                <div className={`bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0 ${compact ? 'hidden' : ''}`}>
                    <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR EVO SYSTEM</div>
                    <div className="text-lg text-emerald-500 font-extrabold uppercase font-sans tracking-wide">{isExplore ? "MAP CONTROLS" : "ACTIVE SESSION"}</div>
                 </div>
 
              {/* Controls / Information Area */}
-             <div className="p-5 flex-grow flex flex-col gap-6 overflow-y-auto">
+             <div className={`flex-grow flex flex-col overflow-y-auto ${compact ? 'p-3 gap-4' : 'p-5 gap-6'}`}>
                      {/* Basemap View Switcher */}
                      <div className="flex flex-col gap-2 bg-slate-950 p-3 border border-slate-800 rounded-xl flex-shrink-0">
                         <div className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5 flex justify-between items-center">
@@ -240,7 +270,7 @@ export function LeftSidebar({
                            <select 
                               value={homeHall}
                               onChange={(e) => setHomeHall(e.target.value)}
-                              className="bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm w-full"
+                              className="bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg px-2.5 py-1.5 touch:py-2.5 text-xs touch:text-base font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm w-full"
                            >
                               <option value="1">Town Centre Fire Hall (TCFH)</option>
                               <option value="2">Mariner Fire Hall</option>
@@ -263,18 +293,18 @@ export function LeftSidebar({
                                  }}
                                  onFocus={() => setShowSuggestions(true)}
                                  onKeyDown={handleKeyDown}
-                                 className="w-full bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg pl-3 pr-8 py-1.5 text-xs focus:outline-none focus:border-sky-500 placeholder-slate-500"
+                                 className="w-full bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded-lg pl-3 pr-8 py-1.5 touch:py-2.5 text-xs touch:text-base focus:outline-none focus:border-sky-500 placeholder-slate-500"
                               />
                               {loading && (
                                  <span className="absolute right-8 top-1/2 -translate-y-1/2 flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                                    <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
                                  </span>
                               )}
                               {searchQuery && (
                                  <button 
                                     onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs font-bold cursor-pointer"
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs font-bold cursor-pointer px-1.5 py-1 touch:px-3 touch:py-2"
                                  >
                                     ✕
                                  </button>
@@ -290,7 +320,7 @@ export function LeftSidebar({
                                        <div 
                                           key={idx}
                                           onClick={() => handleSelectAddress(item)}
-                                          className={`p-2.5 text-xs border-b border-slate-850/50 last:border-0 font-medium transition-all cursor-pointer ${
+                                          className={`p-2.5 touch:py-3 text-xs touch:text-sm border-b border-slate-850/50 last:border-0 font-medium transition-all cursor-pointer ${
                                              idx === activeIndex 
                                                ? "bg-slate-800 text-white" 
                                                : "text-slate-350 hover:text-white hover:bg-slate-800"
@@ -364,60 +394,60 @@ export function LeftSidebar({
                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">MAP LAYERS</h3>
                        <div className="flex flex-col gap-2.5 mt-1.5">
                           {/* 🚒 FIRE HALLS OVERLAY */}
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
                              <input 
                                 type="checkbox" 
                                 checked={showFireHalls !== false} 
                                 onChange={(e) => setShowFireHalls && setShowFireHalls(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                className="rounded border-slate-800 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">🚒 Fire Halls</span>
                           </label>
 
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
                              <input 
                                 type="checkbox" 
                                 checked={showRoadClosures} 
                                 onChange={(e) => setShowRoadClosures(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-rose-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                className="rounded border-slate-800 bg-slate-950 text-rose-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">🚧 Road Closures</span>
                           </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
                              <input 
                                 type="checkbox" 
                                 checked={showHydrants} 
                                 onChange={(e) => setShowHydrants(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                className="rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">💧 Fire Hydrants</span>
                           </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
                              <input 
                                 type="checkbox" 
                                 checked={showLabels} 
                                 onChange={(e) => setShowLabels(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">🏷️ Road Names & Addresses</span>
                           </label>
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
                              <input 
                                 type="checkbox" 
                                 checked={showZones} 
                                 onChange={(e) => setShowZones(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-sky-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                className="rounded border-slate-800 bg-slate-950 text-sky-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">📐 Emergency Zones</span>
                           </label>
                           
                           {/* 🛤️ RAILROAD CROSSINGS OVERLAY */}
-                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
                              <input 
                                 type="checkbox" 
                                 checked={showRailroadCrossings} 
                                 onChange={(e) => setShowRailroadCrossings && setShowRailroadCrossings(e.target.checked)} 
-                                className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">🛤️ Railroad Crossings</span>
                           </label>
@@ -430,7 +460,7 @@ export function LeftSidebar({
                        <div className="flex flex-col gap-2 mt-1.5">
                           <div className="flex flex-col gap-1.5">
                              <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wider">Access Severity</span>
-                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
+                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer touch:min-h-11">
                                 <input 
                                    type="checkbox" 
                                    checked={filterNoAccess || filterAccessOnly} 
@@ -438,19 +468,19 @@ export function LeftSidebar({
                                       setFilterNoAccess(e.target.checked);
                                       setFilterAccessOnly(e.target.checked);
                                    }} 
-                                   className="rounded border-slate-850 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                   className="rounded border-slate-850 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                                 />
                                 <span className="flex items-center gap-2 font-medium">
                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm"></span>
                                    <span>Full Road Closures</span>
                                 </span>
                              </label>
-                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer">
+                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer touch:min-h-11">
                                 <input 
                                    type="checkbox" 
                                    checked={filterCaution} 
                                    onChange={(e) => setFilterCaution(e.target.checked)} 
-                                   className="rounded border-slate-850 bg-slate-950 text-yellow-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer" 
+                                   className="rounded border-slate-850 bg-slate-950 text-yellow-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                                 />
                                 <span className="flex items-center gap-2 font-medium">
                                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block shadow-sm"></span>
@@ -466,14 +496,17 @@ export function LeftSidebar({
         </div>
 
 
-       {/* Floating Toggle Tab */}
+       {/* Floating Toggle Tab (the column's edge; wider for a finger on the touch TV) */}
+       {!compact && (
        <button 
          onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-         className="absolute top-1/2 -translate-y-1/2 -right-6 z-[1010] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-r-lg w-6 h-16 flex items-center justify-center shadow-2xl border border-l-0 border-slate-800 cursor-pointer select-none transition-all duration-300"
+         className="absolute top-1/2 -translate-y-1/2 -right-6 touch:-right-9 z-[1010] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-r-lg w-6 touch:w-9 h-16 flex items-center justify-center shadow-2xl border border-l-0 border-slate-800 cursor-pointer select-none transition-all duration-300"
          title={leftSidebarOpen ? "Collapse Control Panel" : "Expand Control Panel"}
+         aria-label={leftSidebarOpen ? "Collapse control panel" : "Expand control panel"}
        >
          <span className="text-[10px] font-black">{leftSidebarOpen ? "◀" : "▶"}</span>
        </button>
+       )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
 import { STATIONS } from '../MapConstants';
+import { useCompactViewport } from '../../hooks/useCompactViewport';
 
 // The hall this display belongs to. Operator, 2026-09-09: "the hall is going to be hard-coded
 // per kiosk deployment in the .env file" -- VITE_DEFAULT_HALL in frontend/.env.local, read at
@@ -48,6 +49,8 @@ export default function KioskView({ kioskState }) {
   } = kioskState;
 
   const [showPrePlanModal, setShowPrePlanModal] = useState(false);
+  // Below `lg`, a phone or an upright tablet: the grid stacks, the detail tiles become tabs (docs/briefings/mobile_accessibility_review.md).
+  const compact = useCompactViewport();
 
   // There is no no-call branch here on purpose. KioskView is only ever mounted with a
   // call on it: App.jsx sends the screen back to STANDBY (the console) the moment
@@ -162,21 +165,21 @@ export default function KioskView({ kioskState }) {
   return (
     <div
       onClick={resetTimeoutClock}
-      className={`fixed inset-0 bg-slate-950 text-slate-100 flex flex-col z-50 select-none border-[6px] ${borderColor} transition-colors duration-500 overflow-hidden`}
+      className={`fixed inset-0 bg-slate-950 text-slate-100 flex flex-col z-50 select-none border-[6px] ${borderColor} transition-colors duration-500 overflow-hidden safe-area`}
     >
       {/* Queued Call Notification Banner */}
       {queuedCalls.length > 0 && (
         <div
           onClick={advanceToNextCall}
-          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2 flex items-center justify-between cursor-pointer animate-pulse shadow-xl border-b border-amber-600 z-50 flex-shrink-0"
+          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 lg:px-6 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer motion-safe:animate-pulse shadow-xl border-b border-amber-600 z-50 flex-shrink-0"
         >
           <div className="flex items-center gap-3">
             <span className="text-lg">⚠️</span>
-            <span className="text-sm tracking-wide uppercase font-mono">
+            <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
               {queuedCalls.length} New Call{queuedCalls.length > 1 ? 's' : ''} Queued — Tap to View Next
             </span>
           </div>
-          <div className="bg-slate-950 text-amber-400 px-3 py-0.5 rounded text-xs font-mono font-bold">
+          <div className="bg-slate-950 text-amber-400 px-3 py-0.5 rounded text-xs font-mono font-bold max-w-full truncate">
             Next: {queuedCalls[0]?.address || 'Dispatch Alert'} →
           </div>
         </div>
@@ -185,9 +188,9 @@ export default function KioskView({ kioskState }) {
       {/* Tier 1 Unresolved-Location Warning (CLAUDE.md §5) — all call details still
           display normally below; only routing/ETA output is withheld. */}
       {!hasCoords && (
-        <div className="bg-amber-500 text-slate-950 font-bold px-6 py-2 flex items-center gap-3 border-b border-amber-600 shadow-xl z-50 flex-shrink-0 animate-pulse">
+        <div className="bg-amber-500 text-slate-950 font-bold px-3 lg:px-6 py-2 flex items-center gap-3 border-b border-amber-600 shadow-xl z-50 flex-shrink-0 motion-safe:animate-pulse">
           <span className="text-lg">⚠️</span>
-          <span className="text-sm tracking-wide uppercase font-mono">
+          <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
             Location Unresolved — Coordinates Awaiting Operator Verification • Routing &amp; ETAs Unavailable
           </span>
         </div>
@@ -217,10 +220,13 @@ export default function KioskView({ kioskState }) {
       />
 
       {/* Main Content Layout (2/3 Main Route Map, 1/3 Equal Height Detail Stack) */}
-      <main className="flex-1 p-3 grid grid-cols-12 gap-3 min-h-0 overflow-hidden">
+      {/* On a phone (below `lg`) the grid becomes a column: the route map first at just over
+          half the height, then one detail tile at a time on tabs. From `lg` up the 8/4 grid
+          is unchanged. */}
+      <main className="flex-1 p-2 lg:p-3 flex flex-col lg:grid lg:grid-cols-12 gap-2 lg:gap-3 min-h-0 overflow-hidden">
         {/* Left ~2/3 Suggested Route Panel */}
-        <section className="col-span-8 h-full min-h-0">
-          <RouteOverviewPanel activeCall={activeCall} stationHall={KIOSK_HALL} />
+        <section className="lg:col-span-8 h-[52dvh] lg:h-full min-h-0 flex-shrink-0">
+          <RouteOverviewPanel activeCall={activeCall} stationHall={KIOSK_HALL} compact={compact} />
         </section>
 
         {/* Right ~1/3 Equal-Height 3-Panel Detail Stack */}
@@ -230,7 +236,8 @@ export default function KioskView({ kioskState }) {
             map the crew is already reading, so the tile was a second copy of it. */}
         <DetailStack
           call={activeCall}
-          className="col-span-4"
+          className="lg:col-span-4 flex-1"
+          compact={compact}
         />
       </main>
 

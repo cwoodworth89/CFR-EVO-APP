@@ -73,12 +73,38 @@ It also hides the dismiss button, so a wall display cannot be cleared by a passe
 That is the whole feature. If display-type switching is ever wanted, `isTvMode` is the
 hook to extend — not a new parallel mechanism.
 
+### The phone layout (built 2026-09-09)
+
+Below Tailwind's **`lg`** line (1024 px) both surfaces reflow for a phone or an upright
+tablet; at and above it nothing changes. `hooks/useCompactViewport.js` is the same line in
+JavaScript, for the decisions that are not CSS (one map mounted at a time, the search sheet
+folding once an address is picked, a fit padded by a sheet's height). `md` was tried first
+and measured too narrow: a landscape phone at 852 px kept the desktop columns and a 152 px map.
+
+| Surface below `lg` | Becomes |
+|:--|:--|
+| `LeftSidebar` | a sheet over the bottom of the map with a handle; folds when an address is picked |
+| `DetailStack` | tabs (Details, Satellite, Street View), one mounted at a time; on the console a sheet that folds to its tab bar |
+| `RightSidebar` | a drawer from the right |
+| `KioskView` grid | a column: banner (address first), route map at 52 dvh, then the tabs |
+| `RouteOverviewPanel` details box | across the top of the map, folded by default |
+
+**Fits are measured, never written.** `map/fitPadding.js` is the one place both maps get
+their `fitBounds` padding from the container and whatever floats over it. The literals it
+replaced gave Leaflet a NaN zoom on a phone (`docs/standards/dependency-behaviour.md`).
+
 ---
 
 ## Conventions to follow
 
 * **Tailwind responsive prefixes** (`sm:`, `lg:`) for viewport adaptation. There is no
-  custom breakpoint system and none is needed.
+  custom breakpoint system and none is needed. **`lg` is the phone line**; do not add a
+  second one without a measurement that says where it goes.
+* **`touch:`** (`@media (pointer: coarse)`, added in `tailwind.config.js`) for target sizes
+  and 16 px inputs. It applies to the hall's touch TV as much as to a phone, and never to a
+  mouse. `hoverOnlyWhenSupported` is on, so `hover:` never sticks after a tap.
+* **Nothing crew-facing lives only in a `title` tooltip.** A touch screen never shows one;
+  the flag reasons and the changed-field list open on a tap for that reason.
 * **Dark slate palette** (`bg-slate-950`, `border-slate-800`) throughout. This is for
   low-light station conditions and contrast, not viewing distance, and stays regardless of
   the constraint above.

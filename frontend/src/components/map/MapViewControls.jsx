@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { routeFitOptions, snapFitOptions } from './fitPadding';
 
 /**
  * Floating controls layered over the map: zoom readout, reset-view, re-centre-on-route,
@@ -40,6 +41,10 @@ export default function MapViewControls({
   setMapStyle,
   defaultMapStyle,
   resetView: resetMapView,
+  // A phone: the re-centre pill moves to the top, clear of the sheets, and the build
+  // watermark goes. `getFitOverlays` reports what the sheets cover, for the fits.
+  compact = false,
+  getFitOverlays = null,
 }) {
   // The basemap is part of "the view" (operator, 2026-09-08): leaving the aerial layer on
   // after a reset meant the map came back to the default position but not the default
@@ -80,7 +85,7 @@ export default function MapViewControls({
     if (points.length === 1) {
       map.setView(points[0], 18, { animate: false });
     } else {
-      map.fitBounds(points, { paddingTopLeft: [340, 80], paddingBottomRight: [400, 80], maxZoom: 18, animate: false });
+      map.fitBounds(points, snapFitOptions(map, { maxZoom: 18, animate: false, overlays: getFitOverlays?.() }));
     }
   };
 
@@ -88,13 +93,11 @@ export default function MapViewControls({
     setUserPanned(false);
     setViewMode('route');
     if (map && targetCoords && homeStation) {
-      map.fitBounds([homeStation, targetCoords], {
-        // Asymmetric padding: the left sidebar and the right inspection stack both overlay
-        // the map, so an evenly padded fit would tuck the route under them.
-        paddingTopLeft: [340, 80],
-        paddingBottomRight: [400, 80],
-        animate: true,
-      });
+      // Padding measured from the map (map/fitPadding.js). The literals this replaced
+      // assumed the sidebars overlay the map; they sit beside it, so the route was being
+      // fitted into the middle half of a map that was already narrowed, and on a phone the
+      // literals exceeded the container and gave Leaflet a NaN zoom.
+      map.fitBounds([homeStation, targetCoords], routeFitOptions(map, { animate: true, overlays: getFitOverlays?.() }));
     }
   };
 
@@ -107,7 +110,7 @@ export default function MapViewControls({
           <button
             onClick={viewMode === 'call' ? recentreOnRoute : snapToCall}
             title={viewMode === 'call' ? 'Back to the whole route from the hall' : 'Close in on the parcel and the picked hydrants'}
-            className={`px-3 py-1.5 rounded-lg border text-xs font-black font-mono shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+            className={`px-3 py-1.5 touch:py-2.5 rounded-lg border text-xs font-black font-mono shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               viewMode === 'call'
                 ? 'bg-slate-950/90 hover:bg-slate-900 border-sky-700 text-sky-300'
                 : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950'
@@ -124,7 +127,7 @@ export default function MapViewControls({
             title={styleIsOffDefault
               ? 'Reset view to Coquitlam City Center (Zoom 12) and back to the street basemap'
               : 'Reset view to Coquitlam City Center (Zoom 12)'}
-            className="px-3 py-1.5 rounded-lg bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 group animate-in fade-in slide-in-from-top-1 duration-200"
+            className="px-3 py-1.5 touch:py-2.5 rounded-lg bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 group animate-in fade-in slide-in-from-top-1 duration-200"
           >
             <svg className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -137,14 +140,14 @@ export default function MapViewControls({
       {userPanned && targetAddress && viewMode !== 'call' && (
         <button
           onClick={recentreOnRoute}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1100] bg-slate-900/95 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-4.5 py-2.5 rounded-full border border-sky-500/60 shadow-2xl flex items-center gap-2 transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-3 duration-200"
+          className={`absolute ${compact ? 'top-16' : 'bottom-6'} left-1/2 -translate-x-1/2 z-[1100] bg-slate-900/95 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-4.5 py-2.5 rounded-full border border-sky-500/60 shadow-2xl flex items-center gap-2 transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-3 duration-200`}
         >
-          <span className="animate-pulse">🎯</span>
+          <span className="motion-safe:animate-pulse">🎯</span>
           <span>RE-CENTER ON ROUTE</span>
         </button>
       )}
 
-      <div className="absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
+      <div className="hidden lg:block absolute bottom-3 left-3 z-[1000] pointer-events-none font-mono text-[9px] text-slate-400/85 drop-shadow-sm select-none">
         CFR EVO APP | BUILD: {buildTime} | LICENSE: POLYFORM NONCOMMERCIAL 1.0.0
       </div>
     </>

@@ -1,11 +1,12 @@
 # Mobile accessibility review of the frontend
 
 **Written 2026-09-09** at the operator's request (*"making this front end more mobile device
-accessible"*). **Review and plan only. Nothing is built.** The project is in a feature freeze
-(CLAUDE.md §4); this records what was found, what would be done, and what each step rests on,
-so the work can start from evidence when the freeze lifts. The operator answered the first
-six questions the same day; **those rulings are recorded first, below, and the plan in §4 is
-scoped to them.** §6 holds the questions still open, the first of which gates Phase 4.
+accessible"*). Written as a review and a plan under the feature freeze (CLAUDE.md §4); the
+operator answered the questions the same day and then promoted the phone surface (*"right now
+I want to get my android phone working"*), so **Phases 1 to 3 were built 2026-09-09 on branch
+`claude/mobile-accessibility-review-v8cih3`: §7 records what was built and how it was
+checked.** The rulings are recorded first, the plan in §4 is scoped to them, and §6 holds
+what is still open. Phase 4 (the public endpoint) is not built.
 
 Two sources of evidence, kept separate below because they carry different weight:
 
@@ -35,6 +36,8 @@ Quotes are the operator's. Each one changed the plan; the change is stated besid
 | The push's map link | *"the push being google maps is fine for now"* | No external-call change; no `external_calls.md` row. Phase 4 no longer includes redirecting the push. |
 | The access model on the public endpoint (§6 question 1, asked after the first six) | *"it'll probably be a per phone password to access. We have truck phones that each have their own login for ArcGIS Survey, we'll probably copy something similar not sure."* | **Provisional: one account per truck phone, with its own password, on the model of the department's existing per-phone Survey123 logins.** Phase 2's first screen on a phone is a sign-in that persists on the device the way the admin unlock does. Phase 4 item 3 is written to it below, with the two facts about the existing login that it has to change (§3.6). "Not sure" is recorded as such: the model can still move, and nothing is built on it. |
 | Does the hall display keep reading without a login? | *"yeah that sounds like a good plan"* | **Ruled: reads stay open from the LAN and Tailscale, where `is_allowed_network` already draws the line, and a device token is required only from outside it.** The hall display never signs in and cannot log itself out mid-call. Phase 4 item 3 is built to this. |
+| The in-cab tablet | *"it'll probably be an iPad, but this is theory."* | **Deferred.** Phase 3's tablet breakpoint and the in-truck type-size measurement wait until there is a tablet. The layout below `lg` already serves an iPad held upright (§7). |
+| The freeze | *"right now I want to get my android phone working"* | **The phone surface is promoted; Phases 1 to 3 built the same day** (§7). Android Chrome is the bench as ruled; the iOS checks in §7 are still to run on a real iPhone. |
 
 ---
 
@@ -466,7 +469,8 @@ which is a real call through the live path. The touch TV is checked on the touch
 | Reads stay open from the LAN and Tailscale; a token is required only from outside | Ruled 2026-09-09. No longer an assumption. |
 | The hall screen is a touch TV | Ruled 2026-09-09. No longer an assumption. |
 | The `dvh`, wake-lock, safe-area and target-size facts | `caniuse-lite` (checked, table in §3.6), the WCAG 2.2 text and an actual iPhone (not yet checked). |
-| The 8/4 grid and the banner are the shape to keep above `md:` | The #74 design lands with a different layout. Then Phase 3 is written against that. |
+| The 8/4 grid and the banner are the shape to keep above `lg:` | The #74 design lands with a different layout. Then Phase 3 is written against that. |
+| `lg` (1024 px) is the right line for the phone layout | A device between 1024 and about 1100 px wide turns up: it gets the desktop columns and a map about 300 px wide. Measured 2026-09-09: `md` (768) left a landscape phone a 152 px map and an upright iPad 120 px, which is why the line moved. |
 
 ---
 
@@ -477,8 +481,9 @@ screen is touched, how crews reach the system, what a phone shows first, the pus
 link, (provisionally) per-phone accounts, and that the hall display never signs in. Still
 open, and asked one at a time:
 
-1. **Is the mounted tablet an iPad, and which size?** And is it landscape in the cradle?
-   This sets Phase 3's tablet breakpoint and the type-size measurement in the truck.
+1. **Can the Android phone reach `http://100.95.146.94/` today**, over Tailscale or the
+   hall Wi-Fi? That is how §7 gets checked on the real device before the public endpoint
+   exists. The API port must be reachable too; the in-app browsers block it (`ux_notes.md` §5).
 2. **On a crew phone, is it the current call only, or a list of recent calls too?** And do
    the five-minute auto-dismiss and the queue apply, or does a call stay until closed?
 3. **The details box (#74) is with Claude Design.** Should the phone layout wait for that
@@ -491,3 +496,75 @@ open, and asked one at a time:
    emergency pair and the four hall colours, text size, gloves, a bright cab in daylight
    against the dark palette.
 7. **A screenshot of the console on your own phone today**, to sit beside the emulated ones.
+
+---
+
+## 7. What was built, 2026-09-09
+
+Phases 1 to 3 as scoped in §4, on the branch named at the top. Every change is either
+below the `lg` line (1024 px), under a coarse pointer (`touch:`), or a fit that now measures
+what it used to assume. **Above `lg` with a mouse, the console renders byte-for-byte as
+before**: the 1,916 px screenshot after the change differs from the one before by the build
+stamp only. The dispatch display above `lg` keeps every class it had.
+
+### The line, and the variant
+
+* **`lg`, not `md`.** The plan said `md` (768 px). Measured on the first build: a landscape
+  phone at 852 px and an iPad held upright at 820 px got the desktop columns and were left a
+  152 px and a 120 px map. The columns need about 1,000 px to leave a map worth having, so
+  the line is Tailwind's `lg`, and `hooks/useCompactViewport.js` says the same thing in
+  JavaScript for the decisions that are not CSS.
+* **`touch:`** is a Tailwind variant added in `tailwind.config.js` for `@media (pointer:
+  coarse)`: the hall's touch TV, a phone, a tablet. It sizes targets and inputs and changes
+  nothing under a mouse. `hoverOnlyWhenSupported` is on, so a tap on the TV no longer leaves a
+  button lit.
+
+### Phase 1, the foundation
+
+| Item | Where |
+|:--|:--|
+| Flag reasons and changed fields open on a tap, inline under the badges | `hud/ActiveAlertBanner.jsx` |
+| Fit padding measured from the map and the floating box, clamped so Leaflet can never see a negative fit area; the console and the dispatch map share it | `map/fitPadding.js`, tested in `tests/fitPadding.test.mjs` (8 cases) |
+| `h-dvh` with a `100vh` fallback, `viewport-fit=cover`, safe-area padding on both roots | `index.html`, `index.css`, `App.jsx`, `main.jsx`, `MapBoard.jsx`, `KioskView.jsx` |
+| Targets: layer-toggle rows 44 px tall under `touch:`, sidebar tabs 36 px wide, close and expand buttons taller | `LeftSidebar.jsx`, `RightSidebar.jsx`, `TargetAddressCard.jsx`, the two tiles |
+| 16 px inputs under `touch:` (the iOS focus-zoom rule) | search, home hall, admin password, arrival-point note and name |
+| Header on one row at every width; the padlock reachable on a phone | `hud/Header.jsx` |
+| The 26 animations behind `motion-safe:`; `App.css` deleted (Vite's template, imported by nothing) | tree-wide |
+
+### Phase 2, the phone console
+
+Below `lg` the left sidebar is a sheet over the bottom of the map with a handle, open on
+arrival with the search at the top, and it folds to the handle when an address is picked so
+the parcel is the screen. The detail stack is a sheet with tabs, Details, Satellite and
+Street View, one map mounted at a time, and it folds to its tab bar. Road closures are a
+drawer from the right. The floating controls move clear of the sheets; the build watermark
+goes.
+
+### Phase 3, the dispatch display on a phone
+
+Below `lg` the 8/4 grid is a column: the banner stacked with the address first, the route
+map at just over half the height, then the detail tiles as tabs. The details box spans the
+top of the map and starts folded; the fit pads by its height instead of its width. The
+queued-call and Tier 1 banners wrap. TV mode is hidden, being the hall's control. **Built to
+the code, not rendered**: see below.
+
+### Checked
+
+* `npm run lint:crash`, `npm run build`, `npm run test:node` (28 tests, the 8 new ones among
+  them): all pass.
+* `scripts/viewport_smoke.mjs` against the built bundle in headless Chromium at five sizes,
+  393×852, 852×393, 820×1180, 1280×800 and 1916×1000, with touch and mobile emulation: no
+  horizontal overflow, no control off screen, the map at least 60 % of the width below `lg`,
+  a real zoom after the fit, no page errors. The property lookup was driven end to end with
+  the address search answered by the app's own known-buildings table, so nothing was invented
+  (CLAUDE.md §6.5). Screenshots were reviewed by eye at each size.
+* **Not checked here, to be checked on the device:** the dispatch display on a phone (needs a
+  real call: replay one on the phone), iOS Safari (the sandbox has Chromium only; the bench
+  is Android as ruled), the touch TV.
+
+### Seen on the way, not fixed
+
+* The satellite tile's Leaflet zoom control sits under its header pill at every size, so its
+  `+` is covered. Pre-existing; one line to move the control to the bottom right.
+* `animate-in`, `fade-in` and `slide-in-from-*` appear throughout and do nothing: they are
+  from a Tailwind plugin that is not installed. Harmless; the transitions they name never ran.

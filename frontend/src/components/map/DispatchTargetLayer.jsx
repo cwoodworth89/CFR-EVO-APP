@@ -71,7 +71,7 @@ export default function DispatchTargetLayer({
             fillColor: '#38bdf8',
             fillOpacity: 0.25,
             weight: 2.5,
-            className: 'animate-pulse'
+            className: 'motion-safe:animate-pulse'
           }}
         />
       )}

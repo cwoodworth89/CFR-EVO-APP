@@ -14,6 +14,7 @@ import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
 import { TIER } from '../../utils/routeHydrants';
+import { routeFitOptions, snapFitOptions } from '../map/fitPadding';
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 // A programmatic fit fires the same zoomstart the user's scroll wheel does, so the
@@ -34,7 +35,7 @@ function markFitting(map, fittingRef) {
 // `userPanned` was false, so SNAP TO CALL flew to the parcel and was flown straight back --
 // "the map blinks like it should do something but it doesn't move" (operator,
 // DISP-2026-CE3851).
-function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef }) {
+function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef, compact = false }) {
   const map = useMap();
   const lastKeyRef = useRef(null);
 
@@ -50,27 +51,15 @@ function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef }) {
       [destination.lat, destination.lng]
     );
 
-    // Calculate dynamic container-aware padding percentage so route scales to fill map space
-    const containerSize = map.getSize();
-    const w = containerSize.x || 800;
-    const h = containerSize.y || 600;
-
-    const padTop = Math.max(45, Math.round(h * 0.12));
-    const padBottom = Math.max(35, Math.round(h * 0.08));
-    const padSide = Math.max(35, Math.round(w * 0.08));
-    // The dispatch-details box floats over the top-left of the map; the fit keeps the
-    // whole route to the right of it, so the destination pin is never under the box
-    // (operator, 2026-09-06: "it covers up the destination").
-    const panelWidth = panelRef?.current?.offsetWidth || 0;
-
+    // Padding measured from the container and the details box (map/fitPadding.js): the
+    // box floats over the top-left of the map on the hall display and across the top on a
+    // phone, and the fit keeps the whole route clear of it either way, so the destination
+    // pin is never under the box (operator, 2026-09-06: "it covers up the destination").
     markFitting(map, fittingRef);
-    map.fitBounds(bounds, {
-      paddingTopLeft: [padSide + panelWidth, padTop],
-      paddingBottomRight: [padSide, padBottom],
-      maxZoom: 17,
-      animate: true
-    });
-  }, [map, origin, destination, callKey, fittingRef, panelRef]);
+    map.fitBounds(bounds, routeFitOptions(map, {
+      panelEl: panelRef?.current, panelSide: compact ? 'top' : 'left', maxZoom: 17, animate: true,
+    }));
+  }, [map, origin, destination, callKey, fittingRef, panelRef, compact]);
 
   return null;
 }
@@ -97,7 +86,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -157,7 +146,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  // Open on the hall display; closed to its header on a phone, where the box spans the
+  // top of a map that is already only half the screen.
+  const [isPanelOpen, setIsPanelOpen] = useState(() => !compact);
   // 'route': the whole run from the hall; 'call': the final approach, close in, with the
   // parcel and the picked hydrants. One button flips between them (operator, 2026-09-08).
   const [viewMode, setViewMode] = useState('route');
@@ -242,21 +233,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           [origin.lat, origin.lng],
           [destination.lat, destination.lng]
         );
-        const containerSize = mapInstance.getSize();
-        const w = containerSize.x || 800;
-        const h = containerSize.y || 600;
-
-        const padTop = Math.max(45, Math.round(h * 0.12));
-        const padBottom = Math.max(35, Math.round(h * 0.08));
-        const padSide = Math.max(35, Math.round(w * 0.08));
-        const panelWidth = panelRef.current?.offsetWidth || 0;
-
-        mapInstance.fitBounds(bounds, {
-          paddingTopLeft: [padSide + panelWidth, padTop],
-          paddingBottomRight: [padSide, padBottom],
-          maxZoom: 17,
-          animate: true
-        });
+        mapInstance.fitBounds(bounds, routeFitOptions(mapInstance, {
+          panelEl: panelRef.current, panelSide: compact ? 'top' : 'left', maxZoom: 17, animate: true,
+        }));
       } else {
         mapInstance.setView([origin.lat, origin.lng], 13, { animate: true });
       }
@@ -278,23 +257,15 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     for (const h of routeHydrants.picks) {
       if (h.lat != null && h.lng != null) points.push([Number(h.lat), Number(h.lng)]);
     }
-    const containerSize = mapInstance.getSize();
-    const w = containerSize.x || 800;
-    const h = containerSize.y || 600;
-    const pad = Math.max(40, Math.round(Math.min(w, h) * 0.1));
-    const panelWidth = panelRef.current?.offsetWidth || 0;
     // Instant, not animated: a snap is a cut, and an animated four-level zoom sits at
     // Leaflet's animation threshold and is scheduled on requestAnimationFrame, which is
     // where it can fail to start (measured on the workstation, 2026-09-08).
     if (points.length === 1) {
       mapInstance.setView(points[0], 18, { animate: false });
     } else {
-      mapInstance.fitBounds(L.latLngBounds(points), {
-        paddingTopLeft: [pad + panelWidth, pad],
-        paddingBottomRight: [pad, pad],
-        maxZoom: 18,
-        animate: false
-      });
+      mapInstance.fitBounds(L.latLngBounds(points), snapFitOptions(mapInstance, {
+        panelEl: panelRef.current, panelSide: compact ? 'top' : 'left', maxZoom: 18, animate: false,
+      }));
     }
   };
 
@@ -337,7 +308,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       {/* Street section: resolved to a stretch of road, not a point. A third state --
           neither a located incident nor an unresolved one -- so it gets its own card. */}
       {activeCall?.location_type === 'street_section' && (
-        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
+        <div className={`absolute inset-x-4 ${compact ? 'top-32' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
           <StreetSectionBanner activeCall={activeCall} />
         </div>
       )}
@@ -346,14 +317,14 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           Distinct from the unresolved case below: coordinates exist and routing runs,
           but the pin is a substitution and the crew must be told so. */}
       {hasValidCoords && activeCall?.resolution_note && (
-        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
+        <div className={`absolute inset-x-4 ${compact ? 'top-32' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
           <ApproximateLocationBanner activeCall={activeCall} />
         </div>
       )}
 
       {/* High-Visibility Amber Warning Box for Unresolved Incident Location */}
       {!hasValidCoords && (
-        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 animate-pulse">
+        <div className={`absolute inset-x-4 ${compact ? 'top-32' : 'top-20'} z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 motion-safe:animate-pulse`}>
           <span className="text-3xl">⚠️</span>
           <div>
             <h4 className="text-sm font-black tracking-wider text-amber-300 uppercase font-mono">
@@ -367,7 +338,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       )}
 
       {/* Option A: Collapsible Left Dispatch Details & ETAs Panel */}
-      <div ref={panelRef} className="absolute top-3 left-3 z-[1000] w-72 sm:w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+      <div ref={panelRef} className={`absolute z-[1000] bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${compact ? 'top-14 inset-x-2' : 'top-3 left-3 w-72 sm:w-80'}`}>
         {/* Panel Header Toggle Bar */}
         <div 
           onClick={() => setIsPanelOpen(!isPanelOpen)}
@@ -389,7 +360,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
         {/* Collapsible Panel Content Body */}
         {isPanelOpen && (
-          <div className="p-3 flex flex-col gap-2.5 animate-in fade-in duration-200">
+          <div className={`p-3 flex flex-col gap-2.5 animate-in fade-in duration-200 ${compact ? 'max-h-[36dvh] overflow-y-auto' : ''}`}>
             {/* Dispatched Apparatus Unit ETAs List */}
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center px-1">
@@ -491,7 +462,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         <button
           onClick={viewMode === 'call' ? handleRecenter : snapToCall}
           title={viewMode === 'call' ? 'Back to the whole route from the hall' : 'Close in on the parcel and the picked hydrants'}
-          className={`absolute top-3 right-14 z-[1000] font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border flex items-center gap-1.5 cursor-pointer ${
+          className={`absolute top-3 ${compact ? 'right-3' : 'right-14'} z-[1000] font-mono text-xs font-black px-3.5 py-2 touch:py-2.5 rounded-xl shadow-xl border flex items-center gap-1.5 cursor-pointer ${
             viewMode === 'call'
               ? 'bg-slate-900/95 hover:bg-slate-800 text-sky-300 border-sky-700'
               : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300'
@@ -506,7 +477,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       {userPanned && viewMode === 'route' && (
         <button
           onClick={handleRecenter}
-          className="absolute top-14 right-14 z-[1000] bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border border-sky-400 flex items-center gap-1.5 cursor-pointer animate-pulse"
+          className={`absolute ${compact ? 'top-3 left-3' : 'top-14 right-14'} z-[1000] bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-black px-3.5 py-2 touch:py-2.5 rounded-xl shadow-xl border border-sky-400 flex items-center gap-1.5 cursor-pointer motion-safe:animate-pulse`}
         >
           <span>🎯</span>
           <span>RE-CENTER ROUTE</span>
@@ -625,6 +596,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
             callKey={`${callKey}-${selectedCandidateIdx}`}
             fittingRef={fittingRef}
             panelRef={panelRef}
+            compact={compact}
           />
         )}
       </MapSurface>

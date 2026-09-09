@@ -160,7 +160,7 @@ export default function StreetViewPanel({ activeCall }) {
         {!showStatic && !showEmbed && pano.status === 'loading' && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider animate-pulse">Loading Street View…</div>
+            <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider motion-safe:animate-pulse">Loading Street View…</div>
           </div>
         )}
         {sdkDown && (
@@ -273,7 +273,7 @@ export default function StreetViewPanel({ activeCall }) {
 
         <button
           onClick={() => setIsExpanded(true)}
-          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
+          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 touch:py-2 rounded-xl border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
           title="Open the interactive view"
         >
           <span>⤢</span>

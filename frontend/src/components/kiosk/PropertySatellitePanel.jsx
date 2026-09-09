@@ -155,7 +155,7 @@ export default function PropertySatellitePanel({ activeCall }) {
 
         <button
           onClick={() => setIsExpanded(true)}
-          className="absolute top-2 right-2 z-[1000] bg-slate-900/90 hover:bg-amber-600 text-amber-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow cursor-pointer"
+          className="absolute top-2 right-2 z-[1000] bg-slate-900/90 hover:bg-amber-600 text-amber-300 hover:text-white px-2.5 py-1 touch:px-3 touch:py-2 rounded-lg border border-slate-700 text-xs font-bold transition flex items-center gap-1 shadow cursor-pointer"
           title="Pop Out Full Screen View"
         >
           <span>⤢</span>

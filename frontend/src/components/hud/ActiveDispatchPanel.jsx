@@ -24,7 +24,7 @@ export default function ActiveDispatchPanel({ activeDispatch, setActiveDispatch,
   return (
     <div className="flex flex-col h-full bg-slate-905 text-slate-100 overflow-y-auto w-full select-none">
       {/* Active Alert Banner */}
-      <div className={`p-4 text-center border-b animate-pulse flex flex-col gap-0.5 shadow-md flex-shrink-0 ${
+      <div className={`p-4 text-center border-b motion-safe:animate-pulse flex flex-col gap-0.5 shadow-md flex-shrink-0 ${
         activeDispatch.is_test 
           ? "bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 border-amber-500"
           : "bg-gradient-to-r from-red-600 to-orange-600 border-red-700"

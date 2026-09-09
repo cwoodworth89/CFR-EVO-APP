@@ -34,6 +34,7 @@ Quotes are the operator's. Each one changed the plan; the change is stated besid
 | What a phone shows first | *"Right now it would just be the ntfy push leading to Google maps. if it was a crew tablet, then address and route is important."* | The push is untouched. **The tablet's first screen is the address and the route**, large; everything else is second. |
 | The push's map link | *"the push being google maps is fine for now"* | No external-call change; no `external_calls.md` row. Phase 4 no longer includes redirecting the push. |
 | The access model on the public endpoint (§6 question 1, asked after the first six) | *"it'll probably be a per phone password to access. We have truck phones that each have their own login for ArcGIS Survey, we'll probably copy something similar not sure."* | **Provisional: one account per truck phone, with its own password, on the model of the department's existing per-phone Survey123 logins.** Phase 2's first screen on a phone is a sign-in that persists on the device the way the admin unlock does. Phase 4 item 3 is written to it below, with the two facts about the existing login that it has to change (§3.6). "Not sure" is recorded as such: the model can still move, and nothing is built on it. |
+| Does the hall display keep reading without a login? | *"yeah that sounds like a good plan"* | **Ruled: reads stay open from the LAN and Tailscale, where `is_allowed_network` already draws the line, and a device token is required only from outside it.** The hall display never signs in and cannot log itself out mid-call. Phase 4 item 3 is built to this. |
 
 ---
 
@@ -300,8 +301,8 @@ padlock uses, with a sign-in screen where the token is absent or expired.
 LAN needs one too, and a display that logs itself out mid-call is a crew-facing failure of
 the kind CLAUDE.md §1 exists to forbid. The plan therefore assumes **reads stay open from
 the LAN and Tailscale, exactly as `is_allowed_network` already draws that line, and require
-a device token only from outside it.** The kiosk is untouched; the phone signs in. This is an
-assumption put to the operator (§6, question 1), not a ruling.
+a device token only from outside it.** The kiosk is untouched; the phone signs in. **Ruled
+2026-09-09** (operator: *"yeah that sounds like a good plan"*).
 
 **The phone does not need the broker.** A truck phone is woken by the ntfy push; the page
 fetches the current dispatch from the API when it opens or returns to the foreground. That
@@ -462,7 +463,7 @@ which is a real call through the live path. The touch TV is checked on the touch
 | The mounted tablet is an iPad-class device, 8–11", landscape | It is a small Android tablet or a phone-sized unit. Phase 3's `lg:` line moves. |
 | Crews will reach the system over a public HTTPS origin | The exposure is not built, or is VPN-only after all. Then Phase 4 shrinks to item 1 and the tablet install. |
 | Per-phone accounts, on the Survey123 model | Ruled provisionally 2026-09-09 ("not sure"). If it moves to a shared code or a link-carried token, Phase 4 item 3 shrinks and the sign-in screen goes. |
-| Reads stay open from the LAN and Tailscale; a token is required only from outside | The operator wants the hall display to log in too. Then the kiosk needs a device account with a token that cannot expire mid-call, and that is a §1 design question before anything is built. |
+| Reads stay open from the LAN and Tailscale; a token is required only from outside | Ruled 2026-09-09. No longer an assumption. |
 | The hall screen is a touch TV | Ruled 2026-09-09. No longer an assumption. |
 | The `dvh`, wake-lock, safe-area and target-size facts | `caniuse-lite` (checked, table in §3.6), the WCAG 2.2 text and an actual iPhone (not yet checked). |
 | The 8/4 grid and the banner are the shape to keep above `md:` | The #74 design lands with a different layout. Then Phase 3 is written against that. |
@@ -473,23 +474,20 @@ which is a real call through the live path. The touch TV is checked on the touch
 
 Answered 2026-09-09 and recorded above: which surface, which devices, whether the hall
 screen is touched, how crews reach the system, what a phone shows first, the push's map
-link, and (provisionally) per-phone accounts. Still open, and asked one at a time:
+link, (provisionally) per-phone accounts, and that the hall display never signs in. Still
+open, and asked one at a time:
 
-1. **Does the hall display keep reading without a login?** The plan assumes reads stay open
-   from the LAN and Tailscale and need a device token only from outside (§3.6). If the hall
-   kiosk should also sign in, its token must not expire mid-call, and that is a design
-   question before anything is built.
-2. **Is the mounted tablet an iPad, and which size?** And is it landscape in the cradle?
+1. **Is the mounted tablet an iPad, and which size?** And is it landscape in the cradle?
    This sets Phase 3's tablet breakpoint and the type-size measurement in the truck.
-3. **On a crew phone, is it the current call only, or a list of recent calls too?** And do
+2. **On a crew phone, is it the current call only, or a list of recent calls too?** And do
    the five-minute auto-dismiss and the queue apply, or does a call stay until closed?
-4. **The details box (#74) is with Claude Design.** Should the phone layout wait for that
+3. **The details box (#74) is with Claude Design.** Should the phone layout wait for that
    design, or should "collapses to a strip on a narrow screen" be a requirement handed to it?
-5. **Is the review screen ever wanted on a phone**, or is a tablet in landscape its floor?
+4. **Is the review screen ever wanted on a phone**, or is a tablet in landscape its floor?
    May it say so on screen?
-6. **The freeze.** Review-only until it lifts, or Phase 1 on this branch now? Item 1 (the
+5. **The freeze.** Review-only until it lifts, or Phase 1 on this branch now? Item 1 (the
    touch TV's hover-only information) is the one that may deserve promoting on its own.
-7. **Anything beyond screen size?** Colour vision against the green routine and red
+6. **Anything beyond screen size?** Colour vision against the green routine and red
    emergency pair and the four hall colours, text size, gloves, a bright cab in daylight
    against the dark palette.
-8. **A screenshot of the console on your own phone today**, to sit beside the emulated ones.
+7. **A screenshot of the console on your own phone today**, to sit beside the emulated ones.

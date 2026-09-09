@@ -2,7 +2,7 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-79 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+80 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
@@ -19,6 +19,7 @@
 | **55** | 🟠 operational | SUPERSEDED | [Audio Pipeline & Digital PA Architecture Alignment (Locution CAD, 15s Phase 1, 3s Silence)](55-audio-pipeline-digital-pa-architecture-alignment-locuti.md) |
 | **63** | 🔴 crew-visible | CLOSED | [The STT initial prompt is echoed into pauses as "map grid N", and the parser believed it](63-the-stt-initial-prompt-is-echoed-into-pauses-as-map-grid-n.md) |
 | **14** | 🔴 crew-visible | CLOSED | [PA announcements are being captured as dispatches](14-pa-announcements-are-being-captured-as-dispatches.md) |
+| **49** | 🟠 operational | CLOSED | [Access-point review UX — operators cannot set an entrance without direct SQL](49-access-point-review-ux-operators-cannot-set-an-entrance.md) |
 | **37** | ⚪ hygiene | CLOSED | [Close button and timer timeout should not dismiss to the same place](37-close-button-and-timer-timeout-should-not-dismiss-to-th.md) |
 | **35a** | 🟠 operational | CLOSED | [Google Street View panel still not working](35a-google-street-view-panel-still-not-working.md) |
 | **19a** | 🔴 crew-visible | CLOSED | [Remaining fuzzy-match sites have not been reviewed](19a-remaining-fuzzy-match-sites-have-not-been-reviewed.md) |

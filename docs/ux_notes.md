@@ -70,8 +70,9 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 
 | *"When I search an address it doesn't highlight the parcel the same way it does in a dispatch call … good for checking out how the screen will kinda look during a dispatch event and for pre-planning."* (2026-09-08) | The parcel lookup now carries the outline (PostGIS geometry as rings), drawn on the workstation map and in the satellite tile; the centroid target icon is gone (*"we can get rid of that target emoji"*); the kiosk route map shades the parcel soft blue too (*"the target parcel had a soft blue shading"*) | — |
 
-Observed, not yet raised with the operator: in the address search, **Enter does not pick the
-suggestion**; the row has to be clicked. Every automated run of the search hit this.
+An earlier note here said Enter did not pick a suggestion in the address search. Withdrawn
+2026-09-08: the handler selects the highlighted row, or the first one, on Enter; what the
+automated runs hit was pressing it before the suggestions had loaded.
 
 ---
 

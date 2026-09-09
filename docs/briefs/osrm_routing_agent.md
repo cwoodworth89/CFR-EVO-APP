@@ -1,0 +1,93 @@
+# Brief: OSRM routing development
+
+**For a fresh agent, written 2026-09-08.** Read `CLAUDE.md` first, then
+[`../review_status_handoff.md`](../review_status_handoff.md). This brief is the scope, the
+starting facts, the rules of the road on the shared kiosk, and the boundary with the other
+stream running at the same time ([`vector_basemap_agent.md`](vector_basemap_agent.md)).
+
+## What this stream is for
+
+Routing today is **stock OSRM** on the OSM extract, deliberately reset to basics on
+2026-08-30 after an invented "apparatus physics" model steered it wrong (standards index,
+the two CAUTION blocks). It works: ETAs come from OSRM's own `distance` and `duration`, the
+route line is OSRM's geometry, and the operator has not seen a bad route since. The work now
+is to make routing **right for fire apparatus and right for this city**, on evidence:
+
+1. **Reproduce before tuning.** Punch-list #1 (loops, alley cut-throughs) has never been
+   re-observed since stock OSRM. First job: the operator names a call with a bad route, or
+   the item is closed as not reproducible. `tools/verify_snapping_corpus.py` and the
+   `routing_metrics` stored on every dispatch are the corpus to measure against.
+2. **The profile, with its source held.** `osrm-backend` ships `profiles/car.lua`; the
+   installed image's copy is the authoritative text (CLAUDE.md §7.3a). Any change to how
+   roads are weighted for an engine or a ladder cites the line it changes and the reason
+   from the operator or a measurement. The standards index row *Apparatus routing profile*
+   is NOT HELD until that text is vendored under `docs/standards/`.
+3. **Operator designs waiting** (`../post_freeze_backlog.md`): every responding hall's route
+   on one map in hall colours; hydrants along the route are already built on the frontend
+   from the route geometry and need nothing from this stream unless the geometry changes.
+4. **Arrival points.** The resolver sends OSRM the operator-verified arrival point when one
+   exists (`entrance → front → centroid`). Snapping the destination to the road that the
+   address names, not the nearest road, is the open question from
+   [`../briefings/addressed_street_snapping_decision.md`](../briefings/addressed_street_snapping_decision.md).
+
+## Where things are
+
+| | |
+|:--|:--|
+| Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend`, `osrm-routed --algorithm mld /data/vancouver.osrm`), port 5000 |
+| Data | kiosk `backend/data/osrm/`: `vancouver.osm.pbf` (2026-08-14, git-ignored) and the `.osrm` graph built from it. **Find out which profile built the current graph before anything else**; the compose file does not say |
+| Service code | `services/gis/src/gis_service/routing_engine.py` (OSRM client, hall apron departure, staged `APPARATUS_TIERS` — staged, not applied, §6.4) |
+| API | `backend/api/routers/routing.py`; the frontend's `RoutingOverlay.jsx` calls `/api/route` |
+| Frontend | `frontend/src/components/RoutingOverlay.jsx`, `frontend/src/utils/EVORoutingEngine.js` (ETAs per unit from OSRM metrics), the kiosk's `RouteOverviewPanel.jsx` and the workstation's `DispatchTargetLayer.jsx` consume the route |
+| Halls | `frontend/src/components/MapConstants.js` `STATIONS`; the hall apron coordinates in `routing_engine.py` |
+| Skill | `.claude/skills/emergency-routing-engine/SKILL.md` |
+
+## Rules that bind this stream
+
+* **§6.2**: OSRM's distance and duration are the answer. No speed × distance estimates, no
+  turn-count guesses, no re-derived ETAs.
+* **§6.3 / §7**: every weight, penalty or speed carries its source. If the source does not
+  exist in the project, stop and raise it with the operator; do not improvise a default.
+* **§6.5**: test with real dispatches (review replay), never fabricated calls.
+* **Measure before deploying** a profile change: the same corpus routed before and after,
+  distance and duration per call, the ones that changed listed by dispatch id, and the
+  operator shown the routes that moved. A profile change that moves routes the operator
+  did not ask to move is a regression until they say otherwise.
+* **The OSM extract is shared** with the basemap stream. Do not replace or re-download it
+  without telling the other agent and the operator; a newer extract changes both the
+  routing graph and the tiles at once, and that should be one deliberate event.
+
+## The kiosk, shared with another agent
+
+* Deploy by `git pull` on the kiosk. **Never restart `cfr-agent`**; the operator picks the
+  moment (`tools/kiosk_capture_state.sh` first, always).
+* An OSRM graph rebuild (`osrm-extract` / `osrm-partition` / `osrm-customize`) is minutes
+  of all cores and a container restart on port 5000. Announce it, do it when no capture is
+  running, and never while the basemap stream is generating tiles.
+* Restarting the `osrm` container drops routing for every kiosk for the duration; the API
+  returns no route and the kiosk shows no ETA rather than a guess. Short, and announced.
+
+## Working in parallel
+
+* Own branch and worktree: `git worktree add ../CFR-EVO-APP-routing -b routing` from
+  `main`. Stage by name, never `git add -A`; another session may be committing.
+* Files this stream owns: the `osrm` compose service, `backend/data/osrm/` (with the caveat
+  above), `routing_engine.py`, `routing.py`, `RoutingOverlay.jsx`, `EVORoutingEngine.js`,
+  the routing skill. Files it must not touch: `MapLayers.jsx`, `MapSurface.jsx`,
+  `MapConstants.js` `BASE_LAYERS`, the tile server, the crawl and compile scripts.
+* Merge to `main` when a change is measured and the operator has seen it; small merges,
+  often. Pull `main` into the branch daily; the basemap stream's merges do not touch the
+  files above.
+
+## First hour
+
+1. On the kiosk: `docker exec cfr_osrm ls /data`, the `.osrm.timestamp`, and which profile
+   built it (the `.osrm.properties` file records it). Write the answer into this brief.
+2. Route the verified corpus once as the baseline: every dispatch with a verified address,
+   hall → arrival point, distance and duration into a CSV under the scratchpad, and a row in
+   `public.evaluation_history` if the harness fits, so there is a "before".
+3. Ask the operator for one bad route, by dispatch id, or close #1.
+
+<!-- audit-ok: backend/data/osrm/vancouver.osm.pbf -- git-ignored, kiosk only -->
+<!-- audit-ok: backend/data/osrm/ -- git-ignored, kiosk only -->
+<!-- audit-ok: backend/data/tiles/ -- git-ignored, kiosk only -->

@@ -15,6 +15,7 @@ Companion documents:
 * [`docs/standards/README.md`](./standards/README.md) — domain standards index (currently all gaps)
 * [`docs/standards/dependency-behaviour.md`](./standards/dependency-behaviour.md) — **verified library semantics; read this before trusting any API name**
 * [`docs/architecture/unified_map_surface.md`](./architecture/unified_map_surface.md) — frontend architecture, implemented
+* [`docs/briefs/osrm_routing_agent.md`](./briefs/osrm_routing_agent.md) and [`docs/briefs/vector_basemap_agent.md`](./briefs/vector_basemap_agent.md) — **the two post-freeze streams, one brief each**: scope, where things are, the rules on the shared kiosk, the file boundary between them, and the first hour
 * [`docs/ux_notes.md`](./ux_notes.md) — **the brief for the next UX pass**: what the operator said on 2026-09-06, what was done, the open design decisions, and the conventions the screens have settled into
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
 

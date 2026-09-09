@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | CLOSED |
 | **Severity** | operational |
 | **Area** | 🧾 Import Completeness Audit, 2026-08-23 |
 | **Blocks** | 1 |
@@ -88,7 +88,7 @@ Roughly 30 seconds per site. The top 100 is an afternoon.
 
 ## 49 (update). The review queue is 1,671 sites, not 65,401 parcels
 
-> **Status**: 🟡 **Built 2026-09-06 — the operator sets an arrival point from the workstation's search view; the kiosk says when one is in play. Open until the operator has used it on a real site.**
+> **Status**: ✅ **Closed 2026-09-08 — the operator set the first two arrival points on real sites through the search view.**
 
 This item has read as "operators must set entrances on 65,401 parcels", which is why it has
 not moved. Under the `base_site` decision it is **1,671 multi-parcel sites**, ranked by
@@ -145,3 +145,18 @@ UI is the smallest thing that lets them own it:
 Not built: the worst-first review queue as a screen. `docs/complex_sites_for_review.csv`
 still ranks the sites; the operator works it by searching each address. The top hundred
 covers 65 % of the addresses behind complex sites and is an afternoon.
+
+---
+
+## Closed 2026-09-08
+
+The operator used it. `public.parcels` holds two operator-set arrival points, both attributed
+`CW`, both with a note in the officer's words: **2865 Glen Dr**, *"Gated community entrance"*
+(2026-09-08 22:57 PDT), and **602 Como Lake Ave 2606**, *"Front entrance of the building is
+on the corner"* (23:13 PDT). Found on the way and fixed the same evening: the card clipped
+the form's save button at the stack's height (it scrolls now, and the frontage note gives
+way while placing). The kiosk's *ARRIVAL POINT SET BY OPERATOR* line went live with the
+agent restart the same day. The worst-first queue (`docs/complex_sites_for_review.csv`)
+remains a list to work through, not a screen; the operator's design for gating the saves
+behind the admin login is in `docs/ux_notes.md` §3.
+

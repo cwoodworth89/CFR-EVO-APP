@@ -81,6 +81,18 @@ of each, is the operator's call; both start from the same tiles.
 | Leaflet can host MapLibre under the existing overlay panes | `@maplibre/maplibre-gl-leaflet` 0.1.4 declares `leaflet ^1.9.3` and `maplibre-gl ^4.3.2` as peers; the project holds 1.9.4 and 4.7.1 | Declared compatible; not yet run |
 | The OpenMapTiles schema carries every road the crews read on the paper map book | Compare `transportation` at z14 against `public.roads` for one zone | Not measured |
 
+## Rulings so far (2026-09-09, the operator on the trial page)
+
+* The credit line: agreed.
+* Coverage: on standby.
+* Designs: **Positron, Dark Matter, Fiord Color and Toner are out**; OSM Bright, MapTiler
+  Basic and OSM Liberty stay in play. Positron going means the crews' current light look is
+  not the target. MapTiler 3D was tried and dropped (black blobs on these tiles).
+* The trial page grew a per-layer label panel (every symbol layer as its own checkbox) at the
+  operator's request, so each label class can be judged on its own.
+* Tilt and 3D buildings: raised by the operator as a future idea; the answer given is in the
+  session record, not built.
+
 ## Decisions for the operator
 
 1. **Look at it on the hall display** and say whether it stays: the raster stays on disk

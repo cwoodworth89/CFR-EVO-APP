@@ -131,7 +131,6 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
               transparent: true,
               opacity: 0.9,
               attribution: cadastral.attribution,
-              minZoom: cadastral.minZoom,
               maxNativeZoom: cadastral.maxNativeZoom,
               maxZoom: cadastral.maxZoom,
               pane: "overlayPane",

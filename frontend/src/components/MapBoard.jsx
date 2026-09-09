@@ -358,14 +358,16 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   // read against it -- the zone numbers -- cannot disagree with it.
   const baseStyle = (appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : "STREET";
 
-  // Whether road names are wanted at all -- NOT which layer draws them. MapSurface owns
-  // the handover to cadastral at z14. This used to carry the zoom rule itself, with the
-  // threshold at 16 while cadastral actually starts at 14, so z14 and z15 were labelled
-  // twice (operator, 2026-09-08).
+  // Whether the street tiles carry their own labels. This used to be smuggled inside the
+  // choice between two BASE_LAYERS names ("GREY" meant no labels, "VOYAGER" meant labels),
+  // which read as a style preference rather than the decision it is. The rule is unchanged.
   //
-  // targetAddress counts: searching an address is asking where it is, so the streets keep
-  // their names for that even with the layer toggle off.
-  const streetLabels = baseStyle === "STREET" && Boolean(showLabels || targetAddress);
+  // Note the middle clause is not a typo: turning "Road Names & Addresses" ON at zoom 16+
+  // takes labels OFF the basemap, because that same toggle draws the cadastral overlay,
+  // which carries its own road names -- two sets of labels on one map is worse than none.
+  const streetLabels = baseStyle === "STREET"
+    && !(showLabels && currentZoom >= 16)
+    && Boolean(showLabels || targetAddress || currentZoom <= 15);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">

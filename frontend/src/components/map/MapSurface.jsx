@@ -1,43 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, Pane, ZoomControl, useMap } from 'react-leaflet';
+import React from 'react';
+import { MapContainer, Pane, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../MapLayers';
-import { BASE_LAYERS } from '../MapConstants';
-
-/**
- * The street basemap and the cadastral overlay, which cannot both carry names.
- *
- * Cadastral tiles begin at z14 and carry their own road names and addresses. Below that
- * the basemap has to provide them, above it the basemap must stop or every street is
- * labelled twice. That handover is one decision about two layers, so it lives here rather
- * than in each caller -- the dispatch route panel does not track zoom at all, and asking
- * every consumer to derive it was how the two surfaces came to disagree (operator,
- * 2026-09-08: the dispatch map had been double-labelled from z14 up, and the console from
- * z14 to z15).
- *
- * `streetLabels` from the caller is intent -- "names are wanted here" -- not a demand for
- * the basemap specifically. This decides where they come from.
- */
-function StreetAndCadastral({ baseStyle, streetLabels, showCadastral, onCadastralError }) {
-  const map = useMap();
-  const [zoom, setZoom] = useState(() => map.getZoom());
-
-  useEffect(() => {
-    const sync = () => setZoom(map.getZoom());
-    map.on('zoomend', sync);
-    sync();
-    return () => map.off('zoomend', sync);
-  }, [map]);
-
-  const cadastralDrawing = showCadastral && zoom >= BASE_LAYERS.CADASTRAL.minZoom;
-
-  return (
-    <>
-      <BaseMap style={baseStyle} useLabelsFallback={streetLabels && !cadastralDrawing} />
-      <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />
-    </>
-  );
-}
 
 /**
  * The one map. Owns the Leaflet container, the custom panes, and the layers that are on
@@ -114,12 +78,8 @@ export default function MapSurface({
       <Pane name="underlayPane" style={{ zIndex: PANE_Z.underlay }} />
       <Pane name="labelsPane" style={{ zIndex: PANE_Z.labels }} />
 
-      <StreetAndCadastral
-        baseStyle={baseStyle}
-        streetLabels={streetLabels}
-        showCadastral={showCadastral}
-        onCadastralError={onCadastralError}
-      />
+      <BaseMap style={baseStyle} useLabelsFallback={streetLabels} />
+      <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />
       <StationsLayer visible={showFireHalls} />
       <HydrantsLayer visible={showHydrants} targetCoords={hydrantTargetCoords} highlightIds={hydrantHighlightIds} />
 

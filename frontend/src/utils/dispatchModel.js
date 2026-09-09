@@ -216,9 +216,3 @@ export function getVisibleChanges(current, incoming) {
   );
 }
 
-/** Whether a call carries usable coordinates. */
-export function hasCoordinates(call) {
-  return !!call
-    && call.lat != null && call.lng != null
-    && !Number.isNaN(Number(call.lat)) && !Number.isNaN(Number(call.lng));
-}

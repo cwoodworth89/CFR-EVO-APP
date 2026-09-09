@@ -55,29 +55,3 @@ const NS_STREETS = [
   'DESERT', 'REGAN', 'HOWIE', 'REGAN', 'SHAY', 'SOBALL', 'LANSDOWNE', 'DOUGALL'
 ];
 
-/**
- * Calculates the exact 0m front property line midpoint from parcel polygon rings.
- */
-export function calculateParcelFrontagePoint(rings) {
-  if (!rings || !rings.length || !rings[0] || rings[0].length < 3) return null;
-  const pts = rings[0]; // [lng, lat]
-  
-  const avgLat = pts.reduce((sum, p) => sum + p[1], 0) / pts.length;
-  const avgLng = pts.reduce((sum, p) => sum + p[0], 0) / pts.length;
-
-  const edges = [];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    edges.push({
-      p1, p2,
-      midLat: (p1[1] + p2[1]) / 2,
-      midLng: (p1[0] + p2[0]) / 2
-    });
-  }
-  // Return exact parcel centroid for reliable street frontage matching
-  return {
-    front_lat: Number(avgLat.toFixed(6)),
-    front_lng: Number(avgLng.toFixed(6))
-  };
-}

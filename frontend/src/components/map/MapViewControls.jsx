@@ -1,5 +1,4 @@
 import React from 'react';
-import { COQUITLAM_CENTER } from '../MapConstants';
 
 /**
  * Floating controls layered over the map: zoom readout, reset-view, re-centre-on-route,
@@ -9,10 +8,10 @@ import { COQUITLAM_CENTER } from '../MapConstants';
  * chrome, so they are not Leaflet layers — but they were interleaved with the layer JSX,
  * which made the container's render harder to read than it needed to be.
  *
- * The COQUITLAM_CENTER used here is a legitimate default map view, not a dispatch
- * coordinate: it is where "reset view" returns to. Two other uses of that constant in
- * MapBoard were substituting it for missing incident coordinates and were removed
- * (punch-list #2).
+ * The default view itself belongs to useMapInstance, which owns `isOffDefault` and knows
+ * the centre and zoom that flag is measured against. This component had its own copy of
+ * the reset, with the centre and zoom written out a second time, so "the default view"
+ * had two definitions that nothing kept in step.
  */
 
 function ZoomBadge({ currentZoom }) {
@@ -39,6 +38,7 @@ export default function MapViewControls({
   mapStyle,
   setMapStyle,
   defaultMapStyle,
+  resetView: resetMapView,
 }) {
   // The basemap is part of "the view" (operator, 2026-09-08): leaving the aerial layer on
   // after a reset meant the map came back to the default position but not the default
@@ -48,11 +48,8 @@ export default function MapViewControls({
   const styleIsOffDefault = Boolean(defaultMapStyle) && mapStyle !== defaultMapStyle;
 
   const resetView = () => {
-    setUserPanned(false);
     if (styleIsOffDefault && setMapStyle) setMapStyle(defaultMapStyle);
-    if (map) {
-      map.flyTo(COQUITLAM_CENTER, 12, { animate: true, duration: 0.8 });
-    }
+    if (resetMapView) resetMapView();
   };
 
   const recentreOnRoute = () => {
@@ -73,7 +70,7 @@ export default function MapViewControls({
       <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-2">
         <ZoomBadge currentZoom={currentZoom} />
 
-        {isOffDefault && (
+        {(isOffDefault || styleIsOffDefault) && (
           <button
             onClick={resetView}
             title={styleIsOffDefault

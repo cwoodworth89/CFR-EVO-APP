@@ -53,7 +53,7 @@ import { apiClient, API_BASE_URL } from '../apiClient';
 // 🚧 Barricade Icon for Road Closures
 export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   const {
-    map, setMap, currentZoom, isOffDefault, userPanned, setUserPanned,
+    map, setMap, currentZoom, isOffDefault, userPanned, setUserPanned, resetView,
     fitTo, invalidateSoon,
   } = useMapInstance();
 
@@ -474,6 +474,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
             mapStyle={mapStyle}
             setMapStyle={setMapStyle}
             defaultMapStyle={MODE_DEFAULTS.EXPLORE}
+            resetView={resetView}
           />
         </div>
 

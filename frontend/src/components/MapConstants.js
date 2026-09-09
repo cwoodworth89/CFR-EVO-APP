@@ -103,15 +103,6 @@ export const BASE_LAYERS = {
   }
 };
 
-export const OVERLAY_LAYERS = {
-  CADASTRAL: {
-    url: `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
-    fallbackUrl: null,
-    maxNativeZoom: 20,
-    maxZoom: 22,
-  }
-};
-
 export const MODE_DEFAULTS = {
   EXPLORE: "GREY",
   DRIVER_SETUP: "GREY",

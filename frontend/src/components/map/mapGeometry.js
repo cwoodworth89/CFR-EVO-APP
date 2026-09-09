@@ -1,4 +1,3 @@
-import * as turf from '@turf/turf';
 import polylabel from '@mapbox/polylabel';
 import { KNOWN_BUILDINGS } from '../MapConstants';
 
@@ -50,32 +49,6 @@ export const getZoneLabelPoint = (zone) => {
   zoneLabelPointCache.set(zone, point);
   return point;
 };
-
-/**
- * The Alpha side of a parcel boundary: the segment nearest the approach point.
- *
- * @param rings       one ring of the parcel polygon, as [lng, lat] pairs
- * @param referencePt [lng, lat], normally the route's end point
- */
-export function getAlphaSegment(rings, referencePt) {
-  if (!rings || rings.length < 2) return null;
-
-  const refPt = turf.point(referencePt);
-  let minDistance = Infinity;
-  let alphaSeg = null;
-
-  for (let i = 0; i < rings.length - 1; i++) {
-    const p1 = rings[i];
-    const p2 = rings[i + 1];
-    const segment = turf.lineString([p1, p2]);
-    const dist = turf.pointToLineDistance(refPt, segment, { units: 'meters' });
-    if (dist < minDistance) {
-      minDistance = dist;
-      alphaSeg = segment;
-    }
-  }
-  return alphaSeg;
-}
 
 /**
  * Attaches known-building detail to a dispatch target when the address matches one.

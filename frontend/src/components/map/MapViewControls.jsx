@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * Floating controls layered over the map: zoom readout, reset-view, re-centre-on-route,
@@ -33,6 +33,7 @@ export default function MapViewControls({
   setUserPanned,
   targetAddress,
   targetCoords,
+  nearestHydrants = [],
   homeStation,
   buildTime,
   mapStyle,
@@ -52,8 +53,36 @@ export default function MapViewControls({
     if (resetMapView) resetMapView();
   };
 
+  // 'route' or 'call', as on the kiosk: SNAP TO CALL closes in on the parcel and its picked
+  // hydrants; SHOW ROUTE goes back. The operator's workflow for arrival points and Street
+  // View is search, snap, adjust, save (2026-09-08). Reset per searched address.
+  const [viewMode, setViewMode] = useState('route');
+  const [viewModeFor, setViewModeFor] = useState(targetAddress?.address || null);
+  if ((targetAddress?.address || null) !== viewModeFor) {
+    setViewModeFor(targetAddress?.address || null);
+    setViewMode('route');
+  }
+
+  const snapToCall = () => {
+    if (!map || !targetCoords) return;
+    const points = [targetCoords];
+    for (const h of nearestHydrants) {
+      if (h?.lat != null && h?.lng != null) points.push([Number(h.lat), Number(h.lng)]);
+    }
+    // A programmatic move the auto-fit must not undo: the map counts as panned by the
+    // operator from here, and the SHOW ROUTE side of this button is the way back.
+    setUserPanned(true);
+    setViewMode('call');
+    if (points.length === 1) {
+      map.setView(points[0], 18, { animate: true });
+    } else {
+      map.fitBounds(points, { paddingTopLeft: [340, 80], paddingBottomRight: [400, 80], maxZoom: 18, animate: true });
+    }
+  };
+
   const recentreOnRoute = () => {
     setUserPanned(false);
+    setViewMode('route');
     if (map && targetCoords && homeStation) {
       map.fitBounds([homeStation, targetCoords], {
         // Asymmetric padding: the left sidebar and the right inspection stack both overlay
@@ -69,6 +98,21 @@ export default function MapViewControls({
     <>
       <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-2">
         <ZoomBadge currentZoom={currentZoom} />
+
+        {targetAddress && targetCoords && (
+          <button
+            onClick={viewMode === 'call' ? recentreOnRoute : snapToCall}
+            title={viewMode === 'call' ? 'Back to the whole route from the hall' : 'Close in on the parcel and the picked hydrants'}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-black font-mono shadow-xl backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+              viewMode === 'call'
+                ? 'bg-slate-950/90 hover:bg-slate-900 border-sky-700 text-sky-300'
+                : 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950'
+            }`}
+          >
+            <span>{viewMode === 'call' ? '🗺️' : '🎯'}</span>
+            <span>{viewMode === 'call' ? 'SHOW ROUTE' : 'SNAP TO CALL'}</span>
+          </button>
+        )}
 
         {(isOffDefault || styleIsOffDefault) && (
           <button
@@ -86,7 +130,7 @@ export default function MapViewControls({
         )}
       </div>
 
-      {userPanned && targetAddress && (
+      {userPanned && targetAddress && viewMode !== 'call' && (
         <button
           onClick={recentreOnRoute}
           className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1100] bg-slate-900/95 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-4.5 py-2.5 rounded-full border border-sky-500/60 shadow-2xl flex items-center gap-2 transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-3 duration-200"

@@ -481,6 +481,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
             setUserPanned={setUserPanned}
             targetAddress={targetAddress}
             targetCoords={targetCoords}
+            nearestHydrants={nearestHydrants}
             homeStation={STATIONS[homeHall]}
             buildTime={buildTime}
             mapStyle={mapStyle}

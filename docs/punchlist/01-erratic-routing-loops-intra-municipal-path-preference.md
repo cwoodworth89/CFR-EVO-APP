@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | OPEN — apparatus profile **deployed 2026-09-09 12:30 PDT**; closes on the operator's word, the speed table stays unsourced |
 | **Severity** | crew-visible |
 | **Area** | 🧭 Routing Engine & Pathfinding Anomalies |
 | **Blocks** | 1 |
@@ -221,12 +221,18 @@ None of them invents a road: a connection absent from OSM, or a turn across a me
 connecting way, needs a map edit. First candidate for the table: the Colony Farm access above,
 if a route ever reaches for it.
 
-**To deploy**, at a moment the operator picks (restarting `osrm` drops routing on every kiosk for
-the seconds the graph takes to load): in `docker-compose.yml` the `osrm` command's
-`/data/vancouver.osrm` becomes `/data/apparatus.osrm`; `git pull` on the kiosk; `docker compose
-up -d osrm`; then one route on port 5000 and one on the kiosk. `vancouver.osrm.*` stays on disk
-as the rollback, the same edit reversed. Remove `cfr_osrm_trial` afterwards. Until then the trial
-container keeps running on 5001 and nothing a crew sees has changed.
+### Deployed, 2026-09-09 12:30:50 PDT, on the operator's word
+
+`docker-compose.yml`: the `osrm` command serves `/data/apparatus.osrm`, and the image is pinned
+to the digest that built it, because a graph only loads in the OSRM version whose fingerprint it
+carries. Merged to `main` (5512e40), pulled on the kiosk, `docker compose up -d --no-deps osrm`;
+the router was listening again one second after it stopped, and `cfr-agent` and the API were not
+touched. Verified three ways: the Hall 2 departure on port 5000 starts on the apron (snap 0.6 m,
+"depart (unnamed) 10 m, turn right Mariner Way"); `/api/route` from Hall 2 returns a polyline
+whose first points are the apron; and the corpus routed against port 5000 against the trial
+run's row moved **0** routes — the third `routing` row in `evaluation_history`. The trial
+container `cfr_osrm_trial` was then removed. **Rollback**: the same compose edit reversed
+(`vancouver.osrm`, the stock graph, is still on disk) and `up -d --no-deps osrm`.
 
 ---
 

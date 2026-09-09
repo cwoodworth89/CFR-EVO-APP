@@ -34,7 +34,7 @@ is to make routing **right for fire apparatus and right for this city**, on evid
 
 | | |
 |:--|:--|
-| Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend`, `osrm-routed --algorithm mld /data/vancouver.osrm`), port 5000 |
+| Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend` pinned by digest, `osrm-routed --algorithm mld /data/apparatus.osrm` since 2026-09-09; `vancouver.osrm` is the stock graph kept for rollback), port 5000 |
 | Data | kiosk `backend/data/osrm/`: `vancouver.osm.pbf` (a BBBike extract, map data of 2026-08-07, file of 2026-08-14, git-ignored) and the `.osrm` graph built from it by OSRM v26.8.0 with the stock `car.lua` — answered 2026-09-08, below |
 | Profile | `backend/osrm/profiles/apparatus.lua`, the vendored `car.lua` (`docs/standards/osrm/`) with the operator's rulings, each hunk cited; `backend/scripts/build_osrm_graph.sh` builds a graph beside the served one and records what built it |
 | Service code | `services/gis/src/gis_service/routing_engine.py` (OSRM client, hall apron departure, staged `APPARATUS_TIERS` — staged, not applied, §6.4) |
@@ -130,9 +130,10 @@ is to make routing **right for fire apparatus and right for this city**, on evid
    `backend/scripts/build_osrm_graph.sh` and **measured 2026-09-09 against the baseline: 820 of
    2,248 routes moved, 562 of them the Hall 2 apron (a fire lane in OSM), all 24 loops gone,
    nothing slower by more than 11 s** — the second `routing` row, and the table in punch-list
-   #1. Not deployed; the deploy steps are there too. The speed table is the one thing still
-   unsourced. The item stays open on the operator's deploy decision, and on any other dispatch
-   id they name with a route they would not drive.
+   #1. **Deployed 2026-09-09 12:30 PDT** on the operator's word: `cfr_osrm` serves
+   `apparatus.osrm`, image pinned by digest, the stock graph on disk as the rollback. The speed
+   table is the one thing still unsourced. The item closes on the operator's word, or stays
+   open on any dispatch id they name with a route they would not drive.
 
 ## First hour, as originally written
 

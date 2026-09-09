@@ -161,6 +161,23 @@ server {
         client_max_body_size 16m;
     }
 
+    # index.html must revalidate on every use. Without a Cache-Control header a browser
+    # invents a freshness lifetime (RFC 9111 s4.2.2; Chrome and Firefox use ~10% of the age
+    # since Last-Modified), so a page built ten hours ago is served from cache for about an
+    # hour without contacting nginx at all. index.html names content-hashed bundles that a
+    # rebuild deletes, so a stale copy asks for a file that no longer exists, falls through
+    # try_files, gets index.html back, and tries to execute HTML as JavaScript. That is
+    # punch-list #44b -- it cost two live calls. "no-cache" means revalidate, not "do not
+    # store": with the ETag, an unchanged deploy answers 304.
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    # Safe to cache forever precisely because the filename contains a content hash.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }

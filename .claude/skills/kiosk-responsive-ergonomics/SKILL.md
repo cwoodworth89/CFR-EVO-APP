@@ -15,6 +15,12 @@ Decided 2026-08-22. Changing display type — a wall-mounted bay display, multip
 profiles, viewport-driven mode switching — is a **possible future feature, not a current
 requirement.** Do not build sizing infrastructure for it in advance.
 
+**The hall display is a touch-sensitive TV; the Flex 5 is the server only** (operator,
+2026-09-09). Hover is not an input on it: anything carried only by a `title` tooltip or a
+`hover:` state is invisible to the crew, and a control has to be sized for a finger. Phone
+and tablet widths are a separate, planned surface, not this one:
+[`docs/briefings/mobile_accessibility_review.md`](../../../docs/briefings/mobile_accessibility_review.md).
+
 > [!WARNING]
 > **This file previously described a system that did not exist.** It specified an
 > `isKioskMode` / `isKioskView` prop, a `?mode=kiosk` URL switch, a "top 30% / bottom 70%"

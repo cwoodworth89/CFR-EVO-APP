@@ -3,8 +3,9 @@
 **Written 2026-09-09** at the operator's request (*"making this front end more mobile device
 accessible"*). **Review and plan only. Nothing is built.** The project is in a feature freeze
 (CLAUDE.md §4); this records what was found, what would be done, and what each step rests on,
-so the work can start from evidence when the freeze lifts. **§6 lists the questions the plan
-is gated on.** Until they are answered the phases below are a draft, not a commitment.
+so the work can start from evidence when the freeze lifts. The operator answered the first
+six questions the same day; **those rulings are recorded first, below, and the plan in §4 is
+scoped to them.** §6 holds the questions still open, the first of which gates Phase 4.
 
 Two sources of evidence, kept separate below because they carry different weight:
 
@@ -20,6 +21,21 @@ Two sources of evidence, kept separate below because they carry different weight
 
 ---
 
+## Rulings, 2026-09-09 (the operator's answers to §6 questions 1–6)
+
+Quotes are the operator's. Each one changed the plan; the change is stated beside it.
+
+| Asked | Ruled | What it changes |
+|:--|:--|:--|
+| Which surface | *"Ideally for crew members looking at call details, looking up cadastral details or property information. it critical."* and *"possibly having a small tablet mounted in the truck for helping parcel info and routing."* | **The crew's phone is the primary surface**, for two jobs: the current call's details, and looking up a property (parcel outline, hydrants by the operator's rule, arrival point, satellite). That is the console's Explore mode and the dispatch display together, phone first. A mounted in-cab tablet is a possible second surface, for the parcel and the route. |
+| Devices | *"I'm developing on Android but the city uses apple products."* | **iOS Safari is the target; Android Chrome is the bench.** Every iOS-specific fact in §3 (input zoom, `dvh`, safe areas, wake lock, audio after a tap) is on the critical path, and the verification list in §4 needs a real iPhone and iPad, not only the emulator. |
+| The hall display | *"flex is just a server. the screen will be touch sensitive tv."* | **Surface C is a touch TV.** The hover-only flag reasons and changed-field list (§3.1) are live crew-visible defects on the hall display, not phone findings, and promote under CLAUDE.md §7.1. Also corrects §1 row C: the Flex 5 is the server, not the screen. Recorded in `ux_notes.md` §1, §5 and the `kiosk-responsive-ergonomics` skill. |
+| Network | *"the crews will be on wifi or data. I'll have a pubic facing end points"* | **Phones reach the system over the internet, not Tailscale.** This is a bigger change than a layout: see §3.6. It contradicts the row in [`ntfy_server_access_and_qr_spec.md`](../ntfy_server_access_and_qr_spec.md) §1 that records public exposure as *considered and rejected*; the operator's later statement is the plan of record, and that row should be rewritten when the exposure is designed, not silently. |
+| What a phone shows first | *"Right now it would just be the ntfy push leading to Google maps. if it was a crew tablet, then address and route is important."* | The push is untouched. **The tablet's first screen is the address and the route**, large; everything else is second. |
+| The push's map link | *"the push being google maps is fine for now"* | No external-call change; no `external_calls.md` row. Phase 4 no longer includes redirecting the push. |
+
+---
+
 ## 1. "Mobile" is three different surfaces, and they cost different amounts
 
 Nothing in the tree says which one is meant. Each has a different user, a different first
@@ -29,11 +45,11 @@ screen, and a different amount of work behind it.
 |:--|:--|:--|:--|
 | **A. A crew member's phone, after the push** | drivers, officers, chiefs off site | the ntfy notification | The push carries the address, units, grid and talk group as text; its *Open Map Navigation* action opens **Google Maps over the WAN** ([`ntfy_broker.py:65-85`](../../services/dispatch_notifications/src/notification_service/ntfy_broker.py#L65)). No page of ours is involved. |
 | **B. The operator's own phone or tablet** | one person | the console: search an address, set an arrival point, save a Street View, replay a call | The same `MapBoard` the kiosk shows, at whatever width the phone has. §3 is what that looks like. |
-| **C. The kiosk on a smaller or touch display** | the crew in the hall | the dispatch display | The Flex 5 is a **14" 1920×1080 touchscreen** that folds into tablet mode ([`laptop_kiosk_setup.md:41`](../laptop_kiosk_setup.md)); the hardware spec's Pi option is a **10.1" 1280×800 capacitive touch display** ([`hardware_specification.md:54`](../hardware_specification.md)). Whether anyone touches the hall screen is not recorded (`ux_notes.md` §1, §5). |
+| **C. The hall display** | the crew in the hall | the dispatch display | **A touch-sensitive TV; the Flex 5 is the server only** (operator, 2026-09-09). The hardware spec's Pi option was a 10.1" 1280×800 capacitive touch display ([`hardware_specification.md:54`](../hardware_specification.md)); the 14" folding touchscreen in [`laptop_kiosk_setup.md:41`](../laptop_kiosk_setup.md) describes the server's own lid, not the crew's screen. |
 
-The touch findings in §3.1 (hover-only information, target sizes) apply to **C as it is
-deployed today**. The layout findings apply to A and B. The phone call page in §4 Phase 4
-exists only for A.
+The touch findings in §3.1 (hover-only information, target sizes) apply to **C as ruled**:
+the hall screen is touched. The layout findings apply to A and B, which the rulings merge
+into one phone-first surface for the crew.
 
 ---
 
@@ -238,87 +254,166 @@ changes: the QR pairs the phone to the push topic *and* is where a phone learns 
 of the call page. The topic has to come from configuration, read once, for the reason #60
 records.
 
+### 3.6 The public endpoint (added after the rulings)
+
+The operator will expose endpoints to the internet so crews on Wi-Fi or data can reach them.
+What the frontend needs from that is small and specific; what the system exposes is not,
+and it is recorded here so the decision is made with it in view.
+
+**What is open today, without a login.** Every `GET` in the API: the dispatch list with
+addresses, transcripts and units ([`dispatches.py:69`](../../backend/api/routers/dispatches.py#L69)),
+the recordings (`/api/audio/{filename}`), parcels, hydrants, road closures, routing,
+vocabulary, metrics. Only the four saves take `require_admin`
+([`parcels.py:236`](../../backend/api/routers/parcels.py#L236),
+[`:346`](../../backend/api/routers/parcels.py#L346),
+[`streetview.py:83`](../../backend/api/routers/streetview.py#L83),
+[`:126`](../../backend/api/routers/streetview.py#L126)). CORS is `allow_origins=["*"]`
+([`server.py:136`](../../backend/api/server.py#L136)). Mosquitto is `allow_anonymous true`
+([`mosquitto.conf:5`](../../services/mosquitto/mosquitto.conf#L5)), so anyone who can reach the
+WebSocket port receives every dispatch as it is published. ntfy is plain HTTP by design
+(`ntfy_server_access_and_qr_spec.md` §1). [`privacy.md`](../privacy.md) §2 takes the position
+that all of this is public record, broadcast on open radio and published by the City; that is
+the argument for exposure being acceptable, and it is the operator's argument to make, not
+this review's. What this review says is only that **a public endpoint publishes the whole
+archive to anyone who finds the URL unless an access model is chosen first**, and that the
+access model decides the shape of the phone surface (a login screen, a shared code, a link
+that carries a token, or nothing).
+
+**What the frontend needs from it, whichever way that goes.**
+
+1. **One HTTPS origin.** A phone page served over `https://` cannot open `ws://` or
+   `http://host:8000` (mixed content is blocked), and the wake lock in §3.3 needs a secure
+   context. So the API, the tiles and the broker have to be reachable as paths on the page's
+   own origin: `/api/`, `/tiles/`, `/mqtt`. nginx already proxies `/api/`; the MQTT hook
+   already has the `wss://<host>/mqtt` branch
+   ([`useMqttListener.js:15`](../../frontend/src/hooks/useMqttListener.js#L15)); the tile base
+   does not ([`apiClient.js:44`](../../frontend/src/apiClient.js#L44)). The clean rule is:
+   **when the page is `https:`, derive same-origin paths; when it is `http:` on the LAN, keep
+   the ports**, so one build serves the hall and the phones. The `VITE_*_BASE_URL` overrides
+   are build-time and would force two builds.
+2. **The kiosk stays offline-capable.** CLAUDE.md §1 is about the hall: the display must
+   work with no WAN. A public endpoint is an additional way in for phones, not a dependency
+   the kiosk acquires. Nothing in the hall path should start resolving a public hostname.
+3. **A home-screen install for the mounted tablet**, so it opens full screen without
+   browser chrome. iOS supports this through its own meta tags and a partial manifest
+   (`caniuse-lite` marks `web-app-manifest` unsupported on iOS Safari; the install path is
+   *Add to Home Screen*, which is recollection and needs checking on the device). Also
+   needs HTTPS.
+
+**Support facts, from the installed `caniuse-lite` 1.0.30001757, not memory:**
+
+| Feature | iOS Safari | Chrome |
+|:--|:--|:--|
+| Screen Wake Lock (`navigator.wakeLock`) | 16.4 | 85 |
+| Dynamic viewport units (`dvh`) | 15.4 | 108 |
+| `env(safe-area-inset-*)` | 11.3 | 69 |
+| `@media (pointer: coarse)` | 13.2 | 55 |
+| Web Share | 14.0 | 128 |
+| Web App Manifest | not supported (iOS uses its own install path) | 39 |
+
 ---
 
-## 4. Action plan
+## 4. Action plan, scoped to the rulings
 
-Phased so each phase is useful on its own and none of them touches the kiosk at ≥ 1280 px
-except where a phase says so. Sizes are S / M / L, one sitting to several days; hours would
-be invented.
+Phased so each phase is useful on its own. Sizes are S / M / L, one sitting to several days;
+hours would be invented. **Order of value after the rulings: Phase 1 item 4 (the touch TV),
+then Phase 2 (the phone property lookup, "critical"), then Phase 3, then Phase 4 once the
+access model is chosen.**
 
-### Phase 0 — decide and record (S)
+### Phase 0 — record (S)
 
-1. The operator answers §6. The first answer selects which of Phases 2–4 exist.
-2. Add the target-size minimum and the viewport-unit facts to
+1. The target-size minimum and the viewport-unit facts go into
    [`docs/standards/README.md`](../standards/README.md) as rows, verified against the
-   published text first (§7.3, §7.5). Nothing else in this review produces an operational
-   value; layout is judgement (§7.1).
-3. No new external call is expected. If Phase 4's push link changes, that is a row in
-   [`external_calls.md`](../external_calls.md) and a ruling first (CLAUDE.md §1).
+   published text first (§7.3, §7.5). Nothing else here produces an operational value;
+   layout is judgement (§7.1).
+2. The public-exposure row in `ntfy_server_access_and_qr_spec.md` §1 is rewritten to the
+   operator's plan when the exposure is designed.
 
-### Phase 1 — foundation, every surface, no visible change on the kiosk (S–M)
+### Phase 1 — foundation, every surface, no visible change on the hall display (S–M)
 
-1. **Fit padding measured, not written.** One `useLayoutInsets` (or refs, as the dispatch
+1. **Hover-only information becomes tappable.** The flag reasons and the changed-field list
+   render as a tap-to-open list, or inline when there are three or fewer. **Crew-visible on
+   the touch TV as ruled; the one item that may run ahead of the freeze.**
+2. **Fit padding measured, not written.** One `useLayoutInsets` (or refs, as the dispatch
    map already does) feeding `fitTo` on the console and `MapViewControls`; delete the
-   `[340, 80] / [400, 80]` literals. Fixes the negative-padding fit on any width and on the
-   console with the sidebar collapsed.
-2. **`100dvh`** with `100vh` as the fallback line before it; `viewport-fit=cover` and
+   `[340, 80] / [400, 80]` literals. Fixes the `NaN` zoom on any container under 740 px and
+   the off-centre fit with the sidebar collapsed.
+3. **`100dvh`** with `100vh` as the fallback line before it; `viewport-fit=cover` and
    `env(safe-area-inset-*)` padding on the root and the call-status border.
-3. **Touch targets.** `min-h-11` on the layer-toggle labels, 44 px wide sidebar tabs, 44 px
+4. **Touch targets.** `min-h-11` on the layer-toggle labels, 44 px wide sidebar tabs, 44 px
    close buttons. Cite the standard from Phase 0 in the class comment.
-4. **Hover-only information becomes tappable.** The flag reasons and the changed-field list
-   render as a small tap-to-open list (or inline when there are ≤ 3). Crew-visible; may
-   promote ahead of the freeze (§6, question 3).
-5. **16 px inputs** on the search, password and arrival-point fields. `text-base` under a
-   `[@media(pointer:coarse)]` variant if the 12 px look matters on the kiosk.
+5. **16 px inputs** on the search, password and arrival-point fields, at least under
+   `pointer: coarse`. This is the iOS focus-zoom fix and iOS is the target.
 6. **Header reflow.** Below `md:` the hall label shortens to `Hall 1`, the mode select and
-   the two buttons move into a single overflow menu, the padlock stays visible.
-7. **`motion-safe:`** on the twenty-six animations. Delete `App.css`.
+   the two buttons move into one overflow menu, the padlock stays visible.
+7. **`motion-safe:`** on the twenty-six animations. Delete `App.css`. Consider Tailwind's
+   `hoverOnlyWhenSupported` so `hover:` states do not stick after a tap on the TV.
+   **Verified in the installed Tailwind 3.4** (`corePlugins.js:204`): with the flag on,
+   `hover:` compiles to `@media (hover: hover) and (pointer: fine) { &:hover }`; off, it is a
+   bare `&:hover`, which a touch tap sets and nothing clears.
 8. **A viewport smoke test** in `frontend/tests/`, run with `node --test` against
    `vite preview` the way this review was done: no horizontal overflow, header controls
    inside the viewport, map at least 60 % of the width at 393 px, no interactive control
-   under 24 px. It needs no dispatch, so it fabricates nothing (§6.5). Dispatch-display checks
-   stay manual against a replayed real call on the kiosk.
+   under 24 px. It needs no dispatch, so it fabricates nothing (§6.5).
 
-### Phase 2 — the console on a phone or tablet (M) — surface B
+### Phase 2 — the crew's phone: property lookup (M) — "critical"
 
-`md:` (768 px) is the line. Above it nothing changes. Below it:
+The console below `md:` (768 px), phone first, iOS Safari first. Above `md:` nothing changes.
 
-* `LeftSidebar` becomes a bottom sheet over the map, collapsed to the search field and the
-  basemap toggle, expanded on drag or tap for the layer list.
-* `DetailStack` becomes a swipe-up sheet with three tabs (Address, Satellite, Street View),
-  one map mounted at a time.
-* `RightSidebar` becomes a full-height drawer.
-* The fit padding from Phase 1 follows automatically because it is measured.
+* **Search is the screen.** The address field sits at the top over the map; the layer list
+  and basemap toggle live in a bottom sheet, closed by default. A crew member types an
+  address, the map snaps to the parcel with the picked hydrants (the existing SNAP TO CALL),
+  and the address card opens as a sheet from the bottom: address, building name, arrival
+  point as set and why, the hydrant picks with how each was chosen. Read-only unless the
+  padlock is unlocked, exactly as on the console.
+* **One detail tile at a time.** Satellite and Street View are tabs in the sheet, one map
+  mounted at a time; Street View full screen only, which also satisfies the Google terms on
+  that surface.
+* **Road closures** as a drawer, same data, no filter controls (a crew member should not be
+  able to hide a closure; the dispatch map already applies this rule).
+* Everything on it is the same components on a different frame: `DispatchTargetLayer`,
+  `PickedHydrantsLayer`, `TargetAddressCard`, `DetailStack`. The work is the frame, the sheet,
+  and the measured fit from Phase 1.
 
-### Phase 3 — the dispatch display on a phone (M, blocked on #74) — surfaces A and C
+### Phase 3 — the crew's phone and the in-cab tablet: the call (M, blocked on #74)
 
-* `grid-cols-1 md:grid-cols-12`; map first at about 55 % of the height, then one detail
-  tile at a time on tabs, Street View full screen only.
-* Banner reflows to rows: address and incident; unit and ETA chips; a compact timer strip.
-  The queued-call and Tier 1 banners wrap.
-* The details box collapses to a strip below `md:`. **Built to the #74 design, not ahead of
-  it** — the operator has that with Claude Design.
-* Decide (not build) the wake lock and the audio-after-tap behaviour.
+* **Phone:** `grid-cols-1` below `md:`; the address and incident first, the unit and ETA
+  chips second, the route map third at about 55 % of the height, then one detail tile at a
+  time. The queued-call and Tier 1 banners wrap. The details box collapses to a strip.
+  **Built to the #74 design, not ahead of it.**
+* **Tablet (address and route, as ruled):** at tablet width the map takes the screen with
+  the address and incident as a large banner; the detail tiles are behind a tab, not beside
+  the map. This is a second breakpoint (`lg:`), and it is the one that decides whether a
+  mounted 8–11" tablet in landscape reads at arm's length in a moving cab. Nothing in the
+  project records that viewing distance; it is a measurement to take in the truck before the
+  type sizes are chosen (§7.6), not a number to pick.
+* **Behaviour on a phone**, to decide in §6: whether the five-minute auto-dismiss and the
+  queue apply, and whether the phone shows the current call only or a list of recent calls.
+* **Keep the screen on** with the wake lock (iOS 16.4+) once the page is HTTPS; and the
+  chime plays only after a tap, which on a phone means never unless the page asks for one.
 
-### Phase 4 — a phone call page (L) — surface A only
+### Phase 4 — public-endpoint readiness (L, blocked on the access model)
 
-A route (`/call/<dispatch_id>` or `?call=`) that renders the dispatch display for one
-dispatch from the API, without the MQTT queue, dismiss timer or TV mode. The ntfy push's
-*Open Map Navigation* action points at it beside, or instead of, the Google Maps link (that
-is a change to a registered external call: ruling first). MOBILE SETUP pairs the topic from
-configuration (#60). Needs, in order: every crew phone able to reach the kiosk (Tailscale on
-the phone, or the hall LAN); one hostname and one port, so nginx proxies tiles and the broker
-too; a decision on whether the page is open to anyone on the tailnet or behind the admin
-lock. The backend and network work is the bulk of the L.
+1. **Same-origin derivation** in `apiClient.js` and `useMqttListener.js`: `https:` pages use
+   `/api/`, `/tiles/`, `/mqtt` on their own origin; `http:` pages keep today's ports. One
+   build for the hall and the phones.
+2. **nginx proxies `/tiles/` and `/mqtt`** beside `/api/` (the tile server is `GET`/`OPTIONS`
+   only and the `mbtiles-tile-server` skill has the constraints).
+3. **The access model**, whichever the operator chooses, applied to the reads: the frontend
+   side is a login or a link-carried token in the same `apiClient` the admin lock uses.
+4. **Home-screen install** for the tablet: iOS meta tags and a manifest, full-screen, a
+   named icon, and the stale-chunk failsafe checked under that mode (a home-screen app has
+   no reload button; the #44b card's *Ctrl+Shift+R* advice does not apply).
+5. The exposure itself (TLS, hostname, rate limits, what ntfy does over HTTPS) is
+   infrastructure and is the operator's, not this plan's.
 
 ### Verification
 
-Phase 1 and 2 are checked by the smoke test above plus a real phone against
-`http://100.95.146.94/` (the in-app browser blocks the API port; use Chrome or Safari,
-`ux_notes.md` §5). Phase 3 is checked by the review replay on that phone, which is a real
-call through the live path. Phase 4 is checked by a `*TEST*` dispatch with the `is_test`
-flag, the one sanctioned way to exercise the push (§6.5).
+Phase 1 and 2 are checked by the smoke test above, then on a real iPhone and iPad against
+the public endpoint once it exists, or against `http://100.95.146.94/` on Tailscale until
+then (the in-app browser blocks the API port; use Safari, `ux_notes.md` §5). Android Chrome
+is the bench, not the sign-off. Phase 3 is checked by the review replay on those devices,
+which is a real call through the live path. The touch TV is checked on the touch TV.
 
 ---
 
@@ -326,45 +421,37 @@ flag, the one sanctioned way to exercise the push (§6.5).
 
 | Assumption | The cheapest thing that falsifies it |
 |:--|:--|
-| The target is a phone in portrait, about 390–430 CSS px wide | The operator names the 10.1" kiosk display or an iPad instead. Then Phases 2 and 3 shrink to the header reflow, the targets and the hover fix, and Phase 4 does not exist. |
-| Crew phones can reach the kiosk | The department's phones are not on Tailscale and never on the hall Wi-Fi. Then surface A is the push text only, and the useful work is making the push text better, not a page. |
-| The hall screen is touched | Nobody touches it. Then the hover-only flag reasons are a phone finding, not a live kiosk defect, and do not promote. |
-| The `dvh`, target-size and iOS-zoom facts | `caniuse-lite` (checked), the WCAG 2.2 text and an actual iPhone (not yet checked). |
-| The 8/4 grid and the banner are the shape to keep above `md:` | The #74 design lands with a different kiosk layout. Then Phase 3 is written against that, and this document's §3.3 is history. |
+| A crew member's phone is an iPhone at about 390–430 CSS px wide, in portrait | The department's phones turn out to be something else, or are used landscape in a cradle. Ask before Phase 2 chooses its breakpoint. |
+| The mounted tablet is an iPad-class device, 8–11", landscape | It is a small Android tablet or a phone-sized unit. Phase 3's `lg:` line moves. |
+| Crews will reach the system over a public HTTPS origin | The exposure is not built, or is VPN-only after all. Then Phase 4 shrinks to item 1 and the tablet install. |
+| Reads stay open behind the public endpoint | The operator chooses a login. Then Phase 4 item 3 exists and Phase 2's first screen may be a sign-in. |
+| The hall screen is a touch TV | Ruled 2026-09-09. No longer an assumption. |
+| The `dvh`, wake-lock, safe-area and target-size facts | `caniuse-lite` (checked, table in §3.6), the WCAG 2.2 text and an actual iPhone (not yet checked). |
+| The 8/4 grid and the banner are the shape to keep above `md:` | The #74 design lands with a different layout. Then Phase 3 is written against that. |
 
 ---
 
-## 6. Questions for the operator, in the order they gate the plan
+## 6. Questions still open, in the order they gate the plan
 
-**The first one decides which phases exist; the rest refine them.**
+Answered 2026-09-09 and recorded above: which surface, which devices, whether the hall
+screen is touched, how crews reach the system, what a phone shows first, and the push's map
+link. Still open, and asked one at a time:
 
-1. **Which surface is this for?** A crew member's phone after the push, your own phone or
-   tablet using Explore and the review, the kiosk on a smaller or touch display, or more
-   than one of those?
-2. **What devices, exactly?** iPhone or Android, which models, and is the phone in a cradle
-   in the cab or in a hand? Portrait or landscape?
-3. **Is the Flex 5 in the hall used by touch today**, or only with a mouse and keyboard? If
-   touch: the flag reasons and the changed-fields list are unreadable on it now (§3.1), and
-   that is crew-visible. Promote it ahead of the freeze, or hold it?
-4. **Are crew phones on the Tailscale network**, on the hall Wi-Fi, or neither? Who can
-   reach `100.95.146.94` from a phone today?
-5. **On a phone, what does a crew member need in the first ten seconds?** Address, units,
-   grid, talk group, the hydrant pick, the ETA, the route map: rank them. Is Street View
-   wanted on a phone at all?
-6. **The push's *Open Map Navigation* opens Google Maps over the WAN.** Keep that, point it
-   at a local page, or offer both? (A change here is an external-call ruling under CLAUDE.md
-   §1.)
-7. **The details box (#74) is with Claude Design.** Should the phone layout wait for that
+1. **The access model on the public endpoint.** Every read is open today (§3.6). Open to
+   anyone with the URL, a shared department code like the admin lock, a login per person, a
+   link in the push that carries a token, or VPN-only after all? This gates Phase 4 and
+   decides whether Phase 2's first screen is a sign-in.
+2. **Is the mounted tablet an iPad, and which size?** And is it landscape in the cradle?
+   This sets Phase 3's tablet breakpoint and the type-size measurement in the truck.
+3. **On a crew phone, is it the current call only, or a list of recent calls too?** And do
+   the five-minute auto-dismiss and the queue apply, or does a call stay until closed?
+4. **The details box (#74) is with Claude Design.** Should the phone layout wait for that
    design, or should "collapses to a strip on a narrow screen" be a requirement handed to it?
-8. **Is the review screen ever wanted on a phone**, or is a tablet in landscape its floor?
+5. **Is the review screen ever wanted on a phone**, or is a tablet in landscape its floor?
    May it say so on screen?
-9. **Should a phone page behave like the kiosk** (five-minute auto-dismiss, queue, chime) or
-   like a static call sheet that stays until closed?
-10. **The freeze.** Is this review-only until the freeze lifts, or do you want Phase 1
-    built on this branch now? It changes nothing visible on the kiosk at 1,916 px except the
-    flag-reason fix in item 4, which is the one that may deserve promoting.
-11. **Anything beyond screen size?** Colour vision (the green routine / red emergency pair,
-    the four hall colours), text size, gloves, a bright cab in daylight against the dark
-    palette?
-12. **Do you have a screenshot of what the console looks like on your own phone today?** It
-    would sit beside the emulated ones here as the real thing.
+6. **The freeze.** Review-only until it lifts, or Phase 1 on this branch now? Item 1 (the
+   touch TV's hover-only information) is the one that may deserve promoting on its own.
+7. **Anything beyond screen size?** Colour vision against the green routine and red
+   emergency pair and the four hall colours, text size, gloves, a bright cab in daylight
+   against the dark palette.
+8. **A screenshot of the console on your own phone today**, to sit beside the emulated ones.

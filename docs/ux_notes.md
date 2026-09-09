@@ -22,7 +22,7 @@ decide from.
 
 The kiosk runs snap Chromium in kiosk mode on Wayland on the hall machine; the operator also
 opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day are
-1,916 × 1,000 px. Whether the hall display is touch or mouse is not recorded here; ask.
+1,916 × 1,000 px. **The hall display will be a touch-sensitive TV; the Flex 5 is the server only** (operator, 2026-09-09), so anything shown only on hover is not shown at all. The phone and tablet surfaces are reviewed and planned in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md).
 
 ---
 
@@ -216,6 +216,6 @@ anything within 1,000 ft; else the warning. Two picks, numbered on the map.
 * The timings that shape the kiosk: phase 1 publishes at 16–19 s, the address arrives later on
   multi-unit calls, phase 2 lands at the end of the broadcast (about 45–75 s), auto-dismiss is
   5 minutes and pauses during a replay.
-* The hall display's size, viewing distance and input method: not recorded, ask the operator.
+* The hall display is a touch-sensitive TV (operator, 2026-09-09). Its size and viewing distance are still not recorded; ask the operator.
 * Everything on screen must survive with no internet except Street View, which is the one
   accepted exception and is labelled as such.

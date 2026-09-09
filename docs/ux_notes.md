@@ -46,6 +46,8 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 | *"I'd rather have 'unknown' rather than guesses."* (2026-09-05) | The rule behind every empty state on the kiosk: the Tier 1 card, *(as heard)*, *NO HYDRANT WITHIN 1,000 FT*, *Awaiting location* | — |
 | *"I'm not sure the value of a dedicated Kiosk Mode. I think the standby situation should be what is currently called Notifications/Explore."* … *"Calls should drop back down to the homepage explore/notifications."* (2026-09-08) | The kiosk's no-call idle screen is deleted and `KIOSK: IN-STATION MODE` is off the mode select. `App.jsx` now keys on `activeCall` alone, so a finished, closed or timed-out call lands on Explore. The idle screen's *DB Sync: Connected* and *Audio Card: Listening (UCA202)* badges were hardcoded strings that would have read green with the agent stopped (§6.1); they went with it | The hall display's between-calls behaviour is now a deployment question, not a screen — §3.8 |
 
+| *"I like it interactive for now."* (2026-09-08) | The Street View save stays on the interactive SDK panorama: drag, walk the street, save. The panel was hardened the same day into one view object, a tested arithmetic module, one SDK loader and one hook (`google-imagery-streetview` skill, §3) | The simpler design considered and declined for now: a heading dial and width slider over the static image, no SDK at all. Revisit if the SDK keeps costing time |
+
 ### Review screen
 
 | Said | Done | Left |

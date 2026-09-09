@@ -119,13 +119,20 @@ export function CoquitlamOverlays({ visible, onLoadError }) {
     useEffect(() => {
       if (!visible) return;
       
+      // URL and zoom depths come from BASE_LAYERS.CADASTRAL, where every other layer's
+      // config lives. They were written out again here, identically, so the constant was
+      // dead while the real layer carried its own copy -- two definitions that happened to
+      // agree. Opacity, pane and z-index stay local: those are this overlay's rendering
+      // decisions, not part of what the layer IS.
+      const cadastral = BASE_LAYERS.CADASTRAL;
       const overlayLayer = L.tileLayer(
-          `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
+          cadastral.url,
           {
               transparent: true,
               opacity: 0.9,
-              maxNativeZoom: 20,
-              maxZoom: 22,
+              attribution: cadastral.attribution,
+              maxNativeZoom: cadastral.maxNativeZoom,
+              maxZoom: cadastral.maxZoom,
               pane: "overlayPane",
               zIndex: 350
           }

@@ -39,6 +39,7 @@ Quotes are the operator's. Each one changed the plan; the change is stated besid
 | The in-cab tablet | *"it'll probably be an iPad, but this is theory."* | **Deferred.** Phase 3's tablet breakpoint and the in-truck type-size measurement wait until there is a tablet. The layout below `lg` already serves an iPad held upright (§7). |
 | The freeze | *"right now I want to get my android phone working"* | **The phone surface is promoted; Phases 1 to 3 built the same day** (§7). Android Chrome is the bench as ruled; the iOS checks in §7 are still to run on a real iPhone. |
 | Who reads the dash phone, and when (§8) | *"Driver before rolling."* | **The phone is read stationary, at arm's length, by the driver, in the seconds between the tones and rolling.** So: the alert is a confirmation screen, not a glance from across a cab, and normal reading sizes hold; the order of the choices is the driver's order, route first, then the parcel and its hydrants, which are the pump operator's business at the hydrant; nothing on it needs to be legible while moving, so no in-truck type-size measurement is owed for the phone. What is still open is whether the call stays on the phone until dismissed, since the same driver is at the hydrant on arrival. |
+| Does the call stay on the phone? | *"Stay until cleared. another call would wait underneath"* | **Ruled and built:** below `lg` the five-minute clock is off (`useKioskQueue({ autoDismiss: false })`), the banner reads *Stays until cleared* and the button *Clear call*; a later call queues beneath with the existing *N New Calls Queued, Tap to View Next* banner, which is the hall display's queue unchanged. The restore window after a reload stays five minutes on both surfaces: a call from hours ago brought back as active would show an elapsed clock that reads as real (CLAUDE.md §6.1). |
 
 ---
 
@@ -625,9 +626,8 @@ stationary at arm's length and may ask for a read, not a glance; the choices are
 driver's order, Route first, then Parcel, whose hydrant pick is the same person's business at
 the hydrant on arrival.
 
-**Open, in order:** whether the call stays on the phone until dismissed or the next call
-(the hall display times out after five minutes, which on a phone would clear the hydrant
-pick before the driver reaches it); whether satellite and parcel are one view or two; the
-current call only or recent calls too (§6).
+**Ruled 2026-09-09: the call stays until cleared, and a later call waits underneath**
+(built; the rulings table). **Open, in order:** whether satellite and parcel are one view or
+two; the current call only or recent calls too (§6).
 
 <!-- audit-ok: frontend/src/App.css -- deleted 2026-09-09; the text above records the deletion -->

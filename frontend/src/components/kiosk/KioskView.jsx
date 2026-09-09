@@ -37,6 +37,7 @@ export default function KioskView({ kioskState }) {
     queuedCalls,
     isReviewMode,
     isTvMode,
+    autoDismiss,
     isRecentlyUpdated,
     updatedFields,
     elapsedFormatted,
@@ -211,6 +212,7 @@ export default function KioskView({ kioskState }) {
         isResponseUnknown={isResponseUnknown}
         updatedFields={updatedFields}
         isTvMode={isTvMode}
+        autoDismiss={autoDismiss}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
         onDismiss={() => dismissActiveCall('manual')}

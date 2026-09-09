@@ -1,5 +1,6 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { useKioskQueue } from './hooks/useKioskQueue';
+import { useCompactViewport } from './hooks/useCompactViewport';
 import { toActiveCall } from './utils/dispatchModel';
 // KioskView is imported EAGERLY and must stay that way. See punch list #44b.
 //
@@ -54,7 +55,9 @@ const MODE = {
 };
 
 function App() {
-  const kioskState = useKioskQueue();
+  // A phone keeps a call until it is cleared; the hall display clears it after five minutes.
+  const compact = useCompactViewport();
+  const kioskState = useKioskQueue({ autoDismiss: !compact });
   const [returnMode, setReturnMode] = useState('EXPLORE');
 
   // Keyed on activeCall alone. isReviewMode used to be OR'd in here, which meant a review

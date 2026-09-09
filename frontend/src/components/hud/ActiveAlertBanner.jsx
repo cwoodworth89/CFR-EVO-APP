@@ -41,6 +41,8 @@ export default function ActiveAlertBanner({
   isRecentlyUpdated = false,
   updatedFields = [],
   isTvMode = false,
+  // false on a phone: no clock, the call stays until cleared (operator, 2026-09-09).
+  autoDismiss = true,
   elapsedFormatted = '00:00',
   timeoutFormatted = '03:00',
   onDismiss = null,
@@ -272,7 +274,9 @@ export default function ActiveAlertBanner({
           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Elapsed Time</div>
           <div className="text-xl font-black text-emerald-400">{elapsedFormatted}</div>
           <div className="text-[9px] text-slate-500">
-            {(isReviewMode || activeCall?.isReview) ? '⏸️ Auto-Dismiss Paused' : `Auto-Dismiss in ${timeoutFormatted}`}
+            {(isReviewMode || activeCall?.isReview) ? '⏸️ Auto-Dismiss Paused'
+              : autoDismiss ? `Auto-Dismiss in ${timeoutFormatted}`
+              : 'Stays until cleared'}
           </div>
         </div>
 
@@ -294,7 +298,7 @@ export default function ActiveAlertBanner({
               onClick={onDismiss}
               className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-1.5 touch:py-2.5 rounded-xl text-xs font-bold transition shadow cursor-pointer font-mono"
             >
-              Dismiss
+              {autoDismiss ? 'Dismiss' : 'Clear call'}
             </button>
           )
         )}

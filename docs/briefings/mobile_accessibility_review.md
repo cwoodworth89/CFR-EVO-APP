@@ -33,6 +33,7 @@ Quotes are the operator's. Each one changed the plan; the change is stated besid
 | Network | *"the crews will be on wifi or data. I'll have a pubic facing end points"* | **Phones reach the system over the internet, not Tailscale.** This is a bigger change than a layout: see §3.6. It contradicts the row in [`ntfy_server_access_and_qr_spec.md`](../ntfy_server_access_and_qr_spec.md) §1 that records public exposure as *considered and rejected*; the operator's later statement is the plan of record, and that row should be rewritten when the exposure is designed, not silently. |
 | What a phone shows first | *"Right now it would just be the ntfy push leading to Google maps. if it was a crew tablet, then address and route is important."* | The push is untouched. **The tablet's first screen is the address and the route**, large; everything else is second. |
 | The push's map link | *"the push being google maps is fine for now"* | No external-call change; no `external_calls.md` row. Phase 4 no longer includes redirecting the push. |
+| The access model on the public endpoint (§6 question 1, asked after the first six) | *"it'll probably be a per phone password to access. We have truck phones that each have their own login for ArcGIS Survey, we'll probably copy something similar not sure."* | **Provisional: one account per truck phone, with its own password, on the model of the department's existing per-phone Survey123 logins.** Phase 2's first screen on a phone is a sign-in that persists on the device the way the admin unlock does. Phase 4 item 3 is written to it below, with the two facts about the existing login that it has to change (§3.6). "Not sure" is recorded as such: the model can still move, and nothing is built on it. |
 
 ---
 
@@ -279,6 +280,36 @@ archive to anyone who finds the URL unless an access model is chosen first**, an
 access model decides the shape of the phone surface (a login screen, a shared code, a link
 that carries a token, or nothing).
 
+**What the existing login is, since "copy something similar" starts from it.** One
+password, from `ADMIN_PASSWORD`, one role, and any username: `/api/auth/login` accepts
+whatever `username` is sent and issues a 30-day JWT with `role: admin`
+([`auth.py:77-104`](../../backend/api/routers/auth.py#L77), `TOKEN_LIFETIME` at
+[`:28`](../../backend/api/routers/auth.py#L28)). There is no user table and no second role.
+And **login is refused from any address that is not loopback, RFC 1918 or Tailscale**
+([`auth.py:51-63`](../../backend/api/routers/auth.py#L51), enforced at
+[`:70-75`](../../backend/api/routers/auth.py#L70)); nginx forwards the real client address, so
+a truck phone on data would be answered 403 today before its password was read. A
+per-phone account therefore needs, in the API: an accounts store (username, password hash,
+role `device`, enabled flag, so a lost phone can be turned off); the role carried in the
+token; a `require_login` dependency for the reads distinct from `require_admin`, which stays
+on the four saves; and the network filter relaxed for device logins at the public origin
+while the admin login keeps it. On the phone it is the same `apiClient` token path the
+padlock uses, with a sign-in screen where the token is absent or expired.
+
+**The reads and the hall display.** If every read requires a token, the hall kiosk on the
+LAN needs one too, and a display that logs itself out mid-call is a crew-facing failure of
+the kind CLAUDE.md §1 exists to forbid. The plan therefore assumes **reads stay open from
+the LAN and Tailscale, exactly as `is_allowed_network` already draws that line, and require
+a device token only from outside it.** The kiosk is untouched; the phone signs in. This is an
+assumption put to the operator (§6, question 1), not a ruling.
+
+**The phone does not need the broker.** A truck phone is woken by the ntfy push; the page
+fetches the current dispatch from the API when it opens or returns to the foreground. That
+removes Mosquitto from the phone path entirely, so anonymous WebSockets need not be exposed
+publicly at all, and the one-origin work in Phase 4 shrinks to the API and the tiles. The
+in-cab tablet, if it is to update live while mounted, is the one device that would want the
+socket, and that decision waits on what the tablet is.
+
 **What the frontend needs from it, whichever way that goes.**
 
 1. **One HTTPS origin.** A phone page served over `https://` cannot open `ws://` or
@@ -360,6 +391,9 @@ access model is chosen.**
 
 The console below `md:` (768 px), phone first, iOS Safari first. Above `md:` nothing changes.
 
+* **A device sign-in first**, on the phone only: username and password for the phone's
+  account, stored the way the admin token is, shown again only when the token is absent or
+  expired. The hall display never sees it (§3.6, the reads and the hall display).
 * **Search is the screen.** The address field sits at the top over the map; the layer list
   and basemap toggle live in a bottom sheet, closed by default. A crew member types an
   address, the map snaps to the parcel with the picked hydrants (the existing SNAP TO CALL),
@@ -397,10 +431,13 @@ The console below `md:` (768 px), phone first, iOS Safari first. Above `md:` not
 1. **Same-origin derivation** in `apiClient.js` and `useMqttListener.js`: `https:` pages use
    `/api/`, `/tiles/`, `/mqtt` on their own origin; `http:` pages keep today's ports. One
    build for the hall and the phones.
-2. **nginx proxies `/tiles/` and `/mqtt`** beside `/api/` (the tile server is `GET`/`OPTIONS`
-   only and the `mbtiles-tile-server` skill has the constraints).
-3. **The access model**, whichever the operator chooses, applied to the reads: the frontend
-   side is a login or a link-carried token in the same `apiClient` the admin lock uses.
+2. **nginx proxies `/tiles/`** beside `/api/` (the tile server is `GET`/`OPTIONS` only and the
+   `mbtiles-tile-server` skill has the constraints). `/mqtt` only if the in-cab tablet is to
+   update live; the phone polls the API on open and does not need the broker (§3.6).
+3. **Per-phone accounts** (provisional ruling): the accounts store, the `device` role in
+   the token, `require_login` on the reads from outside the LAN and Tailscale, the login
+   network filter relaxed for device accounts at the public origin, and a way to disable
+   one phone's account. On the phone, the sign-in screen from Phase 2 and nothing else.
 4. **Home-screen install** for the tablet: iOS meta tags and a manifest, full-screen, a
    named icon, and the stale-chunk failsafe checked under that mode (a home-screen app has
    no reload button; the #44b card's *Ctrl+Shift+R* advice does not apply).
@@ -424,7 +461,8 @@ which is a real call through the live path. The touch TV is checked on the touch
 | A crew member's phone is an iPhone at about 390–430 CSS px wide, in portrait | The department's phones turn out to be something else, or are used landscape in a cradle. Ask before Phase 2 chooses its breakpoint. |
 | The mounted tablet is an iPad-class device, 8–11", landscape | It is a small Android tablet or a phone-sized unit. Phase 3's `lg:` line moves. |
 | Crews will reach the system over a public HTTPS origin | The exposure is not built, or is VPN-only after all. Then Phase 4 shrinks to item 1 and the tablet install. |
-| Reads stay open behind the public endpoint | The operator chooses a login. Then Phase 4 item 3 exists and Phase 2's first screen may be a sign-in. |
+| Per-phone accounts, on the Survey123 model | Ruled provisionally 2026-09-09 ("not sure"). If it moves to a shared code or a link-carried token, Phase 4 item 3 shrinks and the sign-in screen goes. |
+| Reads stay open from the LAN and Tailscale; a token is required only from outside | The operator wants the hall display to log in too. Then the kiosk needs a device account with a token that cannot expire mid-call, and that is a §1 design question before anything is built. |
 | The hall screen is a touch TV | Ruled 2026-09-09. No longer an assumption. |
 | The `dvh`, wake-lock, safe-area and target-size facts | `caniuse-lite` (checked, table in §3.6), the WCAG 2.2 text and an actual iPhone (not yet checked). |
 | The 8/4 grid and the banner are the shape to keep above `md:` | The #74 design lands with a different layout. Then Phase 3 is written against that. |
@@ -434,13 +472,13 @@ which is a real call through the live path. The touch TV is checked on the touch
 ## 6. Questions still open, in the order they gate the plan
 
 Answered 2026-09-09 and recorded above: which surface, which devices, whether the hall
-screen is touched, how crews reach the system, what a phone shows first, and the push's map
-link. Still open, and asked one at a time:
+screen is touched, how crews reach the system, what a phone shows first, the push's map
+link, and (provisionally) per-phone accounts. Still open, and asked one at a time:
 
-1. **The access model on the public endpoint.** Every read is open today (§3.6). Open to
-   anyone with the URL, a shared department code like the admin lock, a login per person, a
-   link in the push that carries a token, or VPN-only after all? This gates Phase 4 and
-   decides whether Phase 2's first screen is a sign-in.
+1. **Does the hall display keep reading without a login?** The plan assumes reads stay open
+   from the LAN and Tailscale and need a device token only from outside (§3.6). If the hall
+   kiosk should also sign in, its token must not expire mid-call, and that is a design
+   question before anything is built.
 2. **Is the mounted tablet an iPad, and which size?** And is it landscape in the cradle?
    This sets Phase 3's tablet breakpoint and the type-size measurement in the truck.
 3. **On a crew phone, is it the current call only, or a list of recent calls too?** And do

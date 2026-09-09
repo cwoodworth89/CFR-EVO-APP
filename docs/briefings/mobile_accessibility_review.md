@@ -552,7 +552,7 @@ the code, not rendered**: see below.
 
 * `npm run lint:crash`, `npm run build`, `npm run test:node` (28 tests, the 8 new ones among
   them): all pass.
-* `scripts/viewport_smoke.mjs` against the built bundle in headless Chromium at five sizes,
+* `frontend/scripts/viewport_smoke.mjs` against the built bundle in headless Chromium at five sizes,
   393×852, 852×393, 820×1180, 1280×800 and 1916×1000, with touch and mobile emulation: no
   horizontal overflow, no control off screen, the map at least 60 % of the width below `lg`,
   a real zoom after the fit, no page errors. The property lookup was driven end to end with
@@ -568,3 +568,5 @@ the code, not rendered**: see below.
   `+` is covered. Pre-existing; one line to move the control to the bottom right.
 * `animate-in`, `fade-in` and `slide-in-from-*` appear throughout and do nothing: they are
   from a Tailwind plugin that is not installed. Harmless; the transitions they name never ran.
+
+<!-- audit-ok: frontend/src/App.css -- deleted 2026-09-09; the text above records the deletion -->

@@ -119,9 +119,26 @@ concrete at some junctions and "obey them all" is today's behaviour. On dispatch
 (9239096), `no_right_turn` Pinetree Way → David Ave (6850061), `only_straight_on` on Chilko Dr
 (17449481).
 
-Sequence once that is answered: derive `apparatus.lua` from the vendored `car.lua` with each
-change cited to a line above; rebuild the graph on the kiosk at an announced moment (the brief,
-*The kiosk, shared with another agent*); route the corpus against the 2026-09-09 baseline with
+### Operator ruling, 2026-09-09, turn restrictions
+
+> "Ignore turn restrictions, we make those turns under lights and siren."
+
+Consequence: `use_turn_restrictions = false` (`car.lua` line 29). Every restriction relation
+drops out at the next graph build — all 1,080 in the City, the 21 conditionals whatever their
+current state, and relation 6812366 with them, so the Pinetree/Guildford lap disappears from
+our routes; the upstream retag is still the right fix for everyone else's. What this does
+**not** touch: one-way (line 35), barriers (`barrier_whitelist`, lines 71–80, and
+`process_node`), access tags, and the turn costs — `u_turn_penalty = 20` s (line 27) and the
+`turn_penalty` function (line 37) still price a U-turn or a sharp turn, so the router prefers
+not to make one; it is no longer forbidden to.
+
+**The profile's rule set is now fully specified.** Open is only the speed table (car.lua
+lines 169–188, OSRM's own figures, not measured for this city or these vehicles), which is a
+measurement, not a ruling.
+
+Sequence from here: derive `apparatus.lua` from the vendored `car.lua` with each change cited
+to a line above; rebuild the graph on the kiosk at an announced moment (the brief, *The kiosk,
+shared with another agent*); route the corpus against the 2026-09-09 baseline with
 `tools/route_corpus_baseline.py --baseline`; the operator sees every route that moved before
 it goes live.
 

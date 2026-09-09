@@ -438,8 +438,10 @@ OSM relation.
   profile adds `emergency` to its list; no City restriction carries it today.
 * Tags are read in the order `restriction`; then `restriction:conditional` and
   `restriction:<mode>:conditional`, **only when the extractor was told to parse conditionals**
-  (`parse_conditionals`, the `osrm-extract` flag); then `restriction:<mode>` per mode in the
-  list. Whether the kiosk graph's unrecorded build parsed conditionals is not known, so the
+  (`parse_conditionals`, which is `osrm-extract --parse-conditional-restrictions`, verified in
+  the pinned image's `--help` 2026-09-09, applied at customize time by
+  `osrm-customize --parse-conditionals-from-now` with `--time-zone-file`); then
+  `restriction:<mode>` per mode in the list. Whether the kiosk graph's unrecorded build parsed conditionals is not known, so the
   City's 21 weekday-peak turn bans are either all applied or all absent. The check is a route
   through one of them (Clarke Rd → Chapman Ave, `no_right_turn @ (Mo-Fr 07:00-09:00)`, via
   49.26909, −122.88056) at the first rebuild, when the command is recorded.

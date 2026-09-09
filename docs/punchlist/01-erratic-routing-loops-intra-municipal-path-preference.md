@@ -206,6 +206,21 @@ for a per-way exclusion if a route ever reaches for it. The Hall 2 apron departu
 as the truck leaving from its own door, and the E-Comm history is the same defect on the other
 system: a rule at one node penalising a whole hall.
 
+### One-off rules, per way, node or turn (operator's question, 2026-09-09)
+
+Three mechanisms, verified on the pinned image (`osrm-customize --help`, `osrm-extract
+--help`, v26.8.0, 2026-09-09) and the vendored profile API:
+
+| Kind of one-off | Mechanism | Cost |
+|:--|:--|:--|
+| a way or node treated differently (excluded, drivable despite its tags, a gate at no cost) | an override table in `apparatus.lua` keyed by OSM id — `way:id()` and `node:id()` are in the profile API (`lib/relations.lua` line 189 uses `way:id()`); each entry carries the operator's words and the date | rebuild, 10 s |
+| a specific turn dearer or cheaper | `osrm-customize --turn-penalty-file` — one line per from-node, via-node, to-node — and `--segment-speed-file` for one segment's speed (0 blocks it) | customize only, no re-extract |
+| a junction where OSM is wrong | the upstream OSM edit, with the override table covering the gap until the next extract carries it | an OSM account and a new extract |
+
+None of them invents a road: a connection absent from OSM, or a turn across a median with no
+connecting way, needs a map edit. First candidate for the table: the Colony Farm access above,
+if a route ever reaches for it.
+
 **To deploy**, at a moment the operator picks (restarting `osrm` drops routing on every kiosk for
 the seconds the graph takes to load): in `docker-compose.yml` the `osrm` command's
 `/data/vancouver.osrm` becomes `/data/apparatus.osrm`; `git pull` on the kiosk; `docker compose

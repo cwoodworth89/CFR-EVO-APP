@@ -569,4 +569,59 @@ the code, not rendered**: see below.
 * `animate-in`, `fade-in` and `slide-in-from-*` appear throughout and do nothing: they are
   from a Tailwind plugin that is not installed. Harmless; the transitions they name never ran.
 
+---
+
+## 8. The driver's phone on the dash: the operator's design (2026-09-09)
+
+Stated after §7 was built, for the phone mounted on the truck dash. Quoted whole, because the
+shape is the ruling and the contents are not yet:
+
+> *"For receiving a dispatch to a driver's phone, mounted on the truck dash, I think it
+> should pop up with a dispatch alert with the information, and then they can choose*
+> *Show Route (navigate from inside pushes to Google maps) / Show street view / Show
+> satellite view (with cadastral) / Show parcel information (with cadastral and hydrants) /
+> Show dispatch details.*
+> *the exact contents and details tbd, open to suggestions. I don't want to cram everything
+> on a small screen"*
+
+**What this is, in the code's terms.** An alert screen that is the call's home, and five
+full-screen views one tap away, each with a strip at the top carrying the address and the
+way back. Four of the five exist as components today; the frame and the alert are new.
+
+| Choice | What exists | What it needs |
+|:--|:--|:--|
+| Show Route | `RouteOverviewPanel` (the route from the hall, closures, picked hydrants) and the NAVIGATE (GPS) link in the console, already a registered Google Maps hand-off | The details box off the map; NAVIGATE as the one button on the view |
+| Show street view | `StreetViewPanel` expanded, full screen | Nothing; and alone on the screen it satisfies the Google terms (§3.2.3(e)(ii)) that the kiosk layout does not |
+| Show satellite view (with cadastral) | `PropertySatellitePanel`: the City orthophoto with the parcel outline | The cadastral lines are on the main map, not on this tile; adding the overlay is the one change |
+| Show parcel information (with cadastral and hydrants) | SNAP TO CALL on the route map (parcel, cadastral, numbered hydrant picks at zoom 18) plus the address card and the hydrant list with how each was chosen | A screen of its own rather than a state of the route map |
+| Show dispatch details | The banner and the details box: units and ETAs, talk group, grid and its source, cross streets, flags, the pre-plan PDF, the timers | Laid out as a list instead of a banner |
+
+**Suggestions, not rulings.**
+
+1. **The alert holds what the run sheet reads out and nothing else**: address, incident,
+   units, grid, talk group, large, with the choices as full-width buttons below. The
+   elapsed time and the flags are on Details. That is the "don't cram" rule made concrete.
+2. **Two ways in, one screen.** A phone left open on the dash can pop the alert itself the
+   way the hall display does, since the app already switches to the call when one arrives,
+   and a wake lock keeps it lit. A phone in a pocket is woken by the ntfy push, whose tap
+   opens the same call screen. The push then carries one action, *Open dispatch*, beside the
+   Google Maps one it has now; ntfy's limit on action buttons is recollection (three) and is
+   checked against the pinned v2.11.0 before it is relied on.
+3. **Satellite and parcel may be one view with a basemap toggle**, aerial or street, both
+   with the cadastral lines, the parcel outline and the hydrant picks. The kiosk dropped its
+   cadastral tile for the same reason (SNAP TO CALL showed the same thing). Four choices
+   instead of five, if the operator agrees; kept as five if the aerial view is wanted with
+   nothing drawn on it.
+4. **Order the buttons by when they are needed**: Route first, then Parcel, Street View,
+   Satellite, Details.
+5. **Everything but Street View and the Google Maps hand-off is served by the kiosk.** Over
+   the hall Wi-Fi or Tailscale this works now; in the truck on data it needs the public
+   endpoint (Phase 4, §3.6). The design can be built and tested on the operator's phone
+   before that exists.
+
+**Open, in order:** who reads the dash phone and when (the driver before rolling, the
+officer while rolling), which sets the type size and how much a view may ask of a glance;
+whether the call stays until dismissed or times out like the hall display; the current call
+only or recent calls too (§6).
+
 <!-- audit-ok: frontend/src/App.css -- deleted 2026-09-09; the text above records the deletion -->

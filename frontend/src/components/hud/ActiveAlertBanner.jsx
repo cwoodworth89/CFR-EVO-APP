@@ -85,11 +85,11 @@ function UnitRow({ unit, hero = false }) {
         className={`rounded-full flex-shrink-0 ${hero ? 'w-3 h-3' : 'w-2.5 h-2.5'}`}
         style={{ backgroundColor: unit.hallId ? hallColour(unit.hallId) : UNASSIGNED_HALL_COLOUR }}
       />
-      <span className={`font-sans font-extrabold uppercase tracking-tight truncate ${hero ? 'text-xl lg:text-2xl 2xl:text-3xl' : 'text-sm lg:text-base 2xl:text-xl'}`}>
+      <span className={`font-sans font-extrabold uppercase tracking-tight truncate ${hero ? 'text-xl lg:text-[clamp(1.25rem,2.9vh,1.875rem)]' : 'text-sm lg:text-[clamp(0.9rem,1.7vh,1.25rem)]'}`}>
         {String(unit.unit).toUpperCase()}
       </span>
       {hero && <span className="font-mono font-semibold text-[11px] lg:text-xs tracking-wider text-slate-400 whitespace-nowrap">{dist}</span>}
-      <span className={`ml-auto font-mono font-extrabold text-white tabular-nums ${hero ? 'text-2xl lg:text-3xl 2xl:text-4xl' : 'text-base lg:text-lg 2xl:text-2xl'}`}>
+      <span className={`ml-auto font-mono font-extrabold text-white tabular-nums ${hero ? 'text-2xl lg:text-[clamp(1.5rem,3.4vh,2.25rem)]' : 'text-base lg:text-[clamp(1rem,2vh,1.5rem)]'}`}>
         {eta}
       </span>
     </div>
@@ -150,37 +150,46 @@ export default function ActiveAlertBanner({
     });
   const [hero, ...rest] = units;
 
+  // Header type from `lg` up scales with the viewport's height, the canvas's 1920x1080 sizes
+  // as the reference (70 px address, 32 incident, 38 hero ETA, 42 elapsed: 6.5 / 2.8 / 3.4 /
+  // 3.8 vh of 1080), so a 1000-tall laptop and an 800-tall touch display keep the same
+  // proportions instead of the fixed steps that left the header half the screen (operator,
+  // 2026-09-09). A long address shrinks so it stays on one line: an intersection like
+  // "LANSDOWNE DR & ABERDEEN AVE" is 26 characters against the canvas's 15.
+  const addrLen = String(displayAddress || '').length;
+  const addrScale = addrLen <= 16 ? 1 : addrLen <= 24 ? 0.8 : 0.66;
+
   return (
     <header className="flex-shrink-0 z-20 px-2 lg:px-3 pt-2 lg:pt-3 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,29%)_auto] gap-2 lg:gap-3 items-stretch">
       {/* The call */}
       <section className={`${CARD} px-4 py-3 lg:px-6 lg:py-4 flex flex-col items-start gap-1.5 lg:gap-2.5`}>
         <div className="flex items-center gap-2.5 lg:gap-3.5 flex-wrap">
-          <h1 className="m-0 font-sans font-extrabold uppercase tracking-tight leading-[0.95] text-white break-words text-2xl sm:text-3xl lg:text-4xl xl:text-5xl 2xl:text-7xl">
+          <h1 className="m-0 font-sans font-extrabold uppercase tracking-tight leading-[0.95] text-white break-words text-2xl sm:text-3xl lg:text-[calc(clamp(2rem,min(6.5vh,3.8vw),4.5rem)*var(--addr,1))]" style={{ '--addr': addrScale }}>
             {displayAddress}
           </h1>
           {/* "GRID 68", or "GRID 68 · FROM ADDRESS" when phase 1 derived it from the parcel's
               zone and phase 2 has not yet heard it (#72): a derived value is labelled. */}
           {formattedGrid && (
-            <span className="border border-amber-500/50 bg-amber-500/10 text-amber-400 font-mono font-bold tracking-wider whitespace-nowrap rounded-md px-2 py-1 lg:px-3 lg:py-2 text-xs lg:text-base 2xl:text-xl">
+            <span className="border border-amber-500/50 bg-amber-500/10 text-amber-400 font-mono font-bold tracking-wider whitespace-nowrap rounded-md px-2 py-1 lg:px-3 lg:py-2 text-xs lg:text-[clamp(0.8rem,1.8vh,1.25rem)]">
               {formattedGrid}
             </span>
           )}
         </div>
 
         {subaddress && (
-          <div className="font-mono font-medium uppercase tracking-wider text-slate-300 text-[11px] lg:text-sm xl:text-base">
+          <div className="font-mono font-medium uppercase tracking-wider text-slate-300 text-[11px] lg:text-[clamp(0.7rem,1.4vh,1rem)]">
             {subaddress}
           </div>
         )}
 
         {near && (
-          <div className="font-mono font-medium uppercase tracking-wide text-slate-300 text-xs lg:text-base xl:text-lg">
+          <div className="font-mono font-medium uppercase tracking-wide text-slate-300 text-xs lg:text-[clamp(0.8rem,1.6vh,1.125rem)]">
             <span className="text-slate-400 mr-2">Near</span>{near}
           </div>
         )}
 
         <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
-          <div className={`font-sans font-bold uppercase tracking-wider text-lg lg:text-xl xl:text-2xl 2xl:text-3xl ${activeCall.is_test ? 'text-orange-400' : 'text-amber-400'}`}>
+          <div className={`font-sans font-bold uppercase tracking-wider text-lg lg:text-[clamp(1.1rem,2.8vh,2rem)] ${activeCall.is_test ? 'text-orange-400' : 'text-amber-400'}`}>
             {displayIncident}
           </div>
 
@@ -240,7 +249,7 @@ export default function ActiveAlertBanner({
         {talkGroup && (
           <div className="flex items-center gap-2.5 lg:gap-3 mt-0.5 px-2.5 py-1.5 lg:px-3.5 lg:py-2.5 border border-slate-700 bg-slate-400/10 rounded-lg max-w-full">
             <span className={LABEL}>Talk group</span>
-            <span className="font-mono font-bold uppercase text-white text-sm lg:text-lg 2xl:text-2xl leading-none truncate">
+            <span className="font-mono font-bold uppercase text-white text-sm lg:text-[clamp(0.9rem,2.1vh,1.5rem)] leading-none truncate">
               {String(talkGroup)}
             </span>
           </div>
@@ -272,7 +281,7 @@ export default function ActiveAlertBanner({
       <section className={`${CARD} px-3 py-2 lg:px-5 lg:py-4 flex flex-row flex-wrap lg:flex-col lg:flex-nowrap items-center lg:items-end justify-between gap-2 lg:gap-3.5`}>
         <div className="flex items-baseline gap-2 lg:block text-left lg:text-right font-mono leading-none">
           <div className={LABEL}>Elapsed</div>
-          <div className="lg:mt-1.5 font-extrabold text-emerald-400 tabular-nums text-xl lg:text-3xl 2xl:text-[42px]">{elapsedFormatted}</div>
+          <div className="lg:mt-1.5 font-extrabold text-emerald-400 tabular-nums text-xl lg:text-[clamp(1.5rem,3.8vh,2.625rem)]">{elapsedFormatted}</div>
           <div className="lg:mt-1.5 font-medium tracking-wider uppercase text-slate-400 text-[10px] lg:text-[11px] whitespace-nowrap">
             {isReview ? 'Auto-dismiss paused'
               : autoDismiss ? `Auto-dismiss ${timeoutFormatted}`

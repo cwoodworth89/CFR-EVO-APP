@@ -126,6 +126,13 @@ replaced gave Leaflet a NaN zoom on a phone (`docs/standards/dependency-behaviou
   themselves within it; do not set their heights from the parent.
 * **New size variants need a reason.** With one viewing distance, a second set of type
   scales is unjustified until the display-type feature actually exists.
+* **The dispatch header's type scales with viewport height from `lg` up** (2026-09-09).
+  Artboard 3A's sizes at 1920×1080 are the reference, expressed in `vh`: address 6.5 vh
+  (70 px), incident 2.8 vh, first-due ETA 3.4 vh, elapsed 3.8 vh, each in a `clamp()` with a
+  floor and the canvas size as the ceiling. Fixed steps left the header half of a 1000-tall
+  laptop screen with an intersection address. A long address also shrinks by length
+  (`--addr` scale: 1 to 16 characters, 0.8 to 24, 0.66 beyond) so it stays on one line.
+  Below `lg` the phone keeps fixed small sizes.
 
 ## Testing
 

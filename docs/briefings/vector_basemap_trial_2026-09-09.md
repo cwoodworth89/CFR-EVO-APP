@@ -90,6 +90,17 @@ of each, is the operator's call; both start from the same tiles.
   not the target. MapTiler 3D was tried and dropped (black blobs on these tiles).
 * The trial page grew a per-layer label panel (every symbol layer as its own checkbox) at the
   operator's request, so each label class can be judged on its own.
+* **Points of interest**: the operator likes the sports fields at Percy Perry Stadium and the
+  bus-loop bays ("that's a big help"), and calls the rest of the POIs clutter. The trial page
+  lists every POI class in the tileset (122 classes, 190,505 points, counted over all 900 z14
+  tiles) with a checkbox each, and a name rule that keeps points regardless of class. Ruling
+  on the bays: *"I would probably accept any bus stop with the name 'Bay' in it."* A census of
+  the extract found 967 bus stops with "Bay" in the name, and "Bay" alone also admits
+  "Nelson Ave (SB) at Bay St", "Horseshoe Bay Ferry Terminal" and every Bayswater stop, so
+  the rule is `bus:Bay #` (class bus, "Bay" followed by a digit), which keeps the numbered
+  bays at Coquitlam Central, Lincoln, Lafarge Lake-Douglas and Inlet Centre and nothing
+  else; the label is shortened to "Bay 9" since the station is already named on the map.
+  The composed filters validate against the MapLibre style spec for all three styles.
 * Tilt and 3D buildings: raised by the operator as a future idea; the answer given is in the
   session record, not built.
 

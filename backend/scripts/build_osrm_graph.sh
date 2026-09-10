@@ -23,7 +23,7 @@
 #       <image> osrm-routed --algorithm mld /data/<name>.osrm
 #
 # CFR_ROOT overrides the repository root (for a copy of this script run from elsewhere);
-# EXPORT_SCRIPT the polygon exporter's path; OSRM_IMAGE the image.
+# EXPORT_SCRIPT the polygon exporter's path; OSRM_IMAGE the image; OSRM_PBF the extract.
 set -euo pipefail
 PROFILE=${1:?usage: build_osrm_graph.sh <profile.lua> <name> [city]}
 NAME=${2:?usage: build_osrm_graph.sh <profile.lua> <name> [city]}
@@ -34,7 +34,11 @@ DATA="$ROOT/backend/data/osrm"
 # :latest on the kiosk resolves to it today; the digest keeps the profile text and the binary
 # that reads it in step.
 IMAGE=${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend@sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c}
-PBF="$DATA/vancouver.osm.pbf"
+# The extract. vancouver.osm.pbf is the BBBike cut the kiosk has routed on since 2026-08-14;
+# a replacement is named explicitly (OSRM_PBF=backend/data/osrm/<file>) so that swapping the
+# shared extract is a recorded step in <name>.build.txt, never a rename. The basemap stream
+# builds its tiles from the same file; swap both in one window (the routing brief).
+PBF=${OSRM_PBF:-$DATA/vancouver.osm.pbf}
 [ -f "$PBF" ] || { echo "no extract at $PBF" >&2; exit 1; }
 [ -f "$PROFILE" ] || { echo "no profile at $PROFILE" >&2; exit 1; }
 PROFILE_ABS=$(cd "$(dirname "$PROFILE")" && pwd)/$(basename "$PROFILE")

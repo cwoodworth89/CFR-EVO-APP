@@ -24,7 +24,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
-| **74** | 🔴 crew-visible | DEFERRED | [Kiosk map: no hydrants, RE-CENTER always on, details box over the pin, Street View tile buried](punchlist/74-kiosk-map-no-hydrants-recentre-always-on-details-box-over-the-pin.md) |
+| **74** | 🔴 crew-visible | BUILT, unconfirmed (3A, 2026-09-09) | [Kiosk map: no hydrants, RE-CENTER always on, details box over the pin, Street View tile buried](punchlist/74-kiosk-map-no-hydrants-recentre-always-on-details-box-over-the-pin.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |
 | **52a** | ⚪ hygiene | OPEN | [Kiosk review button formatting and review rating functionality](punchlist/52a-kiosk-review-button-formatting-and-review-rating-functi.md) |

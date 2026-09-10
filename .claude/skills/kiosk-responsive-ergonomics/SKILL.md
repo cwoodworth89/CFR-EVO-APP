@@ -38,12 +38,17 @@ and tablet widths are a separate, planned surface, not this one:
 call or a review replay.
 
 ```
-ActiveAlertBanner  (header: address, units, incident, timers)
-├── RouteOverviewPanel   col-span-8   main route map
-└── detail stack         col-span-4   PropertySatellitePanel (the cadastral block tile was dropped 2026-09-08; SNAP TO CALL on the route map replaces it)
-                                      PropertySatellitePanel
-                                      StreetViewPanel
+ActiveAlertBanner  (header: three cards -- the call, the units with ETAs, the clock)
+├── notices row          only when the record carries one: pre-incident plan, operator-set arrival point
+├── RouteOverviewPanel   flex-1       route map: route pill, control stack (ZOOM, SNAP TO CALL, RE-CENTRE, + -), HydrantCard
+└── DetailStack          38.5 %, 360-740 px   PropertySatellitePanel ("AERIAL") and StreetViewPanel, each in a TileFrame header bar
 ```
+
+**Built to artboard 3A of the operator's Claude Design canvas, 2026-09-09**
+(`docs/design/`, the departures in `docs/briefings/mobile_accessibility_review.md` §7). The
+floating details box is gone: units in the header, the hydrant on the map. The canvas's 3C
+(the expand state) is not built. The cadastral block tile was dropped 2026-09-08 (SNAP TO
+CALL on the route map replaces it).
 
 **Workstation console** (`components/MapBoard.jsx`) — standby / explore.
 
@@ -70,6 +75,10 @@ banner. It is consumed only by `ActiveAlertBanner`, where it bumps two headings:
 
 It also hides the dismiss button, so a wall display cannot be cleared by a passer-by.
 
+**Since 2026-09-09 the toggle is not rendered**: artboard 3A demotes it (*"a deployment
+setting, not a per-call control"*), so the header no longer reads `isTvMode` and the state
+in `useKioskQueue` is unreachable. The table above records what it did.
+
 That is the whole feature. If display-type switching is ever wanted, `isTvMode` is the
 hook to extend — not a new parallel mechanism.
 
@@ -86,11 +95,12 @@ and measured too narrow: a landscape phone at 852 px kept the desktop columns an
 | `LeftSidebar` | a sheet over the bottom of the map with a handle; folds when an address is picked |
 | `DetailStack` | tabs (Details, Satellite, Street View), one mounted at a time; on the console a sheet that folds to its tab bar |
 | `RightSidebar` | a drawer from the right |
-| `KioskView` grid | a column: banner (address first), route map at 52 dvh, then the tabs |
-| `RouteOverviewPanel` details box | across the top of the map, folded by default |
+| `KioskView` | a column that scrolls: the three header cards, the route map at 52 dvh, then the tiles as tabs at 56 dvh (the hall display never scrolls) |
+| `RouteOverviewPanel` chrome | SNAP TO CALL and RE-CENTRE only (no zoom readout or buttons; pinch does that); the hydrant card spans the map's foot |
 
 **Fits are measured, never written.** `map/fitPadding.js` is the one place both maps get
-their `fitBounds` padding from the container and whatever floats over it. The literals it
+their `fitBounds` padding from the container and whatever floats over it: on the dispatch
+map, the control stack's width and the hydrant card's height (`overlays`). The literals it
 replaced gave Leaflet a NaN zoom on a phone (`docs/standards/dependency-behaviour.md`).
 
 ---

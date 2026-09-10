@@ -45,9 +45,12 @@ revert), and this one, which reviewed that work and then took the operator's not
 
 Interactive Street View stays (the slider alternative declined); admin-gating the two saves
 is the operator's design for the UX pass; one hydrant versus two is still theirs. **Round 2
-of the model: leave it** (operator, 2026-09-08); round 1 stays live. **#74 is shelved**: the
-operator is designing the details box's home with Claude Design, and the item waits for that
-design rather than for code. All in [`ux_notes.md`](ux_notes.md).
+of the model: leave it** (operator, 2026-09-08); round 1 stays live. **#74's design landed
+2026-09-09 and is built, unconfirmed**: artboard 3A of the operator's Claude Design canvas
+([`design/`](design/README.md)) is the dispatch display on branch
+`claude/mobile-accessibility-review-v8cih3`; the box is gone, units in the header, the
+hydrant on the map. The operator has not yet seen it on the kiosk. All in
+[`ux_notes.md`](ux_notes.md).
 
 ### Two streams, two worktrees
 
@@ -132,7 +135,7 @@ live; the four round-2 rows in `evaluation_history` carry the verdict in their n
 
 | Item | Who | What |
 |:--|:--|:--|
-| #74 | operator | where the dispatch-details box should live (shelved 2026-09-08, being designed outside the code) |
+| #74 | operator | look at artboard 3A on the kiosk (built 2026-09-09 from the operator's own canvas; the branch above) and say whether it stays |
 | #64 | operator | the civic-number checklist, at work |
 | #49 | operator | set an arrival point on a real site, then close |
 | #1 | both | routing loops not re-observed since stock OSRM; the profile has no held documentation (standards index) — reproduce a named call first |

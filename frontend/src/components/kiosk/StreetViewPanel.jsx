@@ -7,6 +7,7 @@ import { apiClient } from '../../apiClient';
 import {
   savedViewFromParcel, defaultViewForCall, staticStreetViewUrl, embedStreetViewUrl,
 } from '../../utils/streetViewGeometry';
+import TileFrame from './TileFrame';
 
 /**
  * THE ONE ONLINE-DEPENDENT SURFACE IN AN OFFLINE-FIRST SYSTEM.
@@ -240,56 +241,45 @@ export default function StreetViewPanel({ activeCall }) {
   // Tier 1: no usable coordinates, no camera, no guess (CLAUDE.md 5).
   if (!view) {
     return (
-      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col items-center justify-center p-6 text-center">
-        <div className="absolute top-2 left-2 z-20 bg-slate-900/80 backdrop-blur px-2 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 shadow">
-          <span>📷</span>
-          <span>Street View</span>
+      <TileFrame label="Street view">
+        <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
+          <h4 className="text-sm font-black uppercase tracking-wider text-slate-200 font-mono">Standby</h4>
+          <p className="text-xs text-slate-400 font-mono mt-1 max-w-xs leading-relaxed">Awaiting valid coordinates</p>
         </div>
-        <div className="w-14 h-14 rounded-2xl bg-indigo-950/40 border border-indigo-700/50 flex items-center justify-center text-2xl mb-3 shadow-inner">📷</div>
-        <h4 className="text-sm font-black uppercase tracking-wider text-indigo-300 font-mono">Street View Standby</h4>
-        <p className="text-xs text-slate-400 font-mono mt-1 max-w-xs leading-relaxed">Awaiting Valid Coordinates</p>
-      </div>
+      </TileFrame>
     );
   }
 
+  // The header bar says what the picture is: the saved heading (a green dot is a human
+  // ruling), or that the saved view could not be looked up, or that the tile is the live
+  // panorama because the static image was not there, or that the internet is off.
+  const meta = (
+    <>
+      {savedView && (
+        <span className="text-emerald-400 font-mono font-bold text-[11px] lg:text-xs" title="Saved preferred view">· {Math.round(savedView.heading)}°</span>
+      )}
+      {lookupFailed && (
+        <span className="text-amber-300 font-mono text-[10px]" title="The parcel lookup failed; a saved view may exist and not be shown">saved view unknown</span>
+      )}
+      {staticFailed && !sdkDown && (
+        <span className="text-slate-400 font-mono text-[10px]" title="No static image within 100 m of this point; the interactive panorama is shown instead">live</span>
+      )}
+      {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px] font-mono">Offline</span>}
+    </>
+  );
+
   return (
     <>
-      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl flex flex-col">
-        {/* Header: small. The tile is the picture (operator, 2026-09-06). */}
-        <div className="absolute top-2 left-2 z-20 bg-slate-900/80 backdrop-blur px-2 py-1 rounded-lg border border-slate-800 text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 shadow">
-          <span>📷</span>
-          <span>Street View</span>
-          {savedView && (
-            <span className="text-emerald-400 font-mono text-[10px]" title="Saved preferred view">● {Math.round(savedView.heading)}°</span>
-          )}
-          {lookupFailed && (
-            <span className="text-amber-300 font-mono text-[10px]" title="The parcel lookup failed; a saved view may exist and not be shown">saved view unknown</span>
-          )}
-          {staticFailed && !sdkDown && (
-            <span className="text-slate-400 font-mono text-[10px]" title="No static image within 100 m of this point; the interactive panorama is shown instead">live</span>
-          )}
-          {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px]">Offline</span>}
-        </div>
-
-        <button
-          onClick={() => setIsExpanded(true)}
-          className="absolute top-2 right-2 z-20 bg-slate-900/90 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 touch:py-2 rounded-xl border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
-          title="Open the interactive view"
-        >
-          <span>⤢</span>
-          <span>Expand</span>
-        </button>
-
+      <TileFrame label="Street view" meta={meta} onExpand={() => setIsExpanded(true)} expandTitle="Open the interactive view">
         {isOnline ? (
           renderContent(false)
         ) : (
           <div className="flex flex-col items-center justify-center p-3 text-center text-slate-400 gap-1.5 h-full">
-            <span className="text-2xl">🌐</span>
             <p className="text-xs font-semibold">Street View needs the internet</p>
             <span className="text-[10px] text-slate-500">The only panel that does; everything else is local</span>
           </div>
         )}
-      </div>
+      </TileFrame>
 
       {isExpanded && (
         <div className="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-md p-4 sm:p-8 flex flex-col animate-in fade-in duration-200">

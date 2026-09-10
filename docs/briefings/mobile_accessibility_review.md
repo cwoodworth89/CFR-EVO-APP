@@ -6,7 +6,10 @@ operator answered the questions the same day and then promoted the phone surface
 I want to get my android phone working"*), so **Phases 1 to 3 were built 2026-09-09 on branch
 `claude/mobile-accessibility-review-v8cih3`: §7 records what was built and how it was
 checked.** The rulings are recorded first, the plan in §4 is scoped to them, and §6 holds
-what is still open. Phase 4 (the public endpoint) is not built.
+what is still open. Phase 4 (the public endpoint) is not built. **Later the same day the
+dispatch display was rebuilt to artboard 3A of the operator's Claude Design canvas**
+([`docs/design/`](../design/README.md)); that is §7's last section, with every place the
+build departs from the canvas.
 
 Two sources of evidence, kept separate below because they carry different weight:
 
@@ -562,14 +565,78 @@ the code, not rendered**: see below.
   (CLAUDE.md §6.5). Screenshots were reviewed by eye at each size.
 * **Not checked here, to be checked on the device:** the dispatch display on a phone (needs a
   real call: replay one on the phone), iOS Safari (the sandbox has Chromium only; the bench
-  is Android as ruled), the touch TV.
+  is Android as ruled), the touch TV. *(Later the same day the dispatch display was rendered
+  in headless Chrome from two real replayed calls: the 3A section below.)*
 
 ### Seen on the way, not fixed
 
 * The satellite tile's Leaflet zoom control sits under its header pill at every size, so its
-  `+` is covered. Pre-existing; one line to move the control to the bottom right.
+  `+` is covered. Pre-existing; one line to move the control to the bottom right. *(Gone with
+  3A: the tile has a header bar and no zoom control; the expanded view keeps it.)*
 * `animate-in`, `fade-in` and `slide-in-from-*` appear throughout and do nothing: they are
   from a Tailwind plugin that is not installed. Harmless; the transitions they name never ran.
+
+### Artboard 3A: the dispatch display rebuilt (2026-09-09, later the same day)
+
+The operator's Claude Design canvas *Dispatch Display Redesign* (committed under
+[`docs/design/`](../design/README.md)) is a **hall-display and workstation design**: every
+artboard is drawn at 1920×1080, turn 1 has a TV-mode state, and its readme names the kiosk's
+own components as its sources. It is not the dash-phone alert of §8. So 3A was built where it
+was drawn, on the dispatch display **at and above `lg`**, and the phone stack below `lg` took
+the same rebuilt pieces in a column. The operator asked to *"see how well the latest 3A looks
+in the system"*; this is that, ready for the kiosk.
+
+**What 3A is, and what it became.** *"Integrated — call details live in the header, right
+column is nothing but views."* The floating *Dispatch Details & ETAs* box is gone (#74, the
+operator's complaint that it covered the destination): its units and ETAs moved into the
+header, its hydrant onto the map, its arrival-point ruling into a notices row.
+
+| Canvas element | Built as | File |
+|:--|:--|:--|
+| Header, three cards: the call (address, GRID, subaddress, NEAR, incident, TALK GROUP) · the units (first large with km and ETA, the rest in two columns) · the clock (ELAPSED, AUTO-DISMISS state, REVIEW REPLAY, EXIT REVIEW) | As drawn; the unit list is the dispatched list in dispatched order, each with OSRM's `road_distance_km` and `eta_minutes` from the stored `routing_metrics`, or `-- KM` / `--:--` | `hud/ActiveAlertBanner.jsx` |
+| Notices row (ROAD CLOSURE · OCCUPANCY · PRE-INCIDENT PLAN) | Only what the record carries: the pre-incident plan button and an operator-set arrival point (emerald, `arrival_point === 'entrance'`). **Road closure and occupancy are not built**: no route-corridor closure check exists and no occupancy record exists, so there is nothing real to put in them (CLAUDE.md §6.1). The row is absent when empty | `kiosk/KioskView.jsx` |
+| Map: `ROUTE · 2.8 KM · 4 MIN` pill top left | OSRM's `distance_km` and `eta_minutes` for the drawn home route, passed up by `RoutingOverlay` with the geometry; `STRAIGHT-LINE · … · -- MIN` when the router answered degraded; `-- KM · -- MIN` until it answers | `RoutingOverlay.jsx`, `kiosk/RouteOverviewPanel.jsx` |
+| Map: control stack top right (ZOOM · SNAP TO CALL · RE-CENTRE · + −) | As drawn, in that fixed order. RE-CENTRE is dim and disabled until a drag, a wheel or a snap has moved the view off the route, which keeps the 2026-09-06 ruling that it must not shout on every call. Leaflet's own zoom control is off; the + − are 48 px, 56 px from `xl`. On a phone: SNAP and RE-CENTRE only | `kiosk/RouteOverviewPanel.jsx` |
+| Map: FIRST HYDRANT card bottom left, TAP TO ZOOM; PRIVATE IS CLOSER pair; NO HYDRANT WITHIN 1,000 FT | `kiosk/HydrantCard.jsx` over the pure model `utils/hydrantCard.js` (12 node tests). The pick's number and NFPA 291 class colour are the map badge's (one colour table). **Distances in feet**, the canvas's and the operator's own unit for the rule; 1 ft = 0.3048 m exactly, from the picker's metres. A second row only where the rule yields a decision: a private first with a City hydrant for supply, or a LONG LAY with the closer off-route option; two straight-line picks show one (ux_notes §3 item 4). Loading, failed and awaiting-location are their own words. A tap is SNAP TO CALL | `kiosk/HydrantCard.jsx`, `utils/hydrantCard.js` |
+| Right column, 740 px of 1,920: AERIAL and STREET VIEW · 216°, each with EXPAND | `lg:w-[clamp(360px,38.5%,740px)]`; both tiles now have a header bar (`kiosk/TileFrame.jsx`) instead of the floating pill and the loose Expand the operator called busy; the Street View bar carries the saved heading. The console's stack uses the same tiles, so it has the bars too | `DetailStack.jsx`, `kiosk/TileFrame.jsx`, the two tiles |
+| Fits | Measured from the control stack's width and the hydrant card's height, never written; the route and the parcel are never under either | `map/fitPadding.js` overlays |
+
+**Where the build departs from the canvas, and why.**
+
+* **Kept, though the canvas leaves them out:** the response badge beside the incident
+  (EMERGENCY / ROUTINE / **RESPONSE UNKNOWN**, the amber state of #31 that the border colour
+  alone does not name), the tappable flag reasons and changed fields (#45, #34), the
+  TEST / DRILL mark, and the hall-colour dot on each unit row that ties it to its route line
+  (the operator's 2026-09-09 hall-routes design).
+* **Dropped, as the canvas demotes them:** the TV-mode toggle (*"a deployment setting, not a
+  per-call control"*), the *From Hall 1 →* line, the OSRM label, the *100% Local* badge. The
+  `isTvMode` state remains in `useKioskQueue`, unreachable; the skill notes it.
+* **Unit names as the record holds them** (`M1`, `E3`), not the canvas's *Medic 1*: the
+  dispatch stores callsigns and nothing expands them.
+* **Fonts:** the canvas uses Archivo and JetBrains Mono from Google Fonts; the build uses the
+  system sans and mono stacks, since a font fetched over the WAN is a new external call
+  (CLAUDE.md §1). Vendoring the two faces (both OFL) is a backlog line.
+* **The phone (below `lg`) scrolls.** Three header cards, a map at half the height and the
+  tiles do not fit an 852 px phone at once; the first render clipped the tile tabs off the
+  bottom, so the column scrolls there and nowhere else. The tiles are tabs, 56 dvh tall.
+* **3C, the expand state, is not built**; EXPAND opens the existing full-screen view.
+
+**Checked.** `npm run lint:crash`, `npm run test:node` (40 tests, 12 new), `npm run build`:
+green. `frontend/scripts/viewport_smoke.mjs` gained a dispatch pass: with `--dispatch` and
+`--api` it fetches a **real** dispatch record from the kiosk's API, hands it to the app
+through the app's own reload-restore path marked `isReview` and re-stamped to now (what the
+review replay does: elapsed from zero, auto-dismiss paused), and proxies every other API and
+tile request to the kiosk, so the route, hydrants, parcel and basemap are the real answers.
+Run 2026-09-09 in headless Chrome (`--channel chrome`; no Chromium download on this machine)
+at the five sizes against **DISP-2026-CE3851** (602 Como Lake Ave, five units from two
+halls) and **DISP-2026-D65FD1** (3030 Gordon Ave, the canvas's own example): no horizontal
+overflow, no control off screen, the route pill carrying OSRM's figures (`9.6 KM · 14 MIN`,
+`2.8 KM · 4 MIN`), the hydrant card present (F-167 AA, L-144 AA at 148 ft, the canvas's own
+figure), a real zoom after the fit, RE-CENTRE live after a snap, the phone column scrolling,
+no page errors. All checks pass. Screenshots were reviewed by eye and sent to the operator.
+The console at 1,916 px is unchanged except the two tile header bars. **Not checked:** the
+kiosk itself and the touch TV (the operator's look is the point of this build), Street View
+with a key (the local build has none, so the tile showed its labelled fallback), iOS Safari.
 
 ---
 
@@ -629,5 +696,11 @@ the hydrant on arrival.
 **Ruled 2026-09-09: the call stays until cleared, and a later call waits underneath**
 (built; the rulings table). **Open, in order:** whether satellite and parcel are one view or
 two; the current call only or recent calls too (§6).
+
+**The canvas that followed is not this screen.** The operator's Claude Design canvas
+(*Dispatch Display Redesign*, [`docs/design/`](../design/README.md)) redesigns the hall
+display at 1920×1080; its artboard 3A was built the same day (§7). The dash-phone alert with
+its five choices is still the description above and is not drawn or built. Below `lg` the
+phone shows the 3A pieces in a scrolling column, which is the interim, not the design.
 
 <!-- audit-ok: frontend/src/App.css -- deleted 2026-09-09; the text above records the deletion -->

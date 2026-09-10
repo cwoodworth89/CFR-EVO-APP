@@ -16,6 +16,15 @@
 > live except where the dispatch-details box should live, and the operator is designing that
 > with Claude Design rather than in the code. The item reopens when the design arrives;
 > nothing here is waiting on an engineering decision.
+>
+> **2026-09-09: the design arrived and is built, unconfirmed.** Artboard 3A of the operator's
+> canvas ([`docs/design/`](../design/README.md)) folds the box away: units and ETAs in the
+> header, the hydrant as a card on the map (TAP TO ZOOM), the arrival-point ruling in a
+> notices row, and the busy tile headers (item 4's "not touched") replaced by one header bar
+> each. Rendered from two real replayed calls at five sizes, all checks green
+> ([`briefings/mobile_accessibility_review.md`](../briefings/mobile_accessibility_review.md)
+> §7, the 3A section). **Reported, not confirmed** (CLAUDE.md §6.6): the operator has not yet
+> seen it on the kiosk. Closes on their word.
 
 The operator's notes, verbatim in substance:
 

@@ -16,27 +16,32 @@ const KIOSK_HALL = (() => {
   return { id: stn.id, lat: stn.coords[0], lng: stn.coords[1], name: stn.name };
 })();
 
-// Color coding tone matching: Engine = Orange, Rescue = Red, Ladder = Cyan, Chief = Gold, Medic = Emerald
-
-function getUnitIcon(unit) {
-  const u = String(unit).toUpperCase();
-  if (u.startsWith('M')) return '🚑'; // Medic
-  if (u.startsWith('L')) return '🚒'; // Ladder
-  if (u.startsWith('E')) return '🚒'; // Engine
-  if (u.startsWith('R')) return '🚒'; // Rescue
-  if (u.startsWith('C') || u.startsWith('B')) return '🚨'; // Chief / Battalion
-  if (u.startsWith('WT') || u.startsWith('W')) return '💧'; // Water Tender
-  if (u.startsWith('SQ')) return '⚡'; // Squad
-  return '🚒';
-}
-
+/**
+ * The dispatch display, laid out to artboard 3A of the operator's Claude Design canvas
+ * (docs/design/Dispatch Display Redesign.dc.html, 2026-09-09):
+ *
+ *   header    three cards -- the call, the units with their ETAs, the clock (ActiveAlertBanner)
+ *   notices   one row, only when there is something real to say: the pre-incident plan, an
+ *             operator-set arrival point
+ *   body      the route map, with the route pill, the control stack and the hydrant card on
+ *             it (RouteOverviewPanel), and a column of two view tiles, aerial and Street View
+ *
+ * The floating "Dispatch Details & ETAs" box is gone: its units moved into the header, its
+ * hydrant onto the map, its arrival-point ruling into the notices row (#74, the operator's
+ * complaint that it covered the destination). Below `lg` the same pieces stack in a column
+ * for a phone: header, map, then the tiles as tabs (docs/briefings/mobile_accessibility_review.md).
+ *
+ * The canvas's ROAD CLOSURE and OCCUPANCY notices are not built: no route-corridor closure
+ * check exists (road-closure-management skill) and no occupancy record exists, so there is
+ * nothing real to put in them (CLAUDE.md s6.1). Its EXPAND state (artboard 3C) is not built;
+ * the tiles keep their full-screen expand.
+ */
 export default function KioskView({ kioskState }) {
 
   const {
     activeCall,
     queuedCalls,
     isReviewMode,
-    isTvMode,
     autoDismiss,
     isRecentlyUpdated,
     updatedFields,
@@ -46,11 +51,10 @@ export default function KioskView({ kioskState }) {
     advanceToNextCall,
     dismissActiveCall,
     exitReview,
-    toggleTvMode,
   } = kioskState;
 
   const [showPrePlanModal, setShowPrePlanModal] = useState(false);
-  // Below `lg`, a phone or an upright tablet: the grid stacks, the detail tiles become tabs (docs/briefings/mobile_accessibility_review.md).
+  // Below `lg`, a phone or an upright tablet: the layout stacks, the detail tiles become tabs.
   const compact = useCompactViewport();
 
   // There is no no-call branch here on purpose. KioskView is only ever mounted with a
@@ -105,7 +109,7 @@ export default function KioskView({ kioskState }) {
     return [];
   };
 
-  let unitList = extractCallUnits(activeCall);
+  const unitList = extractCallUnits(activeCall);
 
   // Tier 1 (CLAUDE.md §5): coordinates are never guessed. If the geocoder did not
   // resolve a location, destLat/destLng stay null, all routing output is suppressed,
@@ -118,19 +122,16 @@ export default function KioskView({ kioskState }) {
     (Number(rawDestLat) !== 0 || Number(rawDestLng) !== 0);
 
   // ETAs are OSRM's, resolved by the backend and persisted on the dispatch.
-  // If they are absent the units render as plain badges with no ETA — never a
-  // client-side estimate (CLAUDE.md §6.1, §6.2).
+  // If they are absent the units render with '--:--' -- never a client-side estimate
+  // (CLAUDE.md §6.1, §6.2). The hall is the record's origin_hall or nothing: it used to be
+  // guessed from the digits in the callsign, which is not where a unit comes from.
   const persistedMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics;
   const unitEtas = (hasCoords && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
     ? persistedMetrics.map((m) => ({
         unit: m.unit,
-        hall: `Hall ${m.origin_hall || (m.unit.match(/\d+/) ? m.unit.match(/\d+/)[0] : '1')}`,
-        etaMin: m.eta_minutes,
-        etaStr: m.eta_minutes != null ? `~${m.eta_minutes} min` : null,
-        distStr: (m.road_distance_km ?? m.distance_km) != null
-          ? `${m.road_distance_km ?? m.distance_km} km`
-          : null,
-        icon: getUnitIcon(m.unit),
+        hallId: m.origin_hall != null ? String(m.origin_hall) : null,
+        etaMin: m.eta_minutes ?? null,
+        distKm: m.road_distance_km ?? m.distance_km ?? null,
       }))
     : [];
 
@@ -163,10 +164,22 @@ export default function KioskView({ kioskState }) {
     : isEmergency ? 'border-red-600'
     : 'border-emerald-500';
 
+  // The notices row: only what the record actually carries.
+  const prePlanUrl = activeCall?.target?.pre_plan_pdf_url || activeCall?.pre_plan_pdf_url || null;
+  // An operator-set arrival point: say so, and why, so the crew reads the pin as a ruling
+  // rather than a wrong guess (#49). 'entrance' is the operator's; 'front' is the parcel's
+  // own frontage and needs no notice.
+  const arrivalSet = activeCall?.target?.arrival_point === 'entrance';
+  const entranceNote = activeCall?.target?.entrance_note || null;
+  const hasNotices = Boolean(prePlanUrl || arrivalSet);
+
   return (
+    // Below `lg` the column scrolls: three header cards, a map at half the height and the
+    // tiles do not fit an 852 px phone at once, and a clipped column left the tile tabs
+    // unreachable (measured 2026-09-09). From `lg` up nothing scrolls, as on the hall display.
     <div
       onClick={resetTimeoutClock}
-      className={`fixed inset-0 bg-slate-950 text-slate-100 flex flex-col z-50 select-none border-[6px] ${borderColor} transition-colors duration-500 overflow-hidden safe-area`}
+      className={`kiosk-root fixed inset-0 bg-slate-950 text-slate-100 flex flex-col z-50 select-none border-[6px] ${borderColor} transition-colors duration-500 overflow-y-auto overflow-x-hidden lg:overflow-hidden safe-area`}
     >
       {/* Queued Call Notification Banner */}
       {queuedCalls.length > 0 && (
@@ -174,12 +187,9 @@ export default function KioskView({ kioskState }) {
           onClick={advanceToNextCall}
           className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 lg:px-6 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer motion-safe:animate-pulse shadow-xl border-b border-amber-600 z-50 flex-shrink-0"
         >
-          <div className="flex items-center gap-3">
-            <span className="text-lg">⚠️</span>
-            <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
-              {queuedCalls.length} New Call{queuedCalls.length > 1 ? 's' : ''} Queued — Tap to View Next
-            </span>
-          </div>
+          <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
+            {queuedCalls.length} New Call{queuedCalls.length > 1 ? 's' : ''} Queued — Tap to View Next
+          </span>
           <div className="bg-slate-950 text-amber-400 px-3 py-0.5 rounded text-xs font-mono font-bold max-w-full truncate">
             Next: {queuedCalls[0]?.address || 'Dispatch Alert'} →
           </div>
@@ -190,14 +200,13 @@ export default function KioskView({ kioskState }) {
           display normally below; only routing/ETA output is withheld. */}
       {!hasCoords && (
         <div className="bg-amber-500 text-slate-950 font-bold px-3 lg:px-6 py-2 flex items-center gap-3 border-b border-amber-600 shadow-xl z-50 flex-shrink-0 motion-safe:animate-pulse">
-          <span className="text-lg">⚠️</span>
           <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
             Location Unresolved — Coordinates Awaiting Operator Verification • Routing &amp; ETAs Unavailable
           </span>
         </div>
       )}
 
-      {/* Modular High-Visibility Active Alert Banner Header */}
+      {/* The header: the call, the units, the clock */}
       <ActiveAlertBanner
         activeCall={activeCall}
         unitEtas={unitEtas}
@@ -211,43 +220,60 @@ export default function KioskView({ kioskState }) {
         isRecentlyUpdated={isRecentlyUpdated}
         isResponseUnknown={isResponseUnknown}
         updatedFields={updatedFields}
-        isTvMode={isTvMode}
         autoDismiss={autoDismiss}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
         onDismiss={() => dismissActiveCall('manual')}
         onExitReview={exitReview}
-        onToggleTvMode={toggleTvMode}
-        onOpenPrePlan={() => setShowPrePlanModal(true)}
       />
 
-      {/* Main Content Layout (2/3 Main Route Map, 1/3 Equal Height Detail Stack) */}
-      {/* On a phone (below `lg`) the grid becomes a column: the route map first at just over
-          half the height, then one detail tile at a time on tabs. From `lg` up the 8/4 grid
-          is unchanged. */}
-      <main className="flex-1 p-2 lg:p-3 flex flex-col lg:grid lg:grid-cols-12 gap-2 lg:gap-3 min-h-0 overflow-hidden">
-        {/* Left ~2/3 Suggested Route Panel */}
-        <section className="lg:col-span-8 h-[52dvh] lg:h-full min-h-0 flex-shrink-0">
+      {/* Notices: one row, rendered only when the record carries something to say. */}
+      {hasNotices && (
+        <div className="flex-shrink-0 px-2 lg:px-3 pt-2 lg:pt-3 flex flex-wrap gap-2 lg:gap-3">
+          {arrivalSet && (
+            <div className="flex-1 min-w-[16rem] flex items-center gap-3 px-3.5 py-2.5 lg:px-4 lg:py-3 rounded-xl bg-emerald-950/60 border border-emerald-700/70">
+              <span className="font-mono font-extrabold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase bg-emerald-400 text-slate-950 rounded px-2 py-1 whitespace-nowrap">Arrival point</span>
+              <span className="font-sans font-medium text-emerald-100 text-sm lg:text-base leading-snug">
+                Set by the operator{entranceNote ? ` — ${entranceNote}` : ''}
+              </span>
+            </div>
+          )}
+          {prePlanUrl && (
+            <button
+              type="button"
+              onClick={() => setShowPrePlanModal(true)}
+              className="flex items-center gap-2.5 px-3.5 py-2.5 lg:px-4 lg:py-3 rounded-xl bg-slate-950 border border-sky-800 hover:border-sky-600 cursor-pointer transition"
+            >
+              <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0" />
+              <span className="font-mono font-bold text-xs lg:text-sm tracking-[0.08em] uppercase text-sky-300">Pre-incident plan</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* The body: the route map and the two view tiles. From `lg` up a row, the map taking
+          what the column leaves; below it a column, the map at just over half the height and
+          the tiles as tabs. The column is the canvas's 740 px of 1,920, held between a floor
+          and that ceiling so the tiles stay readable on the 1,280 px touch display. */}
+      <main className="flex-none lg:flex-1 p-2 lg:p-3 flex flex-col lg:flex-row gap-2 lg:gap-3 min-h-0 lg:overflow-hidden">
+        <section className="h-[52dvh] lg:h-auto lg:flex-1 min-w-0 min-h-0 flex-shrink-0 lg:flex-shrink">
           <RouteOverviewPanel activeCall={activeCall} stationHall={KIOSK_HALL} compact={compact} />
         </section>
 
-        {/* Right ~1/3 Equal-Height 3-Panel Detail Stack */}
-        {/* Two panels, satellite and Street View, each taller. The cadastral block tile that
-            sat above them is gone (operator, 2026-09-08): SNAP TO CALL on the route map
-            shows the parcel outline, the addresses and the hydrants at the same zoom, on the
-            map the crew is already reading, so the tile was a second copy of it. */}
-        <DetailStack
-          call={activeCall}
-          className="lg:col-span-4 flex-1"
-          compact={compact}
-        />
+        {/* Two tiles, aerial and Street View. The cadastral block tile that sat above them is
+            gone (operator, 2026-09-08): SNAP TO CALL on the route map shows the parcel, the
+            addresses and the hydrants at the same zoom, on the map the crew is already reading.
+            On a phone the tiles are tabs under the map, a little over half a screen tall. */}
+        <section className="h-[56dvh] lg:h-auto flex-shrink-0 lg:flex-none lg:w-[clamp(360px,38.5%,740px)] min-h-0">
+          <DetailStack call={activeCall} compact={compact} />
+        </section>
       </main>
 
       {/* Pre-Incident Construction Plan PDF Viewer Modal */}
       <PrePlanModal
         isOpen={showPrePlanModal}
         onClose={() => setShowPrePlanModal(false)}
-        pdfUrl={activeCall?.target?.pre_plan_pdf_url || activeCall?.pre_plan_pdf_url}
+        pdfUrl={prePlanUrl}
         address={activeCall?.address}
         gisId={activeCall?.target?.gis_id || activeCall?.gis_id}
       />

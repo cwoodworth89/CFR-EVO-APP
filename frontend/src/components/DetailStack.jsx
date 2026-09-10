@@ -29,8 +29,9 @@ import StreetViewPanel from './kiosk/StreetViewPanel';
 export default function DetailStack({ call, topCard, className = '', compact = false, sheet = false }) {
   const tabs = [
     topCard ? { id: 'details', label: 'Details' } : null,
-    { id: 'satellite', label: '🛰️ Satellite' },
-    { id: 'street', label: '📷 Street View' },
+    // The tabs carry the tiles' own names (artboard 3A: AERIAL, STREET VIEW), no glyphs.
+    { id: 'satellite', label: 'Aerial' },
+    { id: 'street', label: 'Street view' },
   ].filter(Boolean);
   const [tab, setTab] = useState(tabs[0].id);
   const [open, setOpen] = useState(true);

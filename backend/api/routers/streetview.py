@@ -11,11 +11,13 @@ try:
     from backend.api.models import ParcelModel
     from backend.api.schemas import StreetViewOverrideSchema, ParcelCameraOverrideSchema
     from backend.api.routers.parcels import _clean_streetview_address, save_parcel_streetview
+    from backend.api.routers.auth import require_admin
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import ParcelModel
     from api.schemas import StreetViewOverrideSchema, ParcelCameraOverrideSchema
     from api.routers.parcels import _clean_streetview_address, save_parcel_streetview
+    from api.routers.auth import require_admin
 
 router = APIRouter(tags=["streetview"])
 
@@ -77,8 +79,10 @@ def get_streetview_override(address: str, db: Session = Depends(get_db)):
 
 
 @router.post("/api/streetview-overrides")
-def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = Depends(get_db)):
-    """Saves a Street View camera override for an address."""
+def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = Depends(get_db),
+                             _admin: dict = Depends(require_admin)):
+    """Saves a Street View camera override for an address. Admin-gated over HTTP, the same
+    gate as /api/parcels/streetview: an ungated alias would be a way around it."""
     target_address = payload.address or payload.clean_address
     res = save_parcel_streetview(
         ParcelCameraOverrideSchema(
@@ -118,5 +122,6 @@ def get_streetview_override_alias(address: str, db: Session = Depends(get_db)):
 
 
 @router.post("/api/streetview/override")
-def save_streetview_override_alias(payload: StreetViewOverrideSchema, db: Session = Depends(get_db)):
-    return save_streetview_override(payload, db)
+def save_streetview_override_alias(payload: StreetViewOverrideSchema, db: Session = Depends(get_db),
+                                   _admin: dict = Depends(require_admin)):
+    return save_streetview_override(payload, db, _admin)

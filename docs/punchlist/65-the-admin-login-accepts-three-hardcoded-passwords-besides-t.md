@@ -59,3 +59,10 @@ root `.env` (git-ignored), moved out of `backend/.env` so there is one copy.
 
 Verified on the rebuilt container: the configured password 200, `cfr2026` and `admin` 401,
 body `Invalid username or password.`
+
+**Addendum, 2026-09-09.** The frontend half was still open: `apiClient.getSession` logged
+every browser in by itself with `rescue` written into the source, so the backend fix above
+gated nothing in practice. Removed with the admin unlock (`ux_notes.md` §3). The token
+signing key had the same shape, a literal default in `auth.py` and in compose, now
+`${JWT_SECRET:-}` from the root `.env` beside `ADMIN_PASSWORD`; unset answers 503 the same
+way. Every token issued under the old literal was invalidated by the change.

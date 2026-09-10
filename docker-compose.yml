@@ -36,14 +36,22 @@ services:
       start_period: 5s
 
   osrm:
-    image: ghcr.io/project-osrm/osrm-backend:latest
+    # Pinned by digest: a graph only loads in the OSRM version that built it (the fingerprint
+    # in <graph>.osrm.properties), and this digest is the image that built apparatus.osrm
+    # (backend/data/osrm/apparatus.build.txt, backend/scripts/build_osrm_graph.sh). Moving the
+    # image means rebuilding the graph in the same step.
+    image: ghcr.io/project-osrm/osrm-backend@sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c
     container_name: cfr_osrm
     restart: always
+    # apparatus.osrm: the kiosk graph built 2026-09-09 from backend/osrm/profiles/apparatus.lua
+    # (turn restrictions off, fire lanes drivable; the operator's rulings in punch-list #1),
+    # deployed 2026-09-09 after the corpus measurement in that item. vancouver.osrm.* on the
+    # kiosk is the stock car.lua graph and the rollback: change the name back and `up -d osrm`.
     command: >
-      sh -c 'if [ -f /data/vancouver.osrm.timestamp ]; then
-        exec osrm-routed --algorithm mld /data/vancouver.osrm;
+      sh -c 'if [ -f /data/apparatus.osrm.timestamp ]; then
+        exec osrm-routed --algorithm mld /data/apparatus.osrm;
       else
-        echo "OSRM dataset not yet mounted in /data/vancouver.osrm. Standing by in fallback mode...";
+        echo "OSRM dataset not yet mounted in /data/apparatus.osrm. Standing by in fallback mode...";
         while true; do sleep 3600; done;
       fi'
     ports:
@@ -102,7 +110,11 @@ services:
       OSRM_BACKEND_URL: http://osrm:5000
       TILE_SERVER_URL: http://tiles:8080
       DISABLE_WAN_FALLBACK: ${DISABLE_WAN_FALLBACK:-false}
-      JWT_SECRET: ${JWT_SECRET:-cfr_secret_key_change_in_prod_2026}
+      # Signs the admin unlock tokens (backend/api/routers/auth.py). Root .env, like
+      # ADMIN_PASSWORD below; unset leaves login answering 503. It used to default to a
+      # literal that is in git history, so every clone could mint admin tokens for this
+      # deployment (2026-09-09).
+      JWT_SECRET: ${JWT_SECRET:-}
       # Admin login for the review screen (punch-list #65). Compose interpolates ${...} from
       # the shell or a root .env, never from backend/.env, and the image excludes every .env
       # (.dockerignore) -- so put ADMIN_PASSWORD in <repo>/.env. Unset leaves login answering

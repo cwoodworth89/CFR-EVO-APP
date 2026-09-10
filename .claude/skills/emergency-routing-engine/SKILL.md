@@ -72,9 +72,12 @@ flowchart LR
 > per-request API fees**, so an online routing mode is not a fallback this system is allowed to
 > depend on.
 >
-> **All routing goes through §B, the local OSRM container**, which runs the stock `driving`
-> profile (punch-list #1 — the profile has never been tuned). Leave this subsection only as a
-> record of a path that was considered and not taken.
+> **All routing goes through §B, the local OSRM container.** Since 2026-09-09 it serves the graph
+> built from `backend/osrm/profiles/apparatus.lua`: the stock `car.lua` vendored at
+> `docs/standards/osrm/` with the operator's rulings (turn restrictions ignored under lights and
+> siren, fire lanes drivable), each hunk cited; the speed table is stock and unsourced
+> (punch-list #1). Leave this subsection only as a record of a path that was considered and
+> not taken.
 * **Endpoint**: `https://maps.googleapis.com/maps/api/directions/json`
 * **Parameters**:
   - `origin`: Hall apron coordinates (e.g. Hall 1 `49.29109654571679,-122.79072561861948`)
@@ -89,15 +92,14 @@ flowchart LR
 
 ---
 
-## 3. Apparatus Physical Profiles & Road Restrictions
+## 3. What the Profile Applies, and What It Does Not
 
-Different vehicle classes require specific path weighting:
-
-| Apparatus Class | Units | Weight / Size | Routing Constraints |
-| :--- | :--- | :--- | :--- |
-| **Heavy Aerial / Quint** | `L1`, `L2`, `Q5` (Quint 5) | 35–38 Tons, 12'8" Height | • Avoids residential laneways and tight traffic circles<br>• Avoids weight-restricted bridges<br>• Prefers multi-lane arterial roads |
-| **Pumper / Engine** | `E1`, `E2`, `E3`, `E4` | 18 Tons, 10'2" Height | • Standard commercial vehicle clearance<br>• Prefers secondary arterials over local alleys |
-| **Command / Rescue** | `R1`, `R2`, `C10`, `C1`, `C9` | 3–12 Tons (SUV/Heavy Rescue) | • Standard emergency vehicle clearance<br>• Quickest possible path |
+One profile for every apparatus, emergency response assumed (operator ruling 2026-09-09,
+punch-list #1). Applied: posted turn restrictions ignored; fire lanes (`service=emergency_access`)
+drivable. Not applied, by ruling: weight and height limits, one-way (never offered), bollards
+(never offered). Not applied, unsourced: any per-class speed, road-class or turn weighting — the
+speed table is OSRM's own. Per-way, per-node and per-turn one-offs go through the override
+mechanisms recorded in punch-list #1, never through code in the routing engine.
 
 ---
 

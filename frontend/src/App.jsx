@@ -18,6 +18,7 @@ import { toActiveCall } from './utils/dispatchModel';
 // emergency. Loading it up front means a stale build fails at page load -- where
 // the failsafe in main.jsx reloads it -- instead of mid-call.
 import KioskView from './components/kiosk/KioskView';
+import AdminSessionProvider from './components/AdminSessionProvider';
 
 // MapBoard stays lazy: it is the STANDBY view, so its chunk is fetched at boot
 // rather than deferred to an incident, and a stale reference surfaces immediately.
@@ -103,6 +104,9 @@ function App() {
 
   return (
     <div className="App w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 relative">
+      {/* The admin unlock is one state for both surfaces: the kiosk's Street View save bar
+          and the console's arrival point read the same padlock. */}
+      <AdminSessionProvider>
       <Suspense fallback={<ViewLoadingFallback />}>
         {mode === MODE.DISPATCH ? (
           <KioskView kioskState={kioskState} />
@@ -113,6 +117,7 @@ function App() {
           />
         )}
       </Suspense>
+      </AdminSessionProvider>
     </div>
   );
 }

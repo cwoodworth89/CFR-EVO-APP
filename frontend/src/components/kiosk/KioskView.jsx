@@ -5,6 +5,16 @@ import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
 import { STATIONS } from '../MapConstants';
 
+// The hall this display belongs to. Operator, 2026-09-09: "the hall is going to be hard-coded
+// per kiosk deployment in the .env file" -- VITE_DEFAULT_HALL in frontend/.env.local, read at
+// build time, the same setting the workstation header shows. Unset, Hall 1, which is the one
+// kiosk that exists. Until 2026-09-09 nothing passed this down and the route always left Hall 1.
+const KIOSK_HALL = (() => {
+  const id = String(import.meta.env.VITE_DEFAULT_HALL || '1');
+  const stn = STATIONS.find(s => s.id === id) || STATIONS[0];
+  return { id: stn.id, lat: stn.coords[0], lng: stn.coords[1], name: stn.name };
+})();
+
 // Color coding tone matching: Engine = Orange, Rescue = Red, Ladder = Cyan, Chief = Gold, Medic = Emerald
 
 function getUnitIcon(unit) {
@@ -210,7 +220,7 @@ export default function KioskView({ kioskState }) {
       <main className="flex-1 p-3 grid grid-cols-12 gap-3 min-h-0 overflow-hidden">
         {/* Left ~2/3 Suggested Route Panel */}
         <section className="col-span-8 h-full min-h-0">
-          <RouteOverviewPanel activeCall={activeCall} />
+          <RouteOverviewPanel activeCall={activeCall} stationHall={KIOSK_HALL} />
         </section>
 
         {/* Right ~1/3 Equal-Height 3-Panel Detail Stack */}

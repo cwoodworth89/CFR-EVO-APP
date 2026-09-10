@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Marker, Popup, Polygon, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
-import { RoutingOverlay } from '../RoutingOverlay';
+import HallRoutesOverlay from '../map/HallRoutesOverlay';
+import { hallColour, UNASSIGNED_HALL_COLOUR } from '../MapConstants';
 import MapSurface from '../map/MapSurface';
 import RoadClosuresLayer from '../map/RoadClosuresLayer';
 import { useRoadClosures } from '../../hooks/useRoadClosures';
@@ -100,6 +101,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
+    id: '1',
     lat: 49.29109654571679,
     lng: -122.79072561861948,
     name: 'Hall 1 (1300 Pinetree Way)'
@@ -400,7 +402,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
               {routeMetrics?.units?.map((u, idx) => (
                 <div key={idx} className="flex justify-between items-center bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800 font-mono">
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: u.color }} />
+                    {/* The unit's hall colour, the same as its route line; slate when the record
+                        carries no metrics for it (no hall is guessed). */}
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" title={u.hall ? `Hall ${u.hall}` : 'hall unknown'} style={{ backgroundColor: u.hall ? hallColour(u.hall) : UNASSIGNED_HALL_COLOUR }} />
                     <span className="text-white text-xs font-black">{u.unit}</span>
                     <span className="text-[8px] text-slate-400 uppercase font-extrabold bg-slate-800 px-1.5 py-0.5 rounded border border-slate-750">{u.tierKey}</span>
                   </div>
@@ -557,12 +561,14 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           onSelect={() => {}}
         />
 
-        {/* Live OSRM Emergency Response Routing Overlay */}
+        {/* Every responding hall's route, the home hall's on top and solid; only the home
+            route reports its coordinates, for the hydrant picker and the fit. */}
         {hasValidCoords && (
-          <RoutingOverlay
-            from={[origin.lat, origin.lng]}
-            to={[destLat, destLng]}
-            onRouteCalculated={setRouteCoords}
+          <HallRoutesOverlay
+            dest={[destLat, destLng]}
+            homeHall={origin.id || '1'}
+            routingMetrics={persistedUnitMetrics}
+            onHomeRouteCalculated={setRouteCoords}
           />
         )}
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Polygon, Marker } from 'react-leaflet';
 import { getZoneLabelPoint } from './mapGeometry';
 import { createSoftZoneNumberIcon } from './mapIcons';
+import { HALL_COLOURS, UNASSIGNED_HALL_COLOUR } from '../MapConstants';
 
 /**
  * Emergency response zone polygons, colour-coded by responding hall, with their map-grid
@@ -16,13 +17,9 @@ import { createSoftZoneNumberIcon } from './mapIcons';
  * is dropped. Labels appear only from zoom 13, below which they collide with each other.
  */
 
-const HALL_COLOURS = {
-  1: '#f43f5e', // crimson
-  2: '#3b82f6', // royal blue
-  3: '#10b981', // emerald
-  4: '#a855f7', // purple
-};
-const UNASSIGNED_COLOUR = '#475569'; // slate
+// Hall colours come from MapConstants.HALL_COLOURS, the one table the route lines and the
+// ETA list use too, so a zone and the route crossing it cannot disagree (2026-09-09).
+const UNASSIGNED_COLOUR = UNASSIGNED_HALL_COLOUR;
 
 /** Zone fill/stroke, keyed on responding hall. Falls back to slate when unassigned.
  *  Not exported: only this layer styles zones, and a non-component export here would trip

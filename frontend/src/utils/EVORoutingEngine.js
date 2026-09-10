@@ -104,6 +104,9 @@ export function calculateEVORouteMetrics({
       tierName: tier.name,
       tierSubtitle: tier.subtitle,
       color: tier.color,
+      // The hall the backend routed this unit from (routing_engine.get_unit_station_id).
+      // null when the record carries no metrics for the unit: no hall is guessed here.
+      hall: m?.origin_hall != null ? String(m.origin_hall) : null,
       distanceKm: dist != null ? Number(dist).toFixed(1) : null,
       etaMinutes: eta != null ? Number(eta).toFixed(0) : null
     };

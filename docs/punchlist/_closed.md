@@ -2,10 +2,11 @@
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
-80 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
+81 items closed. Retained for provenance; each file holds the full record of what was verified and how (CLAUDE.md §6.6).
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **1** | 🔴 crew-visible | CLOSED | [Erratic Routing Loops & Intra-Municipal Path Preference](01-erratic-routing-loops-intra-municipal-path-preference.md) |
 | **44a** | 🔴 crew-visible | CLOSED | [Round 1 wins the address unconditionally — Phase 2 never compares the two rounds](44a-round-1-wins-the-address-unconditionally-phase-2-never.md) |
 | **62** | 🔴 crew-visible | CLOSED | [The geocoder's street-centroid step has raised on every call since the `parcels.lat` rename](62-the-geocoders-street-centroid-step-has-raised-on-every-call-si.md) |
 | **66** | 🔴 crew-visible | CLOSED | [The kiosk address sanitizer removed 18 City street names that begin with a unit keyword](66-the-kiosk-address-sanitizer-removed-18-city-street-names-tha.md) |

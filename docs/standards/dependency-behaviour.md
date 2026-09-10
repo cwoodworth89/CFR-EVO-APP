@@ -60,6 +60,7 @@ not the behaviour**, and the code was written against the name.
 | MQTT `qos=1` | delivered once, reliably | delivered **at least** once -- duplicates are guaranteed possible and the receiver must be idempotent |
 | `requestAnimationFrame` | runs after the next paint | runs before the next repaint **only while the document is visible**. On a hidden tab or a blanked kiosk display it never fires |
 | `feature_extractor(speech, sampling_rate=16000)` | encodes the clip you gave it | **keeps the first 30 seconds and silently drops the rest.** `__call__` defaults to `truncation=True`, `padding="max_length"`, `max_length=n_samples` (`chunk_length` 30 x 16 kHz = 480,000 samples) |
+| OSM `restriction=no_right_turn` | the sign at the junction | **whatever the mapper typed.** At Pinetree Way and Guildford Way the sign is *no right on red* (operator, 2026-09-09); the relation says *no right turn*. OSRM v26.8.0 applies the value as written and ignores every value ending `_on_red` — punch-list **#1** |
 | `WhisperModel(dir, local_files_only=True)` | nothing is fetched from the network | **still downloads `tokenizer.json`** from huggingface.co when the model directory lacks one -- the flag does not cover that fallback |
 
 None of these are bugs in the libraries. All are documented or evident in source. The
@@ -412,12 +413,57 @@ stays for training only, where it exists to leave cores for a live dispatch and 
 determinism does not matter. The round-2 job runs the build plain and the training under six
 threads for exactly this reason.
 
+### OSRM v26.8.0 — which `restriction` values the parser applies, and which it ignores
+
+**Read 2026-09-09** in `src/extractor/restriction_parser.cpp` at tag `v26.8.0`, the version
+running on the kiosk ([`osrm/README.md`](osrm/README.md)), after punch-list #1 came down to one
+OSM relation.
+
+`RestrictionParser::TryParse`:
+
+* A value starting `only_` is an only-restriction. A value starting `no_` is a no-restriction
+  **unless it ends `_on_red`**. Anything else yields nothing. So `no_right_turn_on_red`, the
+  tag for the sign at Pinetree Way and Guildford Way, is not a restriction to OSRM at all —
+  it has no signal state and leaves a right-on-red ban alone, which is right. The relation
+  there (6812366) is tagged plain `no_right_turn`, a full ban, and that is the whole cause of
+  the 50 m lap of the junction on every westbound Hall 1 route.
+* The test is `starts_with`, not equality. Relation 17957326 has its time window written into
+  the plain tag — `no_right_turn @ (Mo-Fr 07:00-09:00,16:00-18:00)`, via 49.25084, −122.86907 —
+  and because that starts with `no_` it is applied **all day**. The window belongs in
+  `restriction:conditional`, a different tag.
+* `except=` is split on `;` and the restriction is dropped when any item is in the profile's
+  `restrictions` list — for `car.lua` that is `motorcar`, `motor_vehicle`, `vehicle`. The
+  City's 22 `except` values are psv, bicycle, bus, hgv, police, staff, "city vehicle": every
+  one leaves the restriction in force for the car. `except=emergency` would too, unless a
+  profile adds `emergency` to its list; no City restriction carries it today.
+* Tags are read in the order `restriction`; then `restriction:conditional` and
+  `restriction:<mode>:conditional`, **only when the extractor was told to parse conditionals**
+  (`parse_conditionals`, which is `osrm-extract --parse-conditional-restrictions`, verified in
+  the pinned image's `--help` 2026-09-09, applied at customize time by
+  `osrm-customize --parse-conditionals-from-now` with `--time-zone-file`); then
+  `restriction:<mode>` per mode in the list. Whether the kiosk graph's unrecorded build parsed conditionals is not known, so the
+  City's 21 weekday-peak turn bans are either all applied or all absent. The check is a route
+  through one of them (Clarke Rd → Chapman Ave, `no_right_turn @ (Mo-Fr 07:00-09:00)`, via
+  49.26909, −122.88056) at the first rebuild, when the command is recorded.
+
+### OSRM v26.8.0 — routes are chosen by weight and reported in duration, and the two diverge on penalised ways
+
+**Measured 2026-09-09** on the kiosk, stock `car.lua` against `apparatus.lua`, 2,248 routes
+each. A route response's `distance` and `duration` are the metres and seconds along the route
+returned; they are not the quantity the router minimised. With `weight_name = 'routability'`
+(car.lua line 21) the router minimises weight, and `WayHandlers.penalties`
+([`osrm/lib/way_handlers.lua`](osrm/lib/way_handlers.lua) lines 466–474) sets a way's *rate* to
+speed × the smallest of the service, width, alternating, side-road and priority penalties,
+while its duration comes from the speed alone. A penalised way is therefore cheap in time and
+dear in weight. Seen: once turn restrictions came off, six routes to 3007 Glen Dr left the slip
+lane for the direct turn at Pinetree Way, 11 s *slower* by duration and lighter by weight.
+Consequences: an ETA taken from `duration` is the true time along the route shown, so §6.2
+holds; and a route that got slower after a profile change is not by itself a defect, it may be
+the lighter route. The earlier unverified entry for this is closed.
+
 ## Unverified — assumptions still resting on names
 
 Recorded so they are visible (§7.5). None of these have been checked.
 
-* **OSRM** — whether `distance`/`duration` in the response are affected by the profile's
-  `weight` versus being true metres/seconds. Punch-list #1 depends on this and the profile
-  has not been tuned.
 * **Silero VAD** (`vad_filter=True` in `transcriber.py`) — what it removes, and whether it
   can clip the leading tones or the first unit name of a dispatch.

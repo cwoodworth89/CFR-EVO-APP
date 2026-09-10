@@ -132,6 +132,19 @@ export const STATIONS_MAP = STATIONS.reduce((acc, stn) => {
   return acc;
 }, {});
 
+// Hall colours: the one table for every place a hall is coloured -- zone fills, route lines,
+// the unit dots in the ETA list -- so they cannot disagree. Chosen 2026-09-09 for separation
+// from each other and from the NFPA 291 hydrant badges (sky, green, orange, light red); the
+// operator asked for "4 colors that look nice" and judges them on the kiosk.
+export const HALL_COLOURS = {
+  "1": "#e11d48", // rose      -- Town Centre
+  "2": "#2563eb", // royal blue -- Mariner
+  "3": "#0d9488", // teal      -- Austin Heights
+  "4": "#7c3aed", // violet    -- Burke Mountain
+};
+export const UNASSIGNED_HALL_COLOUR = "#475569"; // slate
+export const hallColour = (id) => HALL_COLOURS[String(id)] || UNASSIGNED_HALL_COLOUR;
+
 // 🏢 KNOWN BUILDING COMPLEXES & HIGH-RISE REGISTRY
 // Pre-configured building names, exact tower footprints, and verified front-entrance routing access points
 export const KNOWN_BUILDINGS = [

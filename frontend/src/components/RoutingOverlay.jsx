@@ -1,11 +1,33 @@
 import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet-routing-machine';
-import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { API_BASE_URL } from '../apiClient';
 
-export function RoutingOverlay({ from, to, onRouteCalculated }) {
+/**
+ * One route line: `from` -> `to` through our own OSRM (`/api/route`), drawn as a Leaflet
+ * polyline. Distance, duration and geometry are the router's (CLAUDE.md 6.2); nothing is
+ * estimated here, and a failed fetch draws nothing.
+ *
+ * `pane` / `paneZIndex` put the line in its own map pane so stacking is deterministic when
+ * several routes are drawn (map/HallRoutesOverlay.jsx): routes finish loading in any order,
+ * and without panes whichever arrived last would sit on top. Leaflet's overlayPane is 400 and
+ * markerPane 600, so 450..460 keeps every route above the parcel fill and under the markers.
+ *
+ * `leaflet-routing-machine` used to be imported here and never called; its default
+ * router.project-osrm.org / api.mapbox.com URLs rode along in the bundle (post-freeze backlog,
+ * 2026-08-31). Gone 2026-09-09.
+ */
+export function RoutingOverlay({
+  from,
+  to,
+  onRouteCalculated,
+  stationId = '1',
+  color = '#00e676',
+  weight = 6,
+  opacity = 0.95,
+  pane,
+  paneZIndex = 450,
+}) {
   const map = useMap();
 
   const fromLat = from ? from[0] : null;
@@ -25,21 +47,26 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
     let isMounted = true;
     let polylineLayer = null;
 
+    if (pane && !map.getPane(pane)) {
+      const p = map.createPane(pane);
+      p.style.zIndex = String(paneZIndex);
+    }
+
     const fetchLocalRoute = async () => {
       try {
-        const resp = await fetch(`${API_BASE_URL}/api/route?start_lat=${fromLat}&start_lng=${fromLng}&dest_lat=${toLat}&dest_lng=${toLng}&station_id=1`);
+        const resp = await fetch(`${API_BASE_URL}/api/route?start_lat=${fromLat}&start_lng=${fromLng}&dest_lat=${toLat}&dest_lng=${toLng}&station_id=${encodeURIComponent(stationId)}`);
         if (resp.ok) {
           const data = await resp.json();
           if (data && data.polyline && isMounted) {
             const latLngs = data.polyline.map(pt => L.latLng(pt[0], pt[1]));
-            
-            // Render high-visibility glowing emerald emergency route polyline
+
             polylineLayer = L.polyline(latLngs, {
-              color: '#00e676',
-              weight: 6,
-              opacity: 0.95,
+              color,
+              weight,
+              opacity,
               lineCap: 'round',
-              lineJoin: 'round'
+              lineJoin: 'round',
+              ...(pane ? { pane } : {}),
             }).addTo(map);
 
             if (onRouteCalculatedRef.current) {
@@ -64,7 +91,7 @@ export function RoutingOverlay({ from, to, onRouteCalculated }) {
         }
       }
     };
-  }, [map, fromLat, fromLng, toLat, toLng]);
+  }, [map, fromLat, fromLng, toLat, toLng, stationId, color, weight, opacity, pane, paneZIndex]);
 
   return null;
 }

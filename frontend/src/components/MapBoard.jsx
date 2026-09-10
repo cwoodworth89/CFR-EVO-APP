@@ -10,6 +10,7 @@ import { RailroadCrossingsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
 import { CircleMarker, Tooltip } from 'react-leaflet';
 import { Header } from './hud/Header';
+import { useAdminSession } from '../hooks/useAdminSession';
 import { LeftSidebar } from './hud/LeftSidebar';
 import { RightSidebar } from './hud/RightSidebar';
 import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
@@ -66,6 +67,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   
   // APP/TERMINAL STATE
   const [appMode, setAppMode] = useState(initialMode);
+  const admin = useAdminSession();
 
   // Sync the initialMode prop into local state during render rather than in an
   // effect: an effect renders the stale mode once before correcting itself.
@@ -358,6 +360,16 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
       setRightSidebarOpen(false);
   }, [applyModeDefaults]);
 
+  // Locking while on the review screen returns to the map: the admin entry is gone from
+  // the select and the screen behind it is admin-only. Waits for the first session check,
+  // so a return from a review replay (initialMode ADMIN_DISPATCHES) is not bounced before
+  // the stored token has been verified.
+  useEffect(() => {
+    if (!(admin.checked && !admin.unlocked && appMode === 'ADMIN_DISPATCHES')) return undefined;
+    const id = window.setTimeout(() => startMode('EXPLORE'), 0);
+    return () => window.clearTimeout(id);
+  }, [admin.checked, admin.unlocked, appMode, startMode]);
+
   // One expression for which base layer is actually drawn, so the overlays that have to
   // read against it -- the zone numbers -- cannot disagree with it.
   const baseStyle = (appMode === "EXPLORE" && mapStyle === "SATELLITE") ? "SATELLITE" : "STREET";
@@ -377,6 +389,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
       
       <Header 
+        admin={admin}
         appMode={appMode} 
         setAppMode={startMode} 
         mapStyle={mapStyle} 
@@ -468,6 +481,8 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 nearestHydrants={nearestHydrants}
                 currentZoom={currentZoom}
                 originStation={STATIONS[homeHall]}
+                homeHall={homeHall}
+                routingMetrics={activeDispatch?.routing_metrics || []}
                 onRouteCalculated={setRouteCoordinates}
               />
             )}
@@ -507,6 +522,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 onStartPlacing={() => { setPlacingEntrance(true); setEntranceDraft(null); }}
                 onCancelPlacing={() => { setPlacingEntrance(false); setEntranceDraft(null); }}
                 onSaveEntrance={saveEntrance}
+                adminUnlocked={admin.unlocked}
                 onClose={() => setTargetAddress(null)}
               />
             }

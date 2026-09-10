@@ -26,6 +26,7 @@ each has a different notion of "correct".
 | **Parser** | Did we pull the right values out of what we heard? | [`backtest_parser_corpus.py`](../tools/backtest_parser_corpus.py) | ✅ Built 2026-08-26 |
 | **Geocoder** | Does the address resolve to the right place? | [`harness_chain.py --skip-stt`](../tools/harness_chain.py); [`trace_geocode_corpus.py`](../tools/trace_geocode_corpus.py) for the step ladder | ✅ Reviewed 2026-09-05 (§3) |
 | **Whole chain** | From the recording to the point on the map, built the way production builds it; every stage scored at once | [`harness_chain.py`](../tools/harness_chain.py) | ✅ Built 2026-09-05 |
+| **Routing** | Does the same corpus route the same way after a profile or graph change, and which routes moved? Not a correctness score: only the operator can say which road a crew takes | [`route_corpus_baseline.py`](../tools/route_corpus_baseline.py) | ✅ Built 2026-09-08 |
 
 The three are **not** interchangeable. Word Error Rate scores transcription and says nothing
 about whether the parser then dropped the qualifier off a call type. Every serious defect in

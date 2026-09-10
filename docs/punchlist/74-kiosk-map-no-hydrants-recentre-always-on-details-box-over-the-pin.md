@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN |
+| **Status** | DEFERRED |
 | **Severity** | crew-visible |
 | **Area** | 🖥️ Kiosk view |
 | **Blocks** | — |
@@ -12,8 +12,10 @@
 
 ---
 
-> **Status**: 🟡 **Built 2026-09-06, including the operator's hydrant rule (along the route
-> first); open on one thing only, where the dispatch-details box should live.**
+> **Status**: 🕓 **Deferred by the operator 2026-09-08.** Everything in this item is built and
+> live except where the dispatch-details box should live, and the operator is designing that
+> with Claude Design rather than in the code. The item reopens when the design arrives;
+> nothing here is waiting on an engineering decision.
 
 The operator's notes, verbatim in substance:
 
@@ -183,4 +185,7 @@ blinks like it should do something but it doesn't move at all."* Two causes, bot
    workstation it sometimes never started. A snap is a cut now (`animate: false`) on both
    maps. Verified on the workstation: zoom 18 held for fifteen seconds with the street and
    cadastral tiles loaded, the parcel shaded and the two picks badged.
+   **Confirmed on the kiosk by the operator, 2026-09-08**: *"Snap and shading look good on the
+   kiosk."* The snap, the parcel shading from the cadastral zoom and the picked hydrants are
+   all crew-visible now, seen on the screen the crew reads.
 

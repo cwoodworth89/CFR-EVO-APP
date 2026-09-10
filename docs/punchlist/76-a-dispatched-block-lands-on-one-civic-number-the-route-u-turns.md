@@ -12,8 +12,8 @@
 
 ---
 
-> **Status**: 🟡 **Built 2026-09-09 to the operator's ruling; live at the next agent
-> restart, which is the operator's to call.** Two block calls in 609, both placed wrongly in
+> **Status**: 🟡 **Built 2026-09-09 to the operator's ruling; live since the agent restart
+> of 2026-09-10 (operator: "Go ahead and restart").** Two block calls in 609, both placed wrongly in
 > a way crews cannot see. **Operator, 2026-09-09: *"A BLOCK flag should trigger a specific
 > form of geocoding, which finds the middle, or average spot of a city block."*** The block
 > step is in the geocoder, measured on both recorded calls (below). The block's extent is
@@ -144,5 +144,11 @@ boundary**, because that is what the announcement says.
 
 Answered 2026-09-09: the location is the block's middle (the operator's ruling above), so
 the section-ends question and the nominal-point question are closed.
+
+**Answered 2026-09-10.** Operator: *"I think we can find the midpoint of whatever is
+available."* Read as: the middle of whatever road data the block has, no finer rule wanted.
+The exact cut at the hundred-block boundary stays as built; if dispatch's "2500 block" turns
+out to reach further, the cut is one number. The agent was restarted the same day on the
+operator's word, so the step is live.
 
 <!-- audit-ok: services/gis/src/gis_service/normalization.py -- exists; named for the parser step -->

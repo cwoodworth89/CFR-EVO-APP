@@ -117,3 +117,33 @@ def test_overlong_house_with_no_street_stays_unresolved(resolver):
 
 def test_four_digit_house_is_not_step_1b(resolver):
     assert resolver.resolve_overlong_house("1300", "Pinetree Way", "Way") is None
+
+
+def test_block_midpoint_barnet_2500_block_lands_mid_block(engine, resolver, caplog):
+    """#76, the recorded call. "2500 Block Barnet Hwy": the western pair of segments carries
+    2534-2565 and the next pair 2574-2675, so the 2500 block is the pair plus the next
+    segment cut at 2599, about 600 m, and its middle is well east of 2534 at the block's end.
+    The longitudes are the segment ends read from public.roads on 2026-09-09 with a margin;
+    the assertion is "inside the block and not at its west end", nothing finer."""
+    with caplog.at_level("ERROR"):
+        point = resolver.resolve_block_midpoint("2500", "Barnet", "HWY")
+    assert "block midpoint" not in caplog.text, caplog.text
+    assert point is not None and point.get("location_type") == "block", point
+    assert point["address"] == "2500 Block Barnet Hwy"
+    assert point["block_range"] == "2534-2599", point["block_range"]
+    assert _inside_city(point), point
+    assert -122.8252 < point["lng"] < -122.8160, point["lng"]      # inside the block
+    assert point["lng"] > -122.8240, point["lng"]                   # not the 2534 west end
+    assert point["segment"] and point["length_m"] > 400, (point["length_m"], len(point["segment"]))
+
+
+def test_block_midpoint_ponderosa_1080_block_resolves(engine, resolver, caplog):
+    """#76, the other block call in the corpus (DISP-2026-266B57), which used to fall to
+    the street centroid."""
+    with caplog.at_level("ERROR"):
+        point = resolver.resolve_block_midpoint("1080", "Ponderosa", "ST")
+    assert "block midpoint" not in caplog.text, caplog.text
+    assert point is not None and point.get("location_type") == "block", point
+    assert point["address"] == "1000 Block Ponderosa St"
+    assert _inside_city(point), point
+    assert point["block_range"].startswith("10"), point["block_range"]

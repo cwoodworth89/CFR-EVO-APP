@@ -583,6 +583,176 @@ class AddressResolver:
             logging.error(f"Error in block interpolation: {e}", exc_info=True)
         return None
 
+    def resolve_block_midpoint(self, house: str, street_raw: str, street_type: str) -> dict | None:
+        """The middle of an announced block (punch-list #76).
+
+        Locution announces some locations as a block -- "2500 Block Barnet Hwy", "1080
+        Block Ponderosa St" -- meaning the hundred-block, not a civic number. Until
+        2026-09-09 the word was stripped and the number geocoded as an address: 2500 exists
+        nowhere on Barnet, so the ladder fell to the nearest civic number, 2534, the lowest
+        on the street, at the block's far end on the far carriageway, and E1's route
+        overshot it by 300 m and U-turned at the Ioco interchange (DISP-2026-AF6731).
+
+        Operator ruling 2026-09-09: "A BLOCK flag should trigger a specific form of
+        geocoding, which finds the middle, or average spot of a city block."
+
+        The block is the stretch of the street whose address ranges fall inside the
+        hundred-block, both sides. A segment whose range straddles the boundary (Barnet's
+        2574-2675 straddles the 2500 and 2600 blocks) is cut by interpolation at it, so
+        "2500 block" is civic 2500-2599 and nothing past: the assumption stated in #76, the
+        default until the operator says otherwise. The location is the point on the block
+        nearest the block's average position (length-weighted centroid), which on a divided
+        road lands on one carriageway. The address is the announced wording.
+
+        Direction assumption, as in resolve_block: left_begin/right_begin is the numbering
+        at the line's start node and left_end/right_end at its end. Checked on Barnet segment
+        1978 (2555 at the west end, the line's start; numbers rise eastward). A segment
+        numbered against its line direction still cuts correctly, because the fractions are
+        computed from the start number and ordered before ST_LineSubstring.
+
+        PROVENANCE for the hundred-block as the unit: the substitution bound in
+        resolve_nearest_civic -- Coquitlam civic numbering allocates one hundred-block per
+        block face, and Locution announces block-level locations that way. Nothing in
+        docs/standards/ governs it (CLAUDE.md 7.2); recorded there as a gap.
+        """
+        fullname = f"{street_raw} {street_type}".strip()
+        try:
+            house_num = int(house)
+        except (ValueError, TypeError):
+            return None
+        block_lo = (house_num // 100) * 100     # the hundred-block the announcement names
+        block_hi = block_lo + 99
+
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text("""
+                    WITH segs AS (
+                        SELECT id,
+                               ST_LineMerge(geom) AS g,
+                               COALESCE(left_begin, right_begin) AS s_num,
+                               COALESCE(left_end,   right_end)   AS e_num,
+                               LEAST(left_begin, left_end, right_begin, right_end)    AS lo_all,
+                               GREATEST(left_begin, left_end, right_begin, right_end) AS hi_all
+                        FROM public.roads
+                        WHERE (UPPER(fullname) = UPPER(:fullname) OR UPPER(roadname) = UPPER(:street_name))
+                          AND COALESCE(left_begin, right_begin) IS NOT NULL
+                          AND COALESCE(left_end,   right_end)   IS NOT NULL
+                    ),
+                    inblock AS (
+                        SELECT id, s_num, e_num, lo_all, hi_all,
+                               LEAST(s_num, e_num) AS lo, GREATEST(s_num, e_num) AS hi,
+                               CASE WHEN GeometryType(g) = 'LINESTRING' THEN g
+                                    ELSE (SELECT d.geom FROM ST_Dump(g) AS d
+                                          ORDER BY ST_Length(d.geom) DESC LIMIT 1)
+                               END AS line
+                        FROM segs
+                        WHERE lo_all <= :hi AND hi_all >= :lo
+                    ),
+                    fr AS (
+                        SELECT *,
+                               (GREATEST(lo, :lo) - s_num)::float / NULLIF(e_num - s_num, 0) AS fa,
+                               (LEAST(hi, :hi)    - s_num)::float / NULLIF(e_num - s_num, 0) AS fb
+                        FROM inblock
+                    ),
+                    cut AS (
+                        SELECT id, GREATEST(lo_all, :lo) AS civic_lo, LEAST(hi_all, :hi) AS civic_hi,
+                               CASE WHEN fa IS NULL THEN line
+                                    ELSE ST_LineSubstring(line,
+                                            LEAST(GREATEST(LEAST(fa, fb), 0.0), 1.0),
+                                            LEAST(GREATEST(GREATEST(fa, fb), 0.0), 1.0))
+                               END AS piece
+                        FROM fr
+                    ),
+                    runs AS (
+                        -- Pieces that touch chain into one run; a divided road's carriageways
+                        -- stay apart (0.00003 deg is about 3 m; carriageways sit 10 m or more
+                        -- apart). ST_LineMerge alone left two consecutive records on Barnet's
+                        -- south side unmerged, which would have made three "carriageways".
+                        -- ST_CollectionExtract(.., 2): each cluster as a MultiLineString, since
+                        -- GeoJSON cannot serialise a collection of collections.
+                        SELECT ST_CollectionExtract(c, 2) AS g
+                        FROM (SELECT unnest(ST_ClusterWithin(piece, 0.00003)) AS c
+                                FROM cut
+                               WHERE piece IS NOT NULL AND NOT ST_IsEmpty(piece) AND ST_Dimension(piece) = 1) x
+                    ),
+                    blk AS (SELECT ST_CollectionExtract(ST_Collect(g), 2) AS g FROM runs)
+                    SELECT ST_AsGeoJSON(blk.g) AS geo,
+                           -- The block's length along the street: the longest run, not the sum,
+                           -- which on a divided road counts both carriageways (Barnet: 1,187 m
+                           -- summed, 593 m along).
+                           (SELECT MAX(ST_Length(g::geography)) FROM runs) AS len_m,
+                           ST_Y(ST_ClosestPoint(blk.g, ST_Centroid(blk.g))) AS lat,
+                           ST_X(ST_ClosestPoint(blk.g, ST_Centroid(blk.g))) AS lng,
+                           (SELECT MIN(civic_lo) FROM cut) AS civic_lo,
+                           (SELECT MAX(civic_hi) FROM cut) AS civic_hi,
+                           (SELECT COUNT(*) FROM runs) AS pieces,
+                           -- The middle of each run: on a divided road, one per carriageway.
+                           -- Routing aims each unit at the one nearer its hall, which is the
+                           -- side it arrives on, so an engine coming westbound is not sent past
+                           -- the block to U-turn back onto the eastbound side.
+                           (SELECT json_agg(json_build_array(ST_X(ST_ClosestPoint(g, ST_Centroid(g))),
+                                                             ST_Y(ST_ClosestPoint(g, ST_Centroid(g)))))
+                              FROM runs) AS mids
+                    FROM blk
+                    WHERE blk.g IS NOT NULL;
+                """), {"fullname": fullname, "street_name": street_raw,
+                       "lo": block_lo, "hi": block_hi}).mappings().fetchone()
+                if not row or not row["geo"] or row["lat"] is None:
+                    return None
+
+                import json
+                geo = json.loads(row["geo"])
+                lines = []
+                def _collect(g):
+                    if g["type"] == "LineString":
+                        lines.append(g["coordinates"])
+                    elif g["type"] == "MultiLineString":
+                        lines.extend(g["coordinates"])
+                    elif g["type"] == "GeometryCollection":
+                        for part in g.get("geometries", []):
+                            _collect(part)
+                _collect(geo)
+                lines = [ln for ln in lines if ln]
+                if not lines:
+                    return None
+
+                announced = title_address(f"{block_lo} BLOCK {fullname}".strip())
+                length_m = int(round(float(row["len_m"] or 0)))
+                mids = row["mids"] if isinstance(row["mids"], list) else json.loads(row["mids"] or "[]")
+                mids = [[float(m[0]), float(m[1])] for m in mids if m and len(m) == 2]
+                civic_lo, civic_hi = int(row["civic_lo"]), int(row["civic_hi"])
+                return {
+                    "address": announced,
+                    "lat": float(row["lat"]),
+                    "lng": float(row["lng"]),
+                    "rings": [],
+                    # The same rung as block interpolation: a position on the street from
+                    # the road's address ranges, not a property.
+                    "confidence": 70.0,
+                    "location_type": "block",
+                    "segment": lines,                     # [[ [lng,lat], ... ], ...]
+                    "length_m": length_m,
+                    "block_range": f"{civic_lo}-{civic_hi}",
+                    # Divided road: the middle of each carriageway, as destination options
+                    # for routing (the same contract a street section uses; each unit goes
+                    # to the one nearer its own hall). Measured 2026-09-09 on DISP-2026-AF6731:
+                    # the single middle landed on the south carriageway and E1's route still
+                    # ran 430 m past it to U-turn at Ioco Road; the north carriageway's middle
+                    # is reached westbound with no loop. One carriageway: no options, the pin.
+                    "endpoints": mids if len(mids) > 1 else None,
+                    "is_block_midpoint": True,
+                    "requested_address": announced,
+                    "resolution_note": (
+                        f"Announced as the {block_lo} block of {title_address(fullname)}, not a "
+                        f"civic address. The pin is the middle of the block (civic "
+                        f"{civic_lo}\u2013{civic_hi}, {length_m} m). Verify on arrival."
+                    ),
+                    "is_ambiguous": False,
+                }
+        except Exception as e:
+            logging.error(f"Error in block midpoint resolution: {e}", exc_info=True)
+        return None
+
     def resolve_x_street_narrow(self, street: str, street_type: str,
                                   x_street_1: str = None, x_street_2: str = None) -> dict | None:
         """Step 4: Narrow location using nearby cross streets.

@@ -77,6 +77,7 @@ no WAN.
 
 | Subsystem | Governing standard (expected) | Status | Notes |
 |:--|:--|:--|:--|
+| An announced block's extent and its middle (#76) | City of Coquitlam civic numbering, one hundred-block per block face; no published rule for where a block starts and ends | ⚠️ NOT HELD | The geocoder's block step (`resolve_block_midpoint`) takes civic N00–N99 on both sides, cuts a segment whose range straddles the boundary by interpolation, and places the pin at the block's length-weighted middle. The middle is the operator's ruling (2026-09-09); the extent is the stated assumption, municipal-data-derived (CLAUDE.md 7.2). |
 | Road centrelines, address points, service boundaries | NENA NG9-1-1 GIS Data Model | ⚠️ NOT HELD | Closest thing to a governing spec for `public.roads`, `public.parcels`, `public.zones` and the derived `public.intersections`. Confirm the current revision and whether it defines an intersection layer (believed not — junctions are derived). |
 | Alarm processing & dispatch time objectives | NFPA 1225 (formerly NFPA 1221) | ⚠️ NOT HELD | Governs the dispatch pipeline itself. Not currently referenced anywhere in the project. |
 | Turnout & response time objectives | NFPA 1710 | ⚠️ NOT HELD | Cited by name in `docs/PROJECT_IDEAS.md`; the document itself is not held and no clause is cited. |

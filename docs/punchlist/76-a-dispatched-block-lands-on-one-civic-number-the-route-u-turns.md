@@ -12,12 +12,13 @@
 
 ---
 
-> **Status**: 🔴 **Open, verified 2026-09-09; the operator has ruled the shape.** Two block
-> calls in 609. Both were placed wrongly in a way crews cannot see: one at the lowest civic
-> number in the block on the far carriageway of a divided highway, one at the street's
-> centroid. **Operator, 2026-09-09: *"A BLOCK flag should trigger a specific form of
-> geocoding, which finds the middle, or average spot of a city block."*** Building to that;
-> one question on the block's extent remains below.
+> **Status**: 🟡 **Built 2026-09-09 to the operator's ruling; live at the next agent
+> restart, which is the operator's to call.** Two block calls in 609, both placed wrongly in
+> a way crews cannot see. **Operator, 2026-09-09: *"A BLOCK flag should trigger a specific
+> form of geocoding, which finds the middle, or average spot of a city block."*** The block
+> step is in the geocoder, measured on both recorded calls (below). The block's extent is
+> the stated default, civic N00–N99, until the operator says otherwise. Closes when a block
+> call has come through the live pipeline, or the operator replays one and says so.
 
 ## What the operator saw
 
@@ -99,6 +100,36 @@ test is the replay of DISP-2026-AF6731 after the build: if the route still turns
 Road, the next step is to hand OSRM the midpoint of each carriageway and keep the shorter
 route. The routing stream's alternative, the whole block as a section with each unit sent to
 its nearer end, is recorded above and not chosen.
+
+## Built and measured, 2026-09-09
+
+`resolve_block_midpoint` in `address_resolver.py`, called as step 0 of `get_coordinates`,
+before the exact-parcel step, whenever the parser flagged a block. Both maps draw the block
+as the amber dashed stretch a street section gets; the kiosk's SNAP TO CALL fits the whole
+block; the review raises `BLOCK_MIDPOINT` (ruled by the verified address) in place of
+LOCATION_SUBSTITUTED. Node and Python tests: 49 pass in the three touched suites, two of
+them live against the kiosk database.
+
+| Call, as announced | Before | Now |
+|:--|:--|:--|
+| *2500 Block Barnet Hwy* (DISP-2026-AF6731) | 2534 Barnet Hwy, the block's west end, south carriageway | **2500 Block Barnet Hwy**, civic 2534–2599, 594 m along, pin at the middle |
+| *1080 Block Ponderosa St* (DISP-2026-266B57) | the street centroid, no block shown | **1000 Block Ponderosa St**, civic 1000–1099, 283 m, pin at the middle |
+
+**The divided-road limit, measured and answered.** The block's single middle landed on the
+south carriageway and Hall 1's route still ran 429 m past it to U-turn at Ioco Road
+(4,451 m). So on a divided road the step also returns the middle of each carriageway as
+`endpoints`, the contract a street section already uses: `payload_builder` hands them to
+routing as destination options and `routing_engine` sends each unit to the one nearer its
+own hall, which is the side it arrives on. Hall 1 to the north carriageway's middle on the
+kiosk's OSRM: **3,574 m, 312 s, no U-turn, no overshoot**, against 4,451 m and 400 s with
+the loop. An undivided street returns no options and routes to the pin: pieces that touch
+are clustered into one run first (ST_ClusterWithin, about 3 m), because two consecutive
+records on Barnet's south side did not merge and would otherwise have read as a third
+carriageway, and on Ponderosa as two half-blocks.
+
+**For the routing stream, one line in its file**: `destination_note` on a block call still
+reads *"Street section: routed to the nearer end of the highlighted stretch"*; on a block it
+is the nearer carriageway's middle. Wording only.
 
 ## The one question left (CLAUDE.md 7.6)
 

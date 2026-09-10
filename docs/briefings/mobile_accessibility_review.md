@@ -621,6 +621,16 @@ header, its hydrant onto the map, its arrival-point ruling into a notices row.
   bottom, so the column scrolls there and nowhere else. The tiles are tabs, 56 dvh tall.
 * **3C, the expand state, is not built**; EXPAND opens the existing full-screen view.
 
+**Ruled 2026-09-09, on seeing the render** (quotes the operator's):
+
+| Asked | Ruled | Built |
+|:--|:--|:--|
+| Feet or metres for hydrant distances | *"All hydrant distances in ft, as we use ft for hose lay lengths."* | Every hydrant distance the crew reads is feet: the card, the map badge tooltips, the console's address card and dispatch panel. The picker still measures in metres and `metresToFeet` converts at the point of display (1 ft = 0.3048 m exactly). |
+| The TV-mode toggle | *"We're going to move away from tv-mode toggle and have a responsive design."* | `isTvMode` and `toggleTvMode` removed from `useKioskQueue`; sizing is Tailwind's responsive prefixes only (the ergonomics skill records what the toggle did). |
+| Which unit leads the units card | *"First due is most important and tells who's closest."* | The large slot is the unit with the shortest OSRM ETA, the rest follow by ETA; units the router did not measure keep dispatched order after them, with `--:--`. Nothing is estimated to rank them. |
+| The expand state | *"I want to keep the same style function where expanding opens the PIP over the map. Maybe it makes sense to swap the pip into the main viewport, and the route into the small pip?"* | The full-screen expand stays. The swap is artboard 3C as drawn (the tile takes the body, the header stays, the route map becomes a tile in the column); asked back as a question before building, since it was offered as a maybe. |
+| The phone | *"I'll dial in the phone stuff later."* | The scrolling column below `lg` stands as the interim; §8's alert screen waits. |
+
 **Checked.** `npm run lint:crash`, `npm run test:node` (40 tests, 12 new), `npm run build`:
 green. `frontend/scripts/viewport_smoke.mjs` gained a dispatch pass: with `--dispatch` and
 `--api` it fetches a **real** dispatch record from the kiosk's API, hands it to the app

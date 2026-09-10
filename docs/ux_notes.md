@@ -199,6 +199,12 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
   **off** the basemap, because that toggle draws the cadastral overlay and its own names.
 * **The marker is where the truck stops** — the city-to-private transition. Distances to it
   are distances the crew will walk or lay hose.
+* **Hydrant distances are in feet**, everywhere the crew reads one (operator, 2026-09-09:
+  *"we use ft for hose lay lengths"*). The picker measures in metres; `utils/hydrantCard.js`
+  converts at the point of display, 1 ft = 0.3048 m exactly. Route distances stay in km, as
+  OSRM and the odometer report them.
+* **No TV mode.** Sizing is responsive by viewport width, never by a per-call toggle
+  (operator, 2026-09-09).
 
 ### Hydrants, as ruled
 

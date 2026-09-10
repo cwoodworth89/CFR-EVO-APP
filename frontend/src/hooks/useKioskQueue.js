@@ -66,7 +66,6 @@ export function useKioskQueue({ autoDismiss = true } = {}) {
   const [isReviewMode, setIsReviewMode] = useState(false);
   // How the last active call ended: { reason: 'manual' | 'timeout', at } (#37).
   const [lastDismiss, setLastDismiss] = useState(null);
-  const [isTvMode, setIsTvMode] = useState(false);
   const [isRecentlyUpdated, setIsRecentlyUpdated] = useState(false);
   // Which operator-visible fields changed, for the badge tooltip. Empty when idle.
   const [updatedFields, setUpdatedFields] = useState([]);
@@ -379,10 +378,6 @@ export function useKioskQueue({ autoDismiss = true } = {}) {
     setQueuedCalls([]);
   }, []);
 
-  const toggleTvMode = useCallback(() => {
-    setIsTvMode((prev) => !prev);
-  }, []);
-
   // Format seconds to mm:ss or hh:mm:ss
   const formatTime = (secs) => {
     const h = Math.floor(secs / 3600);
@@ -399,7 +394,6 @@ export function useKioskQueue({ autoDismiss = true } = {}) {
     queuedCalls,
     isReviewMode,
     lastDismiss,
-    isTvMode,
     isRecentlyUpdated,
     updatedFields,
     elapsedFormatted: formatTime(elapsedSeconds),
@@ -412,6 +406,5 @@ export function useKioskQueue({ autoDismiss = true } = {}) {
     dismissActiveCall,
     triggerReviewCall,
     exitReview,
-    toggleTvMode,
   };
 }

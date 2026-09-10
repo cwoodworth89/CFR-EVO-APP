@@ -75,11 +75,13 @@ banner. It is consumed only by `ActiveAlertBanner`, where it bumps two headings:
 
 It also hides the dismiss button, so a wall display cannot be cleared by a passer-by.
 
-**Since 2026-09-09 the toggle is not rendered**: artboard 3A demotes it (*"a deployment
-setting, not a per-call control"*), so the header no longer reads `isTvMode` and the state
-in `useKioskQueue` is unreachable. The table above records what it did.
+**Removed 2026-09-09.** Artboard 3A demoted the toggle (*"a deployment setting, not a
+per-call control"*) and the operator ruled the same day: *"We're going to move away from
+tv-mode toggle and have a responsive design."* `isTvMode` and `toggleTvMode` are gone from
+`useKioskQueue`; the table above records what the toggle did. Sizing is Tailwind's
+responsive prefixes and nothing else.
 
-That is the whole feature. If display-type switching is ever wanted, `isTvMode` is the
+That was the whole feature. If display-type switching is ever wanted again, a hook like it is the
 hook to extend — not a new parallel mechanism.
 
 ### The phone layout (built 2026-09-09)

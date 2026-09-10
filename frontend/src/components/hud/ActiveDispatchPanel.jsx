@@ -1,3 +1,4 @@
+import { metresToFeet } from '../../utils/hydrantCard';
 import React from 'react';
 import SatelliteMiniMap from './SatelliteMiniMap';
 
@@ -98,7 +99,7 @@ export default function ActiveDispatchPanel({ activeDispatch, setActiveDispatch,
                     )}
                   </div>
                   <div className="text-right">
-                    <div className="font-extrabold text-emerald-400 font-mono">{hyd.distance}m</div>
+                    <div className="font-extrabold text-emerald-400 font-mono">{metresToFeet(hyd.distance) ?? '--'} ft</div>
                     <div className="text-[8px] text-slate-500 font-extrabold uppercase font-mono">Distance</div>
                   </div>
                 </div>

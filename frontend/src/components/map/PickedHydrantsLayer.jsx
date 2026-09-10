@@ -1,4 +1,4 @@
-import { HYDRANT_CLASS_COLOUR } from '../../utils/hydrantCard';
+import { HYDRANT_CLASS_COLOUR, metresToFeet } from '../../utils/hydrantCard';
 import React, { useMemo } from 'react';
 import { Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
@@ -46,7 +46,8 @@ export default function PickedHydrantsLayer({ picks = [] }) {
           <Marker key={h.gisId || i} position={[Number(h.lat), Number(h.lng)]} icon={icons[i]} zIndexOffset={1000}>
             <Tooltip direction="top" offset={[0, -12]}>
               <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 800, fontSize: 11 }}>
-                #{i + 1} {h.gisId} {fc || 'UNRATED'}{isPrivate ? ' PRIVATE' : ''} · {h.distance} m
+                {/* Feet: hose is laid in feet (operator, 2026-09-09: "we use ft for hose lay lengths"). */}
+                #{i + 1} {h.gisId} {fc || 'UNRATED'}{isPrivate ? ' PRIVATE' : ''} · {metresToFeet(h.distance) ?? '--'} ft
               </span>
             </Tooltip>
           </Marker>

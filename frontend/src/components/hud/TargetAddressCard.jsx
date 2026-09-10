@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { metresToFeet } from '../../utils/hydrantCard';
 
 /**
  * Address summary for the workstation inspection stack: the searched target, its building
@@ -175,7 +176,8 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
               </span>
               <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
                 <span className="text-slate-400">ID / Distance</span>
-                <span className="text-white font-black">{nearest.gisId} ({nearest.distance} m{nearest.how === 'doorstep' ? ', within a 50 ft roll' : nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
+                {/* Feet, as hose is laid (operator, 2026-09-09); the picker measures in metres. */}
+                <span className="text-white font-black">{nearest.gisId} ({metresToFeet(nearest.distance) ?? '--'} ft{nearest.how === 'doorstep' ? ', within a 50 ft roll' : nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
               </div>
               {nearest.flowClass && (
                 <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">

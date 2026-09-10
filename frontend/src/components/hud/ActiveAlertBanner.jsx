@@ -10,8 +10,9 @@ import { hallColour, UNASSIGNED_HALL_COLOUR } from '../MapConstants';
  *
  *   the call      address and grid, the subaddress, NEAR the cross streets, the incident,
  *                 the talk group -- what the run sheet reads out;
- *   the units     the first dispatched unit large with its road distance and ETA, the rest
- *                 in a two-column grid, every ETA OSRM's from the stored routing_metrics;
+ *   the units     the first-due unit (shortest OSRM ETA) large with its road distance and
+ *                 ETA, the rest by ETA in a two-column grid, every figure from the stored
+ *                 routing_metrics;
  *   the clock     elapsed, the auto-dismiss state, REVIEW REPLAY and EXIT REVIEW or CLEAR.
  *
  * Below `lg` (a phone or an upright tablet) the same three cards stack, the call first.
@@ -127,15 +128,26 @@ export default function ActiveAlertBanner({
   const near = nearLine(activeCall);
   const subaddress = activeCall.subaddress || activeCall.target?.subaddress || null;
 
-  // The dispatched units in dispatched order, each with OSRM's figures where the record has
-  // them. Built from the unit list rather than from the metrics so a unit the router never
-  // measured is still listed, with '--:--' beside it, instead of vanishing.
+  // The dispatched units, each with OSRM's figures where the record has them. Built from the
+  // unit list rather than from the metrics so a unit the router never measured is still
+  // listed, with '--:--' beside it, instead of vanishing.
+  //
+  // Order: first due first. Operator, 2026-09-09: "First due is most important and tells
+  // who's closest" -- so the large slot is the unit with the shortest OSRM ETA and the rest
+  // follow by ETA. Units the router did not measure keep their dispatched order after them;
+  // nothing is estimated to rank them. Ties keep dispatched order (the sort is stable).
   const metricsByUnit = new Map(unitEtas.map((e) => [String(e.unit).toUpperCase(), e]));
   const names = unitList.length ? unitList : unitEtas.map((e) => e.unit);
-  const units = names.map((u) => {
-    const m = metricsByUnit.get(String(u).toUpperCase());
-    return { unit: u, etaMin: m?.etaMin ?? null, distKm: m?.distKm ?? null, hallId: m?.hallId ?? null };
-  });
+  const units = names
+    .map((u) => {
+      const m = metricsByUnit.get(String(u).toUpperCase());
+      return { unit: u, etaMin: m?.etaMin ?? null, distKm: m?.distKm ?? null, hallId: m?.hallId ?? null };
+    })
+    .sort((a, b) => {
+      const ea = a.etaMin == null ? Infinity : Number(a.etaMin);
+      const eb = b.etaMin == null ? Infinity : Number(b.etaMin);
+      return ea - eb;
+    });
   const [hero, ...rest] = units;
 
   return (

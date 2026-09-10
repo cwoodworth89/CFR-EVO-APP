@@ -7,6 +7,9 @@ import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { STATIONS } from '../MapConstants';
 import { useCompactViewport } from '../../hooks/useCompactViewport';
+import { useArrivalPoint } from '../../hooks/useArrivalPoint';
+import ArrivalPointSection from '../hud/ArrivalPointSection';
+import { sanitizeAddress } from '../../utils/addressUtils';
 
 // The hall this display belongs to. Operator, 2026-09-09: "the hall is going to be hard-coded
 // per kiosk deployment in the .env file" -- VITE_DEFAULT_HALL in frontend/.env.local, read at
@@ -63,6 +66,14 @@ export default function KioskView({ kioskState }) {
   const [snapRequest, setSnapRequest] = useState(0);
   // Below `lg`, a phone or an upright tablet: the layout stacks, the detail tiles become tabs.
   const compact = useCompactViewport();
+
+  // A review replay is the operator alone, reached through the admin-unlocked review screen,
+  // so the arrival point can be set from the call already on the screen rather than by
+  // backing out and searching the address again (operator, 2026-09-10). Gated on the replay
+  // and not on the padlock, at the operator's word -- but a LIVE call renders none of this:
+  // the crew is watching that one and nobody unlocked anything to put it there.
+  const isReview = isReviewMode || Boolean(activeCall?.isReview);
+  const arrival = useArrivalPoint({ address: isReview ? sanitizeAddress(activeCall?.address || '') : '' });
 
   // There is no no-call branch here on purpose. KioskView is only ever mounted with a
   // call on it: App.jsx sends the screen back to STANDBY (the console) the moment
@@ -294,6 +305,7 @@ export default function KioskView({ kioskState }) {
             compact={compact}
             onHydrantModel={setHydrantModel}
             snapRequest={snapRequest}
+            arrival={isReview ? arrival : null}
           />
         </section>
 
@@ -302,7 +314,31 @@ export default function KioskView({ kioskState }) {
             addresses and the hydrants at the same zoom, on the map the crew is already reading.
             On a phone the tiles are tabs under the map, a little over half a screen tall. */}
         <section className="h-[56dvh] lg:h-auto flex-shrink-0 lg:flex-none lg:w-[clamp(360px,38.5%,740px)] min-h-0">
-          <DetailStack call={activeCall} compact={compact} />
+          <DetailStack
+            call={activeCall}
+            compact={compact}
+            topCard={isReview ? (
+              <div className="flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 lg:px-4 lg:py-3">
+                <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
+                  <span className="font-mono font-bold text-[10px] tracking-[0.16em] uppercase text-slate-400">Arrival point</span>
+                  {/* The parcel row is the system of record for every future call to this
+                      address, so a ruling made while replaying an old call is a production
+                      change, not one scoped to the replay. Say so where it is made. */}
+                  <span className="font-mono text-[10px] text-amber-300/90">Applies to the next call at this address</span>
+                </div>
+                <ArrivalPointSection
+                  standalone
+                  parcel={arrival.parcel}
+                  placing={arrival.placing}
+                  draft={arrival.draft}
+                  onStart={arrival.start}
+                  onCancel={arrival.cancel}
+                  onSave={arrival.save}
+                  canEdit
+                />
+              </div>
+            ) : null}
+          />
         </section>
       </main>
 

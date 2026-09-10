@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Marker, Popup, Polygon, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { Marker, Popup, Polygon, Polyline, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
 import HallRoutesOverlay from '../map/HallRoutesOverlay';
@@ -11,6 +11,7 @@ import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
 import { hydrantCardModel } from '../../utils/hydrantCard';
 import { routeFitOptions, snapFitOptions } from '../map/fitPadding';
+import { MapClickEvents } from '../MapActions';
 
 // The chrome over the map (artboard 3A of the operator's Claude Design canvas): the route
 // pill top left, the control stack top right in one fixed order, the hydrant card bottom
@@ -97,7 +98,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0 }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -399,6 +400,21 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
         hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
+
+        {/* Setting an arrival point from a review replay (punch-list #49, operator
+            2026-09-10): while placing, a click on this map is the point the truck should
+            stop at, and the draft pin shows where it landed until it is saved. Only the
+            dispatch display in review mode passes `arrival`; a live call passes none. */}
+        {arrival?.placing && <MapClickEvents onMapClick={arrival.onMapClick} />}
+        {arrival?.draft && (
+          <CircleMarker
+            center={[arrival.draft.lat, arrival.draft.lng]}
+            radius={10}
+            pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.9, weight: 3, dashArray: '4 3' }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (unsaved)</Tooltip>
+          </CircleMarker>
+        )}
         <ZoomWatcher onZoom={setMapZoom} />
 
         {/* The parcel outline, soft blue, as the workstation draws it: rings of [lng, lat]

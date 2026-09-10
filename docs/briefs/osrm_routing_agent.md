@@ -136,6 +136,44 @@ is to make routing **right for fire apparatus and right for this city**, on evid
    table is the one thing still unsourced. The item closes on the operator's word, or stays
    open on any dispatch id they name with a route they would not drive.
 
+## Stay in Coquitlam — measured 2026-09-09, awaiting the factor ruling
+
+Operator, 2026-09-09: *"Staying in the city may actually be a city operational requirement"*;
+the traffic-light preemption system works only in the City ("most or all lights"); use *"the
+city boundary + 100m. That way we cleanly get all the city streets, but it wouldn't take a big
+tour through another city."*
+
+**Mechanism** (OSRM's own, verified on the pinned binary and source; the wiki page *Using
+location dependent data in profiles* is the only documentation, `docs/profiles.md` does not
+mention it): `backend/scripts/export_routing_polygon.py` writes `public.city_boundary` buffered
+100 m as GeoJSON at every build; `osrm-extract --location-dependent-data` takes it;
+`apparatus.lua` scales the routing **rate** of every way whose last node is outside it by
+`CFR_CITY_LIMITS_FACTOR`. Weight rises, duration does not, so the ETA stays the true time along
+the route drawn (`docs/profiles.md`, *Understanding speed, weight and rate*).
+
+**Why the buffer**: on the 2,248 deployed routes the raw boundary flags 369 (every boundary
+road); the 100 m buffer flags 25, 23 of them by more than 500 m — the real tours. Three trial
+graphs, recorded as `routing` rows against the deployed row:
+
+| Factor | Routes moved | From a responding hall | Still >500 m outside | Largest cost to stay in |
+|--:|--:|--:|--:|:--|
+| 0.5 | 18 | 3 | 6 | 770 Ingersoll Ave from Hall 1, +118 s; 2500 Block Barnet Hwy from Hall 3 stays 741 m outside at +36 s |
+| 0.25 | 23 | 4 | 4 | 2500 Block Barnet Hwy from Hall 3, +143 s (289 m outside left, at the address) |
+| 0.1 | 29 | 6 | 4 | the same, plus 2925 Barnet Hwy from all four halls at +13 s for no gain: an edge artefact of the last-node rule |
+
+What every factor fixes: 808 Miller Ave and 770 Ingersoll Ave from Hall 1 go Mariner Way → Como
+Lake instead of through Port Moody (+51 s, +118 s); 39 and 1550 United Blvd from Hall 4 go
+Lougheed → King Edward instead of through Port Coquitlam (+50 s, 8.8 km outside → 0); eleven
+Hall 3 routes to Falcon Dr, Harrier Dr and Runnel Dr go Linton → Como Lake → Mariner → Barnet
+instead of Gatensbury → Grant St through Port Moody (+16 to +23 s). What no factor changes: 3700
+Hastings St, whose last 529 m are beyond the polygon at the address itself.
+
+**Recommendation to the operator**: 0.25. It moves exactly the tours and nothing else; 0.1 adds
+edge artefacts; 0.5 leaves the Barnet Hwy 2500 block partly in Port Moody. The one price worth a
+look is 2500 Block Barnet Hwy from Hall 3 at +2.4 min. Once ruled, the factor becomes the
+default in `apparatus.lua` with the ruling as its provenance, and the deploy is the same as
+2026-09-09 morning's.
+
 ## First hour, as originally written
 
 1. On the kiosk: `docker exec cfr_osrm ls /data`, the `.osrm.timestamp`, and which profile

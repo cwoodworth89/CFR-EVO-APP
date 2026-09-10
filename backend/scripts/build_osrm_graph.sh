@@ -3,6 +3,12 @@
 # graph being served, and record what built it.
 #
 #   backend/scripts/build_osrm_graph.sh backend/osrm/profiles/apparatus.lua apparatus
+#   CFR_CITY_LIMITS_FACTOR=0.25 backend/scripts/build_osrm_graph.sh backend/osrm/profiles/apparatus.lua apparatus city
+#
+# A third argument "city" regenerates the City polygon (public.city_boundary + 100 m,
+# backend/scripts/export_routing_polygon.py) and passes it to osrm-extract as
+# --location-dependent-data; CFR_CITY_LIMITS_FACTOR is the rate factor the profile applies to
+# ways outside it (apparatus.lua, city_limits_factor). Both are recorded in <name>.build.txt.
 #
 # Writes backend/data/osrm/<name>.osrm.* from backend/data/osrm/vancouver.osm.pbf, and
 # backend/data/osrm/<name>.build.txt: image digest, profile md5, extract, command, time. The
@@ -17,10 +23,11 @@
 #       <image> osrm-routed --algorithm mld /data/<name>.osrm
 #
 # CFR_ROOT overrides the repository root (for a copy of this script run from elsewhere);
-# OSRM_IMAGE overrides the image.
+# EXPORT_SCRIPT the polygon exporter's path; OSRM_IMAGE the image.
 set -euo pipefail
-PROFILE=${1:?usage: build_osrm_graph.sh <profile.lua> <name>}
-NAME=${2:?usage: build_osrm_graph.sh <profile.lua> <name>}
+PROFILE=${1:?usage: build_osrm_graph.sh <profile.lua> <name> [city]}
+NAME=${2:?usage: build_osrm_graph.sh <profile.lua> <name> [city]}
+WITH_CITY=${3:-}
 ROOT=${CFR_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}
 DATA="$ROOT/backend/data/osrm"
 # The image that built the graph served since 2026-08-14, by digest (docs/standards/osrm/README.md).
@@ -37,12 +44,26 @@ PROFILE_NAME=$(basename "$PROFILE")
 # graph's name: same bytes, no copy, and vancouver.osrm.* is never written to.
 ln -f "$PBF" "$DATA/$NAME.osm.pbf"
 
+# The City polygon, regenerated from the database at every build so it cannot drift from
+# public.city_boundary. The profile's factor reaches the container as an environment variable.
+LOC_ARGS=()
+ENV_ARGS=()
+POLY_NOTE="location data: none (city_limits_factor off)"
+if [ "$WITH_CITY" = "city" ]; then
+  POLY="$DATA/coquitlam_plus_100m.geojson"
+  "$ROOT/.venv/bin/python" "${EXPORT_SCRIPT:-$ROOT/backend/scripts/export_routing_polygon.py}" --buffer-m 100 --out "$POLY"
+  LOC_ARGS=(--location-dependent-data "/data/$(basename "$POLY")")
+  : "${CFR_CITY_LIMITS_FACTOR:?CFR_CITY_LIMITS_FACTOR must be set when building with the city polygon}"
+  ENV_ARGS=(-e "CFR_CITY_LIMITS_FACTOR=$CFR_CITY_LIMITS_FACTOR")
+  POLY_NOTE="location data: $POLY md5 $(md5sum "$POLY" | cut -d' ' -f1); CFR_CITY_LIMITS_FACTOR=$CFR_CITY_LIMITS_FACTOR"
+fi
+
 # The profile is mounted into /opt so that its require('lib/...') resolves to the image's own
 # lib/, the text vendored at docs/standards/osrm/lib/.
-run() { docker run --rm -v "$DATA:/data" -v "$PROFILE_ABS:/opt/$PROFILE_NAME:ro" "$IMAGE" "$@"; }
+run() { docker run --rm ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} -v "$DATA:/data" -v "$PROFILE_ABS:/opt/$PROFILE_NAME:ro" "$IMAGE" "$@"; }
 
 START=$(date -Is)
-run osrm-extract -p "/opt/$PROFILE_NAME" "/data/$NAME.osm.pbf"
+run osrm-extract -p "/opt/$PROFILE_NAME" ${LOC_ARGS[@]+"${LOC_ARGS[@]}"} "/data/$NAME.osm.pbf"
 run osrm-partition "/data/$NAME.osrm"
 run osrm-customize "/data/$NAME.osrm"
 {
@@ -51,6 +72,7 @@ run osrm-customize "/data/$NAME.osrm"
   echo "image: $IMAGE"
   echo "profile: $PROFILE_ABS md5 $(md5sum "$PROFILE_ABS" | cut -d' ' -f1)"
   echo "extract: $PBF $(stat -c '%s bytes, modified %y' "$PBF")"
-  echo "command: osrm-extract -p /opt/$PROFILE_NAME /data/$NAME.osm.pbf; osrm-partition /data/$NAME.osrm; osrm-customize /data/$NAME.osrm"
+  echo "$POLY_NOTE"
+  echo "command: osrm-extract -p /opt/$PROFILE_NAME ${LOC_ARGS[*]} /data/$NAME.osm.pbf; osrm-partition /data/$NAME.osrm; osrm-customize /data/$NAME.osrm"
 } > "$DATA/$NAME.build.txt"
 cat "$DATA/$NAME.build.txt"

@@ -461,6 +461,20 @@ Consequences: an ETA taken from `duration` is the true time along the route show
 holds; and a route that got slower after a profile change is not by itself a defect, it may be
 the lighter route. The earlier unverified entry for this is closed.
 
+### OSRM v26.8.0 — `way:get_location_tag` decides by the way's last node, and the profile guide never mentions it
+
+**Read 2026-09-09** in `src/extractor/scripting_environment_lua.cpp` at tag `v26.8.0` ("use a
+single node (last) of the way to localize the way") and on the project wiki page *Using
+location dependent data in profiles* ("it is always the last node of a way", and with
+overlapping polygons "the first found tag value will be returned"). `docs/profiles.md` at the
+same tag contains no mention of location-dependent data at all; `osrm-extract --help` on the
+pinned image lists `--location-dependent-data`. Consequences: a road along a boundary is inside
+or outside by where its way ends, which is why the City polygon is the boundary buffered 100 m;
+and a way that crosses out of the polygon counts as outside for its whole length, seen as
+2925 Barnet Hwy moving by 13 s at factor 0.1 for no gain. Without the flag every way reads as
+outside, so the profile's factor must stay off when no polygon was given (`apparatus.lua`,
+`city_limits_factor` is nil unless set at build time).
+
 ## Unverified — assumptions still resting on names
 
 Recorded so they are visible (§7.5). None of these have been checked.

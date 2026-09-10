@@ -50,6 +50,20 @@ function setup()
       left_hand_driving              = false,
     },
 
+    -- Stay in Coquitlam (operator, 2026-09-09: "Staying in the city may actually be a city
+    -- operational requirement"; the traffic-light preemption system works only in the City).
+    -- Ways whose last node lies outside the polygon passed to osrm-extract as
+    -- --location-dependent-data (public.city_boundary buffered 100 m, written by
+    -- backend/scripts/export_routing_polygon.py) have their RATE multiplied by this factor:
+    -- weight rises, duration does not, so the ETA stays the true time along the route
+    -- (docs/profiles.md, "Understanding speed, weight and rate"). nil = off, which is also
+    -- what a build without the polygon must use, because then every way reads as outside.
+    -- The value is chosen by measurement on the corpus and recorded in the brief; set
+    -- CFR_CITY_LIMITS_FACTOR at build time (backend/scripts/build_osrm_graph.sh records it).
+    city_limits_factor        = tonumber(os.getenv('CFR_CITY_LIMITS_FACTOR')),
+    city_limits_tag           = 'cfr_city',
+    city_limits_value         = 'coquitlam',
+
     default_mode              = mode.driving,
     default_speed             = 10,
     oneway_handling           = true,
@@ -469,6 +483,25 @@ local function apparatus_access(profile, way, result, data)
   return WayHandlers.access(profile, way, result, data)
 end
 
+-- Stay in Coquitlam: scale the routing rate of every way outside the City polygon. Runs
+-- after WayHandlers.penalties, which is where the rate is set for weight_name 'routability'
+-- (lib/way_handlers.lua lines 466-474). A way with a fixed weight (a ferry with a duration
+-- tag) has that scaled the same way. Does nothing when no factor was given at build time.
+local function apparatus_city_limits(profile, way, result, data)
+  local f = profile.city_limits_factor
+  if not f or f <= 0 or f >= 1 then return end
+  if way:get_location_tag(profile.city_limits_tag) == profile.city_limits_value then return end
+  if result.forward_rate and result.forward_rate > 0 then
+    result.forward_rate = result.forward_rate * f
+  end
+  if result.backward_rate and result.backward_rate > 0 then
+    result.backward_rate = result.backward_rate * f
+  end
+  if result.weight and result.weight > 0 then
+    result.weight = result.weight / f
+  end
+end
+
 function process_way(profile, way, result, relations)
   -- the intial filtering of ways based on presence of tags
   -- affects processing times significantly, because all ways
@@ -542,6 +575,7 @@ function process_way(profile, way, result, relations)
     WayHandlers.vehicle_speed_cap,
 
     WayHandlers.penalties,
+    apparatus_city_limits,
 
     -- compute class labels
     WayHandlers.classes,

@@ -31,6 +31,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+# The OSRM profile's library, vendored verbatim from the image that built the kiosk graph
+# (docs/standards/osrm/README.md). The rule above is for build output; this is a standard.
+!docs/standards/osrm/lib/
 lib64/
 parts/
 sdist/

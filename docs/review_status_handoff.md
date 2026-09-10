@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **86 items, 6 open (3 crew-visible), 80 closed** as of 2026-09-08 night. The live work queue
+  **87 items, 6 open (3 crew-visible), 81 closed** as of 2026-09-09. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -23,7 +23,7 @@ Companion documents:
 
 ## Update, 2026-09-08 — hardening, the operator's UX pass, and two streams spun out
 
-**Punch list: 6 open, 3 crew-visible, 80 closed.** Two sessions worked this day: one on UX
+**Punch list: 6 open, 3 crew-visible, 81 closed** (2026-09-09: #1 closed by the routing stream, #76 opened). Two sessions worked this day: one on UX
 (kiosk mode removed, zone labels, the Street View zoom saga, the basemap collapse and its
 revert), and this one, which reviewed that work and then took the operator's notes live.
 
@@ -135,7 +135,8 @@ live; the four round-2 rows in `evaluation_history` carry the verdict in their n
 
 | Item | Who | What |
 |:--|:--|:--|
-| #74 | operator | look at artboard 3A on the kiosk (built 2026-09-09 from the operator's own canvas; the branch above) and say whether it stays |
+| #76 | this session | a block announcement geocodes to the middle of the block (operator ruling 2026-09-09); one question left, how far a hundred-block reaches on a straddling segment |
+| #74 | operator | look at artboard 3A on the kiosk (built 2026-09-09 from the operator's own canvas, merged to main the same evening) and say whether it stays |
 | #64 | operator | the civic-number checklist, at work |
 | #49 | operator | set an arrival point on a real site, then close |
 | #1 | both | routing loops not re-observed since stock OSRM; the profile has no held documentation (standards index) — reproduce a named call first |

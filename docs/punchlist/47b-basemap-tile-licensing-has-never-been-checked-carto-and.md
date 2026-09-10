@@ -154,3 +154,13 @@ own `Imagery_2025` cache is unambiguously OGL, self-limiting at the municipal bo
 measurably sharper (1344 vs 664 edge energy at z20). It was crawled, deployed, and rejected
 because its sharpening reads as harsh on the bay display and adds no detail a crew can act on.
 `compile_mbtiles.py --layer ortho` still points at it; the archive is ~6 hours to rebuild.
+
+### The Carto half, 2026-09-09
+
+`PROJECT_IDEAS.md` #11 landed: the app draws `street_vector.mbtiles`, vector tiles the project
+builds from its own OSM extract under licences it holds (`docs/standards/basemap/README.md`),
+and no display draws a Carto tile any more. `street.mbtiles` and `street_nolabels.mbtiles`
+stay on the kiosk's disk as the rollback until the operator says to delete them; the ~5,600
+watermarked z18 tiles they hold are no longer shown to anyone. The aerial layer's accepted
+risk is unchanged.
+

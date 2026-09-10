@@ -104,6 +104,40 @@ of each, is the operator's call; both start from the same tiles.
 * Tilt and 3D buildings: raised by the operator as a future idea; the answer given is in the
   session record, not built.
 
+## Deployed, 2026-09-09 17:45 PDT
+
+Operator, on the trial page: *"So it looks like I'm going to want OSM Bright"*, the label layers
+ticked in a screenshot, the POI classes listed, and *"Can we get this up and running and
+replacing the production mapping? We'll keep 3D as a future development feature."* Done in the
+same session, `f987ca5` on `main`:
+
+* `backend/scripts/build_vector_basemap.sh` builds `street_vector.mbtiles` from the routing
+  extract in about a minute (Planetiler pinned by digest; inputs cached under
+  `backend/data/planetiler_sources/`; guarded against a live capture and an OSRM build; the
+  archive is written under a temporary name and moved into place after the journal check).
+  First production build 59 s, 32 MB, 1,251 tiles; `cfr_tiles` restarted once to register it.
+* `tools/build_basemap_style.py` generates `frontend/public/basemap/street.style.json` from the
+  vendored OSM Bright style with every ruling as a code comment: the ticked label layers (the
+  place-name layers below the screenshot's edge assumed off with the rest); POIs limited to
+  library (bookshops out), hospital and nursing home (the 772 clinics out), named swimming
+  pools (the 9,000 unnamed backyard pools out), ice rinks (both `ice_rink` and `ice_hockey`),
+  fire stations, police; the bus-loop bays from zoom 16 as their own layer, labelled "Bay 9";
+  the sprite's swimming icon for pools and its stadium icon for rinks, which have none. The
+  three narrowings are the author's reading of "clutter", not rulings, and are one line each.
+* `BaseMap` draws `type: 'vector'` layers with MapLibre GL in a Leaflet layer
+  (`@maplibre/maplibre-gl-leaflet` 0.1.4, `maplibre-gl` 4.7.1, both pinned), so no overlay
+  changed. Labels off and the cadastral handover (road names capped at `CADASTRAL_MIN_ZOOM`
+  while the overlay is on) are style properties applied in place; the 2026-09-08 doubled
+  labels are gone without a layer swap. No background layer: the land colour is painted over
+  the tileset's TileJSON bounds and the #40 hatch shows outside them. A failed style or
+  TileJSON fetch leaves the hatch and logs; nothing is drawn in its place.
+* The glyphs (102 MB) live in `frontend/public/basemap/fonts/`, git-ignored, copied to the
+  kiosk once; `npm run build` carries them into `dist/`.
+
+**Verified**: the archive and TileJSON from `cfr_tiles`; the style, a glyph and the sprite
+from the kiosk's nginx; lint, the node tests and a production build. **Not yet verified**: the
+rendered app on the workstation and the hall display, which is the operator's check.
+
 ## Decisions for the operator
 
 1. **Look at it on the hall display** and say whether it stays: the raster stays on disk

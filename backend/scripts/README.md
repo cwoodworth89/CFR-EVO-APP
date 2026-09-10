@@ -49,7 +49,8 @@ The offline basemap pipeline. See the `mbtiles-tile-server` skill before touchin
 
 | Script | Purpose |
 |:--|:--|
-| `compile_mbtiles.py` | Builds the MBTiles archives served by `cfr_tiles`. |
+| `build_vector_basemap.sh` | Builds `street_vector.mbtiles`, the street basemap, from the routing extract with Planetiler (a pinned container; about a minute). Refuses to run over a live capture or beside an OSRM graph build; `--restart-tiles` makes `cfr_tiles` register the new archive, which blanks every basemap for a few seconds. Licences: `docs/standards/basemap/README.md`. |
+| `compile_mbtiles.py` | Builds the raster MBTiles archives served by `cfr_tiles`: the aerial layer, and the two Carto street layers that the app stopped drawing on 2026-09-09 (kept on disk as the rollback; see the §1 licence caution before crawling them again). |
 | `crawl_cadastral_tiles.py` | Pre-caches the City cadastral overlay. |
 | `finalize_mbtiles.py` | Checkpoints WAL and sets `journal_mode = DELETE`. **Required** — the tile volume is mounted read-only and will not open a WAL archive. |
 | `calc_tile_counts.py` | Estimates tile counts for a bounding box and zoom range before a crawl. |

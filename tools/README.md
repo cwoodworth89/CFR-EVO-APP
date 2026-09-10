@@ -34,6 +34,7 @@ problem and will not run again. They are kept for provenance, not for use.
 | `_repo.py` | Locates the repository from any script here and puts `backend/` and `services/*/src` on `sys.path`. Imported, never run. |
 | `install_dev_packages.sh` | Development-environment package installer for Linux (the kiosk side). Read it before running; it is not part of the kiosk build. |
 | `install_dev_packages.ps1` | The same installer for the Windows laptop. |
+| `build_basemap_style.py` | Generates `frontend/public/basemap/street.style.json`, the street basemap's MapLibre style, from the vendored OSM Bright style with the operator's rulings of 2026-09-09 written in as code comments; `--check` fails if the committed file is stale. Validates against the MapLibre style spec when `frontend/node_modules` is present. |
 
 ## QA harnesses and measurement
 

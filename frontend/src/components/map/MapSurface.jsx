@@ -78,7 +78,7 @@ export default function MapSurface({
       <Pane name="underlayPane" style={{ zIndex: PANE_Z.underlay }} />
       <Pane name="labelsPane" style={{ zIndex: PANE_Z.labels }} />
 
-      <BaseMap style={baseStyle} useLabelsFallback={streetLabels} />
+      <BaseMap style={baseStyle} useLabelsFallback={streetLabels} cadastralNames={showCadastral} />
       <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />
       <StationsLayer visible={showFireHalls} />
       <HydrantsLayer visible={showHydrants} targetCoords={hydrantTargetCoords} highlightIds={hydrantHighlightIds} />

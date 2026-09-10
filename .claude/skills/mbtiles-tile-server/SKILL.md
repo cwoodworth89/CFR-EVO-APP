@@ -27,6 +27,7 @@ CFR EVO serves all high-resolution aerial imagery, street basemaps, and municipa
 | `street` | `street.mbtiles` | PNG | Z12–Z18 | `http://${hostname}:8081/services/street/tiles/{z}/{x}/{y}.png` |
 | `street_nolabels` | `street_nolabels.mbtiles` | PNG | Z12–Z18 | `http://${hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png` |
 | `cadastral` | `cadastral.mbtiles` | PNG32 (Transparent) | Z14–Z20 | `http://${hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png` |
+| `street_vector` | `street_vector.mbtiles` | PBF vector tiles (OpenMapTiles schema, gzip) | Z0–Z14, drawn to any zoom | `http://${hostname}:8081/services/street_vector/tiles/{z}/{x}/{y}.pbf`; TileJSON at `/services/street_vector` |
 
 ---
 
@@ -118,6 +119,26 @@ python3 backend/scripts/crawl_cadastral_tiles.py \
 * **Delay**: Default `0.2` ($200\text{ ms}$) provides polite rate-limiting (~5 req/s) against municipal infrastructure.
 * **Resumable**: Skips already downloaded `(zoom_level, tile_column, tile_row)` keys present in SQLite.
 
+### 5.0 The street basemap (`build_vector_basemap.sh`)
+
+**Since 2026-09-09 the street basemap is `street_vector.mbtiles`**, vector tiles the project
+builds itself from the OSM extract the kiosk routes on (`backend/data/osrm/vancouver.osm.pbf`),
+with Planetiler in a pinned container, in about a minute:
+
+```bash
+backend/scripts/build_vector_basemap.sh --restart-tiles
+```
+
+It reads its three auxiliary sources from `backend/data/planetiler_sources/` (1.4 GB, seeded
+once; never downloaded by the script), writes to a temporary name and moves the archive into
+place only after the journal-mode check, so a failed build never replaces the served one. The
+guard refuses to run over a live capture or beside an OSRM graph build. The frontend draws it
+with MapLibre GL under the Leaflet overlays (`frontend/src/components/map/vectorBasemap.js`);
+the style, sprite and glyphs are served from the app's own origin under `/basemap/`, the
+glyphs (102 MB, git-ignored) copied to the kiosk by hand. A missing vector tile answers
+`204 No Content`, not a blank PNG. `street.mbtiles` and `street_nolabels.mbtiles` are no
+longer drawn and stay on disk as the rollback. Licences: `docs/standards/basemap/README.md`.
+
 ### 5.2 Multi-Layer Compiler (`compile_mbtiles.py`)
 
 Crawls and compiles `ortho.mbtiles` (City imagery service), `street.mbtiles` and `street_nolabels.mbtiles` (Carto). The `gdal2tiles`/MrSID ingest path was removed 2026-08-31 — see `gis-pipeline-sync` §4.1:
@@ -134,22 +155,11 @@ python3 backend/scripts/compile_mbtiles.py --layer all --workers 32
 2. **Layer Definitions** in `frontend/src/components/MapConstants.js`:
    ```javascript
    export const BASE_LAYERS = {
+     STREET: { type: 'vector', service: 'street_vector', attribution: '© OpenMapTiles · © OpenStreetMap contributors (ODbL)', maxZoom: 22 },
      SATELLITE: {
        url: `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`,
        fallbackUrl: null,
        maxNativeZoom: 20,
-       maxZoom: 22,
-     },
-     VOYAGER: {
-       url: `${TILE_BASE_URL}/services/street/tiles/{z}/{x}/{y}.png`,
-       fallbackUrl: null,
-       maxNativeZoom: 18,
-       maxZoom: 22,
-     },
-     GREY: {
-       url: `${TILE_BASE_URL}/services/street_nolabels/tiles/{z}/{x}/{y}.png`,
-       fallbackUrl: null,
-       maxNativeZoom: 18,
        maxZoom: 22,
      },
      CADASTRAL: {

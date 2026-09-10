@@ -482,10 +482,25 @@ twice in `MapViewControls.jsx`. Any container narrower than 740 px crosses the l
 in either orientation, and an iPad in portrait with the sidebar open (500 px of map). The
 dispatch map measures its floating box (`panelRef.current.offsetWidth`) instead, and does
 not have this. The fix is the same pattern in one place; found by the mobile accessibility
-review ([`briefings/mobile_accessibility_review.md`](../briefings/mobile_accessibility_review.md)),
-not built during the freeze.
+review ([`briefings/mobile_accessibility_review.md`](../briefings/mobile_accessibility_review.md))
+and **built the same day** as `frontend/src/components/map/fitPadding.js`: one place both maps
+read, measuring the container and whatever floats over it, with a clamp so the two paddings on
+an axis never exceed 60 % of it and the `NaN` cannot occur.
 
 Measure the padding from the elements that occupy the map, never write it down.
+### OSRM v26.8.0 — `way:get_location_tag` decides by the way's last node, and the profile guide never mentions it
+
+**Read 2026-09-09** in `src/extractor/scripting_environment_lua.cpp` at tag `v26.8.0` ("use a
+single node (last) of the way to localize the way") and on the project wiki page *Using
+location dependent data in profiles* ("it is always the last node of a way", and with
+overlapping polygons "the first found tag value will be returned"). `docs/profiles.md` at the
+same tag contains no mention of location-dependent data at all; `osrm-extract --help` on the
+pinned image lists `--location-dependent-data`. Consequences: a road along a boundary is inside
+or outside by where its way ends, which is why the City polygon is the boundary buffered 100 m;
+and a way that crosses out of the polygon counts as outside for its whole length, seen as
+2925 Barnet Hwy moving by 13 s at factor 0.1 for no gain. Without the flag every way reads as
+outside, so the profile's factor must stay off when no polygon was given (`apparatus.lua`,
+`city_limits_factor` is nil unless set at build time).
 
 ## Unverified — assumptions still resting on names
 

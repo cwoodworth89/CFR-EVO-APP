@@ -2,7 +2,10 @@
 import React, { useEffect, useRef } from 'react';
 import { Marker, CircleMarker, Tooltip, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { BASE_LAYERS, MODE_DEFAULTS, STATIONS } from './MapConstants';
+import '@maplibre/maplibre-gl-leaflet';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { BASE_LAYERS, CADASTRAL_MIN_ZOOM, MODE_DEFAULTS, STATIONS } from './MapConstants';
+import { loadStreetStyle, setLabelsVisible, capRoadNames } from './map/vectorBasemap';
 import { API_BASE_URL, TILE_BASE_URL } from '../apiClient';
 import { createFireHallIcon, createRailroadCrossingIcon } from './map/layerIcons';
 import { COQUITLAM_RAILROAD_CROSSINGS } from './map/railroadCrossings';
@@ -12,12 +15,28 @@ import { COQUITLAM_RAILROAD_CROSSINGS } from './map/railroadCrossings';
 // 🚒 Custom Fire Hall Icon Loader (Memoized to prevent render flicker)
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
-export function BaseMap({ style, useLabelsFallback }) {
+export function BaseMap({ style, useLabelsFallback, cadastralNames = false }) {
     const map = useMap();
     const layerRef = useRef(null);
+    const glRef = useRef(null);
+    // The latest label props, read by the style-load handler however late it fires.
+    const wantRef = useRef({ labels: useLabelsFallback, cadastralNames });
+    wantRef.current = { labels: useLabelsFallback, cadastralNames };
+
+    // Labels and the cadastral handover are style properties of the vector map, applied
+    // in place. On the raster they were a second tile set, and switching it mid-zoom read
+    // as a basemap reload to the operator (2026-09-08); nothing here rebuilds the layer.
+    const applyLabelState = () => {
+        const gl = glRef.current;
+        if (!gl || !gl.isStyleLoaded()) return;
+        const want = wantRef.current;
+        setLabelsVisible(gl, want.labels !== false);
+        capRoadNames(gl, want.cadastralNames ? CADASTRAL_MIN_ZOOM : null);
+    };
 
     useEffect(() => {
         const cleanup = () => {
+            glRef.current = null;
             if (layerRef.current) {
                 try {
                     if (map.hasLayer(layerRef.current)) {
@@ -32,73 +51,41 @@ export function BaseMap({ style, useLabelsFallback }) {
 
         cleanup();
 
-        const disableWan = String(import.meta.env.VITE_DISABLE_WAN_FALLBACK || 'false').toLowerCase() === 'true';
         const config = BASE_LAYERS[style] || BASE_LAYERS.STREET;
-        let url = typeof config === 'string' ? config : (config.url || BASE_LAYERS.STREET.url);
-        let fallbackUrl = disableWan ? null : (typeof config === 'object' ? config.fallbackUrl : null);
 
-        if (useLabelsFallback && url && url.includes('_nolabels')) {
-            url = url.replace('_nolabels', '');
+        if (config.type === 'vector') {
+            // The street basemap: MapLibre GL in a Leaflet layer, so every overlay pane
+            // (zones, hydrants, parcels, routes, closures) is untouched.
+            let cancelled = false;
+            loadStreetStyle().then((glStyle) => {
+                if (cancelled) return;
+                const layer = L.maplibreGL({
+                    style: glStyle,
+                    pane: 'tilePane',
+                    interactive: false,
+                    maxZoom: config.maxZoom,
+                    attributionControl: { customAttribution: config.attribution },
+                });
+                layer.addTo(map);
+                layerRef.current = layer;
+                glRef.current = layer.getMaplibreMap();
+                glRef.current.on('style.load', applyLabelState);
+                applyLabelState();
+            }).catch((error) => {
+                // No basemap. The "no map data" hatch on .leaflet-container stays visible
+                // and says so (punch-list #40); nothing is drawn in its place (CLAUDE.md s6.1).
+                console.error('Street basemap unavailable; the hatch stands in for it:', error);
+            });
+            return () => { cancelled = true; cleanup(); };
         }
-        if (useLabelsFallback && fallbackUrl && fallbackUrl.includes('_nolabels')) {
-            fallbackUrl = fallbackUrl.replace('_nolabels', '');
-        }
 
-        const attribution = typeof config === 'object' ? config.attribution : '© OpenStreetMap contributors (Offline Local)';
-        const subdomains = typeof config === 'object' ? config.subdomains : ['a', 'b', 'c', 'd'];
-        const maxNativeZoom = typeof config === 'object' ? (config.maxNativeZoom ?? 18) : 18;
-        const maxZoom = typeof config === 'object' ? (config.maxZoom ?? 22) : 22;
-
-        // Custom Leaflet TileLayer with graceful online fallback support
-        const FallbackTileLayer = L.TileLayer.extend({
-            createTile: function(coords, done) {
-                const tile = document.createElement('img');
-
-                if (this.options.crossOrigin || this.options.crossOrigin === '') {
-                    tile.crossOrigin = this.options.crossOrigin === true ? '' : this.options.crossOrigin;
-                }
-
-                tile.alt = '';
-                tile.setAttribute('role', 'presentation');
-
-                let fallbackTried = false;
-
-                const onLoad = () => {
-                    done(null, tile);
-                };
-
-                const onError = (e) => {
-                    if (fallbackUrl && !fallbackTried) {
-                        fallbackTried = true;
-                        let sub = 'a';
-                        if (Array.isArray(subdomains) && subdomains.length > 0) {
-                            sub = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
-                        }
-                        const fUrl = fallbackUrl
-                            .replace('{s}', sub)
-                            .replace('{z}', coords.z)
-                            .replace('{x}', coords.x)
-                            .replace('{y}', coords.y)
-                            .replace('{r}', '');
-                        tile.src = fUrl;
-                    } else {
-                        done(e, tile);
-                    }
-                };
-
-                L.DomEvent.on(tile, 'load', onLoad);
-                L.DomEvent.on(tile, 'error', onError);
-
-                tile.src = this.getTileUrl(coords);
-                return tile;
-            }
-        });
-
-        const tileLayer = new FallbackTileLayer(url, {
-            attribution: attribution,
-            subdomains: subdomains,
-            maxNativeZoom: maxNativeZoom,
-            maxZoom: maxZoom,
+        // Raster archives (the aerial layer): plain tiles from cfr_tiles. The online
+        // fallback class that used to live here never had a URL to fall back to
+        // (fallbackUrl is null on every layer, CLAUDE.md s1) and is gone.
+        const tileLayer = L.tileLayer(config.url, {
+            attribution: config.attribution,
+            maxNativeZoom: config.maxNativeZoom ?? 18,
+            maxZoom: config.maxZoom ?? 22,
             noWrap: true,
             crossOrigin: "anonymous",
             pane: "tilePane",
@@ -108,7 +95,14 @@ export function BaseMap({ style, useLabelsFallback }) {
         layerRef.current = tileLayer;
 
         return cleanup;
-    }, [map, style, useLabelsFallback]);
+    // applyLabelState reads the props through wantRef; the label effect below owns changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [map, style]);
+
+    useEffect(() => {
+        applyLabelState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [useLabelsFallback, cadastralNames]);
 
     return null;
 }

@@ -24,7 +24,17 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-EXTRACT="$REPO/backend/data/osrm/vancouver.osm.pbf"      # shared with routing; never replaced here
+# The extract, shared with routing and never replaced here. Since 2026-09-09 it is
+# coquitlam_region.osm.pbf, cut from Geofabrik's British Columbia file to the box
+# -123.31,48.99,-122.45,49.52 that covers the workstation's scroll limits (OPERATIONAL_BOUNDS)
+# with a margin (operator: "fill that with our vector maps"); before that, BBBike's Vancouver
+# city extract, whose eastern edge at -122.668 cut the City. BASEMAP_PBF overrides.
+EXTRACT="${BASEMAP_PBF:-$REPO/backend/data/osrm/coquitlam_region.osm.pbf}"
+# The tiles are cut to this box, not to the extract's header: a clip with complete ways
+# keeps whole ways that cross the edge, so the file's nodes reach far past it, and the
+# TileJSON bounds (which the app paints the land colour over, punch-list #40) must be the
+# box the map can actually scroll, not the stray extent of a boundary way.
+BOUNDS="${BASEMAP_BOUNDS:--123.31,48.99,-122.45,49.52}"
 SOURCES="$REPO/backend/data/planetiler_sources"
 TILES="$REPO/backend/data/tiles"
 OUT="$TILES/street_vector.mbtiles"
@@ -73,6 +83,7 @@ docker run --rm --name planetiler_build --user "$(id -u):$(id -g)" \
   --lake_centerlines_path=/data/planetiler_sources/lake_centerline.shp.zip \
   --tmpdir=/data/planetiler_tmp \
   --output=/data/tiles/street_vector.building.mbtiles \
+  --bounds="$BOUNDS" \
   --threads="$(nproc)" --force 2>&1 | sed -e 's/\x1b\[[0-9;]*m//g' | tee -a "$LOG"
 
 # The read-only tiles volume cannot open a WAL-mode archive (mbtiles-tile-server skill, s2).

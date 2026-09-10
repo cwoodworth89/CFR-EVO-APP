@@ -59,6 +59,7 @@ not the behaviour**, and the code was written against the name.
 | `multiprocessing.Process` | the child continues where the parent left off | on Python 3.14 it does not inherit logging config -- the default start method became `forkserver` |
 | MQTT `qos=1` | delivered once, reliably | delivered **at least** once -- duplicates are guaranteed possible and the receiver must be idempotent |
 | `requestAnimationFrame` | runs after the next paint | runs before the next repaint **only while the document is visible**. On a hidden tab or a blanked kiosk display it never fires |
+| Leaflet `map.fitBounds(bounds, { padding })` | fits the bounds inside the padded box | **with padding wider than the container, the box is negative and the map's zoom becomes `NaN`**, silently. A map at zoom `NaN` draws no tiles, which looks like a dead tile server |
 | `feature_extractor(speech, sampling_rate=16000)` | encodes the clip you gave it | **keeps the first 30 seconds and silently drops the rest.** `__call__` defaults to `truncation=True`, `padding="max_length"`, `max_length=n_samples` (`chunk_length` 30 x 16 kHz = 480,000 samples) |
 | OSM `restriction=no_right_turn` | the sign at the junction | **whatever the mapper typed.** At Pinetree Way and Guildford Way the sign is *no right on red* (operator, 2026-09-09); the relation says *no right turn*. OSRM v26.8.0 applies the value as written and ignores every value ending `_on_red` — punch-list **#1** |
 | `WhisperModel(dir, local_files_only=True)` | nothing is fetched from the network | **still downloads `tokenizer.json`** from huggingface.co when the model directory lacks one -- the flag does not cover that fallback |
@@ -461,6 +462,32 @@ Consequences: an ETA taken from `duration` is the true time along the route show
 holds; and a route that got slower after a profile change is not by itself a defect, it may be
 the lighter route. The earlier unverified entry for this is closed.
 
+### Leaflet 1.9.4 — `fitBounds` with padding wider than the container gives zoom `NaN`
+
+```
+container 1596 x 936, paddingTopLeft [340,80], paddingBottomRight [400,80]  -> getZoom() 14
+container   73 x 788, same padding                                            -> getZoom() NaN, nothing thrown
+```
+
+Measured 2026-09-09 in headless Chromium against the installed `leaflet/dist/leaflet.js`
+(1.9.4), with the two points the console fits, Hall 1 and a destination about 3 km away.
+`getBoundsZoom` subtracts the padding from the container size and takes the log of the
+ratio; a negative size gives `NaN`, and `setView` accepts it. The map is then a blank pane:
+a tile layer at zoom `NaN` requests nothing, which is indistinguishable on sight from the
+tile-server failure punch-list #40 painted the hatch to rule out.
+
+**Consequence when unverified**: the console's route fit writes the sidebar widths as
+literals, `paddingTopLeft: [340, 80], paddingBottomRight: [400, 80]`, in `MapBoard.jsx` and
+twice in `MapViewControls.jsx`. Any container narrower than 740 px crosses the line: a phone
+in either orientation, and an iPad in portrait with the sidebar open (500 px of map). The
+dispatch map measures its floating box (`panelRef.current.offsetWidth`) instead, and does
+not have this. The fix is the same pattern in one place; found by the mobile accessibility
+review ([`briefings/mobile_accessibility_review.md`](../briefings/mobile_accessibility_review.md))
+and **built the same day** as `frontend/src/components/map/fitPadding.js`: one place both maps
+read, measuring the container and whatever floats over it, with a clamp so the two paddings on
+an axis never exceed 60 % of it and the `NaN` cannot occur.
+
+Measure the padding from the elements that occupy the map, never write it down.
 ### OSRM v26.8.0 — `way:get_location_tag` decides by the way's last node, and the profile guide never mentions it
 
 **Read 2026-09-09** in `src/extractor/scripting_environment_lua.cpp` at tag `v26.8.0` ("use a

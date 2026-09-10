@@ -70,7 +70,18 @@ export function RoutingOverlay({
             }).addTo(map);
 
             if (onRouteCalculatedRef.current) {
-              onRouteCalculatedRef.current(latLngs.map(l => ({ lat: l.lat, lng: l.lng })));
+              // The router's own distance and duration ride along with the geometry, for the
+              // route pill on the dispatch map (CLAUDE.md s6.2). A degraded answer (no router
+              // reachable) carries a straight-line distance and no ETA, and is marked so the
+              // pill can say so rather than present it as a road distance.
+              onRouteCalculatedRef.current(
+                latLngs.map(l => ({ lat: l.lat, lng: l.lng })),
+                {
+                  distanceKm: data.distance_km ?? null,
+                  etaMinutes: data.eta_minutes ?? null,
+                  degraded: data.status === 'degraded' || String(data.routing_source || '').startsWith('degraded'),
+                },
+              );
             }
           }
         }

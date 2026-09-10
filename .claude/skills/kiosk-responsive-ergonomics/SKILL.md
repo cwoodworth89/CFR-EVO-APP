@@ -15,6 +15,12 @@ Decided 2026-08-22. Changing display type — a wall-mounted bay display, multip
 profiles, viewport-driven mode switching — is a **possible future feature, not a current
 requirement.** Do not build sizing infrastructure for it in advance.
 
+**The hall display is a touch-sensitive TV; the Flex 5 is the server only** (operator,
+2026-09-09). Hover is not an input on it: anything carried only by a `title` tooltip or a
+`hover:` state is invisible to the crew, and a control has to be sized for a finger. Phone
+and tablet widths are a separate, planned surface, not this one:
+[`docs/briefings/mobile_accessibility_review.md`](../../../docs/briefings/mobile_accessibility_review.md).
+
 > [!WARNING]
 > **This file previously described a system that did not exist.** It specified an
 > `isKioskMode` / `isKioskView` prop, a `?mode=kiosk` URL switch, a "top 30% / bottom 70%"
@@ -32,12 +38,17 @@ requirement.** Do not build sizing infrastructure for it in advance.
 call or a review replay.
 
 ```
-ActiveAlertBanner  (header: address, units, incident, timers)
-├── RouteOverviewPanel   col-span-8   main route map
-└── detail stack         col-span-4   PropertySatellitePanel (the cadastral block tile was dropped 2026-09-08; SNAP TO CALL on the route map replaces it)
-                                      PropertySatellitePanel
-                                      StreetViewPanel
+ActiveAlertBanner  (header: three cards -- the call, the units with ETAs, the clock)
+├── notices row          only when the record carries one: pre-incident plan, operator-set arrival point
+├── RouteOverviewPanel   flex-1       route map: route pill, control stack (ZOOM, SNAP TO CALL, RE-CENTRE, + -), HydrantCard
+└── DetailStack          38.5 %, 360-740 px   PropertySatellitePanel ("AERIAL") and StreetViewPanel, each in a TileFrame header bar
 ```
+
+**Built to artboard 3A of the operator's Claude Design canvas, 2026-09-09**
+(`docs/design/`, the departures in `docs/briefings/mobile_accessibility_review.md` §7). The
+floating details box is gone: units in the header, the hydrant on the map. The canvas's 3C
+(the expand state) is not built. The cadastral block tile was dropped 2026-09-08 (SNAP TO
+CALL on the route map replaces it).
 
 **Workstation console** (`components/MapBoard.jsx`) — standby / explore.
 
@@ -64,15 +75,48 @@ banner. It is consumed only by `ActiveAlertBanner`, where it bumps two headings:
 
 It also hides the dismiss button, so a wall display cannot be cleared by a passer-by.
 
-That is the whole feature. If display-type switching is ever wanted, `isTvMode` is the
+**Removed 2026-09-09.** Artboard 3A demoted the toggle (*"a deployment setting, not a
+per-call control"*) and the operator ruled the same day: *"We're going to move away from
+tv-mode toggle and have a responsive design."* `isTvMode` and `toggleTvMode` are gone from
+`useKioskQueue`; the table above records what the toggle did. Sizing is Tailwind's
+responsive prefixes and nothing else.
+
+That was the whole feature. If display-type switching is ever wanted again, a hook like it is the
 hook to extend — not a new parallel mechanism.
+
+### The phone layout (built 2026-09-09)
+
+Below Tailwind's **`lg`** line (1024 px) both surfaces reflow for a phone or an upright
+tablet; at and above it nothing changes. `hooks/useCompactViewport.js` is the same line in
+JavaScript, for the decisions that are not CSS (one map mounted at a time, the search sheet
+folding once an address is picked, a fit padded by a sheet's height). `md` was tried first
+and measured too narrow: a landscape phone at 852 px kept the desktop columns and a 152 px map.
+
+| Surface below `lg` | Becomes |
+|:--|:--|
+| `LeftSidebar` | a sheet over the bottom of the map with a handle; folds when an address is picked |
+| `DetailStack` | tabs (Details, Satellite, Street View), one mounted at a time; on the console a sheet that folds to its tab bar |
+| `RightSidebar` | a drawer from the right |
+| `KioskView` | a column that scrolls: the three header cards, the route map at 52 dvh, then the tiles as tabs at 56 dvh (the hall display never scrolls) |
+| `RouteOverviewPanel` chrome | SNAP TO CALL and RE-CENTRE only (no zoom readout or buttons; pinch does that); the hydrant card spans the map's foot |
+
+**Fits are measured, never written.** `map/fitPadding.js` is the one place both maps get
+their `fitBounds` padding from the container and whatever floats over it: on the dispatch
+map, the control stack's width and the hydrant card's height (`overlays`). The literals it
+replaced gave Leaflet a NaN zoom on a phone (`docs/standards/dependency-behaviour.md`).
 
 ---
 
 ## Conventions to follow
 
 * **Tailwind responsive prefixes** (`sm:`, `lg:`) for viewport adaptation. There is no
-  custom breakpoint system and none is needed.
+  custom breakpoint system and none is needed. **`lg` is the phone line**; do not add a
+  second one without a measurement that says where it goes.
+* **`touch:`** (`@media (pointer: coarse)`, added in `tailwind.config.js`) for target sizes
+  and 16 px inputs. It applies to the hall's touch TV as much as to a phone, and never to a
+  mouse. `hoverOnlyWhenSupported` is on, so `hover:` never sticks after a tap.
+* **Nothing crew-facing lives only in a `title` tooltip.** A touch screen never shows one;
+  the flag reasons and the changed-field list open on a tap for that reason.
 * **Dark slate palette** (`bg-slate-950`, `border-slate-800`) throughout. This is for
   low-light station conditions and contrast, not viewing distance, and stays regardless of
   the constraint above.
@@ -82,6 +126,13 @@ hook to extend — not a new parallel mechanism.
   themselves within it; do not set their heights from the parent.
 * **New size variants need a reason.** With one viewing distance, a second set of type
   scales is unjustified until the display-type feature actually exists.
+* **The dispatch header's type scales with viewport height from `lg` up** (2026-09-09).
+  Artboard 3A's sizes at 1920×1080 are the reference, expressed in `vh`: address 6.5 vh
+  (70 px), incident 2.8 vh, first-due ETA 3.4 vh, elapsed 3.8 vh, each in a `clamp()` with a
+  floor and the canvas size as the ceiling. Fixed steps left the header half of a 1000-tall
+  laptop screen with an intersection address. A long address also shrinks by length
+  (`--addr` scale: 1 to 16 characters, 0.8 to 24, 0.66 beyond) so it stays on one line.
+  Below `lg` the phone keeps fixed small sizes.
 
 ## Testing
 

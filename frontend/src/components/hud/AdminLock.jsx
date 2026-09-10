@@ -44,7 +44,7 @@ export function AdminLock({ admin }) {
         title={admin.unlocked ? 'Admin controls are unlocked. Click to lock.' : 'Unlock admin controls'}
         className={admin.unlocked
           ? 'px-2 py-1.5 text-[10px] font-black font-mono rounded-lg border border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/30 cursor-pointer flex items-center gap-1 select-none'
-          : 'px-1.5 py-1.5 text-sm text-slate-700 hover:text-slate-300 cursor-pointer select-none'}
+          : 'px-1.5 py-1.5 touch:px-3 touch:py-2.5 text-sm text-slate-700 hover:text-slate-300 cursor-pointer select-none'}
       >
         {admin.unlocked ? <><span>🔓</span><span>ADMIN</span></> : '🔒'}
       </button>
@@ -67,7 +67,7 @@ export function AdminLock({ admin }) {
               onChange={(e) => setPassword(e.target.value)}
               disabled={busy}
               placeholder="Admin password"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-600 font-mono"
+              className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-xs touch:text-base text-white rounded-xl px-3 py-2.5 focus:outline-none placeholder-slate-600 font-mono"
             />
             {error && <div className="text-[10px] font-mono text-rose-400">{error}</div>}
             <div className="flex gap-2">

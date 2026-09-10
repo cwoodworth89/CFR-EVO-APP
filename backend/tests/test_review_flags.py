@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cfr_dispatch.pipeline.review_flags import (  # noqa: E402
     compute_review_flags,
-    LOCATION_UNRESOLVED, LOCATION_SUBSTITUTED, STREET_SECTION_ONLY,
+    LOCATION_UNRESOLVED, LOCATION_SUBSTITUTED, STREET_SECTION_ONLY, BLOCK_MIDPOINT,
     NO_TALK_GROUP, NO_MAP_GRID, NO_UNITS, UNKNOWN_CALL_TYPE,
     RESPONSE_TYPE_UNKNOWN, FLAG_LABELS,
 )
@@ -30,6 +30,15 @@ CLEAN = dict(
 
 def test_a_complete_dispatch_raises_nothing():
     assert compute_review_flags(**CLEAN) == []
+
+
+def test_an_announced_block_is_one_flag_not_a_substitution():
+    """#76: the block's middle carries a resolution_note for the amber banner, but the
+    dispatcher named the block and the pin is where the block is. One flag, labelled."""
+    flags = compute_review_flags(**CLEAN, resolution_note="Announced as the 2500 block ...",
+                                 location_type="block")
+    assert flags == [BLOCK_MIDPOINT]
+    assert BLOCK_MIDPOINT in FLAG_LABELS
 
 
 @pytest.mark.parametrize("override,expected", [

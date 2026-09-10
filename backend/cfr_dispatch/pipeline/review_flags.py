@@ -34,6 +34,7 @@ flags, 91 carry one, 9 carry two or more. Sparse enough that a flag means someth
 LOCATION_UNRESOLVED = "LOCATION_UNRESOLVED"
 LOCATION_SUBSTITUTED = "LOCATION_SUBSTITUTED"
 STREET_SECTION_ONLY = "STREET_SECTION_ONLY"
+BLOCK_MIDPOINT = "BLOCK_MIDPOINT"
 NO_TALK_GROUP = "NO_TALK_GROUP"
 NO_MAP_GRID = "NO_MAP_GRID"
 GRID_MISMATCH = "GRID_MISMATCH"
@@ -48,6 +49,7 @@ FLAG_LABELS = {
     LOCATION_UNRESOLVED: "Address could not be located",
     LOCATION_SUBSTITUTED: "Location was substituted by the resolver",
     STREET_SECTION_ONLY: "Street section only — no point location",
+    BLOCK_MIDPOINT: "Announced as a block; the pin is the block's middle, not an address",
     NO_TALK_GROUP: "No talk group announced or transcribed",
     NO_MAP_GRID: "No map grid announced or transcribed",
     GRID_MISMATCH: "Announced map grid differs from the zone the address sits in",
@@ -87,12 +89,18 @@ def compute_review_flags(*, lat, lng, responding_units, incident_type,
     """
     flags = []
 
+    kind = str(location_type or "").strip()
     if lat is None or lng is None:
         flags.append(LOCATION_UNRESOLVED)
-    if not _blank(resolution_note):
+    # A block's middle carries a resolution_note (it raises the kiosk's amber banner) but
+    # it is not a substitution: the dispatcher named the block and the pin is where the
+    # block is. One flag per fact, BLOCK_MIDPOINT below (#76).
+    if not _blank(resolution_note) and kind != "block":
         flags.append(LOCATION_SUBSTITUTED)
-    if str(location_type or "").strip() == "street_section":
+    if kind == "street_section":
         flags.append(STREET_SECTION_ONLY)
+    if kind == "block":
+        flags.append(BLOCK_MIDPOINT)
 
     if _blank(radio_channel):
         flags.append(NO_TALK_GROUP)

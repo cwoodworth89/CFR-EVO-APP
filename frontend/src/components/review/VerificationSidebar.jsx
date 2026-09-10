@@ -847,7 +847,7 @@ export default function VerificationSidebar({
               Include in Whisper training dataset?
             </label>
             {selectedCall.audio_duration !== undefined && selectedCall.audio_duration < 35.0 && (
-              <span className="text-[8px] text-rose-400 font-bold uppercase tracking-wider ml-auto animate-pulse" title="This call is under 35 seconds and appears to be cut off, so it is automatically excluded from Whisper training by default.">
+              <span className="text-[8px] text-rose-400 font-bold uppercase tracking-wider ml-auto motion-safe:animate-pulse" title="This call is under 35 seconds and appears to be cut off, so it is automatically excluded from Whisper training by default.">
                 ⚠️ Cut-Off Default
               </span>
             )}

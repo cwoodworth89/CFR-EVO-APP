@@ -13,6 +13,8 @@ const GROUP_DEFS = {
 };
 
 export function RightSidebar({ 
+  // A phone: a drawer over the right of the map rather than a column beside it.
+  compact = false,
   rightSidebarOpen, 
   setRightSidebarOpen, 
   appMode, 
@@ -135,6 +137,9 @@ export function RightSidebar({
   const isExplore = appMode === "EXPLORE";
   if (!isExplore) return null; // Only render right sidebar alerts in Explore/Information Mode
 
+  // 320 px beside the map; over it, most of a phone's width but never more than 24 rem.
+  const openWidth = compact ? 'w-[min(85vw,24rem)]' : 'w-80';
+
   const formatDateRange = (start, end) => {
     if (!start) return "Ongoing (Until Further Notice)";
     
@@ -154,10 +159,10 @@ export function RightSidebar({
   };
 
   return (
-    <div className={`relative h-full flex flex-row-reverse transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${rightSidebarOpen ? 'w-80 border-l border-slate-800' : 'w-0'}`}>
+    <div className={`${compact ? 'absolute inset-y-0 right-0' : 'relative'} h-full flex flex-row-reverse transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${rightSidebarOpen ? `${openWidth} border-l border-slate-800` : 'w-0'}`}>
        {/* Sidebar Body Wrapper (animates width and uses overflow-hidden to prevent contents sticking out when collapsed) */}
-       <div className={`h-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${rightSidebarOpen ? 'w-80' : 'w-0'}`}>
-          <div className="w-80 h-full flex flex-col overflow-hidden">
+       <div className={`h-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${rightSidebarOpen ? openWidth : 'w-0'}`}>
+          <div className={`${openWidth} h-full flex flex-col overflow-hidden`}>
              {/* Header Title */}
              <div className="bg-slate-950 p-4 border-b border-slate-800 text-center flex-shrink-0">
                 <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR DISPATCH</div>
@@ -232,7 +237,7 @@ export function RightSidebar({
                                                     </span>
                                                     {closure.isActive ? (
                                                       <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded text-[7px] font-black tracking-wider flex items-center gap-1">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse inline-block"></span>
                                                         ACTIVE
                                                       </span>
                                                     ) : (
@@ -266,8 +271,9 @@ export function RightSidebar({
        {/* Floating Toggle Tab */}
        <button 
          onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-         className="absolute top-1/2 -translate-y-1/2 -left-6 z-[1010] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-l-lg w-6 h-16 flex items-center justify-center shadow-2xl border border-r-0 border-slate-800 cursor-pointer select-none transition-all duration-300"
+         className={`absolute ${compact ? 'top-24' : 'top-1/2 -translate-y-1/2'} -left-6 touch:-left-9 z-[1010] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-l-lg w-6 touch:w-9 h-16 flex items-center justify-center shadow-2xl border border-r-0 border-slate-800 cursor-pointer select-none transition-all duration-300`}
          title={rightSidebarOpen ? "Collapse Alerts" : "Expand Alerts"}
+         aria-label={rightSidebarOpen ? "Collapse road closures" : "Expand road closures"}
        >
          <span className="text-[10px] font-black">{rightSidebarOpen ? "▶" : "◀"}</span>
        </button>

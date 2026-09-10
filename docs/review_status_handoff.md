@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **86 items, 6 open (3 crew-visible), 80 closed** as of 2026-09-08 night. The live work queue
+  **87 items, 6 open (3 crew-visible), 81 closed** as of 2026-09-09. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -23,7 +23,7 @@ Companion documents:
 
 ## Update, 2026-09-08 — hardening, the operator's UX pass, and two streams spun out
 
-**Punch list: 6 open, 3 crew-visible, 80 closed.** Two sessions worked this day: one on UX
+**Punch list: 6 open, 3 crew-visible, 81 closed** (2026-09-09: #1 closed by the routing stream, #76 opened). Two sessions worked this day: one on UX
 (kiosk mode removed, zone labels, the Street View zoom saga, the basemap collapse and its
 revert), and this one, which reviewed that work and then took the operator's notes live.
 
@@ -39,15 +39,19 @@ revert), and this one, which reviewed that work and then took the operator's not
 | Snap, parcel shading and the hydrant picks **confirmed on the kiosk by the operator** (not only on the workstation) | #74 |
 | Arrival points set by the operator on two real sites; the card scrolls | #49 closed |
 | Test suite no longer leaves `5000 TESTING WAY` in the live parcels table; the review sidebar names the box that rules each flag | — |
+| **2026-09-09, the announced block (#76)**: "2500 Block Barnet Hwy" geocodes to the block's middle, labelled as announced, the block drawn on both maps, one midpoint per carriageway handed to routing so a westbound engine is not sent past the block to U-turn (measured: 3,574 m and no loop against 4,451 m with it). Live at the operator's next agent restart | #76 |
 | **2026-09-09, the admin unlock**: a padlock at the right of the workstation header; the review entry, the arrival-point controls and the Street View save exist only while unlocked; the four save routes answer 401 without the token; 30 days unless locked. The client's silent self-login (password in the source) is gone and the signing key lives in the root `.env`, so every browser starts locked. **Confirmed by the operator** on the workstation: unlocked, the review entry and both save controls came back | ux_notes §3 |
 
 ### Decisions recorded, not built
 
 Interactive Street View stays (the slider alternative declined); admin-gating the two saves
 is the operator's design for the UX pass; one hydrant versus two is still theirs. **Round 2
-of the model: leave it** (operator, 2026-09-08); round 1 stays live. **#74 is shelved**: the
-operator is designing the details box's home with Claude Design, and the item waits for that
-design rather than for code. All in [`ux_notes.md`](ux_notes.md).
+of the model: leave it** (operator, 2026-09-08); round 1 stays live. **#74's design landed
+2026-09-09 and is built, unconfirmed**: artboard 3A of the operator's Claude Design canvas
+([`design/`](design/README.md)) is the dispatch display on branch
+`claude/mobile-accessibility-review-v8cih3`; the box is gone, units in the header, the
+hydrant on the map. The operator has not yet seen it on the kiosk. All in
+[`ux_notes.md`](ux_notes.md).
 
 ### Two streams, two worktrees
 
@@ -132,7 +136,8 @@ live; the four round-2 rows in `evaluation_history` carry the verdict in their n
 
 | Item | Who | What |
 |:--|:--|:--|
-| #74 | operator | where the dispatch-details box should live (shelved 2026-09-08, being designed outside the code) |
+| #76 | operator | **built 2026-09-09**: an announced block geocodes to the block's middle, with a midpoint per carriageway for routing; goes live at the next agent restart, then a block call closes it. Default extent civic N00–N99 until the operator says otherwise |
+| #74 | operator | look at artboard 3A on the kiosk (built 2026-09-09 from the operator's own canvas, merged to main the same evening) and say whether it stays |
 | #64 | operator | the civic-number checklist, at work |
 | #49 | operator | set an arrival point on a real site, then close |
 | #1 | both | routing loops not re-observed since stock OSRM; the profile has no held documentation (standards index) — reproduce a named call first |

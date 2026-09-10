@@ -565,13 +565,13 @@ export default function DispatchReview({ onClose, onReviewCall }) {
             <span>🛡️ ADMIN DISPATCH REVIEW DASHBOARD</span>
             {dbStatus === 'connected' && (
               <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 motion-safe:animate-pulse"></span>
                 DB Connected
               </span>
             )}
             {dbStatus === 'checking' && (
               <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 motion-safe:animate-ping"></span>
                 Checking DB...
               </span>
             )}
@@ -586,13 +586,13 @@ export default function DispatchReview({ onClose, onReviewCall }) {
                 className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250 cursor-help"
                 title={`RF Listener Online | Device: ${listenerDetails?.device || 'Default'} | Engine: ${listenerDetails?.stt_engine || 'Whisper'}`}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 motion-safe:animate-pulse"></span>
                 📡 LISTENER ONLINE
               </span>
             )}
             {listenerStatus === 'checking' && (
               <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 motion-safe:animate-ping"></span>
                 📡 CHECKING LISTENER...
               </span>
             )}
@@ -601,7 +601,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
                 className="text-[10px] text-rose-400 bg-rose-500/15 border border-rose-500/40 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300 shadow-sm cursor-help"
                 title={listenerDetails?.message || 'RF Listener offline or process died!'}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 motion-safe:animate-ping"></span>
                 ⚠️ LISTENER OFFLINE
               </span>
             )}

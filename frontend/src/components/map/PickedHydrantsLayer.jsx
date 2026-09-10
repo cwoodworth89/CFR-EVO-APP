@@ -1,3 +1,4 @@
+import { HYDRANT_CLASS_COLOUR, metresToFeet } from '../../utils/hydrantCard';
 import React, { useMemo } from 'react';
 import { Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
@@ -13,7 +14,8 @@ import L from 'leaflet';
  * in the NFPA 291 class colour with the pick's number in it, nothing else on the map; the
  * id, class and how it was chosen are in the details box and on hover.
  */
-const CLASS_COLOUR = { AA: '#38bdf8', A: '#4ade80', B: '#fb923c', C: '#f87171' };
+// One table for the map badges and the hydrant card on the dispatch map (utils/hydrantCard.js).
+const CLASS_COLOUR = HYDRANT_CLASS_COLOUR;
 
 function badgeIcon(n, fill, isPrivate) {
   const ring = isPrivate ? '#f59e0b' : '#ffffff';
@@ -44,7 +46,8 @@ export default function PickedHydrantsLayer({ picks = [] }) {
           <Marker key={h.gisId || i} position={[Number(h.lat), Number(h.lng)]} icon={icons[i]} zIndexOffset={1000}>
             <Tooltip direction="top" offset={[0, -12]}>
               <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 800, fontSize: 11 }}>
-                #{i + 1} {h.gisId} {fc || 'UNRATED'}{isPrivate ? ' PRIVATE' : ''} · {h.distance} m
+                {/* Feet: hose is laid in feet (operator, 2026-09-09: "we use ft for hose lay lengths"). */}
+                #{i + 1} {h.gisId} {fc || 'UNRATED'}{isPrivate ? ' PRIVATE' : ''} · {metresToFeet(h.distance) ?? '--'} ft
               </span>
             </Tooltip>
           </Marker>

@@ -100,6 +100,38 @@ class TestGeocoderOrchestrator:
         assert res_62["grid"] == "62"
         assert abs(res_62["lat"] - 49.24500) < 0.0001
 
+    def test_step0_an_announced_block_beats_the_parcel_with_that_number(self, mock_validator):
+        """#76: "1080 Block Ponderosa St" is a hundred-block. A parcel numbered 1080 may
+        exist; resolving to it would say the dispatcher named an address they did not."""
+        mock_validator.address.resolve_exact = MagicMock(return_value={
+            "address": "1080 Ponderosa St", "lat": 49.276, "lng": -122.793,
+            "rings": [[[49.276, -122.793]]], "confidence": 100.0, "is_ambiguous": False
+        })
+        mock_validator.address.resolve_block_midpoint = MagicMock(return_value={
+            "address": "1000 Block Ponderosa St", "lat": 49.2765, "lng": -122.7935,
+            "rings": [], "confidence": 70.0, "location_type": "block",
+            "segment": [[[-122.794, 49.276], [-122.793, 49.277]]], "length_m": 120,
+            "block_range": "1001-1099", "is_block_midpoint": True,
+            "requested_address": "1000 Block Ponderosa St",
+            "resolution_note": "Announced as the 1000 block of Ponderosa St ...",
+            "is_ambiguous": False
+        })
+        res = mock_validator.get_coordinates("1080 Block Ponderosa St")
+        assert res is not None and res["location_type"] == "block"
+        assert res["address"] == "1000 Block Ponderosa St"
+        mock_validator.address.resolve_block_midpoint.assert_called_once_with("1080", "PONDEROSA", "ST")
+        mock_validator.address.resolve_exact.assert_not_called()
+
+    def test_without_the_block_word_the_parcel_still_wins(self, mock_validator):
+        mock_validator.address.resolve_exact = MagicMock(return_value={
+            "address": "1080 Ponderosa St", "lat": 49.276, "lng": -122.793,
+            "rings": [[[49.276, -122.793]]], "confidence": 100.0, "is_ambiguous": False
+        })
+        mock_validator.address.resolve_block_midpoint = MagicMock(return_value=None)
+        res = mock_validator.get_coordinates("1080 Ponderosa St")
+        assert res["address"] == "1080 Ponderosa St"
+        mock_validator.address.resolve_block_midpoint.assert_not_called()
+
     def test_step3_block_interpolation(self, mock_validator):
         mock_validator.address.resolve_exact = MagicMock(return_value=None)
         mock_validator.address.resolve_block = MagicMock(return_value={

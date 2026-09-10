@@ -1,7 +1,7 @@
 /* global __BUILD_DATE__ */
 // NOTE: Map layout config is in docs/gis_endpoints.md, but its local-JSON sections are
 // SUPERSEDED -- hydrants/zones now come from PostGIS via the API, not public/data/*.json.
-import React, { useEffect, useState, useCallback, useMemo } from 'react'; // Added useRef, useCallback, useMemo
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -26,6 +26,8 @@ import RoadClosuresLayer from './map/RoadClosuresLayer';
 import DispatchTargetLayer from './map/DispatchTargetLayer';
 import { useMapLayerPreferences } from '../hooks/useMapLayerPreferences';
 import { useRoadClosures } from '../hooks/useRoadClosures';
+import { useCompactViewport } from '../hooks/useCompactViewport';
+import { routeFitOptions } from './map/fitPadding';
 
 import { RoutingOverlay } from './RoutingOverlay';
 import { calculateEVORouteMetrics, DEFAULT_ROUTING_CONFIG } from '../utils/EVORoutingEngine';
@@ -68,6 +70,15 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   // APP/TERMINAL STATE
   const [appMode, setAppMode] = useState(initialMode);
   const admin = useAdminSession();
+  // A phone (below `lg`): the sidebars become sheets over the map and the detail stack a
+  // tabbed sheet at the bottom; the fits pad by what the sheet covers. Above `md` nothing
+  // changes; `md` was measured too narrow (hooks/useCompactViewport.js).
+  const compact = useCompactViewport();
+  const stackRef = useRef(null);
+  const getFitOverlays = useCallback(
+    () => (compact && stackRef.current ? { bottom: stackRef.current.offsetHeight || 0 } : null),
+    [compact],
+  );
 
   // Sync the initialMode prop into local state during render rather than in an
   // effect: an effect renders the stale mode once before correcting itself.
@@ -333,23 +344,24 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     return [lat, lng];
   }, [targetAddress]);
 
-  // Adaptive Zooming: fit bounds to show both origin hall & destination address inside middle window (between Left 320px & Right 380px sidebars)
+  // Fit the origin hall and the destination. The padding is measured from the map
+  // (map/fitPadding.js). It was written as [340, 80] / [400, 80] on the belief that the
+  // sidebars overlay the map; they are flex siblings and the map is already narrowed by
+  // them, so the route was fitted into the middle half of what was left, and on a phone the
+  // literals exceeded the container, which Leaflet answers with a NaN zoom (measured
+  // 2026-09-09, docs/standards/dependency-behaviour.md). On a phone the detail sheet does
+  // overlay the map, and its measured height pads the bottom.
   useEffect(() => {
     if (map && targetAddress && STATIONS[homeHall] && appMode === "EXPLORE" && !userPanned && targetCoords) {
-      // Padding is asymmetric on purpose: the left sidebar and right inspection stack
-      // both overlay the map, so an evenly padded fit tucks the route underneath them.
-      fitTo([STATIONS[homeHall], targetCoords], {
-        paddingTopLeft: [340, 80],
-        paddingBottomRight: [400, 80],
-      });
+      fitTo([STATIONS[homeHall], targetCoords], routeFitOptions(map, { animate: true, overlays: getFitOverlays() }));
     }
-  }, [map, targetAddress, homeHall, appMode, userPanned, targetCoords, fitTo]);
+  }, [map, targetAddress, homeHall, appMode, userPanned, targetCoords, fitTo, getFitOverlays]);
 
 
   // Auto-resize Leaflet map container to prevent gray areas when sidebars open/close
   useEffect(() => {
     return invalidateSoon();
-  }, [invalidateSoon, leftSidebarOpen, rightSidebarOpen]);
+  }, [invalidateSoon, leftSidebarOpen, rightSidebarOpen, compact]);
 
   const startMode = useCallback((mode) => {
       setAppMode(mode);
@@ -386,7 +398,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     && Boolean(showLabels || targetAddress || currentZoom <= 15);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
+    <div className="h-dvh w-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans safe-area">
       
       <Header 
         admin={admin}
@@ -408,10 +420,11 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
         homeHall={homeHall}
       />
 
-      <div className="flex flex-row flex-grow w-full h-[calc(100vh-4rem)] relative overflow-hidden z-10">
+      <div className="flex flex-row flex-1 min-h-0 w-full relative overflow-hidden z-10">
         {/* Left Control Panel & Option Toggles */}
         <LeftSidebar 
           {...layers}
+          compact={compact}
           leftSidebarOpen={leftSidebarOpen}
           setLeftSidebarOpen={setLeftSidebarOpen}
           appMode={appMode}
@@ -503,14 +516,26 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
             setMapStyle={setMapStyle}
             defaultMapStyle={MODE_DEFAULTS.EXPLORE}
             resetView={resetView}
+            compact={compact}
+            getFitOverlays={getFitOverlays}
           />
         </div>
 
         {/* Right 1/3 Spatial Inspection Stack Panel (Target Address, 3D Satellite, Street View) */}
+        {/* Beside the map from `lg` up; a tabbed sheet over the bottom of it on a phone. The
+            wrapper is measured for the fit padding, so the sheet's height is what it is. */}
         {appMode === "EXPLORE" && targetAddress && (
+          <div
+            ref={stackRef}
+            className={compact
+              ? 'absolute inset-x-0 bottom-0 z-[1000] bg-slate-950 border-t border-slate-800 rounded-t-2xl p-2 shadow-2xl'
+              : 'w-[380px] h-full bg-slate-950 border-l border-slate-800 p-3 z-[1000] flex-shrink-0 shadow-2xl'}
+          >
           <DetailStack
             call={stackCall}
-            className="w-[380px] bg-slate-950 border-l border-slate-800 p-3 z-[1000] flex-shrink-0 shadow-2xl animate-in slide-in-from-right duration-300"
+            className="h-full"
+            compact={compact}
+            sheet={compact}
             topCard={
               <TargetAddressCard
                 targetAddress={targetAddress}
@@ -527,12 +552,14 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
               />
             }
           />
+          </div>
         )}
 
         {/* Right Sidebar Alerts Panel */}
         {(!targetAddress || appMode !== "EXPLORE") && (
           <RightSidebar 
             {...layers}
+            compact={compact}
             rightSidebarOpen={rightSidebarOpen}
             setRightSidebarOpen={setRightSidebarOpen}
             appMode={appMode}

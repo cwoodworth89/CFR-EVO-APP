@@ -108,7 +108,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       const stale = isStaleChunkError(this.state.error);
       return (
-        <div className="w-screen h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none font-sans">
+        <div className="w-screen h-dvh bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none font-sans">
           <div className="max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4 text-left">
             <div className="flex items-center gap-2 text-rose-400">
               <span className="text-3xl">⚠️</span>

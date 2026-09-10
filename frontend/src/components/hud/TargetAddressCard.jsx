@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { metresToFeet } from '../../utils/hydrantCard';
 
 /**
  * Address summary for the workstation inspection stack: the searched target, its building
@@ -77,11 +78,11 @@ function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave
           set the point and when. */}
       {canEdit && (!placing ? (
         <div className="flex gap-1.5">
-          <button onClick={onStart} className="flex-1 text-[10px] font-bold font-mono px-2 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 cursor-pointer">
+          <button onClick={onStart} className="flex-1 text-[10px] font-bold font-mono px-2 py-1.5 touch:py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 cursor-pointer">
             {hasEntrance ? 'Move arrival point' : 'Set arrival point'}
           </button>
           {hasEntrance && (
-            <button onClick={() => { onStart(); }} title="Clear: the computed frontage is used again" className="text-[10px] font-bold font-mono px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-red-900 text-slate-300 border border-slate-700 cursor-pointer">
+            <button onClick={() => { onStart(); }} title="Clear: the computed frontage is used again" className="text-[10px] font-bold font-mono px-2 py-1.5 touch:py-2.5 rounded-lg bg-slate-800 hover:bg-red-900 text-slate-300 border border-slate-700 cursor-pointer">
               Clear
             </button>
           )}
@@ -92,20 +93,20 @@ function ArrivalPointSection({ parcel, placing, draft, onStart, onCancel, onSave
             {draft ? `Pin at ${draft.lat.toFixed(5)}, ${draft.lng.toFixed(5)}` : 'Click the map where the truck stops'}
           </div>
           <input value={note} onChange={e => setNote(e.target.value)} placeholder="Why, in your words: gated, keypad at Glen Dr west end" maxLength={200}
-            className="text-[10px] font-mono bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white placeholder:text-slate-600" />
+            className="text-[10px] touch:text-base font-mono bg-slate-950 border border-slate-700 rounded px-2 py-1 touch:py-2 text-white placeholder:text-slate-600" />
           <input value={setBy} onChange={e => setSetBy(e.target.value)} placeholder="Your name or initials" maxLength={60}
-            className="text-[10px] font-mono bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white placeholder:text-slate-600" />
+            className="text-[10px] touch:text-base font-mono bg-slate-950 border border-slate-700 rounded px-2 py-1 touch:py-2 text-white placeholder:text-slate-600" />
           {error && <div className="text-[10px] font-mono text-red-400">{error}</div>}
           <div className="flex gap-1.5">
-            <button disabled={busy || !draft} onClick={() => submit(false)} className="flex-1 text-[10px] font-bold font-mono px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white border border-emerald-400 cursor-pointer">
+            <button disabled={busy || !draft} onClick={() => submit(false)} className="flex-1 text-[10px] font-bold font-mono px-2 py-1.5 touch:py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white border border-emerald-400 cursor-pointer">
               {busy ? 'Saving…' : 'Save arrival point'}
             </button>
             {hasEntrance && (
-              <button disabled={busy} onClick={() => submit(true)} className="text-[10px] font-bold font-mono px-2 py-1.5 rounded-lg bg-red-800 hover:bg-red-700 text-white border border-red-600 cursor-pointer">
+              <button disabled={busy} onClick={() => submit(true)} className="text-[10px] font-bold font-mono px-2 py-1.5 touch:py-2.5 rounded-lg bg-red-800 hover:bg-red-700 text-white border border-red-600 cursor-pointer">
                 Clear it
               </button>
             )}
-            <button disabled={busy} onClick={onCancel} className="text-[10px] font-bold font-mono px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">
+            <button disabled={busy} onClick={onCancel} className="text-[10px] font-bold font-mono px-2 py-1.5 touch:py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">
               Cancel
             </button>
           </div>
@@ -132,7 +133,7 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
             </div>
             <button 
               onClick={onClose}
-              className="text-slate-400 hover:text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-800 transition cursor-pointer"
+              className="text-slate-400 hover:text-white text-xs font-bold w-6 h-6 touch:w-10 touch:h-10 flex items-center justify-center rounded-full hover:bg-slate-800 transition cursor-pointer"
               title="Close Inspection Panel"
             >
               ✕
@@ -175,7 +176,8 @@ export default function TargetAddressCard({ targetAddress, nearestHydrants = [],
               </span>
               <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
                 <span className="text-slate-400">ID / Distance</span>
-                <span className="text-white font-black">{nearest.gisId} ({nearest.distance} m{nearest.how === 'doorstep' ? ', within a 50 ft roll' : nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
+                {/* Feet, as hose is laid (operator, 2026-09-09); the picker measures in metres. */}
+                <span className="text-white font-black">{nearest.gisId} ({metresToFeet(nearest.distance) ?? '--'} ft{nearest.how === 'doorstep' ? ', within a 50 ft roll' : nearest.how === 'approach' ? ' before arrival, on route' : nearest.how === 'supply' ? ', supply lay' : ''})</span>
               </div>
               {nearest.flowClass && (
                 <div className="flex justify-between text-xs bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">

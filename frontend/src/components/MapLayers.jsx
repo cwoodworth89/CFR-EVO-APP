@@ -386,7 +386,7 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12, highlightId
                 fillColor: borderColor,
                 fillOpacity: isNearest ? 1 : 0.95,
                 weight: isNearest ? 3 : 1.5,
-                className: isNearest ? 'animate-pulse' : ''
+                className: isNearest ? 'motion-safe:animate-pulse' : ''
               }}
             >
               <Tooltip direction="top" offset={[0, -6]} className="!bg-transparent !border-0 !p-0 !shadow-none">

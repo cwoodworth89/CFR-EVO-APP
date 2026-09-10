@@ -131,7 +131,7 @@ export default function ReviewTable({
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-2">
             <span className="flex h-4 w-4 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+              <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-4 w-4 bg-sky-500"></span>
             </span>
             <span className="text-[10px] font-bold font-mono tracking-widest uppercase mt-2">Fetching dispatch logs...</span>
@@ -269,7 +269,7 @@ export default function ReviewTable({
                             🟢 Fine-Tuned
                           </span>
                         ) : (
-                          <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse font-mono" title="Queued for next model retuning run">
+                          <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded motion-safe:animate-pulse font-mono" title="Queued for next model retuning run">
                             🟡 QUEUED
                           </span>
                         )}

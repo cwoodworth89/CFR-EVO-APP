@@ -15,16 +15,17 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**5 open** (2 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**6 open** (3 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 5
+## Open — 6
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **76** | 🔴 crew-visible | OPEN | [A dispatched block lands on one civic number at the block's end, and the route U-turns past it](punchlist/76-a-dispatched-block-lands-on-one-civic-number-the-route-u-turns.md) |
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
-| **74** | 🔴 crew-visible | DEFERRED | [Kiosk map: no hydrants, RE-CENTER always on, details box over the pin, Street View tile buried](punchlist/74-kiosk-map-no-hydrants-recentre-always-on-details-box-over-the-pin.md) |
+| **74** | 🔴 crew-visible | BUILT, unconfirmed (3A, 2026-09-09) | [Kiosk map: no hydrants, RE-CENTER always on, details box over the pin, Street View tile buried](punchlist/74-kiosk-map-no-hydrants-recentre-always-on-details-box-over-the-pin.md) |
 | **60** | ⚪ hygiene | DEFERRED | [`DriverStationSetup` is a placeholder, not in operational use](punchlist/60-driverstationsetup-is-a-placeholder-not-in-operational.md) |
 | **32** | ⚪ hygiene | DEFERRED | [QA review: re-derive the amber "needs attention" threshold once more calls are rated](punchlist/32-qa-review-re-derive-the-amber-needs-attention-threshold.md) |
 | **52a** | ⚪ hygiene | OPEN | [Kiosk review button formatting and review rating functionality](punchlist/52a-kiosk-review-button-formatting-and-review-rating-functi.md) |

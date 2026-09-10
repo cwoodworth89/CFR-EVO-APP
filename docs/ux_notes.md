@@ -15,14 +15,15 @@ decide from.
 
 | Surface | Who looks at it | Where it lives |
 |:--|:--|:--|
-| **Kiosk view** | the crew, for the minutes between the tones and rolling out | `frontend/src/components/kiosk/KioskView.jsx`: banner, route map with a floating details box, a three-panel stack on the right |
+| **Kiosk view** | the crew, for the minutes between the tones and rolling out | `frontend/src/components/kiosk/KioskView.jsx`: three header cards (the call, the units with ETAs, the clock), the route map with a route pill, a control stack and a hydrant card, two view tiles. **Artboard 3A of the operator's Claude Design canvas, built 2026-09-09**: the canvas is in [`design/`](design/README.md), the build and its departures in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md) §7 |
 | **Workstation / Explore** | the operator at a desk: searching an address, setting an arrival point, a Street View | `MapBoard.jsx` with the left controls and the `DetailStack` on the right |
 | **Review screen** | the operator verifying calls, which feeds the training data and the hotwords | `DispatchReview.jsx`, `review/*` |
 | **Mobile setup** | nobody yet (#60, deferred pending redesign) | `DriverStationSetup.jsx`, reached only from the console's **MOBILE SETUP** button since 2026-09-08 |
+| **The crew's phone** | crews, for the call's details and for looking up a property (operator, 2026-09-09: *"it critical"*) | the same two surfaces below Tailwind's `lg` line (1024 px): sheets and tabs instead of columns. Built 2026-09-09; the plan, the rulings and what was checked are in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md) |
 
 The kiosk runs snap Chromium in kiosk mode on Wayland on the hall machine; the operator also
 opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day are
-1,916 × 1,000 px. Whether the hall display is touch or mouse is not recorded here; ask.
+1,916 × 1,000 px. **The hall display will be a touch-sensitive TV; the Flex 5 is the server only** (operator, 2026-09-09), so anything shown only on hover is not shown at all. The phone and tablet surfaces are reviewed and planned in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md).
 
 ---
 
@@ -32,7 +33,7 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 
 | Said | Done | Left |
 |:--|:--|:--|
-| *"I don't like the floating dispatch details box as it is right now. Look, it covers up the destination."* | The route fit now pads its left edge by the box's width, so the pin is never under it | **Where the box should live** is undecided: floating but collapsed by default, folded into the header strip beside the ETA badges, or a slim bar under the map (#74) |
+| *"I don't like the floating dispatch details box as it is right now. Look, it covers up the destination."* | The route fit now pads its left edge by the box's width, so the pin is never under it. **2026-09-09: the box is gone**, to the operator's own artboard 3A: units and ETAs in the header, the hydrant on the map, the arrival-point ruling in a notices row (§1) | Operator to confirm on the kiosk (#74) |
 | *"Re-centre route always appears, even by default."* | A programmatic fit no longer counts as a pan; the button appears only after a real drag or wheel | — |
 | *"The pip windows are VERY busy. The worst offender is the streetview one."* | Street View tile: lower bar removed, header shrunk to *Street View ● 214°* | The cadastral and satellite tiles keep their header pill, a *100% Local* badge and *Expand*. Nothing specific was asked; they are the next candidates |
 | *"The option to save a view should only be inside the expanded window."* | Done | — |
@@ -81,7 +82,10 @@ automated runs hit was pressing it before the suggestions had loaded.
 1. **The details box.** Three options above. The operator dislikes the current floating box;
    what they want instead has not been said. 2026-09-08: the operator is working the design
    out with Claude Design, and #74 is shelved until it lands. Build to that design, not to
-   the three options.
+   the three options. **Landed and built 2026-09-09**: artboard 3A ([`design/`](design/README.md))
+   folds the box into the header and the map; the build and every departure from the canvas
+   are in `briefings/mobile_accessibility_review.md` §7. The operator has not yet seen it on
+   the kiosk; 3C (the expand state) is not built.
 2. **Drop the cadastral tile; snap the route map instead.** Operator, 2026-09-07: *"I'm
    thinking about getting rid of that cadastral pip in the top right corner, and instead have
    a 'Zoom to Incident' or 'Zoom to Parcel' button that snaps the main routing window to a
@@ -195,6 +199,12 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
   **off** the basemap, because that toggle draws the cadastral overlay and its own names.
 * **The marker is where the truck stops** — the city-to-private transition. Distances to it
   are distances the crew will walk or lay hose.
+* **Hydrant distances are in feet**, everywhere the crew reads one (operator, 2026-09-09:
+  *"we use ft for hose lay lengths"*). The picker measures in metres; `utils/hydrantCard.js`
+  converts at the point of display, 1 ft = 0.3048 m exactly. Route distances stay in km, as
+  OSRM and the odometer report them.
+* **No TV mode.** Sizing is responsive by viewport width, never by a per-call toggle
+  (operator, 2026-09-09).
 
 ### Hydrants, as ruled
 
@@ -210,12 +220,17 @@ anything within 1,000 ft; else the warning. Two picks, numbered on the map.
 ## 5. Things a designer will need
 
 * The real screens: the operator takes screenshots readily; the review replay of any past
-  call reproduces the kiosk view without waiting for a dispatch.
+  call reproduces the kiosk view without waiting for a dispatch. Off the kiosk,
+  `frontend/scripts/viewport_smoke.mjs --dispatch DISP-… --api http://100.95.146.94:8000`
+  renders a real replayed call at five sizes in headless Chrome and proxies the data from the
+  kiosk (nothing invented, CLAUDE.md §6.5).
+* The canvases already drawn are committed under [`design/`](design/README.md); a build is
+  checked against the artboard it was made from.
 * The browser to test in is real Chrome or Firefox against `http://100.95.146.94/`; the
   in-app browser blocks the API port. Reload with `?nocache=N` after a build.
 * The timings that shape the kiosk: phase 1 publishes at 16–19 s, the address arrives later on
   multi-unit calls, phase 2 lands at the end of the broadcast (about 45–75 s), auto-dismiss is
   5 minutes and pauses during a replay.
-* The hall display's size, viewing distance and input method: not recorded, ask the operator.
+* The hall display is a touch-sensitive TV (operator, 2026-09-09). Its size and viewing distance are still not recorded; ask the operator.
 * Everything on screen must survive with no internet except Street View, which is the one
   accepted exception and is labelled as such.

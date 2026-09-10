@@ -51,13 +51,21 @@ function rememberDismissedId(dispatchId) {
                 the safe direction to fail: a call shown twice beats one lost. */ }
 }
 
-export function useKioskQueue() {
+/**
+ * @param {object} [options]
+ * @param {boolean} [options.autoDismiss=true]  the hall display's five-minute clock. Off on
+ *   a phone: a call stays until the driver clears it and a later call waits underneath in
+ *   the queue (operator, 2026-09-09: "Stay until cleared. another call would wait
+ *   underneath"). The same driver is at the hydrant on arrival, which the clock would have
+ *   wiped. The restore window after a reload is unchanged on both: a call older than five
+ *   minutes is not brought back as active, because its elapsed clock would read as real.
+ */
+export function useKioskQueue({ autoDismiss = true } = {}) {
   const [activeCall, setActiveCall] = useState(null);
   const [queuedCalls, setQueuedCalls] = useState([]);
   const [isReviewMode, setIsReviewMode] = useState(false);
   // How the last active call ended: { reason: 'manual' | 'timeout', at } (#37).
   const [lastDismiss, setLastDismiss] = useState(null);
-  const [isTvMode, setIsTvMode] = useState(false);
   const [isRecentlyUpdated, setIsRecentlyUpdated] = useState(false);
   // Which operator-visible fields changed, for the badge tooltip. Empty when idle.
   const [updatedFields, setUpdatedFields] = useState([]);
@@ -341,7 +349,7 @@ export function useKioskQueue() {
   // Declared after dismissActiveCall: referencing it earlier hit the temporal dead
   // zone and threw when the countdown actually reached zero.
   useEffect(() => {
-    if (!activeCall || isTimerPaused || isReviewMode || activeCall?.isReview) return;
+    if (!autoDismiss || !activeCall || isTimerPaused || isReviewMode || activeCall?.isReview) return;
 
     timeoutTimerRef.current = setInterval(() => {
       setTimeoutSecondsLeft((prev) => {
@@ -356,7 +364,7 @@ export function useKioskQueue() {
     return () => {
       if (timeoutTimerRef.current) clearInterval(timeoutTimerRef.current);
     };
-  }, [activeCall, isTimerPaused, isReviewMode, dismissActiveCall]);
+  }, [autoDismiss, activeCall, isTimerPaused, isReviewMode, dismissActiveCall]);
 
   // Historical Dispatch Review Replay (Admin Dispatch Review panel)
   const triggerReviewCall = useCallback((reviewCall) => {
@@ -368,10 +376,6 @@ export function useKioskQueue() {
     setIsReviewMode(false);
     setActiveCall(null);
     setQueuedCalls([]);
-  }, []);
-
-  const toggleTvMode = useCallback(() => {
-    setIsTvMode((prev) => !prev);
   }, []);
 
   // Format seconds to mm:ss or hh:mm:ss
@@ -390,17 +394,17 @@ export function useKioskQueue() {
     queuedCalls,
     isReviewMode,
     lastDismiss,
-    isTvMode,
     isRecentlyUpdated,
     updatedFields,
     elapsedFormatted: formatTime(elapsedSeconds),
-    timeoutFormatted: formatTime(timeoutSecondsLeft),
+    autoDismiss,
+    // null when there is no clock, so nothing renders a countdown that is not running.
+    timeoutFormatted: autoDismiss ? formatTime(timeoutSecondsLeft) : null,
     isTimerPaused,
     resetTimeoutClock,
     advanceToNextCall,
     dismissActiveCall,
     triggerReviewCall,
     exitReview,
-    toggleTvMode,
   };
 }

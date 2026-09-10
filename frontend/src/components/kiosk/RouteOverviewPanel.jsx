@@ -1,19 +1,37 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Marker, Popup, Polygon, useMap, useMapEvents } from 'react-leaflet';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { Marker, Popup, Polygon, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
 import HallRoutesOverlay from '../map/HallRoutesOverlay';
-import { hallColour, UNASSIGNED_HALL_COLOUR } from '../MapConstants';
 import MapSurface from '../map/MapSurface';
 import RoadClosuresLayer from '../map/RoadClosuresLayer';
 import { useRoadClosures } from '../../hooks/useRoadClosures';
 import { BASE_LAYERS, CADASTRAL_MIN_ZOOM } from '../MapConstants';
-import { calculateEVORouteMetrics } from '../../utils/EVORoutingEngine';
 import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
-import { TIER } from '../../utils/routeHydrants';
+import HydrantCard from './HydrantCard';
+import { hydrantCardModel } from '../../utils/hydrantCard';
+import { routeFitOptions, snapFitOptions } from '../map/fitPadding';
+
+// The chrome over the map (artboard 3A of the operator's Claude Design canvas): the route
+// pill top left, the control stack top right in one fixed order, the hydrant card bottom
+// left. Each sits Tailwind's spacing-3 (12 px) in from the map's edge; the fits measure the
+// stack and the card and add this inset, so the route is never under either.
+const OVERLAY_INSET_PX = 12;
+const CONTROL = 'bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg px-4 py-3 lg:px-5 lg:py-3.5 touch:py-4 font-mono font-extrabold text-xs lg:text-sm tracking-[0.1em] uppercase shadow-lg transition whitespace-nowrap';
+const ZOOM_BTN = 'w-12 h-12 xl:w-14 xl:h-14 bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg text-slate-50 font-sans text-2xl leading-none shadow-lg cursor-pointer';
+
+/** The route pill's text: OSRM's figures for the drawn home route, or the unknown marks. */
+function routePillText(summary) {
+  if (!summary) return 'ROUTE · -- KM · -- MIN';
+  const km = summary.distanceKm != null ? `${Number(summary.distanceKm).toFixed(1)} KM` : '-- KM';
+  const min = summary.etaMinutes != null ? `${Math.round(Number(summary.etaMinutes))} MIN` : '-- MIN';
+  // A degraded answer is a straight-line distance with no router behind it: say so
+  // (docs/ux_notes.md section 4, "straight-line on a distance that is one").
+  return `${summary.degraded ? 'STRAIGHT-LINE' : 'ROUTE'} · ${km} · ${min}`;
+}
 
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 // A programmatic fit fires the same zoomstart the user's scroll wheel does, so the
@@ -34,7 +52,7 @@ function markFitting(map, fittingRef) {
 // `userPanned` was false, so SNAP TO CALL flew to the parcel and was flown straight back --
 // "the map blinks like it should do something but it doesn't move" (operator,
 // DISP-2026-CE3851).
-function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef }) {
+function AutoFitBounds({ origin, destination, callKey, fittingRef, getOverlays }) {
   const map = useMap();
   const lastKeyRef = useRef(null);
 
@@ -50,27 +68,12 @@ function AutoFitBounds({ origin, destination, callKey, fittingRef, panelRef }) {
       [destination.lat, destination.lng]
     );
 
-    // Calculate dynamic container-aware padding percentage so route scales to fill map space
-    const containerSize = map.getSize();
-    const w = containerSize.x || 800;
-    const h = containerSize.y || 600;
-
-    const padTop = Math.max(45, Math.round(h * 0.12));
-    const padBottom = Math.max(35, Math.round(h * 0.08));
-    const padSide = Math.max(35, Math.round(w * 0.08));
-    // The dispatch-details box floats over the top-left of the map; the fit keeps the
-    // whole route to the right of it, so the destination pin is never under the box
-    // (operator, 2026-09-06: "it covers up the destination").
-    const panelWidth = panelRef?.current?.offsetWidth || 0;
-
+    // Padding measured from the container and what floats over it (map/fitPadding.js): the
+    // control stack at the right and the hydrant card at the bottom, so the destination pin
+    // is never under either (operator, 2026-09-06: "it covers up the destination").
     markFitting(map, fittingRef);
-    map.fitBounds(bounds, {
-      paddingTopLeft: [padSide + panelWidth, padTop],
-      paddingBottomRight: [padSide, padBottom],
-      maxZoom: 17,
-      animate: true
-    });
-  }, [map, origin, destination, callKey, fittingRef, panelRef]);
+    map.fitBounds(bounds, routeFitOptions(map, { overlays: getOverlays?.(), maxZoom: 17, animate: true }));
+  }, [map, origin, destination, callKey, fittingRef, getOverlays]);
 
   return null;
 }
@@ -97,7 +100,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -157,14 +160,23 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
 
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
   // 'route': the whole run from the hall; 'call': the final approach, close in, with the
-  // parcel and the picked hydrants. One button flips between them (operator, 2026-09-08).
+  // parcel and the picked hydrants (operator, 2026-09-08). SNAP TO CALL and RE-CENTRE sit
+  // in the control stack; RE-CENTRE is live only once the view has left the route.
   const [viewMode, setViewMode] = useState('route');
   const fittingRef = useRef(false);
-  const panelRef = useRef(null);
+  // What floats over the map, measured for the fits: the control stack (right) and the
+  // hydrant card (bottom). Nothing is written as a literal (map/fitPadding.js).
+  const controlsRef = useRef(null);
+  const hydrantRef = useRef(null);
+  const getOverlays = useCallback(() => ({
+    right: controlsRef.current ? controlsRef.current.offsetWidth + OVERLAY_INSET_PX : 0,
+    bottom: hydrantRef.current ? hydrantRef.current.offsetHeight + OVERLAY_INSET_PX : 0,
+  }), []);
   // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
   const [routeCoords, setRouteCoords] = useState([]);
+  // OSRM's distance and duration for that drawn route, for the pill (CLAUDE.md s6.2).
+  const [routeSummary, setRouteSummary] = useState(null);
   const [mapZoom, setMapZoom] = useState(13);
 
   // Reset view state when the active call changes.
@@ -179,6 +191,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     setUserPanned(false);
     setSelectedCandidateIdx(0);
     setRouteCoords([]);
+    setRouteSummary(null);
     setViewMode('route');
   }
 
@@ -198,39 +211,18 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   }, [activeCall]);
   const hydrantHighlightIds = useMemo(() => new Set(routeHydrants.picks.map(h => h.gisId)), [routeHydrants]);
 
-  // Dynamic responding units resolution
-  const unitsToRoute = useMemo(() => {
-    const units = activeCall?.responding_units ||
-      activeCall?.verified_units ||
-      activeCall?.units ||
-      activeCall?.raw_units ||
-      activeCall?.target?.responding_units ||
-      activeCall?.target?.units;
-
-    if (Array.isArray(units) && units.length > 0) return units;
-    if (typeof units === 'string' && units.trim().length > 0) {
-      return units.split(',').map((u) => u.trim()).filter(Boolean);
-    }
-    // No units in the dispatch record: route nothing rather than inventing apparatus.
-    return [];
-  }, [activeCall]);
-
-  // ETAs come from the backend's persisted OSRM routing_metrics, never from a
-  // client-side estimate.
+  // The persisted OSRM routing_metrics name the responding halls, one route line each. The
+  // per-unit ETAs they carry are read by the header (ActiveAlertBanner), not here.
   const persistedUnitMetrics = useMemo(
     () => activeCall?.routing_metrics || activeCall?.target?.routing_metrics || [],
     [activeCall]
   );
 
-  const routeMetrics = useMemo(() => {
-    if (!hasValidCoords) return null;
-    return calculateEVORouteMetrics({
-      originCoords: [origin.lat, origin.lng],
-      targetCoords: [destLat, destLng],
-      dispatchedUnits: unitsToRoute,
-      unitMetrics: persistedUnitMetrics
-    });
-  }, [origin, destLat, destLng, hasValidCoords, unitsToRoute, persistedUnitMetrics]);
+  // The hydrant card's words, from the picker's answer (utils/hydrantCard.js).
+  const hydrantModel = useMemo(
+    () => hydrantCardModel({ hasCoords: hasValidCoords, hydrants: routeHydrants }),
+    [hasValidCoords, routeHydrants]
+  );
 
   const handleRecenter = () => {
     setUserPanned(false);
@@ -242,21 +234,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           [origin.lat, origin.lng],
           [destination.lat, destination.lng]
         );
-        const containerSize = mapInstance.getSize();
-        const w = containerSize.x || 800;
-        const h = containerSize.y || 600;
-
-        const padTop = Math.max(45, Math.round(h * 0.12));
-        const padBottom = Math.max(35, Math.round(h * 0.08));
-        const padSide = Math.max(35, Math.round(w * 0.08));
-        const panelWidth = panelRef.current?.offsetWidth || 0;
-
-        mapInstance.fitBounds(bounds, {
-          paddingTopLeft: [padSide + panelWidth, padTop],
-          paddingBottomRight: [padSide, padBottom],
-          maxZoom: 17,
-          animate: true
-        });
+        mapInstance.fitBounds(bounds, routeFitOptions(mapInstance, { overlays: getOverlays(), maxZoom: 17, animate: true }));
       } else {
         mapInstance.setView([origin.lat, origin.lng], 13, { animate: true });
       }
@@ -267,8 +245,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
   // reads at a glance. The bounds are the destination plus every pick, so a hydrant 300 m
   // back on the approach is still on screen; with no picks it is the destination at zoom 18.
   // Capped at 18: the deepest zoom the street tiles were crawled to, and the cadastral and
-  // hydrant layers both draw there. The details box's width pads the left edge, as the
-  // route fit does, so the parcel is never under it.
+  // hydrant layers both draw there. The control stack and the hydrant card pad their edges,
+  // as the route fit does, so the parcel is never under either.
   const snapToCall = () => {
     if (!mapInstance || !hasValidCoords || !destination) return;
     setUserPanned(false);
@@ -278,27 +256,27 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
     for (const h of routeHydrants.picks) {
       if (h.lat != null && h.lng != null) points.push([Number(h.lat), Number(h.lng)]);
     }
-    const containerSize = mapInstance.getSize();
-    const w = containerSize.x || 800;
-    const h = containerSize.y || 600;
-    const pad = Math.max(40, Math.round(Math.min(w, h) * 0.1));
-    const panelWidth = panelRef.current?.offsetWidth || 0;
+    // An announced block or a street section: the whole named stretch is the thing to
+    // see, not just the pin at its middle (#76).
+    if (Array.isArray(activeCall?.segment)) {
+      for (const line of activeCall.segment) {
+        for (const pt of line) {
+          if (Array.isArray(pt) && pt.length >= 2) points.push([Number(pt[1]), Number(pt[0])]);
+        }
+      }
+    }
     // Instant, not animated: a snap is a cut, and an animated four-level zoom sits at
     // Leaflet's animation threshold and is scheduled on requestAnimationFrame, which is
     // where it can fail to start (measured on the workstation, 2026-09-08).
     if (points.length === 1) {
       mapInstance.setView(points[0], 18, { animate: false });
     } else {
-      mapInstance.fitBounds(L.latLngBounds(points), {
-        paddingTopLeft: [pad + panelWidth, pad],
-        paddingBottomRight: [pad, pad],
-        maxZoom: 18,
-        animate: false
-      });
+      mapInstance.fitBounds(L.latLngBounds(points), snapFitOptions(mapInstance, { overlays: getOverlays(), maxZoom: 18, animate: false }));
     }
   };
 
-  const targetAddressDisplay = activeCandidate?.label || activeCall?.address || activeCall?.target?.address || 'Target';
+  // RE-CENTRE has something to do once the view has left the route: a drag, a wheel, or a snap.
+  const offRoute = userPanned || viewMode === 'call';
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
@@ -337,7 +315,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
       {/* Street section: resolved to a stretch of road, not a point. A third state --
           neither a located incident nor an unresolved one -- so it gets its own card. */}
       {activeCall?.location_type === 'street_section' && (
-        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
+        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
           <StreetSectionBanner activeCall={activeCall} />
         </div>
       )}
@@ -346,14 +324,14 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           Distinct from the unresolved case below: coordinates exist and routing runs,
           but the pin is a substitution and the crew must be told so. */}
       {hasValidCoords && activeCall?.resolution_note && (
-        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg">
+        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
           <ApproximateLocationBanner activeCall={activeCall} />
         </div>
       )}
 
       {/* High-Visibility Amber Warning Box for Unresolved Incident Location */}
       {!hasValidCoords && (
-        <div className="absolute inset-x-4 top-20 z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 animate-pulse">
+        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 motion-safe:animate-pulse`}>
           <span className="text-3xl">⚠️</span>
           <div>
             <h4 className="text-sm font-black tracking-wider text-amber-300 uppercase font-mono">
@@ -366,159 +344,63 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
         </div>
       )}
 
-      {/* Option A: Collapsible Left Dispatch Details & ETAs Panel */}
-      <div ref={panelRef} className="absolute top-3 left-3 z-[1000] w-72 sm:w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
-        {/* Panel Header Toggle Bar */}
-        <div 
-          onClick={() => setIsPanelOpen(!isPanelOpen)}
-          className="bg-slate-900 border-b border-slate-800 p-3 flex items-center justify-between cursor-pointer hover:bg-slate-850 transition"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="text-lg">🚒</span>
-            <div>
-              <h3 className="text-xs font-black text-white uppercase tracking-wider">Dispatch Details & ETAs</h3>
-              <p className="text-[10px] font-bold text-emerald-400 font-mono">
-                From {origin.name ? origin.name.split(' (')[0] : 'Hall 1'} → {targetAddressDisplay}
-              </p>
-            </div>
-          </div>
-          <button className="text-slate-400 hover:text-white text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
-            {isPanelOpen ? '▲' : '▼'}
-          </button>
-        </div>
-
-        {/* Collapsible Panel Content Body */}
-        {isPanelOpen && (
-          <div className="p-3 flex flex-col gap-2.5 animate-in fade-in duration-200">
-            {/* Dispatched Apparatus Unit ETAs List */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[9px] text-slate-400 uppercase font-mono font-extrabold tracking-wider">
-                  Dispatched Apparatus ETAs
-                </span>
-                <span className="text-[8.5px] text-sky-400 font-mono font-bold">OSRM</span>
-              </div>
-
-              {routeMetrics?.units?.map((u, idx) => (
-                <div key={idx} className="flex justify-between items-center bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800 font-mono">
-                  <div className="flex items-center gap-2">
-                    {/* The unit's hall colour, the same as its route line; slate when the record
-                        carries no metrics for it (no hall is guessed). */}
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" title={u.hall ? `Hall ${u.hall}` : 'hall unknown'} style={{ backgroundColor: u.hall ? hallColour(u.hall) : UNASSIGNED_HALL_COLOUR }} />
-                    <span className="text-white text-xs font-black">{u.unit}</span>
-                    <span className="text-[8px] text-slate-400 uppercase font-extrabold bg-slate-800 px-1.5 py-0.5 rounded border border-slate-750">{u.tierKey}</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-slate-400 text-[10.5px]">{u.distanceKm != null ? `${u.distanceKm} km` : '-- km'}</span>
-                    <span className="text-emerald-400 text-xs font-black">{u.etaMinutes != null ? `${u.etaMinutes} min` : '-- min'}</span>
-                  </div>
-                </div>
-              ))}
-
-              {!hasValidCoords && (
-                <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[10px] font-mono text-center">
-                  ⚠️ Routing paused — awaiting location
-                </div>
-              )}
-            </div>
-
-            {/* An operator-set arrival point: say so, and why, so the crew reads the pin as a
-                ruling rather than a wrong guess (punch-list #49). */}
-            {(activeCall?.target?.arrival_point === 'entrance') && (
-              <div className="bg-emerald-950/60 border border-emerald-700/70 p-2.5 rounded-xl text-xs font-mono text-emerald-200">
-                <span className="font-black">🚒 ARRIVAL POINT SET BY OPERATOR</span>
-                {activeCall?.target?.entrance_note && <span className="italic"> — {activeCall.target.entrance_note}</span>}
-              </div>
-            )}
-
-            {/* Hydrant & Tactical Notes Bar.
-                Previously fell back to the literal string 'City Hydrant: D-165 (42m)'.
-                No dispatch has ever carried a `hydrant` field -- the backend does not emit
-                one -- so that invented hydrant and distance were shown on every call
-                (CLAUDE.md §6.1, punch-list #24). */}
-            <div className="bg-slate-900/80 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs font-mono">
-              <div className="flex items-center gap-2 text-sky-400 font-bold">
-                <span>💧</span>
-                <span className="text-[10.5px] text-slate-200">
-                  {/* From public.hydrants around the destination, by the operator's rule
-                      (utils/routeHydrants.js); NFPA 291 class as rated by the City. Never
-                      from the dispatch record, which carries no hydrant (#24, #74). */}
-                  {!hasValidCoords ? (
-                    <span className="text-slate-500 italic">Awaiting location</span>
-                  ) : routeHydrants.failed ? (
-                    <span className="text-red-400 italic">Hydrant lookup failed</span>
-                  ) : routeHydrants.loading ? (
-                    <span className="text-slate-500 italic">Hydrant inventory loading…</span>
-                  ) : routeHydrants.tier === TIER.NONE ? (
-                    <span className="text-amber-300 font-black">⚠️ NO HYDRANT WITHIN 1,000 FT</span>
-                  ) : (
-                    <span className="flex flex-col gap-0.5">
-                      {routeHydrants.picks.map((h, i) => (
-                        <span key={h.gisId}>
-                          <span className="text-slate-500">{i + 1}. </span>
-                          <span className="text-white font-black">{h.gisId}</span>
-                          <span className="text-sky-300"> {h.flowClass || 'UNRATED'}</span>
-                          {String(h.status || '').toUpperCase() === 'PRIVATE' && <span className="text-amber-400"> PRIVATE</span>}
-                          <span className="text-slate-400">
-                            {h.how === TIER.DOORSTEP
-                              ? ` · ${h.distance} m from the address, within a 50 ft roll`
-                              : h.how === TIER.APPROACH
-                              ? ` · ${h.distance} m before arrival, on the route${h.longLay ? ' — LONG LAY (500 ft+): relay, or the closer one' : ''}`
-                              : h.closerAlternative
-                                ? ` · ${h.distance} m from the address, off route: the closer option`
-                                : h.how === TIER.NEAR
-                                ? ` · ${h.distance} m from the address${i === 0 ? (routeHydrants.routeKnown ? ', none on the approach within 1,000 ft' : ', route pending') : ''}`
-                                : ` · ${h.distance} m, within the 1,000 ft supply lay; none within 300 ft`}
-                          </span>
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <span className="text-[9px] text-slate-400 uppercase font-bold bg-slate-800 px-1.5 py-0.5 rounded">
-                NFPA 291
-              </span>
-            </div>
-          </div>
-        )}
+      {/* The route pill: OSRM's distance and duration for the drawn home route, the router's
+          own figures and never a recomputation (CLAUDE.md s6.2). Until the route arrives, or
+          when the record has no location, the marks say so. */}
+      <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none bg-slate-950 border border-slate-800 rounded-md px-3 py-2 font-mono font-bold text-[11px] lg:text-xs tracking-[0.1em] uppercase text-slate-50 shadow-lg">
+        {hasValidCoords ? routePillText(routeSummary) : 'ROUTE · AWAITING LOCATION'}
       </div>
 
-      {/* One button, two states: SNAP TO CALL brings the final approach in close; RESET VIEW
-          returns to the whole route. Always shown while the call has a location
-          (operator, 2026-09-08: "it can flip back and forth"). */}
+      {/* The control stack, top right, the console's mirrored (artboard 3A): the zoom readout,
+          SNAP TO CALL, RE-CENTRE, and the zoom buttons, in one fixed order so each is in the
+          same place at 03:00. RE-CENTRE is dim until a drag, a wheel or a snap has moved the
+          view off the route (operator, 2026-09-06: it used to shout on every call). On a phone
+          the readout and the zoom buttons go: pinch does that. */}
       {hasValidCoords && (
-        <button
-          onClick={viewMode === 'call' ? handleRecenter : snapToCall}
-          title={viewMode === 'call' ? 'Back to the whole route from the hall' : 'Close in on the parcel and the picked hydrants'}
-          className={`absolute top-3 right-14 z-[1000] font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border flex items-center gap-1.5 cursor-pointer ${
-            viewMode === 'call'
-              ? 'bg-slate-900/95 hover:bg-slate-800 text-sky-300 border-sky-700'
-              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300'
-          }`}
-        >
-          <span>{viewMode === 'call' ? '🗺️' : '🎯'}</span>
-          <span>{viewMode === 'call' ? 'RESET VIEW' : 'SNAP TO CALL'}</span>
-        </button>
+        <div ref={controlsRef} className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-2">
+          {!compact && (
+            <div className="pointer-events-none select-none flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5">
+              <span className="font-mono font-bold text-[10px] tracking-[0.14em] text-slate-400">ZOOM</span>
+              <span className="font-mono font-extrabold text-xs text-amber-400">{Number(mapZoom).toFixed(1)}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={snapToCall}
+            title="Close in on the parcel and the picked hydrants"
+            className={`${CONTROL} cursor-pointer ${viewMode === 'call' ? 'text-slate-400' : 'text-slate-50'}`}
+          >
+            Snap to call
+          </button>
+          <button
+            type="button"
+            onClick={handleRecenter}
+            disabled={!offRoute}
+            aria-disabled={!offRoute}
+            title="Back to the whole route from the hall"
+            className={`${CONTROL} ${offRoute ? 'text-slate-50 cursor-pointer' : 'text-slate-500 cursor-default'}`}
+          >
+            Re-centre
+          </button>
+          {!compact && (
+            <div className="flex flex-col gap-2 mt-1">
+              <button type="button" aria-label="Zoom in" onClick={() => mapInstance?.zoomIn()} className={ZOOM_BTN}>+</button>
+              <button type="button" aria-label="Zoom out" onClick={() => mapInstance?.zoomOut()} className={ZOOM_BTN}>−</button>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Floating Re-Center Button when the user pans or zooms away from the route */}
-      {userPanned && viewMode === 'route' && (
-        <button
-          onClick={handleRecenter}
-          className="absolute top-14 right-14 z-[1000] bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-black px-3.5 py-2 rounded-xl shadow-xl border border-sky-400 flex items-center gap-1.5 cursor-pointer animate-pulse"
-        >
-          <span>🎯</span>
-          <span>RE-CENTER ROUTE</span>
-        </button>
-      )}
+      {/* The hydrant card, bottom left: the pick by the operator's rule (utils/routeHydrants.js),
+          the City's NFPA 291 class, the distance, and how it was chosen. Never from the dispatch
+          record, which carries no hydrant (#24, #74). A tap is SNAP TO CALL. */}
+      <HydrantCard cardRef={hydrantRef} model={hydrantModel} onSnap={hasValidCoords ? snapToCall : null} compact={compact} />
 
       <MapSurface
         center={hasValidCoords ? [destLat, destLng] : [origin.lat, origin.lng]}
         zoom={13}
         className="w-full h-full z-0"
         mapRef={setMapInstance}
-        zoomControl
         baseStyle="STREET"
         streetLabels
         showCadastral
@@ -545,6 +427,20 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
           />
         )}
 
+        {/* An announced block (#76) or a street section: the stretch of road the dispatcher
+            named, amber and dashed as the workstation draws it, so the pin at its middle
+            reads as "somewhere along here" rather than as an address. */}
+        {(activeCall?.location_type === 'block' || activeCall?.location_type === 'street_section')
+          && Array.isArray(activeCall.segment)
+          && activeCall.segment.map((line, i) => (
+            <Polyline
+              key={`announced-stretch-${i}`}
+              positions={line.map(([lng, lat]) => [lat, lng])}
+              pathOptions={{ color: '#f59e0b', weight: 10, opacity: 0.75, dashArray: '14,10', lineCap: 'round' }}
+              interactive={false}
+            />
+          ))}
+
         {/* The recommended hydrants as numbered badges, at every zoom (#74). */}
         <PickedHydrantsLayer picks={routeHydrants.picks} />
 
@@ -568,7 +464,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
             dest={[destLat, destLng]}
             homeHall={origin.id || '1'}
             routingMetrics={persistedUnitMetrics}
-            onHomeRouteCalculated={setRouteCoords}
+            onHomeRouteCalculated={(coords, summary) => { setRouteCoords(coords); setRouteSummary(summary || null); }}
           />
         )}
 
@@ -624,7 +520,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall }) {
             destination={destination}
             callKey={`${callKey}-${selectedCandidateIdx}`}
             fittingRef={fittingRef}
-            panelRef={panelRef}
+            getOverlays={getOverlays}
           />
         )}
       </MapSurface>

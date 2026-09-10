@@ -260,13 +260,17 @@ def main() -> int:
             }
             rows.append(row)
             rk = f"{did}|{h}"
+            # "p" is the destination actually routed to. --baseline needs it: the corpus is
+            # re-geocoded every run, so a geocoder or parcel change moves the destination and
+            # then the route, and that must not be read as a graph or profile change.
+            dest_p = [round(d_lat, 6), round(d_lng, 6)]
             if desc["code"] == "Ok":
                 routes[rk] = {"d": desc["distance_m"], "t": desc["duration_s"],
                               "g": desc["geometry_md5"], "r": desc["repeated_nodes"],
                               "u": desc["uturns"], "x": h in dispatched, "roads": desc["roads"],
-                              "a": addr}
+                              "a": addr, "p": dest_p}
             else:
-                routes[rk] = {"code": desc["code"], "x": h in dispatched, "a": addr}
+                routes[rk] = {"code": desc["code"], "x": h in dispatched, "a": addr, "p": dest_p}
                 failed.append(rk)
 
         if args.dispatch_id:
@@ -367,7 +371,7 @@ def main() -> int:
         compare(routes, summary, hc.load_summary(args.baseline))
 
     if args.record:
-        compact = {k: {kk: v[kk] for kk in ("d", "t", "g", "r", "u", "x", "code") if kk in v}
+        compact = {k: {kk: v[kk] for kk in ("d", "t", "g", "r", "u", "x", "p", "code") if kk in v}
                    for k, v in routes.items()}
         period = (min(stamps).date(), max(stamps).date()) if stamps else None
         hc.record_run(stage="routing", n=n_calls, args=args, model_version=args.label,
@@ -384,19 +388,39 @@ def compare(routes: dict, summary: dict, baseline: dict) -> None:
     both = sorted(set(routes) & set(before))
     only_now = sorted(set(routes) - set(before))
     only_then = sorted(set(before) - set(routes))
-    moved = []
+    moved, dest_moved, nodes_only = [], [], []
     for k in both:
         c, b = routes[k], before[k]
+        if c.get("p") and b.get("p") and c["p"] != b["p"]:
+            # The destination itself moved since the baseline (a geocoder, parcel or
+            # arrival-point change). Whatever the route did is not the graph's doing.
+            dest_moved.append((k, b, c))
+            continue
         if ("d" in c) != ("d" in b):
             moved.append((k, b, c, "route appeared" if "d" in c else "route lost"))
         elif "d" in c and (c["g"] != b["g"] or abs(c["d"] - b["d"]) > MOVED_M or abs(c["t"] - b["t"]) > MOVED_S):
-            moved.append((k, b, c, "geometry" if c["g"] != b["g"] else "metrics"))
+            if abs(c["d"] - b["d"]) <= MOVED_M and abs(c["t"] - b["t"]) <= MOVED_S:
+                # Same distance and time to the tenth: a node coordinate moved (an OSM edit),
+                # the route did not. Counted, not listed.
+                nodes_only.append((k, b, c))
+            else:
+                moved.append((k, b, c, "geometry" if c["g"] != b["g"] else "metrics"))
 
     print(f"\nCHANGE VS BASELINE ({baseline.get('ran_at', '?')}, {baseline.get('osrm_url', '?')})")
-    print(f"  routes compared {len(both)}, unchanged {len(both) - len(moved)}, moved {len(moved)}"
-          f"  (dispatched: {sum(1 for _, _, c, _ in moved if c.get('x'))})")
+    print(f"  routes compared {len(both)}, unchanged {len(both) - len(moved) - len(nodes_only) - len(dest_moved)}, "
+          f"moved {len(moved)} (dispatched: {sum(1 for _, _, c, _ in moved if c.get('x'))}), "
+          f"node coordinates only {len(nodes_only)}, destination itself moved {len(dest_moved)}")
     if only_now or only_then:
         print(f"  corpus drift: {len(only_now)} routes only in this run, {len(only_then)} only in the baseline")
+    if dest_moved:
+        print("  destinations that moved since the baseline (not the graph's doing):")
+        seen = set()
+        for k, b, c in dest_moved:
+            did = k.split("|")[0]
+            if did in seen:
+                continue
+            seen.add(did)
+            print(f"    {did}  {c.get('a', '')}: {b['p'][0]:.5f},{b['p'][1]:.5f} -> {c['p'][0]:.5f},{c['p'][1]:.5f}")
 
     def dur(x):
         return x["t"] if "t" in x else None

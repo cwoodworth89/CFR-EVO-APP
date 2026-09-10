@@ -54,6 +54,11 @@ export default function KioskView({ kioskState }) {
   } = kioskState;
 
   const [showPrePlanModal, setShowPrePlanModal] = useState(false);
+  // The hydrant is picked along the route the map drew, so the map measures it and hands the
+  // card's model up here; the header renders it and hands TAP TO ZOOM back down to the map's
+  // own SNAP TO CALL (operator, 2026-09-10: the card moved off the map into the header).
+  const [hydrantModel, setHydrantModel] = useState(null);
+  const [snapRequest, setSnapRequest] = useState(0);
   // Below `lg`, a phone or an upright tablet: the layout stacks, the detail tiles become tabs.
   const compact = useCompactViewport();
 
@@ -196,6 +201,25 @@ export default function KioskView({ kioskState }) {
         </div>
       )}
 
+      {/* Review replay: a strip, not a card. Operator, 2026-09-10: REVIEW REPLAY and EXIT
+          REVIEW "can be located somewhere else as they aren't on dispatches" -- so they take
+          the same full-width place the queued-call and Tier 1 banners do, and a real call
+          renders none of it. The card they vacated went to the hydrant. */}
+      {(isReviewMode || activeCall?.isReview) && (
+        <div className="bg-violet-950 border-b border-violet-700 text-violet-200 px-3 lg:px-6 py-1.5 flex items-center justify-between gap-3 flex-shrink-0 z-50">
+          <span className="font-mono font-bold text-[11px] lg:text-xs tracking-[0.14em] uppercase">
+            Review replay — a past call, replayed; auto-dismiss paused
+          </span>
+          <button
+            type="button"
+            onClick={exitReview}
+            className="bg-transparent border border-violet-600 text-violet-200 hover:bg-violet-900 rounded-md px-3 py-1.5 touch:py-2.5 font-mono font-bold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase whitespace-nowrap cursor-pointer transition"
+          >
+            Exit review
+          </button>
+        </div>
+      )}
+
       {/* Tier 1 Unresolved-Location Warning (CLAUDE.md §5) — all call details still
           display normally below; only routing/ETA output is withheld. */}
       {!hasCoords && (
@@ -223,8 +247,9 @@ export default function KioskView({ kioskState }) {
         autoDismiss={autoDismiss}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
+        hydrantModel={hydrantModel}
+        onHydrantTap={hasCoords ? () => setSnapRequest((n) => n + 1) : null}
         onDismiss={() => dismissActiveCall('manual')}
-        onExitReview={exitReview}
       />
 
       {/* Notices: one row, rendered only when the record carries something to say. */}
@@ -257,7 +282,13 @@ export default function KioskView({ kioskState }) {
           and that ceiling so the tiles stay readable on the 1,280 px touch display. */}
       <main className="flex-none lg:flex-1 p-2 lg:p-3 flex flex-col lg:flex-row gap-2 lg:gap-3 min-h-0 lg:overflow-hidden">
         <section className="h-[52dvh] lg:h-auto lg:flex-1 min-w-0 min-h-0 flex-shrink-0 lg:flex-shrink">
-          <RouteOverviewPanel activeCall={activeCall} stationHall={KIOSK_HALL} compact={compact} />
+          <RouteOverviewPanel
+            activeCall={activeCall}
+            stationHall={KIOSK_HALL}
+            compact={compact}
+            onHydrantModel={setHydrantModel}
+            snapRequest={snapRequest}
+          />
         </section>
 
         {/* Two tiles, aerial and Street View. The cadastral block tile that sat above them is

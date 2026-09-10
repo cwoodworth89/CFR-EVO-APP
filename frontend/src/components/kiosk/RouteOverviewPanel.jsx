@@ -11,7 +11,6 @@ import StreetSectionBanner from './StreetSectionBanner';
 import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
-import HydrantCard from './HydrantCard';
 import { hydrantCardModel } from '../../utils/hydrantCard';
 import { routeFitOptions, snapFitOptions } from '../map/fitPadding';
 
@@ -100,7 +99,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall, compact = false }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0 }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -168,10 +167,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // What floats over the map, measured for the fits: the control stack (right) and the
   // hydrant card (bottom). Nothing is written as a literal (map/fitPadding.js).
   const controlsRef = useRef(null);
-  const hydrantRef = useRef(null);
   const getOverlays = useCallback(() => ({
     right: controlsRef.current ? controlsRef.current.offsetWidth + OVERLAY_INSET_PX : 0,
-    bottom: hydrantRef.current ? hydrantRef.current.offsetHeight + OVERLAY_INSET_PX : 0,
   }), []);
   // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
   const [routeCoords, setRouteCoords] = useState([]);
@@ -278,33 +275,24 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // RE-CENTRE has something to do once the view has left the route: a drag, a wheel, or a snap.
   const offRoute = userPanned || viewMode === 'call';
 
-  // The route fit runs once, when the call lands, and measures the hydrant card as it is
-  // then: the one-line "inventory loading" strip. The card grows to two rows a second later,
-  // once the inventory and the route are in, and on 1132 Dufferin St (2026-09-10) that put
-  // the destination pin under it: "It's covering the route" (operator). So whenever the card
-  // changes shape and the view is still the untouched route fit, check whether the pin is
-  // under the card and, only then, refit with the card's real height. A drag, a wheel or a
-  // snap has already moved on and is left alone.
+  // The hydrant card lives in the header now (operator, 2026-09-10), but the picks are
+  // measured here, along the route this map drew, so the model goes up. TAP TO ZOOM comes
+  // back down as a handle on this panel's own SNAP TO CALL: the header needs no map of its
+  // own, and the pin can no longer be covered by a card that is not over the map.
   useEffect(() => {
-    if (!mapInstance || !destination || userPanned || viewMode !== 'route') return undefined;
-    const t = setTimeout(() => {
-      const card = hydrantRef.current;
-      if (!card) return;
-      const p = mapInstance.latLngToContainerPoint([destination.lat, destination.lng]);
-      // The pin icon stands above its anchor and the badges sit beside it: a margin the size
-      // of the icon around the card, so "clear" means visibly clear.
-      const m = 44;
-      const under = p.x >= card.offsetLeft - m && p.x <= card.offsetLeft + card.offsetWidth + m
-                 && p.y >= card.offsetTop - m && p.y <= card.offsetTop + card.offsetHeight + m;
-      if (!under) return;
-      markFitting(mapInstance, fittingRef);
-      mapInstance.fitBounds(
-        L.latLngBounds([origin.lat, origin.lng], [destination.lat, destination.lng]),
-        routeFitOptions(mapInstance, { overlays: getOverlays(), maxZoom: 17, animate: true }),
-      );
-    }, 80);   // after the card has laid out at its new size
-    return () => clearTimeout(t);
-  }, [mapInstance, destination, origin, hydrantModel, userPanned, viewMode, getOverlays]);
+    if (onHydrantModel) onHydrantModel(hydrantModel);
+  }, [hydrantModel, onHydrantModel]);
+
+  // TAP TO ZOOM on the header's hydrant card asks this map to snap. A counter rather than a
+  // handle passed upward: writing a function into a prop ref is the crash-lint's
+  // react-hooks/immutability rule, and a counter says "asked again" without one.
+  const lastSnapRequest = useRef(snapRequest);
+  useEffect(() => {
+    if (snapRequest === lastSnapRequest.current) return;
+    lastSnapRequest.current = snapRequest;
+    if (hasValidCoords) snapToCall();
+  });
+
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
@@ -418,11 +406,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
           )}
         </div>
       )}
-
-      {/* The hydrant card, bottom left: the pick by the operator's rule (utils/routeHydrants.js),
-          the City's NFPA 291 class, the distance, and how it was chosen. Never from the dispatch
-          record, which carries no hydrant (#24, #74). A tap is SNAP TO CALL. */}
-      <HydrantCard cardRef={hydrantRef} model={hydrantModel} onSnap={hasValidCoords ? snapToCall : null} compact={compact} />
 
       <MapSurface
         center={hasValidCoords ? [destLat, destLng] : [origin.lat, origin.lng]}

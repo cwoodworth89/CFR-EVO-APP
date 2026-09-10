@@ -2,26 +2,35 @@ import React, { useState } from 'react';
 import { getUnitBadgeStyle, formatUnitEtaDisplay } from './unitFormat';
 import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
 import { hallColour, UNASSIGNED_HALL_COLOUR } from '../MapConstants';
+import HydrantCard from '../kiosk/HydrantCard';
 
 /**
  * The dispatch display's header, built to artboard 3A of the operator's Claude Design canvas
  * (docs/design/Dispatch Display Redesign.dc.html, "Integrated -- call details live in the
  * header, right column is nothing but views"). Three cards on one row from `lg` up:
  *
- *   the call      address and grid, the subaddress, NEAR the cross streets, the incident,
- *                 the talk group -- what the run sheet reads out;
- *   the units     the first-due unit (shortest OSRM ETA) large with its road distance and
- *                 ETA, the rest by ETA in a two-column grid, every figure from the stored
- *                 routing_metrics;
- *   the clock     elapsed, the auto-dismiss state, REVIEW REPLAY and EXIT REVIEW or CLEAR.
+ *   the call      address and grid, the subaddress, NEAR the cross streets, the incident;
+ *                 along its foot, the talk group and -- small, out of the way -- the elapsed
+ *                 clock, the auto-dismiss state and the dismiss button;
+ *   the units     the first-due unit (shortest OSRM ETA) with its road distance and ETA, the
+ *                 rest by ETA in a two-column grid, every figure from routing_metrics;
+ *   the water     the hydrant by the operator's rule, in feet, with how it was chosen.
  *
  * Below `lg` (a phone or an upright tablet) the same three cards stack, the call first.
+ *
+ * **Rearranged 2026-09-10 on the operator's word.** 3A gave the third card to a clock and put
+ * the hydrant over the route map, where it covered the destination. The clock is not what a
+ * crew reads in the first seconds ("elapsed time maybe out of the way in the main header
+ * card, bottom right"), and REVIEW REPLAY / EXIT REVIEW are not on real dispatches at all
+ * ("can be located somewhere else"), so they became a strip above the header in KioskView.
+ * The hydrant took the card they vacated: its own fixed place, rather than a row inside the
+ * units card that would slide down the screen as the unit count changes.
  *
  * What the canvas leaves out and this keeps, because each is a state the crew must be able
  * to read (CLAUDE.md s6.1): the response badge, where UNKNOWN is an amber state distinct from
  * routine (#31); the flag reasons and the changed fields, which open on a tap (#45, #34);
- * the TEST / DRILL mark. What the canvas demotes and this drops: the TV-mode toggle (a
- * deployment setting, not a per-call control), the hall origin line, the OSRM label.
+ * the TEST / DRILL mark. What the canvas demotes and this drops: the TV-mode toggle (removed
+ * outright 2026-09-09, operator), the hall origin line, the OSRM label.
  *
  * Nothing here is estimated: an ETA or distance the record does not carry renders as
  * '--:--' and '-- KM'; a field the dispatch did not announce is not rendered at all.
@@ -70,26 +79,28 @@ function nearLine(activeCall) {
   }).filter(Boolean).join(' & ');
 }
 
-/** One unit row: the dispatched callsign as the record holds it, its hall's colour, OSRM's figures or the unknown marks. */
+/**
+ * One unit row: the dispatched callsign as the record holds it, its hall's colour, OSRM's
+ * figures or the unknown marks. Stepped down 2026-09-10 ("shrink the hydrant/units/etas in
+ * text size to get a better fit"); the sizes scale with viewport height from `lg` up.
+ */
 function UnitRow({ unit, hero = false }) {
   const style = getUnitBadgeStyle(unit.unit);
   const eta = formatUnitEtaDisplay(unit.etaMin);
   const dist = unit.distKm != null && !Number.isNaN(Number(unit.distKm)) ? `${Number(unit.distKm).toFixed(1)} KM` : '-- KM';
-  // Below `lg` the rows are chips in a wrap and the type steps down; a phone's header has to
-  // leave room for the map under it.
   return (
-    <div className={`flex items-center border rounded-lg ${style} ${hero ? 'gap-2.5 lg:gap-3.5 px-3 py-2 lg:px-4 lg:py-3' : 'gap-2 lg:gap-2.5 px-2.5 py-1.5 lg:px-3 lg:py-2.5'}`}>
+    <div className={`flex items-center border rounded-lg ${style} ${hero ? 'gap-2.5 px-3 py-1.5 lg:px-3.5 lg:py-2' : 'gap-2 px-2.5 py-1.5 lg:py-2'}`}>
       {/* The unit's hall colour, the same as its route line on the map; slate when the record
           carries no hall for it (nothing is guessed from the callsign). */}
       <span
-        className={`rounded-full flex-shrink-0 ${hero ? 'w-3 h-3' : 'w-2.5 h-2.5'}`}
+        className={`rounded-full flex-shrink-0 ${hero ? 'w-2.5 h-2.5' : 'w-2 h-2'}`}
         style={{ backgroundColor: unit.hallId ? hallColour(unit.hallId) : UNASSIGNED_HALL_COLOUR }}
       />
-      <span className={`font-sans font-extrabold uppercase tracking-tight truncate ${hero ? 'text-xl lg:text-[clamp(1.25rem,2.9vh,1.875rem)]' : 'text-sm lg:text-[clamp(0.9rem,1.7vh,1.25rem)]'}`}>
+      <span className={`font-sans font-extrabold uppercase tracking-tight truncate ${hero ? 'text-lg lg:text-[clamp(1.05rem,2.3vh,1.5rem)]' : 'text-sm lg:text-[clamp(0.8rem,1.5vh,1rem)]'}`}>
         {String(unit.unit).toUpperCase()}
       </span>
-      {hero && <span className="font-mono font-semibold text-[11px] lg:text-xs tracking-wider text-slate-400 whitespace-nowrap">{dist}</span>}
-      <span className={`ml-auto font-mono font-extrabold text-white tabular-nums ${hero ? 'text-2xl lg:text-[clamp(1.5rem,3.4vh,2.25rem)]' : 'text-base lg:text-[clamp(1rem,2vh,1.5rem)]'}`}>
+      {hero && <span className="font-mono font-semibold text-[10px] lg:text-[11px] tracking-wider text-slate-400 whitespace-nowrap">{dist}</span>}
+      <span className={`ml-auto font-mono font-extrabold text-white tabular-nums ${hero ? 'text-xl lg:text-[clamp(1.2rem,2.7vh,1.75rem)]' : 'text-base lg:text-[clamp(0.9rem,1.7vh,1.2rem)]'}`}>
         {eta}
       </span>
     </div>
@@ -109,12 +120,15 @@ export default function ActiveAlertBanner({
   isReviewMode = false,
   isRecentlyUpdated = false,
   updatedFields = [],
+  // The hydrant by the operator's rule, from the route map (utils/hydrantCard.js). Null until
+  // the map has measured one; the card then says which state it is in, never a guess.
+  hydrantModel = null,
+  onHydrantTap = null,
   // false on a phone: no clock, the call stays until cleared (operator, 2026-09-09).
   autoDismiss = true,
   elapsedFormatted = '00:00',
   timeoutFormatted = '03:00',
   onDismiss = null,
-  onExitReview = null,
 }) {
   // The flag reasons and the changed fields open on a tap, inline under the chips. They were
   // `title` tooltips, which the touch TV and a phone never show (operator, 2026-09-09).
@@ -151,18 +165,18 @@ export default function ActiveAlertBanner({
   const [hero, ...rest] = units;
 
   // Header type from `lg` up scales with the viewport's height, the canvas's 1920x1080 sizes
-  // as the reference (70 px address, 32 incident, 38 hero ETA, 42 elapsed: 6.5 / 2.8 / 3.4 /
-  // 3.8 vh of 1080), so a 1000-tall laptop and an 800-tall touch display keep the same
-  // proportions instead of the fixed steps that left the header half the screen (operator,
-  // 2026-09-09). A long address shrinks so it stays on one line: an intersection like
-  // "LANSDOWNE DR & ABERDEEN AVE" is 26 characters against the canvas's 15.
+  // as the reference (70 px address, 32 incident: 6.5 / 2.8 vh of 1080), so a 1000-tall
+  // laptop and an 800-tall touch display keep the same proportions instead of the fixed steps
+  // that left the header half the screen (operator, 2026-09-09). A long address shrinks so it
+  // stays on one line: an intersection like "LANSDOWNE DR & ABERDEEN AVE" is 26 characters
+  // against the canvas's 15.
   const addrLen = String(displayAddress || '').length;
   const addrScale = addrLen <= 16 ? 1 : addrLen <= 24 ? 0.8 : 0.66;
 
   return (
-    <header className="flex-shrink-0 z-20 px-2 lg:px-3 pt-2 lg:pt-3 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,29%)_auto] gap-2 lg:gap-3 items-stretch">
+    <header className="flex-shrink-0 z-20 px-2 lg:px-3 pt-2 lg:pt-3 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,21%)_minmax(14rem,19%)] gap-2 lg:gap-3 items-stretch">
       {/* The call */}
-      <section className={`${CARD} px-4 py-3 lg:px-6 lg:py-4 flex flex-col items-start gap-1.5 lg:gap-2.5`}>
+      <section className={`${CARD} px-4 py-3 lg:px-5 lg:py-3.5 flex flex-col items-start gap-1.5 lg:gap-2`}>
         <div className="flex items-center gap-2.5 lg:gap-3.5 flex-wrap">
           <h1 className="m-0 font-sans font-extrabold uppercase tracking-tight leading-[0.95] text-white break-words text-2xl sm:text-3xl lg:text-[calc(clamp(2rem,min(6.5vh,3.8vw),4.5rem)*var(--addr,1))]" style={{ '--addr': addrScale }}>
             {displayAddress}
@@ -170,7 +184,7 @@ export default function ActiveAlertBanner({
           {/* "GRID 68", or "GRID 68 · FROM ADDRESS" when phase 1 derived it from the parcel's
               zone and phase 2 has not yet heard it (#72): a derived value is labelled. */}
           {formattedGrid && (
-            <span className="border border-amber-500/50 bg-amber-500/10 text-amber-400 font-mono font-bold tracking-wider whitespace-nowrap rounded-md px-2 py-1 lg:px-3 lg:py-2 text-xs lg:text-[clamp(0.8rem,1.8vh,1.25rem)]">
+            <span className="border border-amber-500/50 bg-amber-500/10 text-amber-400 font-mono font-bold tracking-wider whitespace-nowrap rounded-md px-2 py-1 lg:px-2.5 lg:py-1.5 text-xs lg:text-[clamp(0.75rem,1.6vh,1.125rem)]">
               {formattedGrid}
             </span>
           )}
@@ -183,13 +197,13 @@ export default function ActiveAlertBanner({
         )}
 
         {near && (
-          <div className="font-mono font-medium uppercase tracking-wide text-slate-300 text-xs lg:text-[clamp(0.8rem,1.6vh,1.125rem)]">
+          <div className="font-mono font-medium uppercase tracking-wide text-slate-300 text-xs lg:text-[clamp(0.75rem,1.5vh,1.05rem)]">
             <span className="text-slate-400 mr-2">Near</span>{near}
           </div>
         )}
 
         <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
-          <div className={`font-sans font-bold uppercase tracking-wider text-lg lg:text-[clamp(1.1rem,2.8vh,2rem)] ${activeCall.is_test ? 'text-orange-400' : 'text-amber-400'}`}>
+          <div className={`font-sans font-bold uppercase tracking-wider text-lg lg:text-[clamp(1.05rem,2.6vh,1.9rem)] ${activeCall.is_test ? 'text-orange-400' : 'text-amber-400'}`}>
             {displayIncident}
           </div>
 
@@ -246,78 +260,67 @@ export default function ActiveAlertBanner({
           </div>
         )}
 
-        {talkGroup && (
-          <div className="flex items-center gap-2.5 lg:gap-3 mt-0.5 px-2.5 py-1.5 lg:px-3.5 lg:py-2.5 border border-slate-700 bg-slate-400/10 rounded-lg max-w-full">
-            <span className={LABEL}>Talk group</span>
-            <span className="font-mono font-bold uppercase text-white text-sm lg:text-[clamp(0.9rem,2.1vh,1.5rem)] leading-none truncate">
-              {String(talkGroup)}
-            </span>
+        {/* The card's foot: the talk group, and at the right the call's own clock, small.
+            Operator, 2026-09-10: elapsed time "out of the way in the main header card, bottom
+            right". It is not what a crew reads in the first seconds; it is what the operator
+            checks later. */}
+        <div className="mt-auto pt-1 w-full flex items-end justify-between gap-3 flex-wrap">
+          {talkGroup ? (
+            <div className="flex items-center gap-2.5 px-2.5 py-1.5 lg:px-3 lg:py-2 border border-slate-700 bg-slate-400/10 rounded-lg min-w-0">
+              <span className={LABEL}>Talk group</span>
+              <span className="font-mono font-bold uppercase text-white text-sm lg:text-[clamp(0.85rem,1.9vh,1.35rem)] leading-none truncate">
+                {String(talkGroup)}
+              </span>
+            </div>
+          ) : <span />}
+
+          <div className="ml-auto flex items-end gap-2.5 lg:gap-3">
+            <div className="text-right font-mono leading-none">
+              <span className={LABEL}>Elapsed</span>
+              <div className="mt-1 font-extrabold text-emerald-400 tabular-nums text-lg lg:text-[clamp(1rem,2.2vh,1.5rem)]">{elapsedFormatted}</div>
+              <div className="mt-1 font-medium tracking-wider uppercase text-slate-500 text-[10px] whitespace-nowrap">
+                {isReview ? 'Auto-dismiss paused'
+                  : autoDismiss ? `Auto-dismiss ${timeoutFormatted}`
+                  : 'Stays until cleared'}
+              </div>
+            </div>
+
+            {/* On a review replay the way out is the strip above the header, not here. */}
+            {!isReview && onDismiss && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="bg-slate-950 border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white rounded-md px-3 py-1.5 lg:py-2 touch:py-2.5 font-mono font-bold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase whitespace-nowrap cursor-pointer transition"
+              >
+                {autoDismiss ? 'Dismiss' : 'Clear call'}
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </section>
 
       {/* The units */}
-      <section className={`${CARD} px-3 py-2.5 lg:px-5 lg:py-4 flex flex-col gap-1.5 lg:gap-3`}>
+      <section className={`${CARD} px-3 py-2.5 lg:px-4 lg:py-3 flex flex-col justify-center gap-1.5 lg:gap-2`}>
         {hero ? (
           <>
             <UnitRow unit={hero} hero />
             {rest.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2">
+              <div className="flex flex-wrap gap-1.5 lg:grid lg:grid-cols-2 lg:gap-1.5">
                 {rest.map((u, i) => <UnitRow key={`${u.unit}-${i}`} unit={u} />)}
               </div>
             )}
           </>
         ) : (
           // No units in the record: an unknown, shown as one (CLAUDE.md s6.1).
-          <div className="flex items-center gap-3 px-3.5 py-3 rounded-lg border border-amber-700/60 bg-amber-950/40">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-700/60 bg-amber-950/40">
             <span className={LABEL}>Units</span>
-            <span className="font-mono font-extrabold text-amber-300 text-lg lg:text-xl">NOT HEARD</span>
+            <span className="font-mono font-extrabold text-amber-300 text-base lg:text-lg">NOT HEARD</span>
           </div>
         )}
       </section>
 
-      {/* The clock */}
-      {/* One slim row on a phone; a column at the right of the header from `lg`. */}
-      <section className={`${CARD} px-3 py-2 lg:px-5 lg:py-4 flex flex-row flex-wrap lg:flex-col lg:flex-nowrap items-center lg:items-end justify-between gap-2 lg:gap-3.5`}>
-        <div className="flex items-baseline gap-2 lg:block text-left lg:text-right font-mono leading-none">
-          <div className={LABEL}>Elapsed</div>
-          <div className="lg:mt-1.5 font-extrabold text-emerald-400 tabular-nums text-xl lg:text-[clamp(1.5rem,3.8vh,2.625rem)]">{elapsedFormatted}</div>
-          <div className="lg:mt-1.5 font-medium tracking-wider uppercase text-slate-400 text-[10px] lg:text-[11px] whitespace-nowrap">
-            {isReview ? 'Auto-dismiss paused'
-              : autoDismiss ? `Auto-dismiss ${timeoutFormatted}`
-              : 'Stays until cleared'}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 lg:gap-2.5">
-          {isReview && (
-            <span className="border border-violet-700 bg-violet-950 text-violet-300 rounded-md px-2 py-1.5 lg:px-2.5 lg:py-2 font-mono font-bold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase whitespace-nowrap">
-              Review replay
-            </span>
-          )}
-          {isReview ? (
-            onExitReview && (
-              <button
-                type="button"
-                onClick={onExitReview}
-                className="bg-transparent border border-violet-700 text-violet-300 hover:bg-violet-950 rounded-md px-3 py-2 lg:px-3.5 lg:py-2.5 touch:py-2.5 font-mono font-bold text-[11px] lg:text-xs tracking-[0.12em] uppercase whitespace-nowrap cursor-pointer transition"
-              >
-                Exit review
-              </button>
-            )
-          ) : (
-            onDismiss && (
-              <button
-                type="button"
-                onClick={onDismiss}
-                className="bg-slate-950 border border-slate-700 text-slate-200 hover:bg-slate-800 rounded-md px-3 py-2 lg:px-3.5 lg:py-2.5 touch:py-2.5 font-mono font-bold text-[11px] lg:text-xs tracking-[0.12em] uppercase whitespace-nowrap cursor-pointer transition"
-              >
-                {autoDismiss ? 'Dismiss' : 'Clear call'}
-              </button>
-            )
-          )}
-        </div>
-      </section>
+      {/* The water */}
+      <HydrantCard model={hydrantModel} onTap={onHydrantTap} />
     </header>
   );
 }

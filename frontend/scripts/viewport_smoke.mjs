@@ -59,6 +59,9 @@ const VIEWPORTS = [
   { name: 'workstation-1916x1000',   width: 1916, height: 1000, isMobile: false, hasTouch: false },
 ];
 const COMPACT_BELOW = 1024; // hooks/useCompactViewport.js
+// The zoom readout is found by an EXACT text match: Playwright's bare `text=ZOOM` is a
+// case-insensitive substring, and it started matching the hydrant card's "Tap to zoom"
+// when that card moved into the header (2026-09-10).
 const QUERY = 'Grand Central 2';               // MapConstants.KNOWN_BUILDINGS
 const SUGGESTION = '📍 2968 Glen Dr';
 
@@ -134,7 +137,7 @@ for (const vp of VIEWPORTS) {
         await shot('2-target');
         m = await measure(page, { vertical: false });
         check(m.offscreen.length === 0, 'no control off screen with a target');
-        const zoom = await page.locator('text=ZOOM').first().locator('..').textContent().catch(() => '');
+        const zoom = await page.locator('text="ZOOM"').first().locator('..').textContent().catch(() => '');
         check(/ZOOM\s*\d/.test(zoom || ''), `a real zoom after the fit (${(zoom || '').trim()})`);
         const fold = page.locator('[role="tablist"] button[aria-expanded]');
         if (await fold.count()) { await fold.first().click(); await page.waitForTimeout(500); await shot('2b-folded'); await fold.first().click(); await page.waitForTimeout(400); }
@@ -187,7 +190,7 @@ for (const vp of VIEWPORTS) {
     check(await page.locator('text=/HYDRANT|TAP TO ZOOM/i').count() > 0, 'the hydrant card is on the map');
     if (vp.width >= COMPACT_BELOW) {
       check(m.mapW >= vp.width * 0.5, `the route map is at least half the width (${Math.round(m.mapW)} of ${vp.width})`);
-      const zoom = await page.locator('text=ZOOM').first().locator('..').textContent().catch(() => '');
+      const zoom = await page.locator('text="ZOOM"').first().locator('..').textContent().catch(() => '');
       check(/ZOOM\s*\d/.test(zoom || ''), `a real zoom after the route fit (${(zoom || '').trim()})`);
     } else {
       check(m.mapW >= vp.width * 0.9, `the route map spans the phone (${Math.round(m.mapW)} of ${vp.width})`);

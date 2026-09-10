@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Marker, Popup, Polygon, useMap, useMapEvents } from 'react-leaflet';
+import { Marker, Popup, Polygon, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
 import HallRoutesOverlay from '../map/HallRoutesOverlay';
@@ -256,6 +256,15 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
     for (const h of routeHydrants.picks) {
       if (h.lat != null && h.lng != null) points.push([Number(h.lat), Number(h.lng)]);
     }
+    // An announced block or a street section: the whole named stretch is the thing to
+    // see, not just the pin at its middle (#76).
+    if (Array.isArray(activeCall?.segment)) {
+      for (const line of activeCall.segment) {
+        for (const pt of line) {
+          if (Array.isArray(pt) && pt.length >= 2) points.push([Number(pt[1]), Number(pt[0])]);
+        }
+      }
+    }
     // Instant, not animated: a snap is a cut, and an animated four-level zoom sits at
     // Leaflet's animation threshold and is scheduled on requestAnimationFrame, which is
     // where it can fail to start (measured on the workstation, 2026-09-08).
@@ -417,6 +426,20 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             interactive={false}
           />
         )}
+
+        {/* An announced block (#76) or a street section: the stretch of road the dispatcher
+            named, amber and dashed as the workstation draws it, so the pin at its middle
+            reads as "somewhere along here" rather than as an address. */}
+        {(activeCall?.location_type === 'block' || activeCall?.location_type === 'street_section')
+          && Array.isArray(activeCall.segment)
+          && activeCall.segment.map((line, i) => (
+            <Polyline
+              key={`announced-stretch-${i}`}
+              positions={line.map(([lng, lat]) => [lat, lng])}
+              pathOptions={{ color: '#f59e0b', weight: 10, opacity: 0.75, dashArray: '14,10', lineCap: 'round' }}
+              interactive={false}
+            />
+          ))}
 
         {/* The recommended hydrants as numbered badges, at every zoom (#74). */}
         <PickedHydrantsLayer picks={routeHydrants.picks} />

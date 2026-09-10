@@ -145,7 +145,7 @@ def build_dispatch_payload(
             # than a point. These fields are what let the kiosk highlight the stretch
             # and warn that it is not a located incident; dropping them here would
             # leave the representative midpoint looking like an exact match.
-            for k in ("location_type", "segment", "endpoints", "length_m",
+            for k in ("location_type", "segment", "endpoints", "length_m", "block_range",
                       "resolution_note", "requested_address", "arrival_point", "entrance_note"):
                 if res.get(k) is not None:
                     local_geocode_result[k] = res[k]
@@ -324,7 +324,7 @@ def build_dispatch_payload(
         # or it did not transcribe -- never a guess. Punch-list #31.
         "response_type": detected_resp,
     }
-    for k in ("location_type", "segment", "endpoints", "length_m",
+    for k in ("location_type", "segment", "endpoints", "length_m", "block_range",
               "resolution_note", "requested_address", "arrival_point", "entrance_note"):
         if local_geocode_result.get(k) is not None:
             target_payload[k] = local_geocode_result[k]

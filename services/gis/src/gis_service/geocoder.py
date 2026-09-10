@@ -111,6 +111,8 @@ class CoquitlamDataValidator:
         Resolution order, most specific first. Each rung returns immediately, so the
         order encodes which answer is better, not merely which is cheaper:
 
+        0. Announced block     — "2500 Block Barnet Hwy" is a hundred-block, not a civic
+                                 number; its middle, before any parcel lookup (#76)
         1. Exact parcel        — a real property at the dispatched number
         2. Intersection        — the announced junction
         3. Block interpolation — position from the road segment's address range
@@ -132,6 +134,18 @@ class CoquitlamDataValidator:
         # Detect address pattern
         is_intersection_pattern = split_intersection_parts(parsed_address) is not None
         parsed = parse_house_and_street(clean)
+
+        # === STEP 0: An announced block (punch-list #76) ===
+        # "2500 Block Barnet Hwy" names a hundred-block, not a civic number. Operator ruling
+        # 2026-09-09: the block flag takes its own step, the middle of the block. It runs
+        # BEFORE the exact-parcel step on purpose: "1080 Block Ponderosa St" must not
+        # resolve to the parcel numbered 1080 as if the dispatcher had said that address.
+        # Falls through when the street has no segment in that block, so the older rungs
+        # still answer.
+        if parsed and parsed.has_block_indicator and parsed.house:
+            result = self.address.resolve_block_midpoint(parsed.house, parsed.street, parsed.street_type)
+            if result:
+                return result
 
         # === STEP 1: Exact address (requires house number) ===
         if parsed:

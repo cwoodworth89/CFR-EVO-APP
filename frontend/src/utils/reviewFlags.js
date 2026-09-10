@@ -12,6 +12,7 @@ export const FLAG_LABELS = {
   LOCATION_UNRESOLVED: 'Address could not be located',
   LOCATION_SUBSTITUTED: 'Location was substituted by the resolver',
   STREET_SECTION_ONLY: 'Street section only — no point location',
+  BLOCK_MIDPOINT: "Announced as a block; the pin is the block's middle, not an address",
   NO_TALK_GROUP: 'No talk group announced or transcribed',
   NO_MAP_GRID: 'No map grid announced or transcribed',
   GRID_MISMATCH: 'Announced map grid differs from the zone the address sits in',
@@ -42,6 +43,7 @@ export const FLAG_RULED_BY = {
   LOCATION_UNRESOLVED: 'verified_address',
   LOCATION_SUBSTITUTED: 'verified_address',
   STREET_SECTION_ONLY: 'verified_address',
+  BLOCK_MIDPOINT: 'verified_address',
 };
 
 /** The box on the review form whose value rules a flag, in the operator's words. */

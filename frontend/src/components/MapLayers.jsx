@@ -335,7 +335,11 @@ export function HydrantsLayer({ visible, targetCoords, minZoom = 12, highlightId
 
     // Tactical Highlight Icons for Nearest City & Private Hydrants
 
-    const canvasRenderer = React.useMemo(() => L.canvas({ padding: 0.5 }), []);
+    // 'hydrantPane' is declared by MapSurface (PANE_Z.hydrants), the only component that
+    // renders this layer. Without an explicit pane the canvas renderer falls back to
+    // overlayPane and carries no z-index, so the dots paint under the cadastral overlay's
+    // z-350 tiles regardless of DOM order.
+    const canvasRenderer = React.useMemo(() => L.canvas({ padding: 0.5, pane: 'hydrantPane' }), []);
 
     if (!visible) return null;
 

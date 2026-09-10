@@ -24,6 +24,12 @@ import { BaseMap, CoquitlamOverlays, StationsLayer, HydrantsLayer } from '../Map
 const PANE_Z = {
   underlay: 390, // below base map labels — zone fills
   labels: 410,   // above base map labels — zone numbers
+  // The cadastral overlay is z-350 *inside* Leaflet's overlayPane, and a canvas renderer sets
+  // no z-index of its own (leaflet 1.9.4: Renderer.options is `padding` only), so hydrant dots
+  // drawn in overlayPane paint under the parcel lines whatever the DOM order. 415 clears
+  // overlayPane entirely while staying under the route lines (450) and every marker (600).
+  // Operator, 2026-09-10: the hydrant layer belongs above the cadastral layer.
+  hydrants: 415, // above the cadastral overlay — hydrant dots
 };
 
 export default function MapSurface({
@@ -77,6 +83,7 @@ export default function MapSurface({
 
       <Pane name="underlayPane" style={{ zIndex: PANE_Z.underlay }} />
       <Pane name="labelsPane" style={{ zIndex: PANE_Z.labels }} />
+      <Pane name="hydrantPane" style={{ zIndex: PANE_Z.hydrants }} />
 
       <BaseMap style={baseStyle} useLabelsFallback={streetLabels} cadastralNames={showCadastral} />
       <CoquitlamOverlays visible={showCadastral} onLoadError={onCadastralError} />

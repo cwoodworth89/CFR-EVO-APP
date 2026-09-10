@@ -7,8 +7,6 @@ import MapSurface from '../map/MapSurface';
 import RoadClosuresLayer from '../map/RoadClosuresLayer';
 import { useRoadClosures } from '../../hooks/useRoadClosures';
 import { BASE_LAYERS, CADASTRAL_MIN_ZOOM } from '../MapConstants';
-import StreetSectionBanner from './StreetSectionBanner';
-import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
 import { hydrantCardModel } from '../../utils/hydrantCard';
@@ -328,37 +326,13 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
         </div>
       )}
 
-      {/* Street section: resolved to a stretch of road, not a point. A third state --
-          neither a located incident nor an unresolved one -- so it gets its own card. */}
-      {activeCall?.location_type === 'street_section' && (
-        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
-          <StreetSectionBanner activeCall={activeCall} />
-        </div>
-      )}
-
-      {/* Amber warning for a location the geocoder could only place approximately.
-          Distinct from the unresolved case below: coordinates exist and routing runs,
-          but the pin is a substitution and the crew must be told so. */}
-      {hasValidCoords && activeCall?.resolution_note && (
-        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
-          <ApproximateLocationBanner activeCall={activeCall} />
-        </div>
-      )}
-
-      {/* High-Visibility Amber Warning Box for Unresolved Incident Location */}
-      {!hasValidCoords && (
-        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 motion-safe:animate-pulse`}>
-          <span className="text-3xl">⚠️</span>
-          <div>
-            <h4 className="text-sm font-black tracking-wider text-amber-300 uppercase font-mono">
-              UNRESOLVED INCIDENT LOCATION — ROUTING PAUSED
-            </h4>
-            <p className="text-xs font-mono text-amber-100/90 mt-0.5">
-              Address: &quot;{activeCall?.address || activeCall?.target?.address || 'Unknown'}&quot;
-            </p>
-          </div>
-        </div>
-      )}
+      {/* The three amber cards that used to float here -- street section, approximate
+          location, unresolved location -- are banners above the header now (KioskView).
+          The unresolved one repeated the banner already at the top of the screen, and all
+          three sat over the route: "there is also a floating/pulsing amber banner that's
+          been popping up in the main map board ... we can remove that since we're using the
+          above header banners" (operator, 2026-09-10). Nothing floats over this map now
+          except the route pill and the control stack, both in its top corners. */}
 
       {/* The route pill: OSRM's distance and duration for the drawn home route, the router's
           own figures and never a recomputation (CLAUDE.md s6.2). Until the route arrives, or

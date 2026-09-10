@@ -3,6 +3,8 @@ import RouteOverviewPanel from './RouteOverviewPanel';
 import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
+import StreetSectionBanner from './StreetSectionBanner';
+import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { STATIONS } from '../MapConstants';
 import { useCompactViewport } from '../../hooks/useCompactViewport';
 
@@ -176,7 +178,7 @@ export default function KioskView({ kioskState }) {
   // own frontage and needs no notice.
   const arrivalSet = activeCall?.target?.arrival_point === 'entrance';
   const entranceNote = activeCall?.target?.entrance_note || null;
-  const hasNotices = Boolean(prePlanUrl || arrivalSet);
+  const hasNotices = arrivalSet;
 
   return (
     // Below `lg` the column scrolls: three header cards, a map at half the height and the
@@ -186,21 +188,6 @@ export default function KioskView({ kioskState }) {
       onClick={resetTimeoutClock}
       className={`kiosk-root fixed inset-0 bg-slate-950 text-slate-100 flex flex-col z-50 select-none border-[6px] ${borderColor} transition-colors duration-500 overflow-y-auto overflow-x-hidden lg:overflow-hidden safe-area`}
     >
-      {/* Queued Call Notification Banner */}
-      {queuedCalls.length > 0 && (
-        <div
-          onClick={advanceToNextCall}
-          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 lg:px-6 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer motion-safe:animate-pulse shadow-xl border-b border-amber-600 z-50 flex-shrink-0"
-        >
-          <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
-            {queuedCalls.length} New Call{queuedCalls.length > 1 ? 's' : ''} Queued — Tap to View Next
-          </span>
-          <div className="bg-slate-950 text-amber-400 px-3 py-0.5 rounded text-xs font-mono font-bold max-w-full truncate">
-            Next: {queuedCalls[0]?.address || 'Dispatch Alert'} →
-          </div>
-        </div>
-      )}
-
       {/* Review replay: a strip, not a card. Operator, 2026-09-10: REVIEW REPLAY and EXIT
           REVIEW "can be located somewhere else as they aren't on dispatches" -- so they take
           the same full-width place the queued-call and Tier 1 banners do, and a real call
@@ -220,6 +207,24 @@ export default function KioskView({ kioskState }) {
         </div>
       )}
 
+      {/* The amber banners stack beneath it, in the order they were raised: another call
+          waiting, then this call's own location state. Operator, 2026-09-10: "make sure amber
+          banners stack up there as well, ideally under the purple banner if it's shown." */}
+      {/* Queued Call Notification Banner */}
+      {queuedCalls.length > 0 && (
+        <div
+          onClick={advanceToNextCall}
+          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 lg:px-6 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer motion-safe:animate-pulse shadow-xl border-b border-amber-600 z-50 flex-shrink-0"
+        >
+          <span className="text-xs lg:text-sm tracking-wide uppercase font-mono">
+            {queuedCalls.length} New Call{queuedCalls.length > 1 ? 's' : ''} Queued — Tap to View Next
+          </span>
+          <div className="bg-slate-950 text-amber-400 px-3 py-0.5 rounded text-xs font-mono font-bold max-w-full truncate">
+            Next: {queuedCalls[0]?.address || 'Dispatch Alert'} →
+          </div>
+        </div>
+      )}
+
       {/* Tier 1 Unresolved-Location Warning (CLAUDE.md §5) — all call details still
           display normally below; only routing/ETA output is withheld. */}
       {!hasCoords && (
@@ -230,7 +235,16 @@ export default function KioskView({ kioskState }) {
         </div>
       )}
 
-      {/* The header: the call, the units, the clock */}
+      {/* Approximate location, and the street-section case: both were floating over the
+          route map, where they covered it. Same words, same amber, in the stack. */}
+      {(activeCall?.location_type === 'street_section' || (hasCoords && activeCall?.resolution_note)) && (
+        <div className="flex-shrink-0 px-2 lg:px-3 pt-2 lg:pt-3 flex flex-col gap-2">
+          <StreetSectionBanner activeCall={activeCall} />
+          {hasCoords && <ApproximateLocationBanner activeCall={activeCall} />}
+        </div>
+      )}
+
+      {/* The header: the call, the units, the hydrant */}
       <ActiveAlertBanner
         activeCall={activeCall}
         unitEtas={unitEtas}
@@ -249,6 +263,8 @@ export default function KioskView({ kioskState }) {
         timeoutFormatted={timeoutFormatted}
         hydrantModel={hydrantModel}
         onHydrantTap={hasCoords ? () => setSnapRequest((n) => n + 1) : null}
+        prePlanUrl={prePlanUrl}
+        onOpenPrePlan={() => setShowPrePlanModal(true)}
         onDismiss={() => dismissActiveCall('manual')}
       />
 
@@ -262,16 +278,6 @@ export default function KioskView({ kioskState }) {
                 Set by the operator{entranceNote ? ` — ${entranceNote}` : ''}
               </span>
             </div>
-          )}
-          {prePlanUrl && (
-            <button
-              type="button"
-              onClick={() => setShowPrePlanModal(true)}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 lg:px-4 lg:py-3 rounded-xl bg-slate-950 border border-sky-800 hover:border-sky-600 cursor-pointer transition"
-            >
-              <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0" />
-              <span className="font-mono font-bold text-xs lg:text-sm tracking-[0.08em] uppercase text-sky-300">Pre-incident plan</span>
-            </button>
           )}
         </div>
       )}

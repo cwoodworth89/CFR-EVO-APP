@@ -168,6 +168,12 @@ for (const vp of VIEWPORTS) {
     await page.waitForTimeout(3000);
 
     const tag = id.replace(/^DISP-\d+-/, '');
+    // A dispatch whose location the geocoder could not resolve is a state of its own, not a
+    // failure: routing, the ETAs and the zoom readout are all withheld and the screen says so
+    // (CLAUDE.md s5). The checks below branch on it rather than demanding figures that ought
+    // not to exist.
+    const t = record.target || {};
+    const located = t.lat != null && t.lng != null && !(Number(t.lat) === 0 && Number(t.lng) === 0);
     console.log(`\n== ${vp.name} :: dispatch ${id} (${(record.verified_address || record.target?.address || '').trim()}) ==`);
     const shot = (name) => (OUT ? page.screenshot({ path: `${OUT}/${vp.name}-D-${tag}-${name}.png` }) : Promise.resolve());
     await shot('1-route');
@@ -184,14 +190,22 @@ for (const vp of VIEWPORTS) {
       await page.evaluate(() => document.querySelector('.kiosk-root')?.scrollTo(0, 0));
     }
     check(await page.locator('h1').count() > 0, 'the address heading is on screen');
-    check(await page.locator('text=/REVIEW REPLAY/i').count() > 0, 'the header says REVIEW REPLAY');
+    check(await page.locator('text=/REVIEW REPLAY/i').count() > 0, 'the review-replay strip is above the header');
     const pill = await page.locator('text=/^(ROUTE|STRAIGHT-LINE) ·/').first().textContent().catch(() => '');
-    check(/(ROUTE|STRAIGHT-LINE) · [\d.]+ KM · \d+ MIN/.test(pill || ''), `the route pill carries OSRM's figures (${(pill || '').trim()})`);
-    check(await page.locator('text=/HYDRANT|TAP TO ZOOM/i').count() > 0, 'the hydrant card is on the map');
+    if (located) {
+      check(/(ROUTE|STRAIGHT-LINE) · [\d.]+ KM · \d+ MIN/.test(pill || ''), `the route pill carries OSRM's figures (${(pill || '').trim()})`);
+    } else {
+      check(/AWAITING LOCATION/.test(pill || ''), `the route pill says the location is awaited (${(pill || '').trim()})`);
+      check(await page.locator('text=/LOCATION UNRESOLVED/i').count() > 0, 'the unresolved-location banner is above the header');
+      check(await page.locator('button', { hasText: /snap to call/i }).count() === 0, 'no SNAP TO CALL without a location');
+    }
+    check(await page.locator('text=/HYDRANT|NO STORED DOCUMENTS/i').count() > 0, 'the hydrant card is in the header');
     if (vp.width >= COMPACT_BELOW) {
       check(m.mapW >= vp.width * 0.5, `the route map is at least half the width (${Math.round(m.mapW)} of ${vp.width})`);
-      const zoom = await page.locator('text="ZOOM"').first().locator('..').textContent().catch(() => '');
-      check(/ZOOM\s*\d/.test(zoom || ''), `a real zoom after the route fit (${(zoom || '').trim()})`);
+      if (located) {
+        const zoom = await page.locator('text="ZOOM"').first().locator('..').textContent().catch(() => '');
+        check(/ZOOM\s*\d/.test(zoom || ''), `a real zoom after the route fit (${(zoom || '').trim()})`);
+      }
     } else {
       check(m.mapW >= vp.width * 0.9, `the route map spans the phone (${Math.round(m.mapW)} of ${vp.width})`);
     }
@@ -203,7 +217,7 @@ for (const vp of VIEWPORTS) {
       catch { check(false, `${what} can be tapped`); return false; }
     };
     const snap = page.locator('button', { hasText: /snap to call/i });
-    if (await snap.count() && await tap(snap, 'SNAP TO CALL')) {
+    if (located && await snap.count() && await tap(snap, 'SNAP TO CALL')) {
       await page.waitForTimeout(2000);
       await shot('2-snap');
       const recentre = page.locator('button', { hasText: /re-centre/i });

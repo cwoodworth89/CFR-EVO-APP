@@ -124,6 +124,9 @@ export default function ActiveAlertBanner({
   // the map has measured one; the card then says which state it is in, never a guess.
   hydrantModel = null,
   onHydrantTap = null,
+  // The call's documents, along the foot of the hydrant card (operator, 2026-09-10).
+  prePlanUrl = null,
+  onOpenPrePlan = null,
   // false on a phone: no clock, the call stays until cleared (operator, 2026-09-09).
   autoDismiss = true,
   elapsedFormatted = '00:00',
@@ -320,7 +323,7 @@ export default function ActiveAlertBanner({
       </section>
 
       {/* The water */}
-      <HydrantCard model={hydrantModel} onTap={onHydrantTap} />
+      <HydrantCard model={hydrantModel} onTap={onHydrantTap} prePlanUrl={prePlanUrl} onOpenPrePlan={onOpenPrePlan} />
     </header>
   );
 }

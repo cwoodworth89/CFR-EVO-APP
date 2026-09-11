@@ -91,8 +91,8 @@ anywhere as the definition of "the address".
   rather than an ambiguity to refuse; and `resolve_exact` selects `is_base_site` and orders by
   it first, so `scored[0][0]` takes the property's master row. Confirmed on the kiosk database:
   `2929 Barnet Hwy` resolves to **id 201357**, and **0 of 500** sampled single-parcel addresses
-  change. Code is on the kiosk; **the API and the dispatch agent have not been restarted**, so
-  it is not yet in force.
+  change. **`cfr_api` rebuilt and confirmed serving the new rule 2026-09-10; the dispatch agent
+  has not restarted**, so the routing half is not yet in force. See *Open* 1.
 
 ## Open
 

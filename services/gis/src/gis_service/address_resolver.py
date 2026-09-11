@@ -287,11 +287,22 @@ class AddressResolver:
                 rows = conn.execute(text("""
                     SELECT id, address, house, street, streettype, centroid_lat, centroid_lng,
                            front_lat, front_lng, entrance_lat, entrance_lng, entrance_note,
-                           zone_id,
+                           zone_id, is_base_site,
                            ST_AsGeoJSON(geom) as geom_geojson
                     FROM public.parcels
                     WHERE house = :house
-                    ORDER BY street, streettype, id;
+                    -- base_site FIRST. public.parcels is one row per address, so a
+                    -- multi-parcel property returns many rows and this ORDER BY is what
+                    -- chooses between them: `scored[0][0]` below takes the first row of the
+                    -- top-scoring set. Ordered by id alone it took an arbitrary suite --
+                    -- 2929 Barnet Hwy resolved to "2929 Barnet Hwy 2112" because that row
+                    -- sorts first -- so an arrival point set on the property's master row
+                    -- was never read (punch-list #77).
+                    --
+                    -- The base_site row is CFR's own, one per multi-parcel address and
+                    -- unique via parcels_base_site_address_uniq. The 26,531 single-parcel
+                    -- addresses have no such row and are unaffected.
+                    ORDER BY is_base_site DESC, street, streettype, id;
                 """), {"house": str(house)}).mappings().fetchall()
 
                 best_score = 0

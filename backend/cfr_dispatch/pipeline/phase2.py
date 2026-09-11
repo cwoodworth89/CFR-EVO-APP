@@ -358,7 +358,11 @@ def process_phase_2_finalize(
                     "raw_transcript": raw_transcript,
                     "sanitized_transcript": reconstructed_transcript,
                     "incident_type": p2_incident_type,
-                    "responding_units": p2_responding_units
+                    "responding_units": p2_responding_units,
+                    # Top level as well as in `target`. The column is what the API reads
+                    # first and what the MQTT UPDATE merges over on a live call; without
+                    # it phase 1's value stayed there while `target` held the new one.
+                    "routing_metrics": target_payload["routing_metrics"]
                 }
                 if INTEGRATION_PAYLOAD_OPTION == 1:
                     update_payload["address"] = p1_address
@@ -492,7 +496,10 @@ def process_phase_2_finalize(
                             "sanitized_transcript": reconstructed_transcript,
                             "incident_type": p2_incident_type,
                             "responding_units": p2_responding_units,
-                            "is_test": is_test
+                            "is_test": is_test,
+                            # See the note at the agreement site: the column must move with
+                            # `target`, or the correction reaches the map and not the ETAs.
+                            "routing_metrics": target_payload["routing_metrics"]
                         }
                         if INTEGRATION_PAYLOAD_OPTION == 1:
                             update_payload["address"] = res["address"]

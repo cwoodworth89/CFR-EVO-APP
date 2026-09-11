@@ -138,6 +138,36 @@ same session, `f987ca5` on `main`:
 from the kiosk's nginx; lint, the node tests and a production build. **Not yet verified**: the
 rendered app on the workstation and the hall display, which is the operator's check.
 
+## The extract, widened the same evening
+
+The first look at the live map showed the #40 hatch inside the workstation's default view: the
+BBBike Vancouver extract ended at lon -122.668 and lat 49.416, while the City boundary runs
+to -122.621 and the zones to -122.614 (five zones cross the edge, 19 parcels beyond it, the
+6000 Quarry Rd lands) and the map lets the user scroll to `OPERATIONAL_BOUNDS`
+(-123.0507..-122.5307, 49.0838..49.4838). Operator: *"I want the map to look complete ...
+We have bound the user to a certain zoom range, and area they can scroll the screen. Let's
+fill that with our vector maps."*
+
+The new extract is `backend/data/osrm/coquitlam_region.osm.pbf`: Geofabrik's British Columbia
+file (1.2 GB, MD5 checked, data date 2026-09-09 20:21 UTC) clipped with osmium-tool in a
+container to `-123.31,48.99,-122.45,49.52`, the scroll box with a margin on every side and
+nothing smaller than before on the west, south or north. BBBike's custom extracts take a web
+form and an email and cannot be scripted. The tile build cuts to that same box explicitly,
+because a complete-ways clip keeps whole ways past the edge and the TileJSON bounds are what
+the app paints land over. The tiles: 1,569, 32 MB, built 2026-09-09 22:28 PDT and served
+from 2026-09-10 morning, when the operator asked whether they were live; the plan had been
+one window with the routing graph swap, which was still waiting on his go in the routing
+session twenty hours later, and a map showing roads the graph lacks is what the raster did
+too. The routing stream's new graph is built and measured (no route to an unchanged
+destination moved by more than 3 s) and deploys on his word there. The old extract and
+graphs stay on disk as the rollback.
+
+A second finding from the same measurement, crew-visible and not yet fixed: the frontend's
+city bounding box (`isWithinCoquitlam`, east edge -122.70) is narrower than the City; 157
+real parcels lie east of it and would get the satellite panel's *NOT AVAILABLE OUTSIDE OF
+CITY* card. The clean fix is the City boundary polygon in PostGIS rather than a rectangle;
+the numbers are shared with the GIS sync procedure. Raised with the operator.
+
 ## Decisions for the operator
 
 1. **Look at it on the hall display** and say whether it stays: the raster stays on disk

@@ -148,7 +148,13 @@ export default function KioskView({ kioskState }) {
   // If they are absent the units render with '--:--' -- never a client-side estimate
   // (CLAUDE.md §6.1, §6.2). The hall is the record's origin_hall or nothing: it used to be
   // guessed from the digits in the callsign, which is not where a unit comes from.
-  const persistedMetrics = activeCall?.routing_metrics || activeCall?.target?.routing_metrics;
+  // `||` cannot choose between these: an empty array is TRUTHY in JavaScript, so a phase 1
+  // `[]` at the top level shadowed the corrected list in `target` when a phase 2 correction
+  // arrived over MQTT -- the units kept showing '--:--' on a live call. It looked fine after
+  // a reload because the API picks the same two in Python, where `[]` IS falsy
+  // (api/routers/dispatches.py, `if not metrics`). Take the first list with entries in it.
+  const persistedMetrics = [activeCall?.routing_metrics, activeCall?.target?.routing_metrics]
+    .find((m) => Array.isArray(m) && m.length > 0) || [];
   const unitEtas = (hasCoords && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
     ? persistedMetrics.map((m) => ({
         unit: m.unit,

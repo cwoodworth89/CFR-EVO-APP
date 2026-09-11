@@ -22,7 +22,8 @@ from cfr_dispatch.parser import (
 )
 from cfr_dispatch.stt import transcribe_audio_local
 from cfr_dispatch.pipeline.models import Phase2Result, PipelineTimer
-from cfr_dispatch.pipeline.payload_builder import build_dispatch_payload, clean_address_string
+from cfr_dispatch.pipeline.payload_builder import (
+    build_dispatch_payload, clean_address_string, refresh_routing_metrics)
 from audio_service import filter_known_tones
 from notification_service import (
     save_dispatch_record,
@@ -318,6 +319,16 @@ def process_phase_2_finalize(
                     "radio_channel": p2_channel
                 }
 
+                # The ETAs follow the coordinates. On this path phase 1 may have WITHHELD
+                # the location (rule A) and phase 2 placed it just above, which moves the
+                # destination out from under anything phase 1 derived from it.
+                target_payload["routing_metrics"] = refresh_routing_metrics(
+                    dispatch_id, p1_target.get("routing_metrics"), p2_responding_units,
+                    target_payload.get("lat"), target_payload.get("lng"),
+                    response_type=((best_p2_candidate.response_type if best_p2_candidate else None)
+                                   or p1_target.get("response_type")),
+                    destination_options=target_payload.get("endpoints"))
+
                 # Recompute rather than asserting a clean result. Phase 2 confirmed
                 # the ADDRESS; it says nothing about a missing talk group or grid, and
                 # the old "confidence_score": 100.0 here silently erased those.
@@ -347,7 +358,11 @@ def process_phase_2_finalize(
                     "raw_transcript": raw_transcript,
                     "sanitized_transcript": reconstructed_transcript,
                     "incident_type": p2_incident_type,
-                    "responding_units": p2_responding_units
+                    "responding_units": p2_responding_units,
+                    # Top level as well as in `target`. The column is what the API reads
+                    # first and what the MQTT UPDATE merges over on a live call; without
+                    # it phase 1's value stayed there while `target` held the new one.
+                    "routing_metrics": target_payload["routing_metrics"]
                 }
                 if INTEGRATION_PAYLOAD_OPTION == 1:
                     update_payload["address"] = p1_address
@@ -443,6 +458,16 @@ def process_phase_2_finalize(
                         if best_p2_candidate and best_p2_candidate.intersection:
                             target_payload["intersection"] = best_p2_candidate.intersection
 
+                        # Phase 2 corrected the ADDRESS, so any ETA phase 1 managed to
+                        # compute was routed to the wrong place. `res` is the geocode these
+                        # coordinates came from, so its endpoints are the ones that match.
+                        target_payload["routing_metrics"] = refresh_routing_metrics(
+                            dispatch_id, p1_target.get("routing_metrics"), p2_responding_units,
+                            res["lat"], res["lng"],
+                            response_type=((best_p2_candidate.response_type if best_p2_candidate else None)
+                                           or p1_target.get("response_type")),
+                            destination_options=res.get("endpoints"))
+
                         # Recomputed, not defaulted. The old line took the geocoder's
                         # confidence "or 80.0" -- a fabricated number when the resolver
                         # reported none (CLAUDE.md 6.1).
@@ -471,7 +496,10 @@ def process_phase_2_finalize(
                             "sanitized_transcript": reconstructed_transcript,
                             "incident_type": p2_incident_type,
                             "responding_units": p2_responding_units,
-                            "is_test": is_test
+                            "is_test": is_test,
+                            # See the note at the agreement site: the column must move with
+                            # `target`, or the correction reaches the map and not the ETAs.
+                            "routing_metrics": target_payload["routing_metrics"]
                         }
                         if INTEGRATION_PAYLOAD_OPTION == 1:
                             update_payload["address"] = res["address"]

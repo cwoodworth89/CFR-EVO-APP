@@ -29,6 +29,85 @@ def clean_address_string(addr: str) -> str:
     addr = re.sub(r',\s*Port Moody\b.*', '', addr, flags=re.IGNORECASE)
     return addr.strip()
 
+def _routing_matches_destination(metrics, lat, lng) -> bool:
+    """True when every stored metric was routed to THIS destination.
+
+    Each metric records the `destination_coords` it was routed to, so staleness is a fact
+    on the record rather than an inference. A street-section dispatch deliberately routes
+    each unit to the nearer end of the section instead of the record's point and is stamped
+    `destination_note`; those cannot be compared this way, so they are passed over rather
+    than reported as moved.
+    """
+    if not metrics or lat is None or lng is None:
+        return False
+    for m in metrics:
+        if m.get("destination_note"):
+            continue
+        dest = m.get("destination_coords") or []
+        if len(dest) < 2 or dest[0] is None or dest[1] is None:
+            return False
+        # 1e-4 degrees is ~11 m at this latitude, finer than any of these placements.
+        if abs(float(dest[0]) - float(lat)) > 1e-4 or abs(float(dest[1]) - float(lng)) > 1e-4:
+            return False
+    return True
+
+
+def compute_routing_metrics(dispatch_id, responding_units, lat, lng,
+                            response_type=None, destination_options=None):
+    """Per-unit OSRM ETAs from each unit's home hall.
+
+    Returns [] when there is nothing to route or the router could not answer. The kiosk
+    renders that as '--:--'; nothing here estimates (CLAUDE.md 6.1, 6.2).
+    """
+    if lat is None or lng is None or not responding_units:
+        return []
+    try:
+        from gis_service.routing_engine import EVORoutingEngine
+        router = EVORoutingEngine()
+        metrics = router.calculate_units_routing(
+            responding_units, lat, lng, response_type=response_type,
+            destination_options=destination_options)
+        logging.info(
+            f"[{dispatch_id}] Computed {response_type or 'unknown (routing at emergency speed)'}"
+            f" routing metrics for {len(metrics)} responding units.")
+        return metrics
+    except Exception as route_err:
+        logging.warning(f"[{dispatch_id}] Could not compute routing metrics: {route_err}")
+        return []
+
+
+def refresh_routing_metrics(dispatch_id, existing, responding_units, lat, lng,
+                            response_type=None, destination_options=None):
+    """Phase 2's ETAs, for the destination phase 2 settled on.
+
+    Phase 1 computes these once, and only if PHASE 1 itself geocoded a location. When it
+    failed and phase 2 rescued the address -- the CORRECTION_AUDIT path, and the withheld-
+    location path -- the coordinates moved and nothing recomputed what had been derived
+    from them, so the units showed '--:--' for the rest of that call's life. Fourteen
+    records carry that, and five carry the opposite: ETAs routed to phase 1's wrong
+    destination, the worst 1.32 km from the address finally recorded. CLAUDE.md 6.6 --
+    name what recomputes X when Y moves.
+
+    Phase 2 therefore recomputes, exactly as it already recomputes the review flags, the
+    map grid, the radio channel and the unit list.
+
+    If the router cannot answer, phase 1's numbers are kept ONLY when they were computed
+    against this same destination; if the destination moved they are dropped. '--:--' is a
+    correct answer, an ETA to somewhere else is not (CLAUDE.md 6.1).
+    """
+    fresh = compute_routing_metrics(dispatch_id, responding_units, lat, lng,
+                                    response_type=response_type,
+                                    destination_options=destination_options)
+    if fresh:
+        return fresh
+    if existing and _routing_matches_destination(existing, lat, lng):
+        logging.info(f"[{dispatch_id}] Router gave nothing; keeping phase 1 metrics, same destination.")
+        return list(existing)
+    if existing:
+        logging.warning(f"[{dispatch_id}] Router gave nothing and the destination moved; dropping stale metrics.")
+    return []
+
+
 def build_dispatch_payload(
     dispatch_id: str,
     raw_transcript: str,
@@ -278,17 +357,12 @@ def build_dispatch_payload(
         verify_location = verify_location_override
         
     # Calculate per-unit routing metrics from home hall origins (accounting for Emergency vs Routine response)
-    routing_metrics = []
-    if lat is not None and lng is not None and responding_units:
-        try:
-            from gis_service.routing_engine import EVORoutingEngine
-            router = EVORoutingEngine()
-            routing_metrics = router.calculate_units_routing(
-                responding_units, lat, lng, response_type=detected_resp,
-                destination_options=local_geocode_result.get("endpoints"))
-            logging.info(f"[{dispatch_id}] Computed {detected_resp or 'unknown (routing at emergency speed)'} routing metrics for {len(routing_metrics)} responding units.")
-        except Exception as route_err:
-            logging.warning(f"[{dispatch_id}] Could not compute routing metrics: {route_err}")
+    # Phase 2 recomputes this against whatever destination it settles on; see
+    # refresh_routing_metrics above for why inheriting phase 1's answer is not safe.
+    routing_metrics = compute_routing_metrics(
+        dispatch_id, responding_units, lat, lng,
+        response_type=detected_resp,
+        destination_options=local_geocode_result.get("endpoints"))
 
     subaddress = next((d.subaddress for d in all_candidates if d.subaddress), None)
     target_payload = {

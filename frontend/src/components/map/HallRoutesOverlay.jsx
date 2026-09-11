@@ -9,15 +9,27 @@ import { hallRoutesToDraw, HOME_ROUTE_STYLE, OTHER_ROUTE_STYLE } from '../../uti
  * translucent in theirs, the next to arrive above the later ones (utils/hallRoutes.js).
  *
  * The halls come from the dispatch's stored routing_metrics; with none, only the home route is
- * drawn. One `/api/route` call per hall, one to four per call. Only the home route reports its
- * coordinates upward: the hydrant picker measures along the approach of the crew reading the
- * screen, and the map fit follows the home route (operator, 2026-09-09: the others may
- * "approach from off screen", it "only matters in the final approach").
+ * drawn. `allHalls` overrides that and draws all four whatever the metrics say — the
+ * workstation console's "All Hall Approaches" layer, where there is no dispatch to take halls
+ * from (operator, 2026-09-11). One `/api/route` call per hall, one to four per call.
+ *
+ * Only the home route reports its *coordinates* upward: the hydrant picker measures along the
+ * approach of the crew reading the screen, and the map fit follows the home route (operator,
+ * 2026-09-09: the others may "approach from off screen", it "only matters in the final
+ * approach"). Every route reports its distance and time through `onHallRoute`, which is the
+ * router's own answer for that hall and nothing derived from it (CLAUDE.md §6.2).
  */
-export default function HallRoutesOverlay({ dest, homeHall, routingMetrics = [], onHomeRouteCalculated }) {
+export default function HallRoutesOverlay({
+  dest,
+  homeHall,
+  routingMetrics = [],
+  allHalls = false,
+  onHomeRouteCalculated,
+  onHallRoute,
+}) {
   const toDraw = useMemo(
-    () => hallRoutesToDraw({ routingMetrics, homeHall, knownHalls: STATIONS.map(s => s.id) }),
-    [routingMetrics, homeHall]
+    () => hallRoutesToDraw({ routingMetrics, homeHall, knownHalls: STATIONS.map(s => s.id), allHalls }),
+    [routingMetrics, homeHall, allHalls]
   );
 
   if (!dest || dest[0] == null || dest[1] == null) return null;
@@ -39,7 +51,10 @@ export default function HallRoutesOverlay({ dest, homeHall, routingMetrics = [],
             opacity={style.opacity}
             pane={`route-hall-${entry.hall}`}
             paneZIndex={450 + i}
-            onRouteCalculated={entry.isHome ? onHomeRouteCalculated : undefined}
+            onRouteCalculated={(coords, stats) => {
+              if (entry.isHome && onHomeRouteCalculated) onHomeRouteCalculated(coords, stats);
+              if (onHallRoute) onHallRoute(entry.hall, stats);
+            }}
           />
         );
       })}

@@ -26,6 +26,12 @@ export default function DispatchTargetLayer({
   homeHall = '1',
   routingMetrics = [],
   onRouteCalculated,
+  // Where the route lines end, when that is not the target's own coordinates: while an arrival
+  // point is being placed the routes follow the draft, so the approaches can be read before the
+  // point is committed (operator, 2026-09-11).
+  routeDest = null,
+  showAllHalls = false,
+  onHallRoute,
 }) {
   if (!targetAddress) return null;
 
@@ -87,13 +93,16 @@ export default function DispatchTargetLayer({
       <PickedHydrantsLayer picks={nearestHydrants} />
 
       {/* Every responding hall's route when the target is a dispatch with routing_metrics;
-          on an address search there are no metrics and only the home hall's route draws. */}
-      {originStation && targetCoords && (
+          on an address search there are no metrics and only the home hall's route draws,
+          unless the All Hall Approaches layer is on, which draws all four. */}
+      {originStation && (routeDest || targetCoords) && (
         <HallRoutesOverlay
-          dest={targetCoords}
+          dest={routeDest || targetCoords}
           homeHall={homeHall}
           routingMetrics={routingMetrics}
+          allHalls={showAllHalls}
           onHomeRouteCalculated={onRouteCalculated}
+          onHallRoute={onHallRoute}
         />
       )}
     </>

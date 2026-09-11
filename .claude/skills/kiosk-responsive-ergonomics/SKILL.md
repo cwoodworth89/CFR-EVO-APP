@@ -81,6 +81,13 @@ Header
 └── right stack          address card, PropertySatellitePanel, StreetViewPanel
 ```
 
+**The console draws every hall's approach on request** (operator, 2026-09-11). `All Hall
+Approaches` in MAP LAYERS turns `HallRoutesOverlay`'s `allHalls` on, which draws all four
+routes instead of the home hall's alone, and puts a distance/time row per hall in the target
+panel. Off by default — the route colours are the zone-fill colours, so four translucent lines
+over four zone fills is a lot to read unasked. The rows stay in hall order: sorting by time
+would read as a first-due order, which this view cannot know. See `docs/ux_notes.md` §3 item 7.
+
 Both are header + main map + right-hand detail stack. See
 [`docs/architecture/unified_map_surface.md`](../../../docs/architecture/unified_map_surface.md)
 for the proposal to collapse them into one mode-selected surface.

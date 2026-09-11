@@ -136,6 +136,29 @@ automated runs hit was pressing it before the suggestions had loaded.
    the zones use; the ETA list's dots take the hall colour. The hydrant picker and the fit
    follow the home route only. Same layer on the workstation. The kiosk's hall now comes from
    `VITE_DEFAULT_HALL`; until then nothing passed it and the route always left Hall 1.
+
+   **All Hall Approaches, on the workstation console** (operator, 2026-09-11, while setting
+   arrival points: *"can we display the kiosk hall as primary but ALSO show all other halls in
+   their colours, and transparency. That'll show me the route oddities from different trucks
+   approaching"*). The layer above takes its halls from a dispatch's `routing_metrics`, and in
+   Explore there is no dispatch — which is why only the home hall drew. `allHalls` adds the
+   rest, and a MAP LAYERS toggle turns it on; **off by default**, because these are the same
+   four colours as the zone fills and four translucent routes over them is a lot to read when
+   it was not asked for. Three rulings that came with it:
+
+   * **The routes follow the draft arrival point**, not just the saved one, so the approaches
+     can be read before the point is committed rather than after.
+   * **The readout is in hall order and is never sorted by time.** Sorting would read as a
+     first-due order and it is not one — staffing, cross-staffing and what is already
+     committed are not in this view. The panel says so in its own footnote (CLAUDE.md §7.1).
+   * **The figures are the router's.** One `/api/route` call per hall; distance and time are
+     what OSRM returned for that hall, and a route that has not come back yet reads `--`
+     rather than a number (§6.1, §6.2).
+
+   Measured 2026-09-11 against the kiosk's API at `3030 Lincoln Ave`: Hall 1 1.59 km / 3 min,
+   Hall 2 3.44 / 5, Hall 3 8.5 / 13, Hall 4 5.08 / 6. The map still fits the **home** route
+   (the 2026-09-09 ruling is untouched), so the other three enter from off screen until you
+   zoom out.
 8. **The review rating from the kiosk** (#52a) and **the mobile setup screen** (#60): both
    need a spec before design.
 8. **What the hall display does between calls.** Operator, 2026-09-08: *"In real deployment,

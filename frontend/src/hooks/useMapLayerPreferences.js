@@ -20,6 +20,11 @@ export function useMapLayerPreferences() {
   const [showRoadClosures, setShowRoadClosures] = useState(true);
   const [showRailroadCrossings, setShowRailroadCrossings] = useState(false);
   const [showFireHalls, setShowFireHalls] = useState(true);
+  // Every hall's route to the target at once, not just this hall's. Off by default: hall
+  // colours are also the zone fills (MapConstants.HALL_COLOURS), so four translucent routes
+  // over four zone fills in the same four colours is a lot to read when it is not wanted
+  // (operator, 2026-09-11).
+  const [showAllHalls, setShowAllHalls] = useState(false);
 
   // Road closure time windows
   const [showActiveNow, setShowActiveNow] = useState(true);
@@ -57,6 +62,7 @@ export function useMapLayerPreferences() {
     showRoadClosures, setShowRoadClosures,
     showRailroadCrossings, setShowRailroadCrossings,
     showFireHalls, setShowFireHalls,
+    showAllHalls, setShowAllHalls,
     showActiveNow, setShowActiveNow,
     showNext24h, setShowNext24h,
     showNext7d, setShowNext7d,
@@ -66,7 +72,7 @@ export function useMapLayerPreferences() {
     applyModeDefaults,
   }), [
     mapStyle, showLabels, showHydrants, showZones, showRoadClosures,
-    showRailroadCrossings, showFireHalls, showActiveNow, showNext24h, showNext7d,
+    showRailroadCrossings, showFireHalls, showAllHalls, showActiveNow, showNext24h, showNext7d,
     filterNoAccess, filterAccessOnly, filterCaution, applyModeDefaults,
   ]);
 }

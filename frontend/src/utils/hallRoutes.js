@@ -28,10 +28,11 @@ export const OTHER_ROUTE_STYLE = { weight: 4, opacity: 0.45 };
  * @param {Array}  args.routingMetrics  backend routing_metrics: [{ unit, origin_hall, eta_minutes }]
  * @param {string} args.homeHall        the hall this screen belongs to, "1".."4"
  * @param {Array}  args.knownHalls      hall ids that exist, e.g. STATIONS.map(s => s.id)
+ * @param {boolean} args.allHalls        draw every known hall, not only those with metrics
  * @returns {Array<{hall: string, isHome: boolean, etaMinutes: number|null, units: string[]}>}
  *          in draw order, bottom first, home hall last
  */
-export function hallRoutesToDraw({ routingMetrics = [], homeHall, knownHalls = [] }) {
+export function hallRoutesToDraw({ routingMetrics = [], homeHall, knownHalls = [], allHalls = false }) {
   const known = new Set((knownHalls || []).map(String));
   const home = homeHall != null ? String(homeHall) : null;
   const byHall = new Map();
@@ -53,6 +54,17 @@ export function hallRoutesToDraw({ routingMetrics = [], homeHall, knownHalls = [
 
   if (home && known.has(home) && !byHall.has(home)) {
     byHall.set(home, { hall: home, isHome: true, etaMinutes: null, units: [] });
+  }
+
+  // Explore: the halls nothing was dispatched from, added with no ETA and no units. They all
+  // land on the unknown-ETA branch of the sort below, which orders them by hall number, so the
+  // stacking is the same on every render instead of following whichever route's fetch returned
+  // first.
+  if (allHalls) {
+    for (const id of known) {
+      if (byHall.has(id)) continue;
+      byHall.set(id, { hall: id, isHome: id === home, etaMinutes: null, units: [] });
+    }
   }
 
   const others = [...byHall.values()].filter(e => !e.isHome);

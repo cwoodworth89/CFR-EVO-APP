@@ -14,7 +14,7 @@ import { Header } from './hud/Header';
 import { useAdminSession } from '../hooks/useAdminSession';
 import { LeftSidebar } from './hud/LeftSidebar';
 import { RightSidebar } from './hud/RightSidebar';
-import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
+import { MODE_DEFAULTS, UNIT_COLORS, STATIONS_MAP as STATIONS, STATIONS as STATION_LIST, hallColour, KNOWN_BUILDINGS, OPERATIONAL_BOUNDS, COQUITLAM_CENTER } from './MapConstants';
 import { enrichAddressWithBuilding } from './map/mapGeometry';
 import { pickRouteHydrants } from '../utils/routeHydrants';
 import RoadClosureMarker from './map/RoadClosureMarker';
@@ -97,7 +97,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   // whole `layers` object, and reach the sidebars through {...layers}.
   const {
     mapStyle, showLabels, showHydrants, showZones, showRoadClosures,
-    showRailroadCrossings, showFireHalls,
+    showRailroadCrossings, showFireHalls, showAllHalls,
     // Header takes these three explicitly rather than by spread: it uses six of the
     // hook's values, so listing them keeps its interface visible.
     setMapStyle, setShowLabels, setShowRoadClosures,
@@ -317,6 +317,48 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     return [lat, lng];
   }, [targetAddress]);
 
+  // Where the route lines end. While an arrival point is being placed they follow the draft
+  // pin, so the approaches can be judged before the point is saved rather than after
+  // (operator, 2026-09-11). With no draft this is the target's own coordinates, which is the
+  // saved arrival point where there is one and the computed frontage where there is not.
+  const routeDest = useMemo(() => {
+    if (arrival.draft && arrival.draft.lat != null && arrival.draft.lng != null) {
+      return [arrival.draft.lat, arrival.draft.lng];
+    }
+    return targetCoords;
+  }, [arrival.draft, targetCoords]);
+
+  // Each hall's road distance and time, as the router returned them (CLAUDE.md 6.2). Keyed by
+  // hall id; a hall whose route has not come back yet, or whose fetch failed, simply has no
+  // entry and renders as `--` rather than as a number (6.1).
+  const [hallRouteStats, setHallRouteStats] = useState({});
+  const handleHallRoute = useCallback((hall, stats) => {
+    setHallRouteStats(prev => ({ ...prev, [hall]: stats }));
+  }, []);
+  const routeDestKey = routeDest ? `${routeDest[0]},${routeDest[1]}` : '';
+  useEffect(() => {
+    // A new destination invalidates every hall's figures at once. Clearing rather than
+    // leaving the old ones up means the panel shows `--` for the moment the routes are in
+    // flight, instead of the previous address's numbers under the new address's name.
+    setHallRouteStats({});
+  }, [routeDestKey, showAllHalls]);
+
+  // The readout beside the map: fixed hall order, never sorted by time. Sorting would read as
+  // a first-due order, and it is not one -- staffing, cross-staffing and what is already
+  // committed are not in this view (CLAUDE.md 7.1).
+  const hallApproaches = useMemo(() => {
+    if (!showAllHalls || !targetAddress) return [];
+    return STATION_LIST.map(stn => ({
+      hall: stn.id,
+      name: stn.name,
+      colour: hallColour(stn.id),
+      isHome: stn.id === String(homeHall),
+      distanceKm: hallRouteStats[stn.id]?.distanceKm ?? null,
+      etaMinutes: hallRouteStats[stn.id]?.etaMinutes ?? null,
+      degraded: hallRouteStats[stn.id]?.degraded === true,
+    }));
+  }, [showAllHalls, targetAddress, hallRouteStats, homeHall]);
+
   // Fit the origin hall and the destination. The padding is measured from the map
   // (map/fitPadding.js). It was written as [340, 80] / [400, 80] on the belief that the
   // sidebars overlay the map; they are flex siblings and the map is already narrowed by
@@ -411,6 +453,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
           nearestHydrant={nearestHydrants[0] || null}
           nearestHydrants={nearestHydrants}
           routeMetrics={routeMetrics}
+          hallApproaches={hallApproaches}
           map={map}
         />
 
@@ -469,6 +512,9 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 originStation={STATIONS[homeHall]}
                 homeHall={homeHall}
                 routingMetrics={activeDispatch?.routing_metrics || []}
+                routeDest={routeDest}
+                showAllHalls={showAllHalls}
+                onHallRoute={handleHallRoute}
                 onRouteCalculated={setRouteCoordinates}
               />
             )}

@@ -30,12 +30,17 @@ export function LeftSidebar({
   setShowRailroadCrossings,
   showFireHalls,
   setShowFireHalls,
+  showAllHalls,
+  setShowAllHalls,
   homeHall,
   setHomeHall,
   targetAddress,
   setTargetAddress,
   nearestHydrants = [],
   routeMetrics,
+  // One row per hall when the All Hall Approaches layer is on: the router's own distance and
+  // time from each hall to the target (MapBoard builds it; CLAUDE.md 6.2).
+  hallApproaches = [],
   // Road access filter toggles
   // Road access filter toggles
   filterNoAccess,
@@ -359,6 +364,44 @@ export function LeftSidebar({
                                     🚙 NAVIGATE (GPS)
                                  </a>
                               )}
+                              {/* Every hall's approach to this target, in hall order. Deliberately
+                                  NOT sorted by time: shortest by road is not first due, and the
+                                  panel must not imply it is (CLAUDE.md 7.1). */}
+                              {hallApproaches.length > 0 && (
+                                 <div className="border-t border-slate-900 pt-2.5 flex flex-col gap-2">
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-[8.5px] text-violet-300 font-extrabold uppercase tracking-wider font-mono flex items-center gap-1">
+                                          🛣️ Hall Approaches
+                                       </span>
+                                       <span className="text-[8px] text-slate-400 font-mono">OSRM</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                       {hallApproaches.map((h) => (
+                                          <div
+                                             key={h.hall}
+                                             className={`flex justify-between items-center px-2.5 py-1.5 rounded-lg border font-mono text-xs ${h.isHome ? 'bg-slate-900 border-slate-700' : 'bg-slate-900/60 border-slate-850'}`}
+                                          >
+                                             <div className="flex items-center gap-2 min-w-0">
+                                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: h.colour }} />
+                                                <span className={h.isHome ? 'text-white font-black' : 'text-slate-300 font-bold'}>HALL {h.hall}</span>
+                                                {h.isHome && <span className="text-[7.5px] text-emerald-400 uppercase font-bold">this hall</span>}
+                                             </div>
+                                             <div className="flex items-center gap-2 flex-shrink-0">
+                                                <span className="text-slate-400 text-[10px]">{h.distanceKm != null ? `${h.distanceKm} km` : '-- km'}</span>
+                                                <span className={`font-black ${h.degraded ? 'text-amber-400' : 'text-slate-200'}`}>
+                                                   {h.etaMinutes != null ? `${h.etaMinutes} min` : '-- min'}
+                                                </span>
+                                             </div>
+                                          </div>
+                                       ))}
+                                    </div>
+                                    <p className="text-[8px] text-slate-500 font-mono leading-snug">
+                                       Road distance and time from each hall. Not a first-due order: staffing and
+                                       availability are not in this view.
+                                    </p>
+                                 </div>
+                              )}
+
                               {/* Multi-Unit Response ETAs & Rail Warning */}
                                <div className="border-t border-slate-900 pt-2.5 flex flex-col gap-2">
                                   <div className="flex justify-between items-center">
@@ -402,6 +445,20 @@ export function LeftSidebar({
                                 className="rounded border-slate-800 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
                              />
                              <span className="flex items-center gap-1.5 font-semibold">🚒 Fire Halls</span>
+                          </label>
+
+                          {/* 🛣️ EVERY HALL'S ROUTE, NOT JUST THIS ONE
+                              Off by default: these are the same four colours as the zone
+                              fills, so four translucent routes over them is a lot to read
+                              when it is not being asked for (operator, 2026-09-11). */}
+                          <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">
+                             <input
+                                type="checkbox"
+                                checked={showAllHalls === true}
+                                onChange={(e) => setShowAllHalls && setShowAllHalls(e.target.checked)}
+                                className="rounded border-slate-800 bg-slate-950 text-violet-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer"
+                             />
+                             <span className="flex items-center gap-1.5 font-semibold">🛣️ All Hall Approaches</span>
                           </label>
 
                           <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer touch:min-h-11">

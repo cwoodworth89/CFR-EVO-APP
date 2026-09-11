@@ -59,3 +59,49 @@ test('the per-hall ETA is the soonest of its units, and units are not repeated',
   assert.equal(h2.etaMinutes, 5);
   assert.deepEqual(h2.units, ['E2', 'L2']);
 });
+
+// --- Explore: every hall at once (operator, 2026-09-11) ---------------------------------
+
+test('allHalls draws every known hall when there are no metrics at all', () => {
+  // The workstation console with an address searched and no dispatch: this is the case the
+  // operator asked for, judging an arrival point against all four approaches.
+  const out = hallRoutesToDraw({ routingMetrics: [], homeHall: '2', knownHalls: KNOWN, allHalls: true });
+  assert.deepEqual(out.map(e => e.hall), ['4', '3', '1', '2']);
+  assert.deepEqual(out.map(e => e.isHome), [false, false, false, true]);
+  assert.deepEqual(out.map(e => e.etaMinutes), [null, null, null, null]);
+  assert.deepEqual(out.map(e => e.units), [[], [], [], []]);
+});
+
+test('allHalls is stable: the same input gives the same draw order every time', () => {
+  const a = hallRoutesToDraw({ routingMetrics: [], homeHall: '1', knownHalls: KNOWN, allHalls: true });
+  const b = hallRoutesToDraw({ routingMetrics: [], homeHall: '1', knownHalls: KNOWN, allHalls: true });
+  assert.deepEqual(a.map(e => e.hall), b.map(e => e.hall));
+  assert.deepEqual(a.map(e => e.hall), ['4', '3', '2', '1']);
+});
+
+test('allHalls keeps the metrics it does have, and invents no ETA for the rest', () => {
+  // Explore while a dispatch is up: halls 1 and 3 have real ETAs and keep their ordering,
+  // halls 2 and 4 are drawn with none rather than a guessed one (CLAUDE.md 6.1).
+  const metrics = [
+    { unit: 'E1', origin_hall: 1, eta_minutes: 9 },
+    { unit: 'E3', origin_hall: 3, eta_minutes: 4 },
+  ];
+  const out = hallRoutesToDraw({ routingMetrics: metrics, homeHall: '3', knownHalls: KNOWN, allHalls: true });
+  assert.deepEqual(out.map(e => e.hall), ['4', '2', '1', '3']);
+  const byHall = Object.fromEntries(out.map(e => [e.hall, e]));
+  assert.equal(byHall['1'].etaMinutes, 9);
+  assert.equal(byHall['2'].etaMinutes, null);
+  assert.equal(byHall['4'].etaMinutes, null);
+  assert.deepEqual(byHall['1'].units, ['E1']);
+  assert.deepEqual(byHall['2'].units, []);
+});
+
+test('allHalls adds no hall that is not in knownHalls', () => {
+  const out = hallRoutesToDraw({ routingMetrics: [], homeHall: '1', knownHalls: ['1', '2'], allHalls: true });
+  assert.deepEqual(out.map(e => e.hall), ['2', '1']);
+});
+
+test('without allHalls the behaviour is unchanged: home only, no metrics', () => {
+  const out = hallRoutesToDraw({ routingMetrics: [], homeHall: '2', knownHalls: KNOWN });
+  assert.deepEqual(out.map(e => e.hall), ['2']);
+});

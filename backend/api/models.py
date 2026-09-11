@@ -198,6 +198,17 @@ class ParcelModel(Base):
     floor_count = Column(Integer, nullable=True)
     is_pa_page = Column(Boolean, server_default="false", default=False, nullable=False)
 
+    # The CFR-owned master row for a multi-parcel address: one per property, built by
+    # import_parcels.build_base_site_rows, unique per address via
+    # parcels_base_site_address_uniq. It carries the operator's context -- entrance point,
+    # lockbox, hazard notes -- and speaks for every City row at that address.
+    #
+    # The column has existed since 2026-08-31 but was absent from this model, so every ORM
+    # lookup was blind to it and resolved an address to an arbitrary City row. That is
+    # punch-list #77: the save and the resolver each picked independently and disagreed.
+    # See docs/briefings/base_site_rows_decision.md.
+    is_base_site = Column(Boolean, server_default="false", default=False, nullable=False)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

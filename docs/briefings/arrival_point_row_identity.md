@@ -13,6 +13,29 @@ hazards in §4 are the ones that will bite whoever writes it.
 
 Tracked as **[punch list #77](../punchlist/77-an-arrival-point-is-saved-to-one-parcel-row-and-read-from-another.md)**, crew-visible.
 
+> [!IMPORTANT]
+> **Resolved 2026-09-10 (`ec34d27`), and two findings below are wrong.** Read the punch item
+> for the current state; this brief is kept as the record of the investigation.
+>
+> **1. The 1,671 null-`gis_id` rows are not an accidental bucket — they are the `base_site`
+> rows.** §2 and §4 read them as *"1,671 unrelated addresses"* and concluded no key could
+> group a site. They are CFR's own master rows, one per multi-parcel property, built since
+> 2026-08-31 and unique per address by partial index. `gis_id IS NULL` is their signature:
+> they carry no City handle because they are not City rows. The base row for `2929 Barnet Hwy`
+> is one of them. All three hazards in §4 dissolve against that — there is no grouping key to
+> choose, "the main one" is already unique, and nothing is copied so nothing needs a marker.
+> What was missing was the *read* side: `ParcelModel` never declared the column, so no ORM
+> lookup could prefer it.
+>
+> **2. §3's "Fixing the resolver's row choice will move no routes" is false beyond this one
+> address.** True at 2929 Barnet, where all 236 rows share a footprint. Across all 1,671
+> base_site sites: 1,543 unchanged, 57 move 1–24 m, **71 move 25 m or more, worst 397 m**.
+> Review queue: [`base_site_frontage_review_queue.md`](base_site_frontage_review_queue.md).
+>
+> The operator ruled on 2026-09-10 that the `base_site` row is the master row the whole system
+> reads and he curates, and that suites are out of scope for now — so §4's propagation design,
+> and the named-tenant question, were not built. See the punch item's *Deliberately not done*.
+
 **Nothing here is a live routing error today.** See §3. The system routes to the same
 coordinates it always did; it is the arrival-point feature that does not connect.
 

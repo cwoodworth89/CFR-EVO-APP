@@ -10,13 +10,13 @@ try:
     from backend.api.database import get_db
     from backend.api.models import ParcelModel
     from backend.api.schemas import StreetViewOverrideSchema, ParcelCameraOverrideSchema
-    from backend.api.routers.parcels import _clean_streetview_address, save_parcel_streetview
+    from backend.api.routers.parcels import _address_row, save_parcel_streetview
     from backend.api.routers.auth import require_admin
 except ModuleNotFoundError:
     from api.database import get_db
     from api.models import ParcelModel
     from api.schemas import StreetViewOverrideSchema, ParcelCameraOverrideSchema
-    from api.routers.parcels import _clean_streetview_address, save_parcel_streetview
+    from api.routers.parcels import _address_row, save_parcel_streetview
     from api.routers.auth import require_admin
 
 router = APIRouter(tags=["streetview"])
@@ -47,19 +47,9 @@ def get_all_streetview_overrides(db: Session = Depends(get_db)):
 @router.get("/api/streetview-overrides/{address}")
 def get_streetview_override(address: str, db: Session = Depends(get_db)):
     """Retrieves the Street View camera override for a specific address."""
-    clean_addr = _clean_streetview_address(address)
-    raw_upper = address.strip().upper()
-    addr_norm = address.strip().lower()
-
-    p = db.query(ParcelModel).filter(
-        (ParcelModel.address == clean_addr) |
-        (ParcelModel.address == raw_upper) |
-        (ParcelModel.address_normalized == addr_norm) |
-        (ParcelModel.gis_id == address.strip())
-    ).first()
-
-    if not p and clean_addr:
-        p = db.query(ParcelModel).filter(ParcelModel.address.ilike(f"%{clean_addr}%")).first()
+    # Same row rule as the entrance card and the console lookup, so a site's saved camera
+    # is read back from the row it was written to (#77).
+    p = _address_row(db, address)
 
     if not p or p.streetview_heading is None:
         raise HTTPException(status_code=404, detail="Streetview override not found")

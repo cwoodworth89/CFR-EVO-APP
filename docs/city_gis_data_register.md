@@ -310,6 +310,40 @@ do not get is the individual home within it. That is the same problem as the mul
 in `docs/complex_sites_for_review.csv` and is handled the same way: a reviewed access point
 per site, not a code fix.
 
+### The unitted variant — `1176 / 1180 / 1190 Lansdowne Dr` on one lot
+
+Added 2026-09-10, from the operator setting an arrival point on the kiosk: selecting
+`1180 Lansdowne Dr` outlined a parcel visibly containing three buildings. **That outline is
+correct and is not a CFR defect** — recorded here so the next person to see it does not go
+looking for a bug.
+
+`!4190528` is a single cadastral lot of **18,145 m²** carrying **109 City address rows across
+three house numbers** — 1176, 1180, 1190 — and **one** distinct geometry. Every row, all three
+buildings and all ~105 suites, holds the identical polygon, and all share one computed front
+point (49.283284, -122.809025).
+
+This differs from the cases above in one way that matters: those are house numbers with **no**
+unit designator, while these three buildings each carry their own unit series (1180 has
+113–123, 213–224, 313–324). So it is not rowhousing mis-shaped as one parcel — it is one lot
+with three apartment buildings on it, addressed by building. The cadastre showing a single
+polygon is accurate; there is simply no geometry anywhere that says *which* building is 1180.
+
+**There is no building-footprint layer to fall back on.** Checked 2026-09-10: no `buildings`,
+`footprints`, `structures` or `lidar` table exists in the database. The LiDAR-height building
+footprints named in CLAUDE.md §1 live only in the basemap tiles, not as queryable PostGIS
+geometry, so the parcel outline is the finest resolution available for a lot like this.
+
+**What makes it workable anyway.** `build_base_site_rows` groups on
+`(house, street, streettype)`, so this lot has **three** `base_site` rows — 200859 (1176),
+**200865 (1180)**, 200882 (1190) — and `entrance_lat` is per row. An arrival point set on 1180
+therefore serves 1180 and its suites without touching 1176 or 1190, even though the three share
+a polygon. The outline still draws the whole lot; the arrival-point marker is what identifies
+the building, and for a shared lot it is the only thing that can.
+
+Two City rows are addressed exactly `1180 Lansdowne Dr` (132564, 132565). Before `ec34d27` the
+lookup returned an arbitrary one of those; it now returns the base row deterministically
+(punch list #77).
+
 ---
 
 ## 13. Is there a driveway curb-cut / property access point layer?

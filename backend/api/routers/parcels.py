@@ -341,6 +341,70 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
     }
 
 
+def _entrance_target(db: Session, payload) -> ParcelModel:
+    """The one parcel row an arrival point belongs to, or an error saying why it is unclear.
+
+    **public.parcels is one row per ADDRESS, not per parcel.** Measured on the kiosk database
+    2026-09-11: 71,212 rows over 27,855 gis_ids; 43,842 rows (62 %) share a gis_id with a
+    different address, and one Coquitlam Centre gis_id covers 1,671 suites. 2,170 addresses
+    are themselves duplicated. So neither key identifies a row.
+
+    This endpoint used to build `target = gis_id or address` and OR four conditions together
+    with `.first()`. With a gis_id supplied that searched by gis_id alone and returned an
+    arbitrary member of the group: the operator's Coquitlam Centre arrival point was answered
+    200 OK and written to "2929 Barnet Hwy 1202" while the dispatched address, "2929 Barnet
+    Hwy", kept none -- so the ruling was saved and never used (operator, 2026-09-10: "still
+    didn't save").
+
+    Order now: the row id if the caller has one (the lookup returns it), then an exact address,
+    then a gis_id that names exactly one row. An ambiguous match is refused rather than
+    guessed, because writing a ruling to an arbitrary suite is worse than not writing it
+    (CLAUDE.md s6.1).
+    """
+    if payload.parcel_id is not None:
+        p = db.query(ParcelModel).filter(ParcelModel.id == payload.parcel_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail=f"No parcel row with id {payload.parcel_id}")
+        return p
+
+    address = (payload.address or "").strip()
+    if address:
+        clean_addr = _clean_streetview_address(address)
+        rows = db.query(ParcelModel).filter(
+            (ParcelModel.address == clean_addr) |
+            (ParcelModel.address == address.upper()) |
+            (ParcelModel.address_normalized == address.lower())
+        ).all()
+        if len(rows) == 1:
+            return rows[0]
+        if len(rows) > 1:
+            # Duplicated address: the gis_id the caller also sent picks between them.
+            gid = (payload.gis_id or "").strip()
+            narrowed = [r for r in rows if gid and r.gis_id == gid]
+            if len(narrowed) == 1:
+                return narrowed[0]
+            raise HTTPException(
+                status_code=409,
+                detail=f"{len(rows)} parcel rows are addressed {address!r}; send parcel_id to say which",
+            )
+
+    gis_id = (payload.gis_id or "").strip()
+    if gis_id:
+        rows = db.query(ParcelModel).filter(ParcelModel.gis_id == gis_id).all()
+        if len(rows) == 1:
+            return rows[0]
+        if len(rows) > 1:
+            raise HTTPException(
+                status_code=409,
+                detail=(f"gis_id {gis_id!r} covers {len(rows)} addresses (a multi-unit site); "
+                        "send parcel_id, or the address, to say which one"),
+            )
+
+    target = payload.address or payload.gis_id
+    raise HTTPException(status_code=404,
+                        detail=f"No parcel for {target!r}; an arrival point needs a parcel to belong to")
+
+
 @router.post("/entrance")
 def set_parcel_entrance(payload: ParcelEntranceSchema, db: Session = Depends(get_db),
                         _admin: dict = Depends(require_admin)):
@@ -357,21 +421,12 @@ def set_parcel_entrance(payload: ParcelEntranceSchema, db: Session = Depends(get
     set_by = (payload.set_by or "").strip()
     if not set_by:
         raise HTTPException(status_code=400, detail="set_by is required: every override is attributable")
-    target = (payload.gis_id or payload.address or "").strip()
-    if not target:
-        raise HTTPException(status_code=400, detail="address or gis_id required")
+    if payload.parcel_id is None and not (payload.address or payload.gis_id or "").strip():
+        raise HTTPException(status_code=400, detail="parcel_id, address or gis_id required")
     if (payload.lat is None) != (payload.lng is None):
         raise HTTPException(status_code=400, detail="lat and lng go together")
 
-    clean_addr = _clean_streetview_address(target)
-    p = db.query(ParcelModel).filter(
-        (ParcelModel.gis_id == target) |
-        (ParcelModel.address == clean_addr) |
-        (ParcelModel.address == target.upper()) |
-        (ParcelModel.address_normalized == target.lower())
-    ).first()
-    if not p:
-        raise HTTPException(status_code=404, detail=f"No parcel for {target!r}; an arrival point needs a parcel to belong to")
+    p = _entrance_target(db, payload)
 
     p.entrance_lat = payload.lat
     p.entrance_lng = payload.lng
@@ -380,7 +435,7 @@ def set_parcel_entrance(payload: ParcelEntranceSchema, db: Session = Depends(get
     p.entrance_set_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(p)
-    logging.info("Arrival point %s for %s by %s: %s",
+    logging.info("Arrival point %s for %s (id %s, gis %s) by %s: %s",
                  "cleared" if payload.lat is None else f"set to {payload.lat:.6f},{payload.lng:.6f}",
-                 p.address, set_by, p.entrance_note or "(no note)")
+                 p.address, p.id, p.gis_id, set_by, p.entrance_note or "(no note)")
     return {"status": "success", "parcel": serialize_parcel(p)}

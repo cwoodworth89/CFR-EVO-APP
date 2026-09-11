@@ -58,10 +58,17 @@ export function useArrivalPoint({ address, onSaved = null }) {
 
   // lat/lng null clears the ruling and the computed frontage is used again. set_by is
   // required by the API: every override is attributable.
+  //
+  // `parcel_id` is the row's own key and is what decides where this lands. public.parcels is
+  // one row per ADDRESS: 62 % of rows share a gis_id with a different address, and one
+  // Coquitlam Centre gis_id covers 1,671 suites. Sending gis_id alone had the API answer
+  // 200 OK and write the ruling to an arbitrary suite -- "2929 Barnet Hwy 1202" instead of
+  // "2929 Barnet Hwy", so it was saved and never used (operator, 2026-09-10). The address
+  // and gis_id still go along for an older API and for the log.
   const save = useCallback(async ({ lat, lng, note, setBy }) => {
     if (!parcel) throw new Error('No parcel behind this address');
     const res = await apiClient.parcels.saveEntrance({
-      gis_id: parcel.gis_id, address: parcel.address, lat, lng, note, set_by: setBy,
+      parcel_id: parcel.id, gis_id: parcel.gis_id, address: parcel.address, lat, lng, note, set_by: setBy,
     });
     const saved = res?.parcel || null;
     setParcel(saved);

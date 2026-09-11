@@ -115,7 +115,13 @@ class StreetViewOverrideSchema(BaseModel):
 
 
 class ParcelEntranceSchema(BaseModel):
-    """Set (or clear, with lat/lng null) the operator-verified arrival point of one parcel (#49)."""
+    """Set (or clear, with lat/lng null) the operator-verified arrival point of one parcel (#49).
+
+    `parcel_id` is public.parcels.id, the row's own key, and is what a caller should send:
+    neither gis_id nor address identifies a row on its own. See _entrance_target() in
+    routers/parcels.py for the measurement behind that.
+    """
+    parcel_id: Optional[int] = None
     address: Optional[str] = None
     gis_id: Optional[str] = None
     lat: Optional[float] = None

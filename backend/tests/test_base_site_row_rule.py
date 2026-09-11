@@ -148,6 +148,26 @@ class TestSharedRowRule(unittest.TestCase):
                 )
         self.assertGreater(checked, 0, "the scan matched nothing; the pattern has drifted")
 
+    def test_search_shows_one_row_per_property_without_hiding_the_city(self):
+        """`is_base_site == True` on its own is the wrong filter, and wrong in the dangerous
+        direction: base rows exist ONLY for multi-parcel properties, so filtering to them
+        hides the **27,749 single-parcel addresses** that have no base row -- most of the
+        city's housing, silently unfindable.
+
+        A property is its base row where it has one, and its lone City row where it does not.
+        That needs the anti-join; this fails if anyone reduces it to the obvious one-liner.
+        """
+        body = top_level_functions(source("parcels"))["search_parcels"]
+        self.assertIn("outerjoin(", body,
+                      "one row per property needs the anti-join, not an is_base_site filter")
+        self.assertIn("base.id.is_(None)", body,
+                      "rows no base row speaks for -- the single-parcel addresses -- must "
+                      "still be returned")
+        self.assertNotRegex(
+            body, r"filter\(\s*ParcelModel\.is_base_site\.is_\(True\)\s*\)",
+            "filtering search to base_site rows alone hides 27,749 single-parcel addresses",
+        )
+
     def test_search_results_can_distinguish_the_base_row(self):
         """Two rows are addressed exactly `1176 Lansdowne Dr` — 200859 and 131890 — both with
         a null unit. Ordering puts the base row first, but a list that does not say which is

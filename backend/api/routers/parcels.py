@@ -8,8 +8,8 @@ import json
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy import text, and_, func, or_
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy.exc import IntegrityError
 
 try:
@@ -207,23 +207,58 @@ def lookup_parcel(query: str, db: Session = Depends(get_db)):
 
 @router.get("/search")
 def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Session = Depends(get_db)):
-    """Fast local autocomplete search against 65,400 ingested municipal parcels."""
+    """Autocomplete over one row per PROPERTY: 29,420 of the 71,212 rows.
+
+    Operator ruling, 2026-09-10: *"I only want the base building showing in the search bar.
+    No suites or other rows."*
+
+    Filtering to `is_base_site` alone would have been wrong and badly so -- those rows exist
+    only for multi-parcel properties, so it would have hidden **27,749 single-parcel
+    addresses**, which is most of the city's housing. A property is therefore its base_site
+    row where it has one, and its single City row where it does not:
+
+        1,671  base_site rows          (multi-parcel properties)
+      + 27,749 lone City rows          (single-parcel; no base row exists for them)
+      = 29,420 searchable              41,792 suites and duplicate rows hidden
+
+    Measured 2026-09-10: 2929 Barnet Hwy collapses 236 rows to 1, 3000 Riverbend Dr 258 to 1,
+    and 1176/1180/1190 Lansdowne Dr 109 rows to 3 -- one per building, because base rows are
+    grouped on (house, street, streettype). Appian St, entirely single-family, keeps all 49.
+    The 8 lone rows that do carry a unit are kept: they are the only row for their address,
+    and dropping them would make those addresses unfindable (§6.1).
+
+    Written as a LEFT JOIN anti-join rather than `NOT EXISTS`. Both are correct; the
+    correlated form inflated the planner's cost estimate enough to turn on JIT and ran in
+    632 ms against a 105 ms baseline, where this runs in 124 ms (EXPLAIN ANALYZE, kiosk,
+    2026-09-10).
+    """
     clean_q = q.strip().lower()
-    # base_site FIRST, same rule as _address_row and the resolver (#77). This list had no
+    # base_site FIRST, the same rule as _address_row and the resolver (#77). This list had no
     # ORDER BY at all, so "1176 Lansdowne" returned City row 131890 at the top and the
     # property's base row 200859 not at all inside the limit. The operator set an arrival
-    # point on the base row, came back through this search, landed on the City row and saw
-    # an empty field -- reported as "1176 got set, and then it lost it" (2026-09-10). The
-    # ruling was never lost; the search handed back a different row than the one it wrote.
-    #
-    # Suites stay in the results deliberately: they are kept in the table to be worked with,
-    # and the operator searches for them. Only the ORDER changes, so the row that speaks for
-    # the property heads the list. `id` second preserves the previous de-facto order for
-    # everything else.
-    results = db.query(ParcelModel).filter(
-        (ParcelModel.address_normalized.ilike(f"%{clean_q}%")) |
-        (ParcelModel.address.ilike(f"%{clean_q}%"))
-    ).order_by(*_BASE_SITE_FIRST).limit(limit).all()
+    # point on the base row, came back through this search, landed on the City row and saw an
+    # empty field -- "1176 got set, and then it lost it" (2026-09-10). The ruling was never
+    # lost; the search handed back a different row than the one it had written to.
+    base = aliased(ParcelModel)
+    results = (
+        db.query(ParcelModel)
+        .outerjoin(base, and_(
+            base.is_base_site.is_(True),
+            base.house == ParcelModel.house,
+            base.street == ParcelModel.street,
+            # streettype is nullable on both sides, so `=` would drop the NULL pairs.
+            func.coalesce(base.streettype, "") == func.coalesce(ParcelModel.streettype, ""),
+        ))
+        .filter(
+            or_(ParcelModel.address_normalized.ilike(f"%{clean_q}%"),
+                ParcelModel.address.ilike(f"%{clean_q}%")),
+            # the property's own row: the base row, or a row no base row speaks for
+            or_(ParcelModel.is_base_site.is_(True), base.id.is_(None)),
+        )
+        .order_by(*_BASE_SITE_FIRST)
+        .limit(limit)
+        .all()
+    )
 
     return {
         "count": len(results),

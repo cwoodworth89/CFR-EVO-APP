@@ -136,6 +136,7 @@ live; the four round-2 rows in `evaluation_history` carry the verdict in their n
 
 | Item | Who | What |
 |:--|:--|:--|
+| Arrival points on multi-unit sites | operator, then a debugging session | The save and the dispatch resolver choose different parcel rows for the same address, so a ruling is stored where nothing reads it. Measured, deployed-as-far-as-it-goes, and blocked on three questions: [`briefings/arrival_point_row_identity.md`](briefings/arrival_point_row_identity.md) |
 | #76 | operator | **built 2026-09-09, live 2026-09-10**: an announced block geocodes to the block's middle, with a midpoint per carriageway for routing. Extent ruled "the midpoint of whatever is available". The next block call through the live pipeline closes it |
 | #74 | operator | look at artboard 3A on the kiosk (built 2026-09-09 from the operator's own canvas, merged to main the same evening) and say whether it stays |
 | #64 | operator | the civic-number checklist, at work |

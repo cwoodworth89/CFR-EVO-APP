@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | FIXED `ec34d27` — code on the kiosk, **awaiting a restart to take effect** |
+| **Status** | FIXED `ec34d27`. **API half CONFIRMED live** 2026-09-10 — `/api/parcels/lookup` returns the base row for all five of the operator's sites. **Resolver half NOT yet live**: the dispatch agent has been up 14 h and still holds the old `address_resolver`. |
 | **Severity** | 🔴 crew-visible |
 | **Area** | 🗺️ GIS / address resolver · 🖥️ Kiosk view |
 | **Ruling** | Operator, 2026-09-10: the `base_site` row is the master row the whole system reads and the operator curates. Suites stay in the table, unread. |
@@ -96,9 +96,14 @@ anywhere as the definition of "the address".
 
 ## Open
 
-1. **Restart to take effect.** `backend/api` needs `docker compose up -d --build api`; the
-   resolver change is in `services/gis`, which the dispatch agent loads. Left for the operator
-   to pick the moment — a restart during a capture loses the call and its audio (#70).
+1. **The dispatch agent still holds the old resolver.** Confirmed 2026-09-10: `cfr_api` was
+   rebuilt and `/api/parcels/lookup` returns the base row for all five of the operator's sites
+   (`2929 Barnet Hwy` → 201357, `2865 Glen Dr` → 201337, `3030 Lincoln Ave` → 201436,
+   `1800 Austin Ave` → 201131, `602 Como Lake Ave` → 201792). But `backend/main.py` has been up
+   14 h and imports `services/gis/src/gis_service/address_resolver.py` at start, so **a live
+   dispatch is still routed by the old row choice.** Setting arrival points works now; they
+   will not be read on a call until the agent restarts. Left for the operator to pick the
+   moment — a restart during a capture loses the call and its audio (#70).
 2. **The 71-site frontage review.** Pointing everything at the master row makes that row's
    frontage the default destination. It is the *same* snapping algorithm — `backfill_parcel_frontage`
    treats a base row like any other — against the property union rather than one arbitrary lot.

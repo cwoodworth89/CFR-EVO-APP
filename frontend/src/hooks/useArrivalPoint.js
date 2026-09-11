@@ -60,8 +60,10 @@ export function useArrivalPoint({ address, onSaved = null }) {
   // required by the API: every override is attributable.
   //
   // `parcel_id` is the row's own key and is what decides where this lands. public.parcels is
-  // one row per ADDRESS: 62 % of rows share a gis_id with a different address, and one
-  // Coquitlam Centre gis_id covers 1,671 suites. Sending gis_id alone had the API answer
+  // one row per ADDRESS: 62 % of rows share a gis_id with a different address, and the one
+  // Coquitlam Centre gis_id covers 235 of them. (An earlier version of this comment said
+  // 1,671 -- that is the count of CFR's own base_site rows, which have no gis_id at all;
+  // corrected 2026-09-11, punch-list #77.) Sending gis_id alone had the API answer
   // 200 OK and write the ruling to an arbitrary suite -- "2929 Barnet Hwy 1202" instead of
   // "2929 Barnet Hwy", so it was saved and never used (operator, 2026-09-10). The address
   // and gis_id still go along for an older API and for the log.

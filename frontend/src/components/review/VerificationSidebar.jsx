@@ -11,6 +11,11 @@ import { getReviewFlags, getRuledFlags, flagLabel, flagRuledByLabel } from '../.
 // example data in a field that writes to the ground-truth corpus reads as real (CLAUDE.md
 // §6.1 / §6.5), and 2648 Sandstone Cres is a real Coquitlam parcel. Punch-list #33.
 const NO_SYSTEM_VALUE = '-- nothing parsed --';
+
+// Review playback speeds. Working through a run of calls is mostly waiting now that the
+// transcripts are usually right (operator, 2026-09-10). This is a listening aid on the
+// review screen only -- it changes nothing that is stored, and nothing the crew sees.
+const PLAYBACK_RATES = [1, 1.5, 2];
 import { API_BASE_URL } from '../../apiClient';
 
 export default function VerificationSidebar({
@@ -61,6 +66,15 @@ export default function VerificationSidebar({
   const localFormContainerRef = useRef(null);
   const formContainerRef = externalFormContainerRef || localFormContainerRef;
   const transcriptTextareaRef = useRef(null);
+  const audioRef = useRef(null);
+
+  // The <audio> element is keyed on the signed URL, so selecting another call remounts it
+  // and the fresh element starts back at 1x. Reapplying the choice after each remount is
+  // what makes the speed hold across a run of calls rather than being re-picked every time.
+  const [playbackRate, setPlaybackRate] = useState(1);
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
+  }, [playbackRate, audioSignedUrl]);
 
   const adjustTranscriptHeight = () => {
     if (transcriptTextareaRef.current) {
@@ -249,9 +263,29 @@ export default function VerificationSidebar({
                   <span>🎙️</span>
                   <span>DISPATCH AUDIO RECORDING</span>
                 </span>
-                {selectedCall.audio_duration && (
-                  <span className="text-slate-500 font-bold">{selectedCall.audio_duration.toFixed(1)}s</span>
-                )}
+                <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-0.5">
+                    {PLAYBACK_RATES.map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setPlaybackRate(rate)}
+                        title={`Play this recording at ${rate}x speed`}
+                        aria-pressed={playbackRate === rate}
+                        className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded border cursor-pointer transition-all ${
+                          playbackRate === rate
+                            ? 'text-sky-300 bg-sky-900/50 border-sky-700/60'
+                            : 'text-slate-500 bg-slate-900/40 border-slate-800 hover:text-sky-400 hover:bg-sky-950/40'
+                        }`}
+                      >
+                        {rate}×
+                      </button>
+                    ))}
+                  </span>
+                  {selectedCall.audio_duration && (
+                    <span className="text-slate-500 font-bold">{selectedCall.audio_duration.toFixed(1)}s</span>
+                  )}
+                </span>
               </div>
               {/* src is audioSignedUrl only -- never selectedCall.audio_url.
                 *
@@ -271,6 +305,7 @@ export default function VerificationSidebar({
                 * until the URL is resolved, and the key change remounts the element with
                 * it. */}
               <audio
+                ref={audioRef}
                 key={audioSignedUrl || 'no-audio'}
                 controls
                 src={audioSignedUrl || undefined}

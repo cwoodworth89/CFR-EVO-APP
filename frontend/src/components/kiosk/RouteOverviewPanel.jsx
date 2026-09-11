@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Marker, Popup, Polygon, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { Marker, Popup, Polygon, Polyline, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { altCandidatePinIcon, targetPinIcon } from '../map/mapIcons';
 import HallRoutesOverlay from '../map/HallRoutesOverlay';
@@ -7,13 +7,11 @@ import MapSurface from '../map/MapSurface';
 import RoadClosuresLayer from '../map/RoadClosuresLayer';
 import { useRoadClosures } from '../../hooks/useRoadClosures';
 import { BASE_LAYERS, CADASTRAL_MIN_ZOOM } from '../MapConstants';
-import StreetSectionBanner from './StreetSectionBanner';
-import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
-import HydrantCard from './HydrantCard';
 import { hydrantCardModel } from '../../utils/hydrantCard';
 import { routeFitOptions, snapFitOptions } from '../map/fitPadding';
+import { MapClickEvents } from '../MapActions';
 
 // The chrome over the map (artboard 3A of the operator's Claude Design canvas): the route
 // pill top left, the control stack top right in one fixed order, the hydrant card bottom
@@ -100,7 +98,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall, compact = false }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -168,10 +166,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // What floats over the map, measured for the fits: the control stack (right) and the
   // hydrant card (bottom). Nothing is written as a literal (map/fitPadding.js).
   const controlsRef = useRef(null);
-  const hydrantRef = useRef(null);
   const getOverlays = useCallback(() => ({
     right: controlsRef.current ? controlsRef.current.offsetWidth + OVERLAY_INSET_PX : 0,
-    bottom: hydrantRef.current ? hydrantRef.current.offsetHeight + OVERLAY_INSET_PX : 0,
   }), []);
   // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
   const [routeCoords, setRouteCoords] = useState([]);
@@ -278,6 +274,25 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // RE-CENTRE has something to do once the view has left the route: a drag, a wheel, or a snap.
   const offRoute = userPanned || viewMode === 'call';
 
+  // The hydrant card lives in the header now (operator, 2026-09-10), but the picks are
+  // measured here, along the route this map drew, so the model goes up. TAP TO ZOOM comes
+  // back down as a handle on this panel's own SNAP TO CALL: the header needs no map of its
+  // own, and the pin can no longer be covered by a card that is not over the map.
+  useEffect(() => {
+    if (onHydrantModel) onHydrantModel(hydrantModel);
+  }, [hydrantModel, onHydrantModel]);
+
+  // TAP TO ZOOM on the header's hydrant card asks this map to snap. A counter rather than a
+  // handle passed upward: writing a function into a prop ref is the crash-lint's
+  // react-hooks/immutability rule, and a counter says "asked again" without one.
+  const lastSnapRequest = useRef(snapRequest);
+  useEffect(() => {
+    if (snapRequest === lastSnapRequest.current) return;
+    lastSnapRequest.current = snapRequest;
+    if (hasValidCoords) snapToCall();
+  });
+
+
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
       {/* Interactive Dual Junction Ambiguity Banner */}
@@ -312,37 +327,13 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
         </div>
       )}
 
-      {/* Street section: resolved to a stretch of road, not a point. A third state --
-          neither a located incident nor an unresolved one -- so it gets its own card. */}
-      {activeCall?.location_type === 'street_section' && (
-        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
-          <StreetSectionBanner activeCall={activeCall} />
-        </div>
-      )}
-
-      {/* Amber warning for a location the geocoder could only place approximately.
-          Distinct from the unresolved case below: coordinates exist and routing runs,
-          but the pin is a substitution and the crew must be told so. */}
-      {hasValidCoords && activeCall?.resolution_note && (
-        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg`}>
-          <ApproximateLocationBanner activeCall={activeCall} />
-        </div>
-      )}
-
-      {/* High-Visibility Amber Warning Box for Unresolved Incident Location */}
-      {!hasValidCoords && (
-        <div className={`absolute inset-x-4 ${compact ? 'top-16' : 'top-20'} z-[1000] mx-auto max-w-lg bg-amber-950/95 border-2 border-amber-500 text-amber-200 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 motion-safe:animate-pulse`}>
-          <span className="text-3xl">⚠️</span>
-          <div>
-            <h4 className="text-sm font-black tracking-wider text-amber-300 uppercase font-mono">
-              UNRESOLVED INCIDENT LOCATION — ROUTING PAUSED
-            </h4>
-            <p className="text-xs font-mono text-amber-100/90 mt-0.5">
-              Address: &quot;{activeCall?.address || activeCall?.target?.address || 'Unknown'}&quot;
-            </p>
-          </div>
-        </div>
-      )}
+      {/* The three amber cards that used to float here -- street section, approximate
+          location, unresolved location -- are banners above the header now (KioskView).
+          The unresolved one repeated the banner already at the top of the screen, and all
+          three sat over the route: "there is also a floating/pulsing amber banner that's
+          been popping up in the main map board ... we can remove that since we're using the
+          above header banners" (operator, 2026-09-10). Nothing floats over this map now
+          except the route pill and the control stack, both in its top corners. */}
 
       {/* The route pill: OSRM's distance and duration for the drawn home route, the router's
           own figures and never a recomputation (CLAUDE.md s6.2). Until the route arrives, or
@@ -391,11 +382,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
         </div>
       )}
 
-      {/* The hydrant card, bottom left: the pick by the operator's rule (utils/routeHydrants.js),
-          the City's NFPA 291 class, the distance, and how it was chosen. Never from the dispatch
-          record, which carries no hydrant (#24, #74). A tap is SNAP TO CALL. */}
-      <HydrantCard cardRef={hydrantRef} model={hydrantModel} onSnap={hasValidCoords ? snapToCall : null} compact={compact} />
-
       <MapSurface
         center={hasValidCoords ? [destLat, destLng] : [origin.lat, origin.lng]}
         zoom={13}
@@ -414,6 +400,21 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
         hydrantHighlightIds={hydrantHighlightIds}
       >
         <MapInteractivity onPan={() => setUserPanned(true)} fittingRef={fittingRef} />
+
+        {/* Setting an arrival point from a review replay (punch-list #49, operator
+            2026-09-10): while placing, a click on this map is the point the truck should
+            stop at, and the draft pin shows where it landed until it is saved. Only the
+            dispatch display in review mode passes `arrival`; a live call passes none. */}
+        {arrival?.placing && <MapClickEvents onMapClick={arrival.onMapClick} />}
+        {arrival?.draft && (
+          <CircleMarker
+            center={[arrival.draft.lat, arrival.draft.lng]}
+            radius={10}
+            pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.9, weight: 3, dashArray: '4 3' }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (unsaved)</Tooltip>
+          </CircleMarker>
+        )}
         <ZoomWatcher onZoom={setMapZoom} />
 
         {/* The parcel outline, soft blue, as the workstation draws it: rings of [lng, lat]

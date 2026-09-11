@@ -38,11 +38,20 @@ and tablet widths are a separate, planned surface, not this one:
 call or a review replay.
 
 ```
-ActiveAlertBanner  (header: three cards -- the call, the units with ETAs, the clock)
+review strip       only on a review replay: REVIEW REPLAY / EXIT REVIEW, full width
+ActiveAlertBanner  (header: three cards -- the call, the units with ETAs, the hydrant)
 ├── notices row          only when the record carries one: pre-incident plan, operator-set arrival point
-├── RouteOverviewPanel   flex-1       route map: route pill, control stack (ZOOM, SNAP TO CALL, RE-CENTRE, + -), HydrantCard
+├── RouteOverviewPanel   flex-1       route map: route pill, control stack (ZOOM, SNAP TO CALL, RE-CENTRE, + -)
 └── DetailStack          38.5 %, 360-740 px   PropertySatellitePanel ("AERIAL") and StreetViewPanel, each in a TileFrame header bar
 ```
+
+**The header's three cards are fixed places** (operator, 2026-09-10). The hydrant has the
+card the elapsed clock vacated rather than a row inside the units card, because the units
+card grows downward with the unit count and would move the hydrant about the screen. The
+elapsed clock, the auto-dismiss state and the dismiss button are small, at the foot of the
+call card on the right; the review controls are a strip above the header, since they are
+never on a real dispatch. **Nothing floats over the route map's lower half**: the hydrant
+card used to, and covered the destination on 1132 Dufferin St.
 
 **Built to artboard 3A of the operator's Claude Design canvas, 2026-09-09**
 (`docs/design/`, the departures in `docs/briefings/mobile_accessibility_review.md` §7). The

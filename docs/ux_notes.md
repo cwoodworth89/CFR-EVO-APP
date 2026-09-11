@@ -62,7 +62,7 @@ opens the same pages in Firefox and Chrome on a laptop. Screenshots from the day
 | Said | Done | Left |
 |:--|:--|:--|
 | *"It would be nice to see hydrants to a given address."* | A searched address shows its picks and the arrival-point section | — |
-| Arrival points could only be set by SQL (#49) | *Set arrival point* on the target card: click the map, note, name, save; attributed | The worst-first review queue is a CSV, not a screen |
+| Arrival points could only be set by SQL (#49) | *Set arrival point* on the target card: click the map, note, name, save; attributed. **2026-09-10: also from a review replay**, on the dispatch display itself, so the operator no longer backs out and re-types the address (*"I can set the streetview but I can't easily set a new arrival point"*). One implementation for both, `hooks/useArrivalPoint.js` | The worst-first review queue is a CSV, not a screen |
 | *"The box gets a little clipped and I can't get to what I assume is save button at the bottom."* (2026-09-08) | The card scrolls and the frontage explanation gives way to the form while placing | — |
 | *"I'm not sure I want this, or the street view save button to be crew facing, only admin unlocked."* (2026-09-08, "doesn't need to change or secure at this moment") | **Built 2026-09-09**: a padlock at the right end of the workstation header; unlocked with the admin password it reveals the review screen entry, the arrival-point controls and the Street View save, and the four save routes answer 401 without the token. Stays unlocked 30 days unless locked (operator). | An auto-lock is a production feature, not built. See §3 |
 | *"we can get rid of driver push setups from the dropdown menu. It's handled by the button Driver Alerts. But I think the name of that button needs to change to be more intuitive. Mobile Alerting? Mobile Setup?"* (2026-09-08) | `MOBILE: DRIVER PUSH SETUP` is off the mode select; the button is **📱 MOBILE SETUP**. The screen is a one-time QR pairing page, not a live alert feed, which is what *DRIVER ALERTS* read like. The select is now two entries, Explore and Admin | The screen behind it is still the #60 placeholder, still publishing the wrong ntfy topic |
@@ -199,6 +199,10 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
   **off** the basemap, because that toggle draws the cadastral overlay and its own names.
 * **The marker is where the truck stops** — the city-to-private transition. Distances to it
   are distances the crew will walk or lay hose.
+* **A ruling is a production change, wherever it is made.** The arrival point and the saved
+  Street View live on the parcel row, so setting one while replaying a call from August
+  changes where trucks stop tomorrow. The dispatch display's arrival-point card says so
+  beside the control; nothing is scoped to a replay.
 * **Hydrant distances are in feet**, everywhere the crew reads one (operator, 2026-09-09:
   *"we use ft for hose lay lengths"*). The picker measures in metres; `utils/hydrantCard.js`
   converts at the point of display, 1 ft = 0.3048 m exactly. Route distances stay in km, as

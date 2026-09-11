@@ -3,8 +3,13 @@ import RouteOverviewPanel from './RouteOverviewPanel';
 import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
 import ActiveAlertBanner from '../hud/ActiveAlertBanner';
+import StreetSectionBanner from './StreetSectionBanner';
+import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { STATIONS } from '../MapConstants';
 import { useCompactViewport } from '../../hooks/useCompactViewport';
+import { useArrivalPoint } from '../../hooks/useArrivalPoint';
+import ArrivalPointSection from '../hud/ArrivalPointSection';
+import { sanitizeAddress } from '../../utils/addressUtils';
 
 // The hall this display belongs to. Operator, 2026-09-09: "the hall is going to be hard-coded
 // per kiosk deployment in the .env file" -- VITE_DEFAULT_HALL in frontend/.env.local, read at
@@ -54,8 +59,21 @@ export default function KioskView({ kioskState }) {
   } = kioskState;
 
   const [showPrePlanModal, setShowPrePlanModal] = useState(false);
+  // The hydrant is picked along the route the map drew, so the map measures it and hands the
+  // card's model up here; the header renders it and hands TAP TO ZOOM back down to the map's
+  // own SNAP TO CALL (operator, 2026-09-10: the card moved off the map into the header).
+  const [hydrantModel, setHydrantModel] = useState(null);
+  const [snapRequest, setSnapRequest] = useState(0);
   // Below `lg`, a phone or an upright tablet: the layout stacks, the detail tiles become tabs.
   const compact = useCompactViewport();
+
+  // A review replay is the operator alone, reached through the admin-unlocked review screen,
+  // so the arrival point can be set from the call already on the screen rather than by
+  // backing out and searching the address again (operator, 2026-09-10). Gated on the replay
+  // and not on the padlock, at the operator's word -- but a LIVE call renders none of this:
+  // the crew is watching that one and nobody unlocked anything to put it there.
+  const isReview = isReviewMode || Boolean(activeCall?.isReview);
+  const arrival = useArrivalPoint({ address: isReview ? sanitizeAddress(activeCall?.address || '') : '' });
 
   // There is no no-call branch here on purpose. KioskView is only ever mounted with a
   // call on it: App.jsx sends the screen back to STANDBY (the console) the moment
@@ -171,7 +189,7 @@ export default function KioskView({ kioskState }) {
   // own frontage and needs no notice.
   const arrivalSet = activeCall?.target?.arrival_point === 'entrance';
   const entranceNote = activeCall?.target?.entrance_note || null;
-  const hasNotices = Boolean(prePlanUrl || arrivalSet);
+  const hasNotices = arrivalSet;
 
   return (
     // Below `lg` the column scrolls: three header cards, a map at half the height and the
@@ -181,6 +199,28 @@ export default function KioskView({ kioskState }) {
       onClick={resetTimeoutClock}
       className={`kiosk-root fixed inset-0 bg-slate-950 text-slate-100 flex flex-col z-50 select-none border-[6px] ${borderColor} transition-colors duration-500 overflow-y-auto overflow-x-hidden lg:overflow-hidden safe-area`}
     >
+      {/* Review replay: a strip, not a card. Operator, 2026-09-10: REVIEW REPLAY and EXIT
+          REVIEW "can be located somewhere else as they aren't on dispatches" -- so they take
+          the same full-width place the queued-call and Tier 1 banners do, and a real call
+          renders none of it. The card they vacated went to the hydrant. */}
+      {(isReviewMode || activeCall?.isReview) && (
+        <div className="bg-violet-950 border-b border-violet-700 text-violet-200 px-3 lg:px-6 py-1.5 flex items-center justify-between gap-3 flex-shrink-0 z-50">
+          <span className="font-mono font-bold text-[11px] lg:text-xs tracking-[0.14em] uppercase">
+            Review replay — a past call, replayed; auto-dismiss paused
+          </span>
+          <button
+            type="button"
+            onClick={exitReview}
+            className="bg-transparent border border-violet-600 text-violet-200 hover:bg-violet-900 rounded-md px-3 py-1.5 touch:py-2.5 font-mono font-bold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase whitespace-nowrap cursor-pointer transition"
+          >
+            Exit review
+          </button>
+        </div>
+      )}
+
+      {/* The amber banners stack beneath it, in the order they were raised: another call
+          waiting, then this call's own location state. Operator, 2026-09-10: "make sure amber
+          banners stack up there as well, ideally under the purple banner if it's shown." */}
       {/* Queued Call Notification Banner */}
       {queuedCalls.length > 0 && (
         <div
@@ -206,7 +246,16 @@ export default function KioskView({ kioskState }) {
         </div>
       )}
 
-      {/* The header: the call, the units, the clock */}
+      {/* Approximate location, and the street-section case: both were floating over the
+          route map, where they covered it. Same words, same amber, in the stack. */}
+      {(activeCall?.location_type === 'street_section' || (hasCoords && activeCall?.resolution_note)) && (
+        <div className="flex-shrink-0 px-2 lg:px-3 pt-2 lg:pt-3 flex flex-col gap-2">
+          <StreetSectionBanner activeCall={activeCall} />
+          {hasCoords && <ApproximateLocationBanner activeCall={activeCall} />}
+        </div>
+      )}
+
+      {/* The header: the call, the units, the hydrant */}
       <ActiveAlertBanner
         activeCall={activeCall}
         unitEtas={unitEtas}
@@ -223,8 +272,11 @@ export default function KioskView({ kioskState }) {
         autoDismiss={autoDismiss}
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
+        hydrantModel={hydrantModel}
+        onHydrantTap={hasCoords ? () => setSnapRequest((n) => n + 1) : null}
+        prePlanUrl={prePlanUrl}
+        onOpenPrePlan={() => setShowPrePlanModal(true)}
         onDismiss={() => dismissActiveCall('manual')}
-        onExitReview={exitReview}
       />
 
       {/* Notices: one row, rendered only when the record carries something to say. */}
@@ -238,16 +290,6 @@ export default function KioskView({ kioskState }) {
               </span>
             </div>
           )}
-          {prePlanUrl && (
-            <button
-              type="button"
-              onClick={() => setShowPrePlanModal(true)}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 lg:px-4 lg:py-3 rounded-xl bg-slate-950 border border-sky-800 hover:border-sky-600 cursor-pointer transition"
-            >
-              <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0" />
-              <span className="font-mono font-bold text-xs lg:text-sm tracking-[0.08em] uppercase text-sky-300">Pre-incident plan</span>
-            </button>
-          )}
         </div>
       )}
 
@@ -257,7 +299,14 @@ export default function KioskView({ kioskState }) {
           and that ceiling so the tiles stay readable on the 1,280 px touch display. */}
       <main className="flex-none lg:flex-1 p-2 lg:p-3 flex flex-col lg:flex-row gap-2 lg:gap-3 min-h-0 lg:overflow-hidden">
         <section className="h-[52dvh] lg:h-auto lg:flex-1 min-w-0 min-h-0 flex-shrink-0 lg:flex-shrink">
-          <RouteOverviewPanel activeCall={activeCall} stationHall={KIOSK_HALL} compact={compact} />
+          <RouteOverviewPanel
+            activeCall={activeCall}
+            stationHall={KIOSK_HALL}
+            compact={compact}
+            onHydrantModel={setHydrantModel}
+            snapRequest={snapRequest}
+            arrival={isReview ? arrival : null}
+          />
         </section>
 
         {/* Two tiles, aerial and Street View. The cadastral block tile that sat above them is
@@ -265,7 +314,31 @@ export default function KioskView({ kioskState }) {
             addresses and the hydrants at the same zoom, on the map the crew is already reading.
             On a phone the tiles are tabs under the map, a little over half a screen tall. */}
         <section className="h-[56dvh] lg:h-auto flex-shrink-0 lg:flex-none lg:w-[clamp(360px,38.5%,740px)] min-h-0">
-          <DetailStack call={activeCall} compact={compact} />
+          <DetailStack
+            call={activeCall}
+            compact={compact}
+            topCard={isReview ? (
+              <div className="flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 lg:px-4 lg:py-3">
+                <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
+                  <span className="font-mono font-bold text-[10px] tracking-[0.16em] uppercase text-slate-400">Arrival point</span>
+                  {/* The parcel row is the system of record for every future call to this
+                      address, so a ruling made while replaying an old call is a production
+                      change, not one scoped to the replay. Say so where it is made. */}
+                  <span className="font-mono text-[10px] text-amber-300/90">Applies to the next call at this address</span>
+                </div>
+                <ArrivalPointSection
+                  standalone
+                  parcel={arrival.parcel}
+                  placing={arrival.placing}
+                  draft={arrival.draft}
+                  onStart={arrival.start}
+                  onCancel={arrival.cancel}
+                  onSave={arrival.save}
+                  canEdit
+                />
+              </div>
+            ) : null}
+          />
         </section>
       </main>
 

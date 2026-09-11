@@ -8,6 +8,7 @@ import L from 'leaflet';
 // Import from your other components
 import { RailroadCrossingsLayer } from './MapLayers';
 import { MapClickEvents } from './MapActions';
+import { useArrivalPoint } from '../hooks/useArrivalPoint';
 import { CircleMarker, Tooltip } from 'react-leaflet';
 import { Header } from './hud/Header';
 import { useAdminSession } from '../hooks/useAdminSession';
@@ -117,11 +118,6 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   });
   const [targetAddress, setTargetAddress] = useState(null);
   const [targetPolygon, setTargetPolygon] = useState(null);
-  // Arrival point (punch-list #49): the parcel row behind the searched address, the
-  // placement mode, and the draft pin the operator has clicked but not yet saved.
-  const [targetParcel, setTargetParcel] = useState(null);
-  const [placingEntrance, setPlacingEntrance] = useState(false);
-  const [entranceDraft, setEntranceDraft] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [allHydrantsData, setAllHydrantsData] = useState([]);
 
@@ -203,29 +199,32 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     // this component unless it is declared. Listing it changes nothing at runtime.
   }, [setUserPanned]);
 
-  // The parcel row for the searched address: its entrance_* columns drive the arrival
-  // point section of the card. Cleared with the target.
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTargetParcel(null);
-    setPlacingEntrance(false);
-    setEntranceDraft(null);
-    const key = targetAddress?.address;
-    if (!key) return undefined;
-    apiClient.parcels.lookup(key).then((res) => {
-      if (cancelled || !res?.found || !res.parcel) return;
-      setTargetParcel(res.parcel);
-      // The parcel outline, drawn on the map and in the satellite tile the way a dispatch
-      // draws it (operator, 2026-09-08: "good for checking out how the screen will look
-      // during a dispatch event and for pre-planning"). The search result carries no
-      // geometry; the lookup does.
-      if (Array.isArray(res.parcel.rings) && res.parcel.rings.length > 0) {
-        setTargetPolygon(res.parcel.rings.map(ring => ring.map(coord => [coord[1], coord[0]])));
+  // Arrival point (punch-list #49), the same hook the dispatch display uses in a review
+  // replay: the parcel row behind the searched address, the placement mode, the draft pin.
+  const arrival = useArrivalPoint({
+    address: targetAddress?.address,
+    // The map follows the ruling: the route and the hydrant picks measure from the new
+    // point, or from the computed frontage again after a clear.
+    onSaved: useCallback((parcel) => {
+      if (!parcel) return;
+      const nextLat = parcel.entrance_lat ?? parcel.front_lat ?? parcel.lat;
+      const nextLng = parcel.entrance_lng ?? parcel.front_lng ?? parcel.lng;
+      if (nextLat != null && nextLng != null) {
+        setTargetAddress(prev => prev ? { ...prev, lat: nextLat, lng: nextLng, front_lat: nextLat, front_lng: nextLng } : prev);
+        setRouteCoordinates([]);
       }
-    }).catch(() => { /* the card says the parcel is unknown */ });
-    return () => { cancelled = true; };
-  }, [targetAddress?.address]);
+    }, []),
+  });
+  const targetParcel = arrival.parcel;
+
+  // The parcel outline, drawn on the map and in the satellite tile the way a dispatch draws
+  // it (operator, 2026-09-08: "good for checking out how the screen will look during a
+  // dispatch event and for pre-planning"). The search result carries no geometry; the
+  // lookup behind the hook does.
+  useEffect(() => {
+    if (!Array.isArray(targetParcel?.rings) || targetParcel.rings.length === 0) return;
+    setTargetPolygon(targetParcel.rings.map(ring => ring.map(coord => [coord[1], coord[0]])));
+  }, [targetParcel]);
 
   // What the detail stack sees: the searched target with the parcel's rings from the
   // lookup, so the satellite tile outlines the parcel as it does on a dispatch.
@@ -235,33 +234,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
     return { ...targetAddress, rings };
   }, [targetAddress, targetParcel]);
 
-  const handleEntranceMapClick = useCallback((latlng) => {
-    if (!placingEntrance || !latlng) return;
-    setEntranceDraft({ lat: latlng.lat, lng: latlng.lng });
-  }, [placingEntrance]);
 
-  const saveEntrance = useCallback(async ({ lat, lng, note, setBy }) => {
-    if (!targetParcel) throw new Error('No parcel behind this address');
-    const res = await apiClient.parcels.saveEntrance({
-      gis_id: targetParcel.gis_id, address: targetParcel.address,
-      lat, lng, note, set_by: setBy,
-    });
-    const parcel = res?.parcel;
-    setTargetParcel(parcel || null);
-    setPlacingEntrance(false);
-    setEntranceDraft(null);
-    // The map follows the ruling: the route and the hydrant picks measure from the new
-    // point, or from the computed frontage again after a clear.
-    if (parcel) {
-      const nextLat = parcel.entrance_lat ?? parcel.front_lat ?? parcel.lat;
-      const nextLng = parcel.entrance_lng ?? parcel.front_lng ?? parcel.lng;
-      if (nextLat != null && nextLng != null) {
-        setTargetAddress(prev => prev ? { ...prev, lat: nextLat, lng: nextLng, front_lat: nextLat, front_lng: nextLng } : prev);
-        setRouteCoordinates([]);
-      }
-    }
-    return parcel;
-  }, [targetParcel]);
 
 
   useEffect(() => {
@@ -474,12 +447,12 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
               onSelect={setSelectedClosure}
             />
 
-            {appMode === "EXPLORE" && placingEntrance && (
-              <MapClickEvents onMapClick={handleEntranceMapClick} />
+            {appMode === "EXPLORE" && arrival.placing && (
+              <MapClickEvents onMapClick={arrival.onMapClick} />
             )}
-            {appMode === "EXPLORE" && entranceDraft && (
+            {appMode === "EXPLORE" && arrival.draft && (
               <CircleMarker
-                center={[entranceDraft.lat, entranceDraft.lng]}
+                center={[arrival.draft.lat, arrival.draft.lng]}
                 radius={10}
                 pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.9, weight: 3, dashArray: '4 3' }}
               >
@@ -542,11 +515,11 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
                 nearestHydrants={nearestHydrants}
                 hydrantTier={routeHydrants.tier}
                 parcel={targetParcel}
-                placingEntrance={placingEntrance}
-                entranceDraft={entranceDraft}
-                onStartPlacing={() => { setPlacingEntrance(true); setEntranceDraft(null); }}
-                onCancelPlacing={() => { setPlacingEntrance(false); setEntranceDraft(null); }}
-                onSaveEntrance={saveEntrance}
+                placingEntrance={arrival.placing}
+                entranceDraft={arrival.draft}
+                onStartPlacing={arrival.start}
+                onCancelPlacing={arrival.cancel}
+                onSaveEntrance={arrival.save}
                 adminUnlocked={admin.unlocked}
                 onClose={() => setTargetAddress(null)}
               />

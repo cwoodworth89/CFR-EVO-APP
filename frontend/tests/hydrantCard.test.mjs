@@ -79,14 +79,18 @@ test('a long lay with the closer off-route option is the LONG LAY pair', () => {
   ]) });
   assert.equal(m.title, 'LONG LAY');
   assert.equal(m.rows.length, 2);
+  assert.equal(m.note, null);
   assert.equal(m.rows[1].how, 'from the address, off route: the closer option');
 });
 
-test('a long lay with no closer option is one amber row', () => {
+test('a long lay with no closer option is one amber row, and the chip is the whole message', () => {
   const m = hydrantCardModel({ hasCoords: true, hydrants: found([city({ distance: 170, longLay: true })]) });
   assert.equal(m.title, 'LONG LAY');
+  assert.equal(m.warn, true);
   assert.equal(m.rows.length, 1);
-  assert.match(m.note, /500 ft\+/);
+  // The amber LONG LAY chip and the distance say it; the sentence under them said it again
+  // and the operator asked for it gone (2026-09-10).
+  assert.equal(m.note, null);
 });
 
 test('every tier has a how line and unknown tiers have none', () => {

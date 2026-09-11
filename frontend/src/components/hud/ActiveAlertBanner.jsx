@@ -267,7 +267,7 @@ export default function ActiveAlertBanner({
             Operator, 2026-09-10: elapsed time "out of the way in the main header card, bottom
             right". It is not what a crew reads in the first seconds; it is what the operator
             checks later. */}
-        <div className="mt-auto pt-1 w-full flex items-end justify-between gap-3 flex-wrap">
+        <div className="pt-0.5 w-full flex items-end justify-between gap-3 flex-wrap">
           {talkGroup ? (
             <div className="flex items-center gap-2.5 px-2.5 py-1.5 lg:px-3 lg:py-2 border border-slate-700 bg-slate-400/10 rounded-lg min-w-0">
               <span className={LABEL}>Talk group</span>
@@ -281,11 +281,14 @@ export default function ActiveAlertBanner({
             <div className="text-right font-mono leading-none">
               <span className={LABEL}>Elapsed</span>
               <div className="mt-1 font-extrabold text-emerald-400 tabular-nums text-lg lg:text-[clamp(1rem,2.2vh,1.5rem)]">{elapsedFormatted}</div>
-              <div className="mt-1 font-medium tracking-wider uppercase text-slate-500 text-[10px] whitespace-nowrap">
-                {isReview ? 'Auto-dismiss paused'
-                  : autoDismiss ? `Auto-dismiss ${timeoutFormatted}`
-                  : 'Stays until cleared'}
-              </div>
+              {/* On a replay the strip above already says the clock is paused, so this would
+                  be the same fact twice (operator, 2026-09-10). On a live call it is the only
+                  place that says whether the call clears itself, so it stays. */}
+              {!isReview && (
+                <div className="mt-1 font-medium tracking-wider uppercase text-slate-500 text-[10px] whitespace-nowrap">
+                  {autoDismiss ? `Auto-dismiss ${timeoutFormatted}` : 'Stays until cleared'}
+                </div>
+              )}
             </div>
 
             {/* On a review replay the way out is the strip above the header, not here. */}
@@ -303,7 +306,7 @@ export default function ActiveAlertBanner({
       </section>
 
       {/* The units */}
-      <section className={`${CARD} px-3 py-2.5 lg:px-4 lg:py-3 flex flex-col justify-center gap-1.5 lg:gap-2`}>
+      <section className={`${CARD} px-3 py-2.5 lg:px-4 lg:py-3 flex flex-col justify-start gap-1.5 lg:gap-2`}>
         {hero ? (
           <>
             <UnitRow unit={hero} hero />

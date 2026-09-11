@@ -5,7 +5,8 @@ import { TIER } from './routeHydrants.js';
  *
  * The card is artboard 3A of the operator's Claude Design canvas (docs/design/Dispatch
  * Display Redesign.dc.html): one hydrant, numbered as it is on the map, its NFPA 291 class,
- * its distance in feet, and one line saying how it was chosen. A second row appears only
+ * its distance in feet, and -- where the title does not already say it -- one line on how it
+ * was chosen. A second row appears only
  * where the operator's rule produces a decision rather than a list: the nearest is private
  * and a City hydrant is shown for supply, or the first choice is a long lay and a closer
  * off-route hydrant sits beside it (docs/ux_notes.md section 3 item 4). Two straight-line
@@ -102,14 +103,12 @@ export function hydrantCardModel({ hasCoords, hydrants }) {
     title = 'PRIVATE IS CLOSER';
     warn = true;
     note = `Nearest is private${first.flowClass ? '' : ' and unrated'}; nearest City hydrant shown for supply`;
-  } else if (longLay) {
+  } else if (longLay || first.longLay) {
+    // The amber LONG LAY chip is the whole message and the two distances say the rest
+    // (operator, 2026-09-10: "get rid of the first choice is 500ft away text, that's clear").
     title = 'LONG LAY';
     warn = true;
-    note = 'First choice is 500 ft+ along the route: relay pumping, or the closer one off route';
-  } else if (first.longLay) {
-    title = 'LONG LAY';
-    warn = true;
-    note = `${rows[0].isPrivate ? 'Private' : 'City'} · ${rows[0].how}; 500 ft+ of supply line`;
+    note = null;
   }
 
   return { state: CARD_STATE.PICKS, title, warn, rows, note };

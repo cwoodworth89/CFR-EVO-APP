@@ -87,7 +87,15 @@ export default function ArrivalPointSection({ parcel, placing, draft, onStart, o
             className="text-[10px] touch:text-base font-mono bg-slate-950 border border-slate-700 rounded px-2 py-1 touch:py-2 text-white placeholder:text-slate-600" />
           <input value={setBy} onChange={e => setSetBy(e.target.value)} placeholder="Your name or initials" maxLength={60}
             className="text-[10px] touch:text-base font-mono bg-slate-950 border border-slate-700 rounded px-2 py-1 touch:py-2 text-white placeholder:text-slate-600" />
-          {error && <div className="text-[10px] font-mono text-red-400">{error}</div>}
+          {/* A refused save is the commonest failure here -- the API admin-gates it -- and it
+              used to be one 10 px red line under the form, which the operator missed while the
+              pin sat unsaved (2026-09-10). Nothing is written when this shows. */}
+          {error && (
+            <div className="rounded-lg border border-red-600 bg-red-950/80 px-2.5 py-2 text-[11px] font-mono font-bold text-red-200 leading-snug">
+              NOT SAVED — {error}
+              {/^Admin unlock/i.test(error) && <span className="block font-normal text-red-300/90 mt-0.5">Unlock the padlock on the console header, then save again. The pin is still here.</span>}
+            </div>
+          )}
           <div className="flex gap-1.5">
             <button disabled={busy || !draft} onClick={() => submit(false)} className="flex-1 text-[10px] font-bold font-mono px-2 py-1.5 touch:py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white border border-emerald-400 cursor-pointer">
               {busy ? 'Saving…' : 'Save arrival point'}

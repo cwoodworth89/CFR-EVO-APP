@@ -502,6 +502,36 @@ and a way that crosses out of the polygon counts as outside for its whole length
 outside, so the profile's factor must stay off when no polygon was given (`apparatus.lua`,
 `city_limits_factor` is nil unless set at build time).
 
+### JavaScript and Python disagree about an empty list, and the same fallback was written in both
+
+**Measured 2026-09-11** on the running system, after the fix in `79a05f5` reached the database
+and not the kiosk.
+
+The dispatch record carries `routing_metrics` twice — the column, and inside `target` — and both
+readers pick between them with what looks like the same expression:
+
+| | | |
+|:--|:--|:--|
+| `api/routers/dispatches.py` | `if not metrics:` -> fall through to `target` | `[]` is **falsy** in Python |
+| `kiosk/KioskView.jsx` | `a.routing_metrics \|\| a.target?.routing_metrics` | `[]` is **truthy** in JavaScript |
+
+`||` selects the first **truthy** operand, and every array is truthy in JavaScript, `[]`
+included. So the JavaScript reader can never fall through on an empty list: it returns the
+empty one and stops. The Python reader, on identical data, returns the populated one.
+
+**Consequence when unverified**: phase 1 writes `routing_metrics` at the top level and phase 2
+wrote its recomputed answer only into `target`. On a page load the API resolved it correctly and
+the ETAs appeared; on the live MQTT `UPDATE` the merge kept phase 1's top-level `[]`, `||` chose
+it, and the units stayed at `--:--` on the one call it mattered for — the one being corrected
+while the crew watched. The bug was invisible to every check that involved a reload, which is
+every check a developer makes by habit. Fixed in `edad22d`: phase 2 sends both copies, and the
+kiosk takes the first list with entries rather than the first truthy one.
+
+Neither expression is wrong for its language. What was wrong was carrying one language's
+reading of "empty means keep looking" across an API boundary into the other. A fallback that
+spans the Python/JavaScript line has to be written twice and verified twice.
+
+
 ## Unverified — assumptions still resting on names
 
 Recorded so they are visible (§7.5). None of these have been checked.

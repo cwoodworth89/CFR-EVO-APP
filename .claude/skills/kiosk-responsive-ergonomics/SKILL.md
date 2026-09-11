@@ -48,9 +48,22 @@ ActiveAlertBanner  (header: three cards -- the call, the units with ETAs, the hy
 **The header's three cards are fixed places** (operator, 2026-09-10). The hydrant has the
 card the elapsed clock vacated rather than a row inside the units card, because the units
 card grows downward with the unit count and would move the hydrant about the screen. The
-elapsed clock, the auto-dismiss state and the dismiss button are small, at the foot of the
-call card on the right; the review controls are a strip above the header, since they are
-never on a real dispatch. **Nothing floats over the route map's lower half**: the hydrant
+review controls are a strip above the header, since they are never on a real dispatch.
+
+**The call card ends in one status line** (operator, 2026-09-11: *"group Map Grid + talk
+group + elapsed time together"*): `GRID · TG · response · ELAPSED`, then the auto-dismiss
+state and the dismiss button on a live call. It replaced a two-level foot row that stood
+50 px because its right-hand stack did, and it supersedes the 2026-09-10 placement of the
+clock at bottom right — the operator's own ruling, and his to overturn. **The address line
+carries the address and nothing else**: the GRID chip beside it was taking the width that
+made a long intersection address wrap, 80 px against 36.
+
+**The response word lives in that line, not as a badge.** Removing it outright was asked for
+on the grounds that the 6 px coloured border already says the mode. The border does, but the
+badge cost no height (it shared the incident row), so deleting it would have saved nothing
+and left colour as the only channel — red against green, the worst pairing for it. Punch-list
+#31 and CLAUDE.md §6.1. UNKNOWN keeps its amber chip; routine and emergency are the word in
+their colour, with no pulse. **Nothing floats over the route map's lower half**: the hydrant
 card used to, and covered the destination on 1132 Dufferin St.
 
 **Built to artboard 3A of the operator's Claude Design canvas, 2026-09-09**

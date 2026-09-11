@@ -15,7 +15,7 @@ decide from.
 
 | Surface | Who looks at it | Where it lives |
 |:--|:--|:--|
-| **Kiosk view** | the crew, for the minutes between the tones and rolling out | `frontend/src/components/kiosk/KioskView.jsx`: three header cards (the call, the units with ETAs, the clock), the route map with a route pill, a control stack and a hydrant card, two view tiles. **Artboard 3A of the operator's Claude Design canvas, built 2026-09-09**: the canvas is in [`design/`](design/README.md), the build and its departures in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md) §7 |
+| **Kiosk view** | the crew, for the minutes between the tones and rolling out | `frontend/src/components/kiosk/KioskView.jsx`: three header cards (the call, the units with ETAs, the hydrant), the route map with a route pill and a control stack, two view tiles. The call card ends in one status line, `GRID · TG · response · ELAPSED` (operator, 2026-09-11). **Artboard 3A of the operator's Claude Design canvas, built 2026-09-09**: the canvas is in [`design/`](design/README.md), the build and its departures in [`briefings/mobile_accessibility_review.md`](briefings/mobile_accessibility_review.md) §7 |
 | **Workstation / Explore** | the operator at a desk: searching an address, setting an arrival point, a Street View | `MapBoard.jsx` with the left controls and the `DetailStack` on the right |
 | **Review screen** | the operator verifying calls, which feeds the training data and the hotwords | `DispatchReview.jsx`, `review/*` |
 | **Mobile setup** | nobody yet (#60, deferred pending redesign) | `DriverStationSetup.jsx`, reached only from the console's **MOBILE SETUP** button since 2026-09-08 |

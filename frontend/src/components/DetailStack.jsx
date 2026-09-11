@@ -25,12 +25,17 @@ import StreetViewPanel from './kiosk/StreetViewPanel';
  * `sheet`: the compact stack is floating over the map (the console) rather than in the
  * column (the dispatch display), so it can fold down to its tab bar and give the map back;
  * a landscape phone has 393 px of height for everything.
+ *
+ * `aerialOverride`: a node that takes the aerial cell's place while it is given. The
+ * dispatch display lends that cell to the arrival-point card during a review replay, so the
+ * operator gets the controls without a fourth cell squeezing the tiles (operator,
+ * 2026-09-10: "it squishes the other PIP screens ... that way I keep the normal look").
  */
-export default function DetailStack({ call, topCard, className = '', compact = false, sheet = false }) {
+export default function DetailStack({ call, topCard, className = '', compact = false, sheet = false, aerialOverride = null }) {
   const tabs = [
     topCard ? { id: 'details', label: 'Details' } : null,
     // The tabs carry the tiles' own names (artboard 3A: AERIAL, STREET VIEW), no glyphs.
-    { id: 'satellite', label: 'Aerial' },
+    { id: 'satellite', label: aerialOverride ? 'Arrival point' : 'Aerial' },
     { id: 'street', label: 'Street view' },
   ].filter(Boolean);
   const [tab, setTab] = useState(tabs[0].id);
@@ -44,7 +49,7 @@ export default function DetailStack({ call, topCard, className = '', compact = f
         {topCard}
 
         <div className="flex-1 min-h-0 relative">
-          <PropertySatellitePanel activeCall={call} />
+          {aerialOverride || <PropertySatellitePanel activeCall={call} />}
         </div>
 
         <div className="flex-1 min-h-0 relative">
@@ -89,7 +94,7 @@ export default function DetailStack({ call, topCard, className = '', compact = f
       {showContent && (
         <div className={`relative flex flex-col ${sheet ? 'h-[46dvh]' : 'flex-1 min-h-0'}`}>
           {active === 'details' && topCard}
-          {active === 'satellite' && <PropertySatellitePanel activeCall={call} />}
+          {active === 'satellite' && (aerialOverride || <PropertySatellitePanel activeCall={call} />)}
           {active === 'street' && <StreetViewPanel activeCall={call} />}
         </div>
       )}

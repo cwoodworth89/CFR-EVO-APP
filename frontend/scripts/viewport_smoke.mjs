@@ -223,6 +223,22 @@ for (const vp of VIEWPORTS) {
       const recentre = page.locator('button', { hasText: /re-centre/i });
       check(await recentre.count() > 0 && !(await recentre.first().isDisabled()), 'RE-CENTRE is live after a snap');
     }
+    // The arrival point is offered only on a replay, and only where the aerial tile sits, so
+    // opening it must not cost a cell and closing it must give the aerial back.
+    const arrivalBtn = page.locator('button', { hasText: /^set arrival point$/i });
+    if (await arrivalBtn.count() && await tap(arrivalBtn, 'SET ARRIVAL POINT')) {
+      await page.waitForTimeout(1200);
+      await shot('4-arrival-point');
+      check(await page.locator('text=/Applies to the next call at this address/i').count() > 0, 'the arrival-point card opened');
+      const m2 = await measure(page, { vertical: !compact });
+      check(m2.offscreen.length === 0, `no control off screen with the arrival card${m2.offscreen.length ? ': ' + m2.offscreen.join(', ') : ''}`);
+      const close = page.locator('button', { hasText: /close arrival point/i });
+      if (await close.count() && await tap(close, 'CLOSE ARRIVAL POINT')) {
+        await page.waitForTimeout(800);
+        check(await page.locator('text=/Applies to the next call at this address/i').count() === 0, 'closing it gives the aerial tile back');
+      }
+    }
+
     const tab = page.locator('button[role="tab"]', { hasText: /street view/i });
     if (await tab.count() && await tap(tab, 'the Street View tab')) { await page.waitForTimeout(1500); await shot('3-streetview-tab'); }
     check(errors.length === 0, `no page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);

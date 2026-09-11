@@ -74,6 +74,11 @@ export default function KioskView({ kioskState }) {
   // the crew is watching that one and nobody unlocked anything to put it there.
   const isReview = isReviewMode || Boolean(activeCall?.isReview);
   const arrival = useArrivalPoint({ address: isReview ? sanitizeAddress(activeCall?.address || '') : '' });
+  // Closed until the operator asks for it from the review strip. Open, it borrows the aerial
+  // cell rather than adding a fourth: the tiles keep their size and the screen its shape
+  // (operator, 2026-09-10: "it squishes the other PIP screens").
+  const [arrivalOpen, setArrivalOpen] = useState(false);
+  const showArrival = isReview && arrivalOpen;
 
   // There is no no-call branch here on purpose. KioskView is only ever mounted with a
   // call on it: App.jsx sends the screen back to STANDBY (the console) the moment
@@ -208,6 +213,22 @@ export default function KioskView({ kioskState }) {
           <span className="font-mono font-bold text-[11px] lg:text-xs tracking-[0.14em] uppercase">
             Review replay — a past call, replayed; auto-dismiss paused
           </span>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            {/* The replay is the operator alone, so it is the one place that offers the
+                arrival point: it opens where the aerial tile sits, and closing it puts the
+                aerial back (operator, 2026-09-10). A live call has no strip and no button. */}
+            <button
+              type="button"
+              onClick={() => { if (arrivalOpen) arrival.cancel(); setArrivalOpen((v) => !v); }}
+              aria-pressed={arrivalOpen}
+              className={`rounded-md px-3 py-1.5 touch:py-2.5 font-mono font-bold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase whitespace-nowrap cursor-pointer transition border ${
+                arrivalOpen
+                  ? 'bg-amber-500 border-amber-300 text-slate-950'
+                  : 'bg-transparent border-violet-600 text-violet-200 hover:bg-violet-900'
+              }`}
+            >
+              {arrivalOpen ? 'Close arrival point' : 'Set arrival point'}
+            </button>
           <button
             type="button"
             onClick={exitReview}
@@ -215,6 +236,7 @@ export default function KioskView({ kioskState }) {
           >
             Exit review
           </button>
+          </div>
         </div>
       )}
 
@@ -305,7 +327,7 @@ export default function KioskView({ kioskState }) {
             compact={compact}
             onHydrantModel={setHydrantModel}
             snapRequest={snapRequest}
-            arrival={isReview ? arrival : null}
+            arrival={showArrival ? arrival : null}
           />
         </section>
 
@@ -317,8 +339,8 @@ export default function KioskView({ kioskState }) {
           <DetailStack
             call={activeCall}
             compact={compact}
-            topCard={isReview ? (
-              <div className="flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 lg:px-4 lg:py-3">
+            aerialOverride={showArrival ? (
+              <div className="w-full h-full overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 lg:px-4 lg:py-3">
                 <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
                   <span className="font-mono font-bold text-[10px] tracking-[0.16em] uppercase text-slate-400">Arrival point</span>
                   {/* The parcel row is the system of record for every future call to this

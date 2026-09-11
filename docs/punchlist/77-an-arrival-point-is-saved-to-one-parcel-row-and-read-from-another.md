@@ -93,6 +93,26 @@ anywhere as the definition of "the address".
   `2929 Barnet Hwy` resolves to **id 201357**, and **0 of 500** sampled single-parcel addresses
   change. **`cfr_api` rebuilt and `cfr-agent` restarted 2026-09-10; both halves are running.**
   See *Open* 1 for what is still unconfirmed.
+* **`ce6de64`** — **the fifth path, missed by `ec34d27`.** `/api/parcels/search`, Explore's
+  autocomplete, had no `ORDER BY` at all: "1176 Lansdowne" returned City row 131890 first and
+  base row 200859 not at all inside the limit. The operator set an arrival point on the base
+  row, came back through the search onto the City row and saw an empty field — *"1176 got set,
+  and then it lost it"* (2026-09-10). Nothing was lost; the search returned a different row
+  than the one it had written to. Two rows carry the identical text `1176 Lansdowne Dr` with
+  both units null, so the screen could not distinguish them either.
+  **The guard test had a hole shaped like the bug** — it looked for `address_normalized ==`
+  and this endpoint matches with `ilike`, so it was never examined. It now scans every router
+  file for any query filtering on an address column and requires an `ORDER BY`, verified to
+  fail when the ordering is removed. `is_base_site` and `has_arrival_point` are also returned
+  now, so a list can say which row speaks for the property.
+* **`f24e941`** — the search bar lists **one row per property**, on the operator's ruling
+  *"I only want the base building showing in the search bar. No suites or other rows."*
+  Filtering to `is_base_site` alone would have hidden the **27,749 single-parcel addresses**
+  that have no base row, so a property is its base row where it has one and its lone City row
+  where it does not: 1,671 + 27,749 = **29,420 searchable, 41,792 hidden**. Confirmed on the
+  running API: `1176 Lansdowne` → 1 row (200859, arrival point present), `2929 Barnet` 236 → 1,
+  `3000 Riverbend` 258 → 1, `Appian` keeps all 49, and `1180 Lansdowne Dr 213` returns 0 —
+  a suite number is deliberately no longer findable in Explore.
 
 ## Open
 

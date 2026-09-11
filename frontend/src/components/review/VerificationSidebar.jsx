@@ -68,10 +68,15 @@ export default function VerificationSidebar({
   const transcriptTextareaRef = useRef(null);
   const audioRef = useRef(null);
 
+  // Opens at 1.5x. The operator worked a run of calls at that speed on 2026-09-10 and it
+  // reads as ordinary speech: "1.5x is perfect and it sounds totally normal. Not squeeky."
+  // So 1x is the button you reach for to slow down and listen hard, not the one you sit at.
+  // Pitch is preserved by the browser's own default; nothing here sets preservesPitch.
+  //
   // The <audio> element is keyed on the signed URL, so selecting another call remounts it
   // and the fresh element starts back at 1x. Reapplying the choice after each remount is
   // what makes the speed hold across a run of calls rather than being re-picked every time.
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState(1.5);
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackRate;
   }, [playbackRate, audioSignedUrl]);

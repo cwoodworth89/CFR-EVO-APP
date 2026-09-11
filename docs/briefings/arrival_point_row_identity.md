@@ -7,7 +7,9 @@ don't think it is setting"*, then *"still didn't save"*, then — on seeing the 
 debugger."*
 
 It is. The layout half is done and deployed. What is left is a data-model question about what
-identifies "an address" in `public.parcels`, and a domain ruling only the operator can give.
+identifies "an address" in `public.parcels`. **The operator ruled on the behaviour the same
+day (§4); what is open is not what it should do but which key makes it true**, and the three
+hazards in §4 are the ones that will bite whoever writes it.
 
 **Nothing here is a live routing error today.** See §3. The system routes to the same
 coordinates it always did; it is the arrival-point feature that does not connect.
@@ -39,11 +41,21 @@ All on the kiosk database, 2026-09-11, via the read-only `cfr-postgres` connecti
 |:--|--:|
 | Rows in `public.parcels` | 71,212 |
 | Distinct `gis_id` | 27,855 |
-| `gis_id` values covering more than one address | 2,451 |
+| `gis_id` values covering more than one address | 2,450 |
 | Rows sharing a `gis_id` with a *different* address | **43,842 (62 %)** |
-| Largest group under one `gis_id` | **1,671 rows** |
+| Largest group under one real `gis_id` | 646 rows (`!4200300`, 1158 The High St) |
+| **Rows with no `gis_id` at all** | **1,671**, across 1,671 distinct house+street pairs |
 | Duplicated `address` values | 2,170 |
-| Rows at `2929 Barnet Hwy` (house 2929, street Barnet) | 236 |
+| Rows at house 2929, street Barnet | 236 (235 under `!4200373`, one with none) |
+| Rows addressed exactly `2929 Barnet Hwy` | **2** (id 182135 `!4200373`, id 201357 no gis_id) |
+
+> **Correction, 2026-09-11.** The first version of this brief said one Coquitlam Centre
+> `gis_id` covered 1,671 suites. That was wrong, and it was asserted from the largest
+> `GROUP BY gis_id` count without looking at which group it was. 1,671 is the number of rows
+> with **no** `gis_id`, spanning 1,671 different addresses on 265 streets; Coquitlam Centre's
+> `gis_id` covers 235. The 62 % figure is unaffected (`q.gis_id = p.gis_id` is false for
+> nulls, so those rows were never in it). Recorded rather than quietly edited, per
+> CLAUDE.md §7.7.
 
 **`public.parcels` is one row per ADDRESS, not per parcel.** Neither `gis_id` nor `address`
 identifies a row on its own. There is a `bigint id` primary key and a `parcel_uuid`, and
@@ -53,8 +65,8 @@ identifies a row on its own. There is a `bigint id` primary key and a `parcel_uu
 
 **The save** (`backend/api/routers/parcels.py`, `set_parcel_entrance`) built
 `target = gis_id or address` and ORed four conditions with `.first()`. With a `gis_id`
-supplied it therefore searched by `gis_id` alone and took an arbitrary member of a
-1,671-row group. **Fixed `d4989cd`**: the client sends `parcel_id`, the API writes that row,
+supplied it therefore searched by `gis_id` alone and took an arbitrary member of the
+235-row Coquitlam Centre group. **Fixed `d4989cd`**: the client sends `parcel_id`, the API writes that row,
 and an ambiguous match is refused with a 409 naming how many rows matched. Deployed and the
 API rebuilt; `ParcelEntranceSchema` on the running instance carries `parcel_id`.
 
@@ -85,37 +97,64 @@ and `entrance_lat` is null on all but one, the destination is identical whicheve
 Only `entrance_lat` is per-row, which is precisely the feature that fails. **Do not "fix" the
 resolver's row choice expecting routes to move; they will not, until an arrival point exists.**
 
-## 4. The ruling that is blocked, and why the obvious answer is wrong
+## 4. The ruling, and the three hazards the data puts in its way
 
-The operator proposed the cascade himself: *"Check for a default base building arrival point,
-but if there is also a sub-address arrival point that can be used for further accuracy?"* —
-with the example *"if it specifically said London Drugs, I would choose another spot."*
+**Ruled by the operator, 2026-09-11**, after seeing the measurements:
 
-The model is right. The **key** is the problem. Of 617 dispatches, 289 carry a `subaddress`
-across 151 distinct values:
+> *"We decided to keep all of the suites in the database, but the main one should be the one
+> pulled by the parser. And the base building arrival point should be propagated to all the
+> suites, and if the suite has an arrival point different from default (set manually), leave
+> it alone. So all 1600+ rows should have the same arrival point, unless otherwise set."*
 
-| Shape | Count | Examples |
-|:--|--:|:--|
-| Contains a number | 138 | `Number 201`, `Number 1404`, `Number 189 Parkwood Manor` |
-| Pure name, no digits | 151 | `Rain City Housing`, `Coquitlam Center Mall`, `Number Basement` |
+That settles all three open questions: the base row wins for the parser, a suite inherits the
+building's point, and a suite's own point outranks the inherited one. It chooses **propagation
+at write time** (store a copy on every row) over a cascade at read time (store once, derive on
+read). Both give the operator the behaviour he described; the choice decides where the
+complexity sits, and the data below decides how much of it there is.
 
-Zero are a bare number. `public.parcels.unit` holds the suite (`2112`), so a **unit-keyed**
-cascade is mechanical. But the operator's own example, London Drugs, is a **name**, and names
-are the larger half. A name has nowhere to live:
+Note that the earlier worry about *named* places — his own London Drugs example, and the 151
+pure-name sub-addresses in the corpus — is **not** settled by this ruling. It is about suites
+and units. A named tenant inside a mall still has no row of its own to carry a point.
 
-> **`public.custom_places` does not exist in the database.** CLAUDE.md §1 names it as
-> authoritative and `backend/tests/test_postgis_migration.py:146` asserts against it. The only
-> other code reference is a comment in `frontend/src/components/map/layerIcons.js` recording
-> its *removal*. Establish what actually happened to it before designing on top of it
-> (CLAUDE.md §6.6: the records lag the system).
+### Hazard 1 — `gis_id` cannot be the grouping key
 
-### The three questions for the operator
+The base row the operator saves to, `2929 Barnet Hwy`, has **`gis_id = NULL`**. Its 235 suites
+have `!4200373`. So a fan-out keyed on `gis_id` would write all 235 suites and **miss the one
+row the ruling calls the main one**. Worse, the null bucket is not a building: 1,671 rows on
+265 streets share it, so treating null as a group would propagate one site's arrival point
+across 1,670 unrelated addresses.
 
-1. Does a unit with no arrival point fall back to the building's? (Presumed yes — that is the
-   cascade he described, but it has not been said.)
-2. Do **named** places get their own arrival point, or is a name only a label on the
-   building's point? This is the expensive one: it needs a table that is not there.
-3. When no unit is announced, should the **base** row win? Today an arbitrary suite does.
+House + street groups differently again: 236 rows match house 2929 on Barnet, which is the 235
+plus the null-gis_id base row. **Whatever key is chosen has to be stated and tested, because
+the two obvious ones disagree about membership at the very address that started this.**
+
+### Hazard 2 — "the main one" is not unique either
+
+Two rows are addressed exactly `2929 Barnet Hwy`, ids 182135 and 201357, both with a null
+`unit` and the same `front_lat`. The lookup returns 182135; the resolver reaches
+`2929 Barnet Hwy 2112` (id 181939, the lowest id in the group). "The main one" needs a
+definition that picks one of these deliberately — the row with a null `unit`, the lowest id,
+the one carrying the gis_id — rather than whichever a query happens to return.
+
+### Hazard 3 — a copy needs to know it is a copy
+
+The ruling requires telling an inherited point from a deliberate one, so that re-propagating
+the building's point does not overwrite a suite someone set by hand. Nothing records that
+today: `entrance_set_by`, `entrance_note` and `entrance_set_at` are written identically either
+way. Without a marker, the second propagation silently destroys the first manual suite ruling,
+and the only evidence is a truck going to the wrong door.
+
+This is CLAUDE.md §6.6 and `standards/dependency-behaviour.md` verbatim: *if `X` is computed
+from `Y`, name what recomputes `X` when `Y` moves — or do not store `X`.* Storing the point on
+1,900-odd rows is storing `X`. The cheapest honest options, for the debugging session to weigh:
+
+* a column recording where a point came from (`entrance_inherited_from`, or a boolean), so a
+  propagation pass can skip rows that were set for themselves;
+* or keep one stored point per site and resolve the fallback on read, which needs no marker
+  and no fan-out but is the design the ruling did not choose.
+
+Either way, **what re-runs the propagation when the base point changes** has to be named
+before any of it is written.
 
 ## 5. Loose ends left deliberately
 

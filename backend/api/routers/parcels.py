@@ -137,6 +137,9 @@ def serialize_parcel(p: ParcelModel, rings=None) -> dict:
         "rings": rings or [],
         "id": p.id,
         "parcel_uuid": str(p.parcel_uuid) if p.parcel_uuid else None,
+        # Whether this row is the one that speaks for the property (#77). The entrance card
+        # writes to whatever `id` it was handed, so the UI can say which row it is about.
+        "is_base_site": p.is_base_site,
         "gis_id": p.gis_id,
         "address": p.address,
         "clean_address": p.address,  # Backward compatibility
@@ -206,10 +209,21 @@ def lookup_parcel(query: str, db: Session = Depends(get_db)):
 def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Session = Depends(get_db)):
     """Fast local autocomplete search against 65,400 ingested municipal parcels."""
     clean_q = q.strip().lower()
+    # base_site FIRST, same rule as _address_row and the resolver (#77). This list had no
+    # ORDER BY at all, so "1176 Lansdowne" returned City row 131890 at the top and the
+    # property's base row 200859 not at all inside the limit. The operator set an arrival
+    # point on the base row, came back through this search, landed on the City row and saw
+    # an empty field -- reported as "1176 got set, and then it lost it" (2026-09-10). The
+    # ruling was never lost; the search handed back a different row than the one it wrote.
+    #
+    # Suites stay in the results deliberately: they are kept in the table to be worked with,
+    # and the operator searches for them. Only the ORDER changes, so the row that speaks for
+    # the property heads the list. `id` second preserves the previous de-facto order for
+    # everything else.
     results = db.query(ParcelModel).filter(
         (ParcelModel.address_normalized.ilike(f"%{clean_q}%")) |
         (ParcelModel.address.ilike(f"%{clean_q}%"))
-    ).limit(limit).all()
+    ).order_by(*_BASE_SITE_FIRST).limit(limit).all()
 
     return {
         "count": len(results),
@@ -221,6 +235,12 @@ def search_parcels(q: str = Query(..., min_length=2), limit: int = 25, db: Sessi
                 "street": p.street,
                 "streettype": p.streettype,
                 "unit": p.unit,
+                # The base row and a City row can carry the IDENTICAL address text with both
+                # units null -- "1176 Lansdowne Dr" is two rows, 200859 and 131890 -- so the
+                # list cannot distinguish them without this. Returned so the UI can mark which
+                # one speaks for the property; ordering already puts it first.
+                "is_base_site": p.is_base_site,
+                "has_arrival_point": p.entrance_lat is not None,
                 "zone_id": p.zone_id,
                 "lat": p.centroid_lat,
                 "lng": p.centroid_lng,

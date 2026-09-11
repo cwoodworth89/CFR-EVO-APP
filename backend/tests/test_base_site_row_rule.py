@@ -109,6 +109,53 @@ class TestSharedRowRule(unittest.TestCase):
                     f"_address_row instead so it cannot disagree with the resolver (#77)",
                 )
 
+    def test_every_address_query_anywhere_in_the_routers_is_ordered(self):
+        """The miss of 2026-09-10, and the reason this test is broader than the one above.
+
+        `test_no_router_reintroduces_a_private_address_lookup` looks for
+        `ParcelModel.address_normalized ==`. `search_parcels` matches with `ilike`, so it was
+        never examined -- and it had no ORDER BY at all. Explore's autocomplete therefore
+        returned City row 131890 above base row 200859 for "1176 Lansdowne", the operator set
+        an arrival point on the base row, came back through the search onto the City row and
+        saw an empty field: *"1176 got set, and then it lost it"*.
+
+        Any query filtering on an address column, in any router, must order its results --
+        `.first()` and a `.limit()`ed list are equally arbitrary without it. Scans the whole
+        router directory rather than a fixed list so a new endpoint is covered on the day it
+        is written.
+        """
+        router_dir = os.path.join(REPO, "backend", "api", "routers")
+        checked = 0
+        for fname in sorted(os.listdir(router_dir)):
+            if not fname.endswith(".py"):
+                continue
+            text = io.open(os.path.join(router_dir, fname), encoding="utf-8",
+                           errors="replace").read()
+            for name, body in top_level_functions(text).items():
+                if name in ADDRESS_LOOKUP_OWNERS:
+                    continue
+                if not re.search(r"ParcelModel\.address(_normalized)?\b", body):
+                    continue
+                if "db.query(ParcelModel)" not in body:
+                    continue
+                checked += 1
+                self.assertIn(
+                    ".order_by(", body,
+                    f"{fname}::{name} filters parcels by address without an ORDER BY. "
+                    f"Which row comes back is then arbitrary, and the row the operator "
+                    f"writes to stops matching the row they are shown (#77). Apply "
+                    f"_BASE_SITE_FIRST.",
+                )
+        self.assertGreater(checked, 0, "the scan matched nothing; the pattern has drifted")
+
+    def test_search_results_can_distinguish_the_base_row(self):
+        """Two rows are addressed exactly `1176 Lansdowne Dr` — 200859 and 131890 — both with
+        a null unit. Ordering puts the base row first, but a list that does not say which is
+        which leaves the operator picking between identical-looking entries."""
+        body = top_level_functions(source("parcels"))["search_parcels"]
+        self.assertIn('"is_base_site": p.is_base_site', body,
+                      "search results must expose which row speaks for the property")
+
     def test_entrance_target_prefers_the_base_site_row(self):
         """Two rows are addressed exactly `2929 Barnet Hwy`. One is the base_site row, and
         that is not an ambiguity to refuse -- it is the answer."""

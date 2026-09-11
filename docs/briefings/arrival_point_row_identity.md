@@ -11,6 +11,8 @@ identifies "an address" in `public.parcels`. **The operator ruled on the behavio
 day (§4); what is open is not what it should do but which key makes it true**, and the three
 hazards in §4 are the ones that will bite whoever writes it.
 
+Tracked as **[punch list #77](../punchlist/77-an-arrival-point-is-saved-to-one-parcel-row-and-read-from-another.md)**, crew-visible.
+
 **Nothing here is a live routing error today.** See §3. The system routes to the same
 coordinates it always did; it is the arrival-point feature that does not connect.
 

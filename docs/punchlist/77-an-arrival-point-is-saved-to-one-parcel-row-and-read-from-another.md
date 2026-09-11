@@ -83,8 +83,16 @@ anywhere as the definition of "the address".
 * **2026-09-10, by hand** — the operator's mall ruling moved from `2929 Barnet Hwy 1202`
   (id 181959) to `2929 Barnet Hwy 2112` (id 181939) on his
   instruction. Values copied verbatim including `entrance_set_at`: the filing was corrected,
-  the decision was not remade. **Superseded by `ec34d27`**: suite 2112 was the row the *old*
-  resolver read, and it is not the base row. The point belongs on id 201357.
+  the decision was not remade. **Superseded twice over**: by `ec34d27`, because suite 2112 was
+  the row the *old* resolver read and is not the base row; and by the operator's own re-set
+  below. The suite row's copy is now a stale duplicate.
+* **2026-09-11, by the operator** — `2929 Barnet Hwy` and `2865 Glen Dr` re-set by hand on
+  their base rows through Explore (05:13 and 05:14), plus three new points on the Lansdowne Dr
+  complexes. **Confirmed on the kiosk database**: the resolver's own ordering,
+  `ORDER BY is_base_site DESC, street, streettype, id`, returns **id 201357** for
+  `2929 Barnet Hwy`, and its destination is the operator's arrival point
+  (49.279960, -122.800029) rather than the computed frontage. The ruling is now read by the
+  path that routes the truck.
 * **`ec34d27`** — **the read side.** `ParcelModel` declares `is_base_site`; `parcels._address_row`
   becomes the one address → row rule and `lookup_parcel`, both Street View save paths and the
   Street View override all call it; `_entrance_target` treats a base_site row as the answer
@@ -133,13 +141,25 @@ anywhere as the definition of "the address".
    Where the union point is wrong the fix is **an arrival point on the base row** — `front_lat`
    is recomputed every import, so a copied coordinate reverts silently; `entrance_lat` is
    protected by omission and survives.
-3. **Four arrival points are still filed on City rows.** `2865 Glen Dr`, `3030 Lincoln Ave`,
-   `602 Como Lake Ave 2606` and `2929 Barnet Hwy 2112` carry rulings the resolver no longer
-   reads. `1800 Austin Ave` (id 201131) was already on its base row and is correct. The
-   operator is re-setting them by hand in Explore with admin unlocked; with `lookup_parcel`
-   now preferring the base row, entering the address targets the right row by construction.
-   The stale values on the suite rows are unread rather than wrong, and can be cleared at
-   leisure.
+3. **Two arrival points are still filed on City rows the resolver no longer reads**, down
+   from four. Measured on the kiosk database 2026-09-11, after the operator re-set several by
+   hand in Explore:
+
+   | Address | On the base row | On a City row | Gap |
+   |:--|:--|:--|--:|
+   | `1800 Austin Ave` | 201131 ✅ — was always the base row | — | — |
+   | `2929 Barnet Hwy` | **201357** ✅ *Main fire panel entrance* | 181939 suite 2112, stale | 3 m |
+   | `2865 Glen Dr` | **201337** ✅ *Gated Entrance* | 163590, stale | 12 m |
+   | `1176` / `1180` / `1190 Lansdowne Dr` | 200859 / 200865 / 200882 ✅ *Main complex gate* | — | — |
+   | `3030 Lincoln Ave` | 201436 — **no point** | 163422 *Main entrance* | **≈ 40 m** from the base row's frontage |
+   | `602 Como Lake Ave` | 201792 — **no point** | 198562 suite 2606 *Front entrance … on the corner* | **≈ 15 m** from the base row's frontage |
+
+   The two **stale** rows are unread duplicates of a decision now filed correctly, and are safe
+   to clear whenever convenient. The two rows with **no base-row point** are different: those
+   rulings are still going unread, so a dispatch to either address routes to the computed
+   frontage — 40 m from the main entrance at 3030 Lincoln, 15 m round the corner at 602 Como
+   Lake. Re-setting them in Explore files them where the resolver looks. Clearing a stale row
+   needs the admin token or a database write.
 
 ## Deliberately not done
 

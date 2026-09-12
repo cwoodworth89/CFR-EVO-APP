@@ -168,9 +168,24 @@ def test_a_mistranscription_is_still_flagged():
 
 
 def test_a_term_absent_from_the_vocabulary_still_flags():
-    """"Unnamed Ln" is a descriptor by transcript ("near pinewood avenue and unnamed lane") but
-    was not encoded in 2026-08-23, which carried only verified terms. It flags until a row is
-    added -- which is the intended behaviour: a new descriptor is seen once, then curated."""
+    """A descriptor nobody has curated yet is seen once, then added. That is the intended
+    behaviour, and it is why the vocabulary is data: "Unnamed Lane" flagged until the operator
+    ruled it in on 2026-09-12 (migration 2026-09-12_xstreet_descriptor_unnamed_lane.sql)."""
     from cfr_dispatch.pipeline.near_roads import resolve_near_roads
-    out = resolve_near_roads(["Unnamed Ln"], _Validator(["Pinewood", "Pinetree", "Walton"]), 49.28, -122.79)
+    out = resolve_near_roads(["Some New Thing Access Way"], _Validator(["Pinewood", "Pinetree"]), 49.28, -122.79)
     assert out[0]["how"] == "unresolved"
+
+
+def test_unnamed_lane_is_a_descriptor_now():
+    """DISP-2026-0093AD: "near pinewood avenue and unnamed lane". Both spellings, because
+    suffix normalisation turns the spoken "Lane" into "Ln" before this sees it."""
+    from cfr_dispatch.pipeline.near_roads import resolve_near_roads
+    vocab = VOCAB + [
+        {"term": "Unnamed Lane", "normalized": "UNNAMED LANE", "kind": "generic"},
+        {"term": "Unnamed Ln", "normalized": "UNNAMED LANE", "kind": "generic"},
+    ]
+    nearby = ["Delahaye", "Julian", "Pinetree", "Pinewood", "Town Centre", "Walton"]
+    out = resolve_near_roads(["Pinewood Ave", "Unnamed Ln"], _Validator(nearby, vocab), 49.2810, -122.7930)
+    assert out[0]["how"] == "base"                 # the real road still wins on its own merits
+    assert out[1]["how"] == "descriptor"
+    assert out[1]["resolved"] == "Unnamed Lane"

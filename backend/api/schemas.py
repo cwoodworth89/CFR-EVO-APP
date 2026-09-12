@@ -137,8 +137,21 @@ class ParcelCameraOverrideSchema(BaseModel):
     heading: float = 0.0
     pitch: float = 5.0
     fov: float = 90.0   # degrees
+    # Where the camera stands. `view_lat`/`view_lng` is the name; `front_lat`/`front_lng`
+    # is the older spelling of the same thing and is still accepted, but neither writes the
+    # parcel's computed frontage any more (punch list #78, operator ruling 2026-09-11).
+    view_lat: Optional[float] = None
+    view_lng: Optional[float] = None
     front_lat: Optional[float] = None
     front_lng: Optional[float] = None
     pano_id: Optional[str] = None
+
+    @property
+    def camera_lat(self) -> Optional[float]:
+        return self.view_lat if self.view_lat is not None else self.front_lat
+
+    @property
+    def camera_lng(self) -> Optional[float]:
+        return self.view_lng if self.view_lng is not None else self.front_lng
 
 

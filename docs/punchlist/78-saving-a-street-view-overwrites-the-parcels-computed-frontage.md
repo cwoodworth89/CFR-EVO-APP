@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | **REPORTED, not fixed.** Mechanism confirmed in the code on both sides and corroborated on the kiosk database 2026-09-11. The fix and the data repair are the operator's call — see *The decision this needs*. |
+| **Status** | **FIXED in the tree, NOT yet deployed.** The camera position has its own column; the save no longer writes the frontage. The migration, the API rebuild and the frontage repair are three writes the operator runs — see *Deploying this*. |
 | **Severity** | 🔴 crew-visible |
 | **Area** | 🗺️ GIS / parcels · 🖼️ Street View · 🚒 Routing destination |
 | **Origin** | Found 2026-09-11 while checking the operator's *"I just tried to set 1190 Pacific, but the marker didn't move"*. The arrival point was fine; the frontage underneath it was not. |
@@ -72,19 +72,53 @@ The first explanation tried — that saving an arrival point moved the frontage 
 is recorded rather than quietly dropped (CLAUDE.md §7.7). `updated_at` moving with the entrance
 save is the ORM's `onupdate`, not a frontage write.
 
-## The decision this needs
+## The ruling, and the fix
 
-Two questions, both the operator's:
+> Operator, 2026-09-11: *"I don't want the destination/arrival/calculation to change just
+> because I change the street view. The default calculated point, arrival point, and
+> streetview point should be separate and no change each other."*
 
-1. **Should the Street View save write a frontage at all?** On an existing parcel row, no: the
-   frontage comes from `backfill_parcel_frontage` snapping the polygon to its own street, and a
-   camera position is not that. But the same endpoint also *creates* a row for an address the
-   municipal data does not contain, and there `front_lat` is the only coordinate it has
-   (see the comment at parcels.py:399). The narrow fix is to keep the write on the create path
-   and drop it on the update path.
-2. **What repairs the 7 exposed rows?** `front_lat` is recomputed for every row on every parcel
-   import, so a re-run of `backfill_parcel_frontage` restores them — that is the same property
-   that makes a hand-copied coordinate revert. Worth confirming before relying on it.
+The camera had no column of its own, which is why it was living in the frontage. It has one now:
+
+| | Set by | Means |
+|:--|:--|:--|
+| `front_lat` / `front_lng` | `backfill_parcel_frontage` | the computed frontage — the polygon snapped to its own street |
+| `entrance_lat` / `entrance_lng` | the operator | where the truck stops. Outranks the frontage |
+| `streetview_lat` / `streetview_lng` | the Street View save | where the camera stands. Routes nothing |
+
+* **Migration** `2026-09-11_streetview_camera_is_its_own_point.sql` adds the two columns and
+  backfills them from `front_*` for the 17 rows that carry a saved view — for those rows
+  today's frontage *is* the camera position, so nothing is lost and every saved view keeps
+  pointing where it was left.
+* **`save_parcel_streetview`** writes `streetview_*` and never `front_*`, on both the update
+  and the `IntegrityError` retry path. The payload gains `view_lat`/`view_lng`;
+  `front_lat`/`front_lng` are still accepted as the older spelling of the *camera*, and the
+  legacy `/api/streetview-overrides` alias passes them through as such.
+* **The create path** (an address the municipal data lacks) now leaves `front_*` null instead
+  of filling it from the camera. Such an address resolves as Tier 1, *location unresolved*,
+  which a crew can see — rather than routing to where a photographer stood, which they cannot
+  (§5, §6.1). **No row has ever been created by this path** (0 measured, 2026-09-11).
+* **`savedViewFromParcel`** reads the camera columns with **no fallback** to `front_lat`. The
+  fallback would be the bug again in the other direction: after the frontage repair below, it
+  would aim the camera at the repaired point instead of where the operator framed it.
+
+## Deploying this
+
+Three writes, in this order. The frontend must go **last**: it asks the API for
+`streetview_lat`, and an un-migrated API does not answer with one, so saved views would read as
+absent until the other two are done.
+
+1. the migration, against the kiosk database;
+2. `docker compose up -d --build cfr_api` — an `api/` change needs `--build`, not a restart;
+3. `git pull && npm run build` in `frontend/`.
+
+## Still open: the frontages the old behaviour overwrote
+
+**7 rows carry a Street View and no arrival point**, so their `front_lat` is a camera position
+and is still the destination. `backfill_parcel_frontage` recomputes `front_lat` for every row —
+that is the repair, and it is the same property that makes a hand-copied coordinate revert.
+It moves routing destinations, so it is the operator's to time, and the two rows with a
+recorded before-value (2865 Glen Dr, 3030 Lincoln Ave) are the check that it lands right.
 
 ## Falsifier
 

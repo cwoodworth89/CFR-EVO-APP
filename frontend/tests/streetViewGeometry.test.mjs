@@ -32,11 +32,11 @@ test('the Static API request is bounded, the stored angle is not', () => {
 });
 
 test('a saved view comes from the parcel row and an unsaved parcel gives null', () => {
-  assert.equal(savedViewFromParcel({ streetview_heading: null, front_lat: 49.27, front_lng: -122.79 }), null);
-  const v = savedViewFromParcel({ streetview_heading: 214, streetview_pitch: 13, streetview_fov: 127.31, streetview_pano_id: 'p1', front_lat: 49.27, front_lng: -122.79 });
+  assert.equal(savedViewFromParcel({ streetview_heading: null, streetview_lat: 49.27, streetview_lng: -122.79 }), null);
+  const v = savedViewFromParcel({ streetview_heading: 214, streetview_pitch: 13, streetview_fov: 127.31, streetview_pano_id: 'p1', streetview_lat: 49.27, streetview_lng: -122.79 });
   assert.deepEqual(v, { lat: 49.27, lng: -122.79, heading: 214, pitch: 13, fov: 127.31, panoId: 'p1' });
   // Missing pitch/fov fall to the defaults; a saved heading of 0 is a real save, not "unset".
-  const zero = savedViewFromParcel({ streetview_heading: 0, front_lat: 49.27, front_lng: -122.79 });
+  const zero = savedViewFromParcel({ streetview_heading: 0, streetview_lat: 49.27, streetview_lng: -122.79 });
   assert.equal(zero.heading, 0);
   assert.equal(zero.fov, DEFAULT_FOV);
 });
@@ -58,4 +58,22 @@ test('viewsMatch tolerates stored precision and nothing more', () => {
   assert.ok(!viewsMatch({ heading: 214, pitch: 13, fov: 90, panoId: 'p1' }, view));
   assert.ok(!viewsMatch({ heading: 214, pitch: 13, fov: 127.31, panoId: 'other' }, view));
   assert.ok(!viewsMatch(null, view));
+});
+
+// The three points are separate and do not change each other (operator, 2026-09-11; punch
+// list #78). The camera used to be read from, and written to, the computed frontage.
+test('a saved view comes from the camera position, never from the frontage', () => {
+  const frontageOnly = savedViewFromParcel({
+    streetview_heading: 214, front_lat: 49.27, front_lng: -122.79,
+  });
+  assert.equal(frontageOnly, null, 'front_lat must not stand in for the camera');
+
+  const both = savedViewFromParcel({
+    streetview_heading: 214,
+    streetview_lat: 49.2705, streetview_lng: -122.7905,
+    front_lat: 49.27, front_lng: -122.79,
+    entrance_lat: 49.2712, entrance_lng: -122.7912,
+  });
+  assert.equal(both.lat, 49.2705);
+  assert.equal(both.lng, -122.7905);
 });

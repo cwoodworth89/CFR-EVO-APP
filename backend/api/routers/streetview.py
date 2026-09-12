@@ -78,8 +78,10 @@ def save_streetview_override(payload: StreetViewOverrideSchema, db: Session = De
         ParcelCameraOverrideSchema(
             address=target_address,
             clean_address=target_address,
-            front_lat=payload.front_lat,
-            front_lng=payload.front_lng,
+            # The legacy field name for the camera position. It no longer writes the
+            # parcel's frontage (punch list #78); passing it as view_* says so.
+            view_lat=payload.front_lat,
+            view_lng=payload.front_lng,
             heading=payload.heading,
             pitch=payload.pitch,
             fov=payload.fov,

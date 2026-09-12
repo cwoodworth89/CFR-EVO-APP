@@ -115,7 +115,13 @@ def test_save_and_lookup_parcel_streetview():
     assert data["status"] == "success"
     assert data["parcel"]["clean_address"] == "999 TEST DISPATCH BLVD"
     assert data["parcel"]["streetview_heading"] == 135.5
-    assert data["parcel"]["front_lat"] == 49.2785
+    # The camera position goes to its own column, and the frontage is NOT written from it:
+    # framing a picture must not move where a truck is sent (punch list #78, operator ruling
+    # 2026-09-11). This row is created by the save, so it has no computed frontage at all.
+    assert data["parcel"]["streetview_lat"] == 49.2785
+    assert data["parcel"]["streetview_lng"] == -122.7932
+    assert data["parcel"]["front_lat"] is None
+    assert data["parcel"]["front_lng"] is None
 
     # Test lookup endpoint hit
     lookup_res = lookup_parcel(query="999 TEST DISPATCH BLVD", db=db)
@@ -176,7 +182,9 @@ def test_legacy_post_streetview_overrides():
     res = lookup_parcel(query="777 OVERRIDE RD", db=db)
     assert res["found"] is True
     assert res["parcel"]["streetview_heading"] == 45.0
-    assert res["parcel"]["front_lat"] == 49.25
+    # Same rule through the legacy alias, which delegates to the same save (punch list #78).
+    assert res["parcel"]["streetview_lat"] == 49.25
+    assert res["parcel"]["front_lat"] is None
 
     # Cleanup
     p = db.query(ParcelModel).filter(ParcelModel.clean_address == "777 OVERRIDE RD").first()

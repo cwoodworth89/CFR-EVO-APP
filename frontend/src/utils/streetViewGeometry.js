@@ -71,8 +71,14 @@ export const savedViewFromParcel = (parcel) => {
   if (!parcel) return null;
   const heading = parcel.streetview_heading ?? parcel.heading;
   if (heading == null || !Number.isFinite(Number(heading))) return null;
-  const lat = parcel.front_lat ?? parcel.lat;
-  const lng = parcel.front_lng ?? parcel.lng;
+  // The camera's own position. It used to be read from `front_lat` -- the computed frontage,
+  // which the save also overwrote, so reframing a view moved the routing destination (punch
+  // list #78). Operator ruling 2026-09-11: the computed point, the arrival point and the
+  // Street View point are separate and do not change each other. There is deliberately no
+  // fallback to `front_lat`: after a frontage repair that fallback would aim the camera at
+  // the repaired point instead of where the operator left it.
+  const lat = parcel.streetview_lat;
+  const lng = parcel.streetview_lng;
   if (!isCoord(lat, lng)) return null;
   return {
     lat: Number(lat),

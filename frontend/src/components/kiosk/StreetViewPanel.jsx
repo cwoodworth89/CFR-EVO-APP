@@ -118,8 +118,10 @@ export default function StreetViewPanel({ activeCall }) {
     const payload = {
       address: cleanAddrKey,
       clean_address: cleanAddrKey,
-      front_lat: live.lat,
-      front_lng: live.lng,
+      // Where the camera stands. This is NOT the parcel's frontage and no longer writes it
+      // (punch list #78, operator ruling 2026-09-11).
+      view_lat: live.lat,
+      view_lng: live.lng,
       heading: live.heading,
       pitch: live.pitch,
       // Degrees, full precision, NOT clamped: operator ruling 2026-09-08. The SDK can frame

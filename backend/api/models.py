@@ -190,6 +190,12 @@ class ParcelModel(Base):
     # not just the heading. Storable indefinitely under the Maps Platform Service Specific
     # Terms A.3 (docs/standards/google-maps-platform-terms-excerpts.md).
     streetview_pano_id = Column(Text, nullable=True)
+    # Where the camera stands, which is NOT where the truck stops. It lived in front_lat
+    # until 2026-09-11 and moved the routing destination every time a view was saved
+    # (punch list #78). Operator ruling: the computed point, the arrival point and the
+    # Street View point are separate and do not change each other.
+    streetview_lat = Column(Float, nullable=True)
+    streetview_lng = Column(Float, nullable=True)
 
     lock_box_notes = Column(Text, nullable=True)
     hazard_notes = Column(Text, nullable=True)

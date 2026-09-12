@@ -172,6 +172,9 @@ def serialize_parcel(p: ParcelModel, rings=None) -> dict:
         "streetview_pitch": p.streetview_pitch,
         "streetview_fov": p.streetview_fov,
         "streetview_pano_id": p.streetview_pano_id,
+        # Where the camera stands, separate from front_* and entrance_* (punch list #78).
+        "streetview_lat": p.streetview_lat,
+        "streetview_lng": p.streetview_lng,
         "lock_box_notes": p.lock_box_notes,
         "hazard_notes": p.hazard_notes,
         "pre_plan_pdf_url": p.pre_plan_pdf_url,
@@ -349,18 +352,20 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
                 gis_id=payload.gis_id or clean_addr,
                 address=clean_addr,
                 address_normalized=clean_addr.lower(),
-                front_lat=payload.front_lat,
-                front_lng=payload.front_lng,
-                # centroid_* is deliberately NOT set. This row is created for an address
-                # the municipal parcel data does not contain, so there is no polygon and
-                # therefore no centroid. It used to be filled from front_lat -- inventing
-                # a "centre of the property" that is actually a point on the road. Same
-                # class as punch-list #50, in the other direction: copying one of the
-                # three positions into another.
+                streetview_lat=payload.camera_lat,
+                streetview_lng=payload.camera_lng,
+                # front_* and centroid_* are deliberately NOT set. This row is created for an
+                # address the municipal parcel data does not contain, so there is no polygon,
+                # no centroid, and no computed frontage -- and the camera position is not a
+                # substitute for one. It used to be written into front_lat, which made the
+                # spot a photographer stood the spot a truck stops (punch list #78, operator
+                # ruling 2026-09-11: the three points do not change each other).
                 #
-                # NULL is correct and costs nothing: the resolver order is
-                # entrance -> front -> centroid, and front_lat is set here, so the
-                # centroid is never reached (CLAUDE.md §6.1).
+                # NULL is correct: an address with no location resolves as Tier 1, "location
+                # unresolved", which a crew can see, rather than as a plausible wrong point
+                # they cannot (CLAUDE.md §5, §6.1). No row has ever been created by this path
+                # (0 rows measured 2026-09-11); an arrival point is how such an address gets a
+                # destination.
                 streetview_heading=payload.heading,
                 streetview_pitch=payload.pitch,
                 streetview_fov=payload.fov,
@@ -372,10 +377,13 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
             p.streetview_pitch = payload.pitch
             p.streetview_fov = payload.fov
             p.streetview_pano_id = payload.pano_id or None
-            if payload.front_lat is not None:
-                p.front_lat = payload.front_lat
-            if payload.front_lng is not None:
-                p.front_lng = payload.front_lng
+            # The camera position, and nothing else. Writing front_lat here moved the
+            # routing destination every time a view was reframed -- 66 m at 2865 Glen Dr,
+            # 65 m at 3030 Lincoln Ave (punch list #78).
+            if payload.camera_lat is not None:
+                p.streetview_lat = payload.camera_lat
+            if payload.camera_lng is not None:
+                p.streetview_lng = payload.camera_lng
 
         db.commit()
         db.refresh(p)
@@ -387,27 +395,32 @@ def save_parcel_streetview(payload: ParcelCameraOverrideSchema, db: Session = De
             p.streetview_heading = payload.heading
             p.streetview_pitch = payload.pitch
             p.streetview_fov = payload.fov
-            if payload.front_lat is not None:
-                p.front_lat = payload.front_lat
-            if payload.front_lng is not None:
-                p.front_lng = payload.front_lng
+            # The camera position, and nothing else. Writing front_lat here moved the
+            # routing destination every time a view was reframed -- 66 m at 2865 Glen Dr,
+            # 65 m at 3030 Lincoln Ave (punch list #78).
+            if payload.camera_lat is not None:
+                p.streetview_lat = payload.camera_lat
+            if payload.camera_lng is not None:
+                p.streetview_lng = payload.camera_lng
         else:
             p = ParcelModel(
                 gis_id=payload.gis_id or clean_addr,
                 address=clean_addr,
                 address_normalized=clean_addr.lower(),
-                front_lat=payload.front_lat,
-                front_lng=payload.front_lng,
-                # centroid_* is deliberately NOT set. This row is created for an address
-                # the municipal parcel data does not contain, so there is no polygon and
-                # therefore no centroid. It used to be filled from front_lat -- inventing
-                # a "centre of the property" that is actually a point on the road. Same
-                # class as punch-list #50, in the other direction: copying one of the
-                # three positions into another.
+                streetview_lat=payload.camera_lat,
+                streetview_lng=payload.camera_lng,
+                # front_* and centroid_* are deliberately NOT set. This row is created for an
+                # address the municipal parcel data does not contain, so there is no polygon,
+                # no centroid, and no computed frontage -- and the camera position is not a
+                # substitute for one. It used to be written into front_lat, which made the
+                # spot a photographer stood the spot a truck stops (punch list #78, operator
+                # ruling 2026-09-11: the three points do not change each other).
                 #
-                # NULL is correct and costs nothing: the resolver order is
-                # entrance -> front -> centroid, and front_lat is set here, so the
-                # centroid is never reached (CLAUDE.md §6.1).
+                # NULL is correct: an address with no location resolves as Tier 1, "location
+                # unresolved", which a crew can see, rather than as a plausible wrong point
+                # they cannot (CLAUDE.md §5, §6.1). No row has ever been created by this path
+                # (0 rows measured 2026-09-11); an arrival point is how such an address gets a
+                # destination.
                 streetview_heading=payload.heading,
                 streetview_pitch=payload.pitch,
                 streetview_fov=payload.fov

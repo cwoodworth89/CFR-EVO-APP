@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | **FIXED in the tree, NOT yet deployed.** The camera position has its own column; the save no longer writes the frontage. The migration, the API rebuild and the frontage repair are three writes the operator runs — see *Deploying this*. |
+| **Status** | **FIXED and deployed, repair confirmed** 2026-09-11. Migration applied, `cfr_api` rebuilt, frontend built, and `--frontage-only` run: both rows with a recorded pre-damage value came back to within **4 cm** of it, and **0** rows citywide now sit off their computed frontage. The write path is confirmed at the operator's next Street View save — not fabricated to close this out (§6.6). |
 | **Severity** | 🔴 crew-visible |
 | **Area** | 🗺️ GIS / parcels · 🖼️ Street View · 🚒 Routing destination |
 | **Origin** | Found 2026-09-11 while checking the operator's *"I just tried to set 1190 Pacific, but the marker didn't move"*. The arrival point was fine; the frontage underneath it was not. |
@@ -149,11 +149,29 @@ Nine of the seventeen have no arrival point, so the move changes where a truck i
 `602 Como Lake Ave` 8 m, `3346 Robson Dr` 8 m, `2971 Lotus Crt` 5 m. The other eight are
 shielded by an arrival point, which outranks the frontage.
 
-### The check afterwards
+### The check afterwards — run 2026-09-11, passed
 
-`2865 Glen Dr` (201337) should return to **49.282752, -122.804565** and `3030 Lincoln Ave`
-(201436) to **49.279070, -122.791199** — the values this same function produced on 2026-09-10,
-recorded in the review queue before the Street View saves overwrote them.
+| Row | Expected (queue, 2026-09-10) | After the repair | Off by | Now clear of its camera |
+|:--|:--|:--|--:|--:|
+| `2865 Glen Dr` (201337) | 49.282752, -122.804565 | 49.282752, -122.804565 | **0.01 m** | 66.2 m |
+| `3030 Lincoln Ave` (201436) | 49.279070, -122.791199 | 49.279070, -122.791199 | **0.04 m** | 64.9 m |
+
+Across the table afterwards: **0** rows sit 1 m or more off their computed frontage, **0**
+street-viewed rows still have a frontage equal to their camera, all **17** camera positions are
+intact, and all **9** arrival points are on base rows.
+
+The read path was re-checked against live data with no test injection — now that `front_lat`
+and `streetview_lat` are genuinely different points, the check discriminates on its own.
+At `1132 Dufferin St` the panel stands at the camera (49.279189…) and ignores the repaired
+frontage (49.278896…), 33 m away.
+
+## Still unconfirmed
+
+**The write path.** That a Street View save now writes `streetview_*` and leaves `front_*`
+alone is confirmed in the code and by the backend tests' assertions, but has not been exercised
+against the running system: the save is admin-gated and the password is the operator's. The
+falsifier is one save — `front_lat` must not move. Recorded as unconfirmed rather than closed
+(CLAUDE.md §6.6).
 
 ## Falsifier
 

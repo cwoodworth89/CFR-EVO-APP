@@ -102,6 +102,14 @@ With canonical terms the whole branch collapses to `use talk group {term}`.
 
 ## Not fixed here
 
+* **The channel list is knowingly incomplete.** The operator ruled 2026-09-11 that it holds
+  the channels that matter and is not the full set, and that completing it waits. An absent
+  channel usually resolves to `None` as it should, but one sharing a listed channel's
+  distinguishing word is captured by it — `combined venue port moody` returns **Combined
+  Venue Port Mann**, because `port` belongs to no other listed channel. Not a regression:
+  the pre-#79 rule returns the same, verified against `HEAD~1`. No code change can close
+  this; only the list can → [`post_freeze_backlog.md`](../post_freeze_backlog.md).
+
 * `DISP-2026-07CC85` also parsed its address as `4453 Port Man Bridge`, which is not a civic
   address. Separate defect → [`post_freeze_backlog.md`](../post_freeze_backlog.md).
 * The fallback talk-group regex in `announcement.py` is bounded by `map grid` **or end of

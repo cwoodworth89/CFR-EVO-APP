@@ -821,7 +821,29 @@ if __name__ == "__main__":
         default=5000,
         help="Batch insert chunk size (default: 5000)"
     )
+    parser.add_argument(
+        "--frontage-only",
+        action="store_true",
+        help="Recompute front_lat/front_lng for every parcel and do nothing else. Reads no "
+             "shapefile: the inputs are public.parcels.geom and public.roads, both already in "
+             "the database. Added 2026-09-11 for punch list #78, where a Street View save had "
+             "overwritten the frontage on nine rows and there was no way to run this step on "
+             "its own without re-running the whole import."
+    )
     args = parser.parse_args()
+
+    if args.frontage_only:
+        from sqlalchemy import create_engine
+        db_url = get_database_url()
+        logging.info(f"Connecting to database: {db_url.split('@')[-1] if '@' in db_url else db_url}...")
+        engine = create_engine(db_url, pool_pre_ping=True)
+        # The same function the import calls, not a copy of its SQL (CLAUDE.md §6.2). It
+        # recomputes EVERY parcel with a polygon and a centroid, which is deliberate -- see
+        # the comment in backfill_parcel_frontage about the points freezing against a stale
+        # road network when it only filled in NULLs.
+        updated = backfill_parcel_frontage(engine, batch_size=args.batch_size)
+        logging.info(f"Frontage recomputed for {updated} parcels. Nothing else was touched.")
+        sys.exit(0)
 
     run_import(
         address_shp_path=args.addresses,

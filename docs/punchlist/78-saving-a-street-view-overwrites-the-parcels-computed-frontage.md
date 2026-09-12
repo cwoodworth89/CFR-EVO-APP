@@ -112,13 +112,48 @@ absent until the other two are done.
 2. `docker compose up -d --build cfr_api` — an `api/` change needs `--build`, not a restart;
 3. `git pull && npm run build` in `frontend/`.
 
-## Still open: the frontages the old behaviour overwrote
+## Repairing the frontages the old behaviour overwrote
 
-**7 rows carry a Street View and no arrival point**, so their `front_lat` is a camera position
-and is still the destination. `backfill_parcel_frontage` recomputes `front_lat` for every row —
-that is the repair, and it is the same property that makes a hand-copied coordinate revert.
-It moves routing destinations, so it is the operator's to time, and the two rows with a
-recorded before-value (2865 Glen Dr, 3030 Lincoln Ave) are the check that it lands right.
+`backfill_parcel_frontage` is a **function inside the parcel import**
+([`import_parcels.py`](../../backend/scripts/import_parcels.py)), not a command — so there was
+no way to run this one step without re-running the whole import against shapefiles. It has an
+entry point now:
+
+```
+docker exec cfr_api python /app/backend/scripts/import_parcels.py --frontage-only
+```
+
+`backend/scripts` is bind-mounted into `cfr_api` and `DATABASE_URL` is set there, so a
+`git pull` is enough — no rebuild. It reads no shapefile: the inputs are `public.parcels.geom`
+and `public.roads`, both already in the database.
+
+### Dry run, 2026-09-11 — what it would change
+
+Measured by running the function's own `SELECT` read-only against the kiosk before any write:
+
+| | Rows |
+|:--|--:|
+| Touched | 71,053 |
+| **Unchanged (<1 m)** | **71,036** |
+| Move 1–24 m | 7 |
+| Move 25 m or more | 10 |
+| Largest move | 323 m (`2929 Barnet Hwy`) |
+
+**All 17 movers carry a saved Street View.** Not one row without one moves. The recompute does
+the repair and nothing else, which is the strongest evidence available that the Street View
+save is the only thing that had been moving these points.
+
+Nine of the seventeen have no arrival point, so the move changes where a truck is sent:
+`580 Clarke Rd` 73 m, `3030 Lincoln Ave` (City row) 35 m, `1132 Dufferin St` 33 m,
+`3030 Gordon Ave` 24 m, `2573 Diamond Cres` 15 m, `2865 Glen Dr` (City row) 11 m,
+`602 Como Lake Ave` 8 m, `3346 Robson Dr` 8 m, `2971 Lotus Crt` 5 m. The other eight are
+shielded by an arrival point, which outranks the frontage.
+
+### The check afterwards
+
+`2865 Glen Dr` (201337) should return to **49.282752, -122.804565** and `3030 Lincoln Ave`
+(201436) to **49.279070, -122.791199** — the values this same function produced on 2026-09-10,
+recorded in the review queue before the Street View saves overwrote them.
 
 ## Falsifier
 

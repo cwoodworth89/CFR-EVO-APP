@@ -39,7 +39,7 @@ Run when City data is refreshed. Order matters: roads before parcels, parcels be
 | `fix_shapefiles.py` | Repairs geometry winding order after download. |
 | `read_dbf.py` | Streaming DBF reader — audits `Addresses.dbf` without GDAL or fiona. |
 | `import_gis_data.py` | Roads, intersections, zones, city boundary and vocabulary into PostGIS. |
-| `import_parcels.py` | All 69,708 `Addresses.shp` records, plus the derived `base_site` rows (#48) and road-facing front points. |
+| `import_parcels.py` | All 69,708 `Addresses.shp` records, plus the derived `base_site` rows (#48) and road-facing front points. `--frontage-only` recomputes just the front points, reading no shapefile (#78). |
 | `sync_hydrants.py` | Municipal hydrant inventory into `public.hydrants`, NFPA 291 classified. |
 | `derive_intersections.py` | Rebuilds `public.intersections` from road centreline geometry. |
 

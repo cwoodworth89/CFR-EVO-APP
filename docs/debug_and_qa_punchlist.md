@@ -25,7 +25,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 |:--|:--|:--|:--|
 | **79** | 🔴 crew-visible | FIXED in the tree, migration not yet applied | [A venue talk group loses to channel 10 on list order, and no stored channel is a vocabulary term](punchlist/79-a-venue-talk-group-loses-to-channel-10-on-list-order.md) |
 | **77** | 🔴 crew-visible | FIXED `ec34d27`, awaiting kiosk restart | [An arrival point is saved to one parcel row and read from another](punchlist/77-an-arrival-point-is-saved-to-one-parcel-row-and-read-from-another.md) |
-| **78** | 🔴 crew-visible | FIXED, deployed, repair confirmed | [Saving a Street View overwrites the parcel's computed frontage](punchlist/78-saving-a-street-view-overwrites-the-parcels-computed-frontage.md) |
+| **78** | 🔴 crew-visible | CLOSED — confirmed on the running system | [Saving a Street View overwrites the parcel's computed frontage](punchlist/78-saving-a-street-view-overwrites-the-parcels-computed-frontage.md) |
 | **76** | 🔴 crew-visible | OPEN | [A dispatched block lands on one civic number at the block's end, and the route U-turns past it](punchlist/76-a-dispatched-block-lands-on-one-civic-number-the-route-u-turns.md) |
 | **64** | 🔴 crew-visible | OPEN | [Sixteen dispatched civic numbers are absent from the City's address layer](punchlist/64-sixteen-dispatched-civic-numbers-are-absent-from-the-citys-a.md) |
 | **74** | 🔴 crew-visible | BUILT, unconfirmed (3A, 2026-09-09) | [Kiosk map: no hydrants, RE-CENTER always on, details box over the pin, Street View tile buried](punchlist/74-kiosk-map-no-hydrants-recentre-always-on-details-box-over-the-pin.md) |

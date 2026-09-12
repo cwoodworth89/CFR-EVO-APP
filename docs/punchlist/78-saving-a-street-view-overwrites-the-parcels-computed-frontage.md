@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | **FIXED and deployed, repair confirmed** 2026-09-11. Migration applied, `cfr_api` rebuilt, frontend built, and `--frontage-only` run: both rows with a recorded pre-damage value came back to within **4 cm** of it, and **0** rows citywide now sit off their computed frontage. The write path is confirmed at the operator's next Street View save — not fabricated to close this out (§6.6). |
+| **Status** | **CLOSED — fixed, deployed, and confirmed on the running system** 2026-09-11/12. The repair returned both recorded rows to within 4 cm, and the operator then saved a Street View *and* an arrival point at `1132 Dufferin St`: the frontage did not move, measuring **0.000 m** from its computed value. Before the fix that same save would have dragged it 32.7 m to the camera. |
 | **Severity** | 🔴 crew-visible |
 | **Area** | 🗺️ GIS / parcels · 🖼️ Street View · 🚒 Routing destination |
 | **Origin** | Found 2026-09-11 while checking the operator's *"I just tried to set 1190 Pacific, but the marker didn't move"*. The arrival point was fine; the frontage underneath it was not. |
@@ -165,13 +165,28 @@ and `streetview_lat` are genuinely different points, the check discriminates on 
 At `1132 Dufferin St` the panel stands at the camera (49.279189…) and ignores the repaired
 frontage (49.278896…), 33 m away.
 
-## Still unconfirmed
+## The write path, confirmed on the running system
 
-**The write path.** That a Street View save now writes `streetview_*` and leaves `front_*`
-alone is confirmed in the code and by the backend tests' assertions, but has not been exercised
-against the running system: the save is admin-gated and the password is the operator's. The
-falsifier is one save — `front_lat` must not move. Recorded as unconfirmed rather than closed
-(CLAUDE.md §6.6).
+The operator saved a Street View and an arrival point at `1132 Dufferin St` (id 200790) on
+2026-09-12 00:30. That is the falsifier this item asked for, and it passed:
+
+| | |
+|:--|:--|
+| Frontage | 49.278896, -122.804034 — **0.000 m** from its computed value |
+| Camera | 49.279190, -122.804044 — 32.7 m from the frontage, heading re-framed 258° → 252° |
+| Arrival point | 49.279148, -122.804355 — *"Main entrance"*, CW, 36.5 m from the frontage |
+
+The heading change proves the save landed; the frontage sitting at exactly its computed value
+proves the save no longer touches it. Before the fix, that save would have written the camera
+straight into `front_lat` and moved the destination 32.7 m.
+
+**What this run does not prove**, stated rather than glossed: the camera position was unchanged
+(the same panorama, re-framed), so it cannot distinguish "wrote `streetview_lat` with the same
+value" from "did not write it". A save from a *different* panorama position would settle that.
+The frontage half — the half the ruling was about — is settled.
+
+Across the table afterwards: **0** rows sit 1 m or more off their computed frontage, and all
+**10** arrival points are on base rows.
 
 ## Falsifier
 

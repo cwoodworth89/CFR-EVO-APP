@@ -9,8 +9,17 @@ Coquitlam's real streets have a *different* real street scoring 75 or better aga
 ("aberdeen avenue" to "eden avenue", 85), so a mishearing could be silently rewritten to another
 genuine street. Here the candidates are the roads within NEAR_ROAD_RADIUS_M of the placed point,
 or the roads crossing the zone when the address is not placed yet, and the outcome is always
-reported: exact, matched by base name, substituted within the nearby set (flagged), or left as
-heard and flagged unresolved. Never a city-wide rewrite.
+reported: exact, matched by base name, substituted within the nearby set (flagged), a known
+non-street descriptor, or left as heard and flagged unresolved. Never a city-wide rewrite.
+
+**Descriptors** (2026-09-12): Locution announces things that are not streets -- "near mall
+access and turning lane". They are in `public.vocabulary` as category `xstreet_descriptor`,
+seeded 2026-08-23 for exactly this, but nothing read that vocabulary, so a correctly heard
+descriptor counted as a near road matching nothing. Measured over the corpus: 14 of the 24
+unresolved occurrences (58 %) were descriptors, 9 were mistranscriptions and 1 was a real road
+just outside the radius. Operator, 2026-09-12: "I don't want turning lane or mall access road
+to throw errors if that is what the system hears" and "street first, descriptor only if no
+street matches".
 """
 import logging
 import re
@@ -76,10 +85,54 @@ def match_heard_road(heard: str, candidates: List[str]) -> tuple:
     return None, "unresolved"
 
 
+def _plain(name: str) -> str:
+    """Upper case with runs of whitespace collapsed. Deliberately NOT the street normaliser:
+    a descriptor is not a street, and normalize_street_name would rewrite "Turning Lane" to
+    "Turning Ln" before it could be compared. The vocabulary already carries both spellings."""
+    return " ".join(str(name or "").upper().split())
+
+
+def match_descriptor(heard: str, descriptors: List[dict]) -> tuple:
+    """(canonical text, kind) when the heard name is a known non-street descriptor, else (None, None).
+
+    Operator ruling 2026-09-12: **street first, descriptor only if no street matches.** This is
+    called after the street matcher has failed, never before it, because a descriptor entry can
+    otherwise swallow a misheard real street -- Whisper writes "near a gate" for Agate, and if
+    "a gate" were ever a descriptor the mishearing would be accepted silently. Measured over
+    the 16 descriptor occurrences in the corpus (2026-09-12): the best score any of them
+    reached against a real road within 400 m was 53, against the threshold of 75, so none is
+    rewritten to a street before it gets here.
+
+    `prefixed` descriptors name a specific facility with the name in front ("Summit Middle
+    School Access" for "School Access"), so they match on the tail and keep the heard text --
+    the facility is the useful part. `generic` and `ambiguous` match the whole name and are
+    shown in the vocabulary's canonical form.
+    """
+    h = _plain(heard)
+    if not h:
+        return None, None
+    for d in descriptors or []:
+        term, norm, kind = _plain(d.get("term")), _plain(d.get("normalized")), d.get("kind") or "generic"
+        if kind == "prefixed":
+            for t in (term, norm):
+                if t and h.endswith(t) and h != t:
+                    return str(heard).strip(), kind
+        if h in (term, norm):
+            # The canonical spelling, so "Turn Ln" and "Turning Ln" both read "Turning Lane".
+            return (norm or term).title(), kind
+    return None, None
+
+
 def resolve_near_roads(heard: List[Optional[str]], validator: Any, lat, lng, zone_id=None) -> List[Optional[dict]]:
     """One entry per heard name (None where nothing was heard):
     {"heard", "resolved", "how", "scope"}, scope being point | zone | none."""
     candidates, scope = [], "none"
+    descriptors = []
+    if validator is not None and hasattr(validator, "xstreet_descriptors"):
+        try:
+            descriptors = validator.xstreet_descriptors()
+        except Exception as e:
+            logging.warning(f"XStreet descriptor vocabulary unavailable: {e}")
     if validator is not None and lat is not None and lng is not None:
         try:
             candidates = validator.roads_near_point(lat, lng, NEAR_ROAD_RADIUS_M)
@@ -97,10 +150,17 @@ def resolve_near_roads(heard: List[Optional[str]], validator: Any, lat, lng, zon
         if not name or not str(name).strip():
             out.append(None)
             continue
-        if not candidates:
-            out.append({"heard": name, "resolved": None, "how": "no-candidates", "scope": scope})
-            continue
-        resolved, how = match_heard_road(name, candidates)
+        resolved, how = (None, "no-candidates") if not candidates else match_heard_road(name, candidates)
+        # Street first. Only a name no nearby road accounts for is offered to the descriptor
+        # vocabulary (operator, 2026-09-12). "no-candidates" counts as no street matched: a
+        # generic descriptor does not depend on where the call is, and the match is a literal
+        # vocabulary lookup rather than a fuzzy one, so it cannot invent a street.
+        if resolved is None and how in ("unresolved", "no-candidates", "ambiguous"):
+            text_, kind = match_descriptor(name, descriptors)
+            if text_:
+                out.append({"heard": name, "resolved": text_, "how": "descriptor",
+                            "kind": kind, "scope": scope})
+                continue
         out.append({"heard": name, "resolved": resolved, "how": how, "scope": scope})
     return out
 
@@ -118,6 +178,10 @@ def apply_near_roads(x1, x2, validator, lat, lng, zone_id=None) -> dict:
         "x_street_2": shown(1, x2),
         "x_streets_heard": [x1, x2],
         "x_streets_how": [n["how"] if n else None for n in near],
+        # A descriptor is neither resolved-to-a-street nor unresolved: dispatch named a feature
+        # that is not a street and the system heard it correctly, so it is not a reason to
+        # review the call (operator, 2026-09-12). It stays in the XStreets field, as spoken.
         "xstreets_unresolved": sum(1 for n in near if n and not n.get("resolved")),
         "xstreets_substituted": sum(1 for n in near if n and n.get("how") == "nearby-fuzzy"),
+        "xstreets_descriptors": sum(1 for n in near if n and n.get("how") == "descriptor"),
     }

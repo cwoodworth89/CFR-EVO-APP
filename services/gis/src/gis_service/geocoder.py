@@ -388,6 +388,9 @@ class CoquitlamDataValidator:
     def roads_in_zone(self, grid_id):
         return self.spatial.roads_in_zone(grid_id)
 
+    def xstreet_descriptors(self):
+        return self.spatial.xstreet_descriptors()
+
     def is_within_city(self, lat, lng=None, lon=None):
         return self.spatial.is_within_city(lat, lng if lng is not None else lon)
 

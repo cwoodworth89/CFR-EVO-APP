@@ -166,6 +166,35 @@ class SpatialQueryEngine:
             logging.error(f"Error fetching roads near point: {e}", exc_info=True)
             return []
 
+    def xstreet_descriptors(self) -> List[dict]:
+        """The things Locution announces in the XStreets field that are not streets.
+
+        `public.vocabulary`, category `xstreet_descriptor`, seeded from the corpus on
+        2026-08-23 with the derivation in that migration. One row per spoken variant;
+        `term_normalized` carries the canonical form, and `kind` records whether the
+        descriptor could ever have a coordinate -- `generic` (there are hundreds of turning
+        lanes), `prefixed` (a named facility, locatable in principle from the Open Data
+        layers) or `ambiguous` ("Mall Access": a real place, but not which one). For telling
+        a descriptor from a street, all three count the same.
+
+        Read side added 2026-09-12: the vocabulary had been in the database for three weeks
+        with nothing consulting it, so every descriptor still counted as a near road that
+        matched nothing (operator: "I don't want turning lane or mall access road to throw
+        errors if that is what the system hears").
+        """
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text("""
+                    SELECT term, term_normalized, COALESCE(metadata->>'kind', 'generic') AS kind
+                    FROM public.vocabulary
+                    WHERE category = 'xstreet_descriptor' AND is_active
+                    ORDER BY term;
+                """)).fetchall()
+                return [{"term": r[0], "normalized": r[1], "kind": r[2]} for r in res if r[0]]
+        except Exception as e:
+            logging.error(f"Error fetching xstreet descriptors: {e}", exc_info=True)
+            return []
+
     def roads_in_zone(self, grid_id: str) -> List[str]:
         """Distinct road names whose centreline crosses a response zone (punch-list #56)."""
         if not grid_id:

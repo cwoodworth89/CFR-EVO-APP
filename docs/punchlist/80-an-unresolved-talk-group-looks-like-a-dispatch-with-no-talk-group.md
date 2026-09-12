@@ -60,8 +60,13 @@ the name is a contract.
 | `test_review_flags.py` | 26 passed, including the every-flag-has-wording check |
 | **The chip on screen** | **not confirmed** — needs a call with no talk group |
 
-## Not done here
+## The map grid, on the same ruling
 
-The same `{value && …}` pattern hides the **map grid** when it is missing (31 of 629 calls),
-and `NO_MAP_GRID` is a flag for the same reason `NO_TALK_GROUP` is. Whether a missing grid
-deserves the same amber chip is the operator's call and has not been asked → backlog.
+Operator, 2026-09-11: *"Yes, do the map grid the same way."* `{gridValue && …}` hid the grid
+by exactly the same pattern on **31 of 629 calls**, and `NO_MAP_GRID` is a flag for the same
+reason `NO_TALK_GROUP` is. It now shows an amber **`Unknown map grid`** chip, and its label
+becomes *"Map grid unknown — none announced, or not transcribed"*.
+
+**26 of those 31 are also missing the talk group**, so a badly-transcribed call shows both
+chips at once. That is two unknowns stated twice, which is what has happened; the row is
+`flex-wrap` and takes it.

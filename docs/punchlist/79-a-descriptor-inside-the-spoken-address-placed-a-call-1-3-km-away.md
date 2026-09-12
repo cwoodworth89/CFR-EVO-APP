@@ -30,9 +30,28 @@ The parser carried the parenthetical through as part of the address:
 | **Off by** | **1,284 m** |
 
 There is no house number in the broadcast, so the resolver had a street name polluted with a
-descriptor and nothing else to go on. `location_type` is null, `review_flags` is null — the
+descriptor and nothing else to go on. `location_type` is null, `review_flags` is absent — the
 record predates the flag list, so **nothing on the screen said the placement was doubtful**.
 That is the §7.1 test: a plausible wrong answer a crew cannot see through.
+
+## It landed outside the zone the broadcast named
+
+Operator, 2026-09-12: *"It picked a spot outside it's emergency zone map???"* It did.
+
+| | |
+|:--|:--|
+| Grid announced | **68** |
+| Zone containing the placed point | **61** |
+| Zone containing `3000 Lougheed Hwy` | **68** ✓ |
+
+The broadcast carried the answer the whole time. The placement contradicted the dispatcher's
+own grid and nothing compared the two, because this record predates `GRID_MISMATCH`.
+
+**Today it would be caught.** `compute_review_flags` raises `GRID_MISMATCH` when the announced
+`map_grid` differs from the `derived_map_grid` of the zone the address sits in (#72): 55
+dispatches now carry a derived grid and 4 of them raised the flag. So the *silence* is fixed;
+the 1.3 km placement is not. This item is about the placement — a flag is a person's cue to
+look, not a correction.
 
 ## Why the descriptor vocabulary does not fix this
 
@@ -57,13 +76,21 @@ The last two matter: **no Coquitlam street is named anything like a descriptor t
 rule that refuses descriptor text in an address cannot collide with a real street name. That
 is what makes the operator's rule safe to enforce rather than merely plausible.
 
-## The open question, which is the operator's
+## The rule, as far as the operator will commit to it
 
-His own words: *"Maybe an intersection call, I don't know."* An intersection is announced as
-`<street> and <street>`, and whether a descriptor can legitimately occupy one side of that —
-"Barnet Highway and the mall access" — is dispatch language, not something to infer from one
-record. **That decision is what a fix depends on**, because it decides whether the rule is
-"strip the descriptor from an address" or "strip it, unless the address is an intersection".
+Operator, 2026-09-12: *"the xstreet terms/vocab should NEVER show in a main address to my
+knowledge"*, then — asked whether an intersection could be the exception — *"I don't know if a
+dispatch can come in as 'Lougheed Hwy and Turning Lane' … I feel like it could."*
+
+Recorded as a **leaning, not a ruling**, because he hedged it and the corpus cannot settle it:
+**0 of 617 dispatches** announce an intersection with a descriptor on one side. So a fix must
+be written to *allow* that shape rather than forbid descriptors outright — the cheap direction
+to be wrong in, since allowing it costs nothing today and forbidding it would silently mangle
+the first real one.
+
+What would settle it is the next such broadcast, or a look at Locution's own address grammar.
+Until then a fix should target the case that is actually evidenced: a **parenthetical** inside
+a single-street address, which is what this record is.
 
 ## Falsifier
 

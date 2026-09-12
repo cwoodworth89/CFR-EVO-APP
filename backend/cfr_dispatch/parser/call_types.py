@@ -73,6 +73,72 @@ def incident_search_text(transcript: str, units_vocabulary=None) -> str:
     return unit_token.sub(' ', transcript or "")
 
 
+# Minimum fuzz.ratio for a heard qualifier to name one. Swept 70/75/80/85/90 against all 601
+# verified calls on 2026-09-11: 70 through 85 behave identically (one call corrected, none
+# broken) and 90 fires on nothing, because the case that motivated it -- "chest payne" for
+# "Chest Pain" on DISP-2026-A7BE29 -- scores 86. 80 is the midpoint of the band that behaves
+# identically, so the value is not on an edge in either direction.
+#
+# A minimum margin over the runner-up was swept alongside it (0/5/10/15) and changed nothing
+# on any call, so there is no measurement to justify one and none is imposed. An outright tie
+# is handled instead, below.
+_QUALIFIER_MIN_RATIO = 80
+
+
+def _name_the_qualifier(matched: str, norm_transcript: str, call_types: List[str]) -> str:
+    """Having matched a call type by substring, name a qualifier heard after it -- or don't.
+
+    The exact-substring stage returns the longest candidate that appears verbatim, so a
+    misheard qualifier drops the whole clause: "medical aid chest payne" contains
+    "medical aid" and not "medical aid chest pain", and the answer came back as the bare
+    category with the fuzzy stage never reached (DISP-2026-A7BE29).
+
+    So once a category is matched, the qualifier is chosen among that category's own
+    variants -- the same partition-then-decide shape the talk group uses (parser/channels.py).
+    Scoring within the partition is what makes it safe: every sibling shares the category
+    words, so only the qualifier can separate them, and fuzz.ratio over the equivalent window
+    of what was heard is doing the one job it is reliable at. token_set_ratio must not be used
+    here -- it returns 100 whenever one token set is a subset of the other, so the bare
+    category would score a perfect match against every variant at once
+    (docs/standards/dependency-behaviour.md).
+
+    A longer qualifier scoring the same as a shorter one wins, because it accounts for more of
+    what was heard: "overdose arrest" over "overdose". An outright tie on both score and length
+    returns the bare category rather than whichever sorted first.
+
+    Returning the bare category is a real answer, not a failure: 161 of 601 verified calls
+    (26.8 %) are announced with no qualifier at all.
+
+    Measured 2026-09-11 over all 601 verified calls: 584 -> 585 correct, nothing broken.
+    """
+    cat_norm = re.sub(r'\s*-\s*', ' ', matched.lower())
+    prefix = matched.lower() + " - "
+    siblings = [t for t in call_types if t.lower().startswith(prefix)]
+    if not siblings:
+        return matched
+
+    at = norm_transcript.find(cat_norm)
+    if at < 0:
+        return matched
+    heard = norm_transcript[at + len(cat_norm):].split()
+    if not heard:
+        return matched
+
+    scored = []
+    for term in siblings:
+        qualifier = re.sub(r'\s*-\s*', ' ', term[len(matched) + 3:].lower())
+        window = " ".join(heard[:len(qualifier.split())])
+        scored.append((fuzz.ratio(qualifier, window), len(qualifier.split()), term))
+    scored.sort(key=lambda row: (-row[0], -row[1]))
+
+    best = scored[0]
+    if best[0] < _QUALIFIER_MIN_RATIO:
+        return matched
+    if len(scored) > 1 and (scored[1][0], scored[1][1]) == (best[0], best[1]):
+        return matched
+    return best[2]
+
+
 def match_incident_type(transcript: str, call_types: List[str], aliases: dict = None,
                         units_vocabulary=None) -> str:
     """Matches transcript text to incident/call types using exact substring or fuzzy matching.
@@ -103,7 +169,7 @@ def match_incident_type(transcript: str, call_types: List[str], aliases: dict = 
     for match_text, canonical in candidates:
         norm_ct = re.sub(r'\s*-\s*', ' ', match_text.lower())
         if norm_ct in norm_transcript:
-            return canonical
+            return _name_the_qualifier(canonical, norm_transcript, call_types)
 
     # 2. Look for best fuzzy match
     best_match = None

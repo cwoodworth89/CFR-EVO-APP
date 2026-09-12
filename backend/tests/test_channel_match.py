@@ -1,10 +1,15 @@
-"""The talk group is the digit, or the channel accounting for most of what was heard.
+"""The operator's cascade: the number, then "venue", then the words that remain.
 
-The eight channels share "coquitlam", and three of them share "combined". A fragment that
-names no channel by a word only that channel carries is unknown (#19a). A fragment that
-names two is decided by how much of it each accounts for, not by list order -- the defect
-behind DISP-2026-07CC85 and DISP-2026-B772D2, where Whisper inserted "response" into
-"combined venue port mann" and the venue channel lost to channel 10 for being listed first.
+The roster is a number plus "Coquitlam", or a venue. So the number decides it when there is
+one -- across 148 calls on channels 5, 6 and 7 the digit survived the STT every time -- and
+"venue" decides which half of the roster is in play when there is not. Only then do the
+remaining words choose within that half. Nothing is ever decided by list order.
+
+Note what the corpus actually says: the dispatcher announces "combined response venue port
+mann" (DISP-2026-07CC85, and the operator's verified transcript of DISP-2026-B772D2). The
+vocabulary had "Combined Venue Port Mann", missing "Response" -- the list was wrong and the
+STT was right. Whisper's real failure is the opposite one: it drops the "10" from channel 10
+on 8.5 % of those calls, and loses "coquitlam" with it on 3.9 %.
 
 Pure: the real channel list, no database.
 """
@@ -16,13 +21,13 @@ from cfr_dispatch.parser.channels import match_radio_channel  # noqa: E402
 
 # The vocabulary terms verbatim, in an order that is not the vocabulary's -- nothing here
 # may depend on where a channel sits in the list.
-CHANNELS = ["Combined Venue Port Mann", "Combined Venue Transit System",
+CHANNELS = ["Combined Response Venue Port Mann", "Combined Response Venue Transit System",
             "10 Combined Response Coquitlam", "5 Coquitlam", "6 Coquitlam",
             "7 Coquitlam", "8 Coquitlam", "9 Coquitlam"]
 
 VOCAB_ORDER = ["5 Coquitlam", "6 Coquitlam", "7 Coquitlam", "8 Coquitlam", "9 Coquitlam",
-               "10 Combined Response Coquitlam", "Combined Venue Port Mann",
-               "Combined Venue Transit System"]
+               "10 Combined Response Coquitlam", "Combined Response Venue Port Mann",
+               "Combined Response Venue Transit System"]
 
 
 def test_the_digit_names_the_channel():
@@ -31,21 +36,44 @@ def test_the_digit_names_the_channel():
     assert match_radio_channel("6 coquitlam", CHANNELS) == "6 Coquitlam"
 
 
-def test_combined_response_alone_is_still_channel_10():
-    # The digit was lost but the phrase belongs to one channel only.
+def test_the_digit_is_dropped_but_coquitlam_still_names_channel_10():
+    """Whisper loses the "10" on ~9 % of channel-10 calls; "coquitlam" carries it.
+
+    Three words to Port Mann's two. This is why the unique-word gate had to go: with the
+    corrected venue names, channel 10 owns no word but its digit.
+    """
+    assert match_radio_channel("combined response coquitlam", CHANNELS) == "10 Combined Response Coquitlam"
+
+
+def test_bare_combined_response_is_channel_10():
+    """Operator ruling 2026-09-11 (#79), on the measurement: 17 of 436 channel-10 calls
+    (3.9 %) degrade this far and all 17 verify to channel 10.
+
+    It falls out of the cascade rather than being special-cased: no "venue" rules the venue
+    channels out, and no numbered channel carries these words. The risk the operator accepted
+    is that a Port Mann call losing all three of "venue port mann" would land here -- "venue"
+    survived in both Port Mann calls on record, which is two calls.
+    """
     assert match_radio_channel("combined response", CHANNELS) == "10 Combined Response Coquitlam"
 
 
-def test_a_venue_is_named_by_its_own_words():
-    assert match_radio_channel("combined venue port mann", CHANNELS) == "Combined Venue Port Mann"
-    assert match_radio_channel("combined venue transit system", CHANNELS) == "Combined Venue Transit System"
-
-
-def test_shared_words_alone_name_nothing():
-    # "coquitlam" is in six channels; "combined venue" in two. Neither picks one.
+def test_coquitlam_alone_still_names_nothing():
+    # Six channels carry it and the digit that separates them is gone.
     assert match_radio_channel("coquitlam", CHANNELS) is None
+
+
+def test_a_venue_is_named_by_its_own_words():
+    assert match_radio_channel("combined response venue port mann", CHANNELS) == "Combined Response Venue Port Mann"
+    assert match_radio_channel("combined response venue transit system", CHANNELS) == "Combined Response Venue Transit System"
+    # And still when the STT drops "response" rather than the digit.
+    assert match_radio_channel("combined venue port mann", CHANNELS) == "Combined Response Venue Port Mann"
+    assert match_radio_channel("combined venue transit system", CHANNELS) == "Combined Response Venue Transit System"
+
+
+def test_a_venue_word_with_no_venue_named_is_unknown():
+    # "venue" narrows to the two venue channels and then nothing chooses between them.
     assert match_radio_channel("combined venue", CHANNELS) is None
-    assert match_radio_channel("combined", CHANNELS) is None
+    assert match_radio_channel("combined response venue", CHANNELS) is None
 
 
 def test_a_misheard_digit_is_unknown_not_a_guess():
@@ -54,9 +82,16 @@ def test_a_misheard_digit_is_unknown_not_a_guess():
     assert match_radio_channel("talk group fine", CHANNELS) is None
 
 
-def test_a_digit_that_is_not_a_channel_is_unknown():
+def test_a_digit_no_channel_carries_falls_through_to_the_words():
+    """"12" is a misread, not an answer -- but it is not a reason to abandon the fragment.
+
+    The extractor can also over-run into the map grid, putting a stray number in front of a
+    perfectly readable channel name (backlog, 2026-09-11).
+    """
     assert match_radio_channel("12", CHANNELS) is None
     assert match_radio_channel("", CHANNELS) is None
+    assert match_radio_channel("12 combined response venue port mann", CHANNELS) == "Combined Response Venue Port Mann"
+    assert match_radio_channel("combined response coquitlam map grid 68", CHANNELS) == "10 Combined Response Coquitlam"
 
 
 def test_two_channel_digits_in_one_fragment_is_unknown():
@@ -64,25 +99,34 @@ def test_two_channel_digits_in_one_fragment_is_unknown():
     assert match_radio_channel("5 10 combined", CHANNELS) is None
 
 
-def test_an_inserted_word_does_not_outrank_the_channel_actually_named():
-    """DISP-2026-07CC85 / DISP-2026-B772D2.
+def test_the_venue_channel_outranks_channel_10_on_the_words_they_share():
+    """DISP-2026-07CC85 / DISP-2026-B772D2, exactly as broadcast.
 
-    Whisper put "response" into "combined venue port mann". That word belongs to channel 10
-    and to nothing else, so both channels are in contention -- but the fragment carries three
-    of Port Mann's words and one of channel 10's. Port Mann is the answer in either spelling
-    of "mann", and in either list order.
+    "combined response" belongs to both, so the venue words decide it: five words to two.
+    Correct in either spelling of "mann" -- Whisper wrote "man" on 07CC85 -- and in any list
+    order, which is what the old rule got wrong.
     """
     for channels in (CHANNELS, VOCAB_ORDER, list(reversed(VOCAB_ORDER))):
-        assert match_radio_channel("combined response venue port man", channels) == "Combined Venue Port Mann"
-        assert match_radio_channel("combined response venue port mann", channels) == "Combined Venue Port Mann"
+        assert match_radio_channel("combined response venue port man", channels) == "Combined Response Venue Port Mann"
+        assert match_radio_channel("combined response venue port mann", channels) == "Combined Response Venue Port Mann"
 
 
 def test_list_order_decides_nothing():
     import itertools
-    fragments = ["10 combined response", "combined response", "combined venue port mann",
-                 "combined venue transit system", "combined response venue port man",
-                 "5", "coquitlam", "fine"]
+    fragments = ["10 combined response", "combined response", "combined response coquitlam",
+                 "combined venue port mann", "combined response venue transit system",
+                 "combined response venue port man", "5", "coquitlam", "fine",
+                 "combined venue", "12 combined response venue port mann"]
     for frag in fragments:
         answers = {match_radio_channel(frag, list(perm))
                    for perm in itertools.islice(itertools.permutations(VOCAB_ORDER), 200)}
         assert len(answers) == 1, f"{frag!r} depends on list order: {answers}"
+
+
+def test_a_new_venue_channel_needs_no_code():
+    """Adding a channel to public.vocabulary is enough -- step 2 finds it by "venue" and
+    step 3 by its own words. The operator flagged Skytrain as a name still to verify."""
+    extended = CHANNELS + ["Combined Response Venue Skytrain"]
+    assert match_radio_channel("combined response venue skytrain", extended) == "Combined Response Venue Skytrain"
+    assert match_radio_channel("combined response venue port mann", extended) == "Combined Response Venue Port Mann"
+    assert match_radio_channel("combined response", extended) == "10 Combined Response Coquitlam"

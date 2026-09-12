@@ -15,14 +15,15 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**7 open** (4 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**8 open** (5 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 7
+## Open — 8
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **79** | 🔴 crew-visible | FIXED in the tree, migration not yet applied | [A venue talk group loses to channel 10 on list order, and no stored channel is a vocabulary term](punchlist/79-a-venue-talk-group-loses-to-channel-10-on-list-order.md) |
 | **77** | 🔴 crew-visible | FIXED `ec34d27`, awaiting kiosk restart | [An arrival point is saved to one parcel row and read from another](punchlist/77-an-arrival-point-is-saved-to-one-parcel-row-and-read-from-another.md) |
 | **78** | 🔴 crew-visible | FIXED in the tree, not yet deployed | [Saving a Street View overwrites the parcel's computed frontage](punchlist/78-saving-a-street-view-overwrites-the-parcels-computed-frontage.md) |
 | **76** | 🔴 crew-visible | OPEN | [A dispatched block lands on one civic number at the block's end, and the route U-turns past it](punchlist/76-a-dispatched-block-lands-on-one-civic-number-the-route-u-turns.md) |

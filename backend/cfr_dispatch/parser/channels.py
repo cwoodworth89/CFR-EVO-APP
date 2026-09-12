@@ -11,63 +11,67 @@ def _tokens(text: str) -> List[str]:
 def match_radio_channel(talk_group_raw: str, radio_channels: List[str]) -> Optional[str]:
     """The channel named by what was heard after "talk group", or None.
 
-    A channel is named by its digit ("5", "10"), or by words only it carries ("response"
-    for 10 Combined Response Coquitlam, "port"/"mann" for the Port Mann venue). Words the
-    channels share -- "coquitlam", "combined", "venue" -- name nothing on their own, but
-    they do break ties once a channel is in contention.
+    A digit settles it outright. Otherwise the channel accounting for the most of what was
+    heard wins, and a tie is None -- no channel is named by being earlier in the list, and
+    none is named by a margin it does not have.
 
-    Two order-dependencies have been removed here. Until 2026-09-06 (#19a) a fragment with
-    no digit fell through to token_set_ratio over the shared words, which scores a subset at
-    100 (docs/standards/dependency-behaviour.md) and returned whichever channel came first
-    in the list. That stage was replaced by a uniquely-owned-word test which still returned
-    the first channel in list order when more than one qualified -- so "combined response
-    venue port man" (DISP-2026-07CC85: Whisper inserted "response" into "combined venue port
-    mann") matched Combined Venue Port Mann on three words and 10 Combined Response Coquitlam
-    on one, and channel 10 won for being sixth in the list rather than seventh.
+    Two earlier rules failed the same way, each replaced after the next call exposed it:
 
-    So a qualifying channel is now scored by how much of what was heard it accounts for, and
-    a tie is None. Measured 2026-09-11 by replaying all 624 stored raw transcripts through
-    the parser and diffing both rules over the 1029 fragments that reached this function:
-    1026 identical, 3 changed, all 3 the Port Mann defect above. No fragment the first-in-list
-    rule got right is decided differently.
+      * until 2026-09-06 (#19a) a fragment with no digit fell to token_set_ratio over the
+        words the channels share, which scores a subset at 100
+        (docs/standards/dependency-behaviour.md) and returned the first channel in the list;
+      * until 2026-09-11 (#79) a channel had to be named by a word no other channel carried,
+        and among those that qualified the first in the list won. "combined response venue
+        port man" named two and channel 10 took it for being listed sixth rather than
+        seventh (DISP-2026-07CC85, DISP-2026-B772D2).
 
-    None is not a fallback -- the pipeline shows it as NO_TALK_GROUP, an unknown rather than
-    a guess (CLAUDE.md 6.1). The return value is the vocabulary term verbatim, which is also
-    the spoken form, so nothing downstream has to rewrite it.
+    The unique-word gate is gone with it, because the corrected channel names break it:
+    "Combined Response Venue Port Mann" and "10 Combined Response Coquitlam" share
+    "combined" and "response", so channel 10 has no distinguishing word left that is not its
+    digit -- and Whisper drops that digit on about 9 % of channel-10 calls (39 of 434,
+    confirmed against the operator's own verified transcripts). Under a gate those calls
+    resolve to nothing. Under plain overlap "combined response coquitlam" still names
+    channel 10, on three words to Port Mann's two.
+
+    What overlap cannot separate, it does not pretend to: a fragment degraded to bare
+    "combined response" matches both channels equally and returns None. That is the
+    operator's ruling of 2026-09-11 -- 10 calls of 584 -- taken over a frequency tiebreak,
+    because channel 10 being 460 calls to Port Mann's 2 is not evidence about the call in
+    hand (CLAUDE.md 6.1).
+
+    None here means *unresolved*, not *no channel*. A dispatch with no talk group is a valid
+    form of dispatch (operator, 2026-09-11) and 39 calls in the corpus carry no talk-group
+    clause at all, against 12 that carry one this function could not read. The pipeline does
+    not yet tell those apart -- both raise NO_TALK_GROUP and the kiosk hides the field either
+    way, so a crew cannot see that a channel was announced and lost. Punch list #80.
+
+    Measured 2026-09-11 by replaying all 624 stored raw transcripts through the parser and
+    diffing per call: 572 of 584 unchanged, 2 corrected to Port Mann, 10 to NO_TALK_GROUP.
+    tools/oneshot/2026-09-11_replay_channel_match.py.
+
+    The return value is the vocabulary term verbatim, which is also the spoken form.
     """
     raw_tokens = _tokens(talk_group_raw)
     if not raw_tokens:
         return None
     raw_set = set(raw_tokens)
 
-    channel_tokens = {ch: _tokens(ch) for ch in radio_channels}
+    channel_tokens = {ch: set(_tokens(ch)) for ch in radio_channels}
 
     # 1. A digit names the channel that carries it as a whole word. A digit no channel
     #    carries ("12") is a misread, not an invitation to match on the other words; two
     #    channels' digits in one fragment is ambiguity, not a reason to take the earlier one.
     raw_digits = {t for t in raw_tokens if t.isdigit()}
     if raw_digits:
-        named = [ch for ch, toks in channel_tokens.items() if raw_digits & set(toks)]
+        named = [ch for ch, toks in channel_tokens.items() if raw_digits & toks]
         return named[0] if len(named) == 1 else None
 
-    # 2. No digit: a channel is in contention only if the fragment carries a word that no
-    #    other channel has. Among those, the one accounting for the most of what was heard
-    #    wins -- shared words ("combined", "venue") are the tiebreak they are good for. An
-    #    outright tie is unknown.
-    owner_count = {}
-    for toks in channel_tokens.values():
-        for t in set(toks):
-            owner_count[t] = owner_count.get(t, 0) + 1
-
-    contenders = []
-    for channel, toks in channel_tokens.items():
-        unique = {t for t in toks if owner_count.get(t) == 1 and not t.isdigit()}
-        if unique & raw_set:
-            contenders.append((len(set(toks) & raw_set), channel))
-    if not contenders:
+    # 2. No digit: the channel whose name accounts for most of what was heard, and only if
+    #    it does so outright. Nothing in common is unknown; an equal split is unknown too.
+    scored = sorted(((len(toks & raw_set), ch) for ch, toks in channel_tokens.items()),
+                    key=lambda pair: (-pair[0], pair[1]))
+    if scored[0][0] == 0:
         return None
-
-    contenders.sort(key=lambda pair: (-pair[0], pair[1]))
-    if len(contenders) > 1 and contenders[0][0] == contenders[1][0]:
+    if len(scored) > 1 and scored[0][0] == scored[1][0]:
         return None
-    return contenders[0][1]
+    return scored[0][1]

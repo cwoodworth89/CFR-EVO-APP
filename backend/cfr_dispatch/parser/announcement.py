@@ -19,7 +19,7 @@ from cfr_dispatch.config import (
 
 from .sanitize import sanitize_transcript
 from .call_types import CALL_TYPES, match_incident_type
-from .channels import match_radio_channel, clean_channel_name_for_output
+from .channels import match_radio_channel
 from .location import (
     normalize_street_suffix,
     clean_location_text,
@@ -137,9 +137,12 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 if map_grid_match:
                     talk_group_end = min(talk_group_end, map_grid_match.start())
                 talk_group_raw = remainder[talk_group_start:talk_group_end].strip()
-                matched_chan = match_radio_channel(talk_group_raw, RADIO_CHANNELS)
-                if matched_chan:
-                    talk_group_str = clean_channel_name_for_output(matched_chan)
+                # The vocabulary term verbatim. It used to be run through
+                # clean_channel_name_for_output, which stripped "Talk Group"/"Coquitlam" and
+                # stored a string that was in no vocabulary -- 575 of 576 stored channels did
+                # not match the list the operator picks from, so the HITL dropdown appended
+                # every one as a stray extra option (2026-09-11).
+                talk_group_str = match_radio_channel(talk_group_raw, RADIO_CHANNELS)
                     
             # Extract Map Grid
             map_grid_str = None
@@ -285,9 +288,7 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
     tg_match = talk_group_pattern.search(text)
     fallback_tg_str = None
     if tg_match:
-        matched_chan = match_radio_channel(tg_match.group(1), RADIO_CHANNELS)
-        if matched_chan:
-            fallback_tg_str = clean_channel_name_for_output(matched_chan)
+        fallback_tg_str = match_radio_channel(tg_match.group(1), RADIO_CHANNELS)
             
     for dispatch in found_dispatches:
         dispatch.units = units_str
@@ -418,20 +419,14 @@ def reconstruct_template_transcript(dispatch: DispatchData) -> str:
         address_part = "address"
         intersection_part = ""
         
-    # 6. Radio Channel (Map digital channels back to the full verbal name)
+    # 6. Radio Channel. The vocabulary term is the spoken form, so it is read back verbatim.
+    # The branch this replaced rewrote any channel whose name contained "combined" as
+    # "use talk group 10 combined response coquitlam" -- which made a Combined Venue Port
+    # Mann call score against words the dispatcher never said. That is punch-list #31
+    # again, in the same function it is documented in (2026-09-11).
     channel_part = None
     if dispatch.radio_channel:
-        chan = dispatch.radio_channel.strip()
-        if chan == "10" or "combined" in chan.lower():
-            channel_part = "use talk group 10 combined response coquitlam"
-        else:
-            chan_lower = chan.lower()
-            if "talk group" in chan_lower:
-                channel_part = chan_lower
-            else:
-                channel_part = f"use talk group {chan_lower}"
-            if not channel_part.endswith("coquitlam"):
-                channel_part = f"{channel_part} coquitlam"
+        channel_part = f"use talk group {dispatch.radio_channel.strip().lower()}"
             
     # 7. Map Grid
     grid_part = f"map grid {dispatch.map_grid}" if dispatch.map_grid else None

@@ -2,10 +2,10 @@
 
 | | |
 |:--|:--|
-| **Status** | Matcher + canonical names FIXED and deployed (`1616c01`, agent restarted 2026-09-11 17:25). Venue-name correction FIXED in the tree, migration `2026-09-11b` pending. |
+| **Status** | FIXED in the tree; migrations `2026-09-11` and `2026-09-11b` both applied. **The running agent is still on the earlier matcher** — the operator holds the restart. |
 | **Severity** | 🔴 crew-visible |
 | **Area** | 🎙️ Parser / talk group · 🗄️ Vocabulary · 🖥️ HITL review |
-| **Ruling** | Operator, 2026-09-11: (a) `Talk Group` is not part of a channel's name — canonical is `5 Coquitlam`, `10 Combined Response Coquitlam`; (b) from the audio, the venue channels are **`Combined Response Venue Port Mann`** and `Combined Response Venue Transit System`; (c) a fragment degraded to bare `combined response` is unresolved, not a frequency guess — and *unresolved* is not *no talk group*, which is a valid dispatch (→ #80). The list holds the channels that matter and is knowingly not the full roster. |
+| **Ruling** | Operator, 2026-09-11: (a) `Talk Group` is not part of a channel's name — canonical is `5 Coquitlam`, `10 Combined Response Coquitlam`; (b) from the audio, the venue channels are **`Combined Response Venue Port Mann`** and `Combined Response Venue Transit System`; (c) the matcher is a cascade, not a score — *"looking for a number first and foremost with a following coquitlam... Then if no number, or unsure, check if it says venue"*; (d) a fragment degraded to bare `combined response` resolves to channel 10. *Unresolved* is not *no talk group*, which is a valid dispatch (→ #80). The list holds the channels that matter and is knowingly not the full roster. |
 | **Origin** | Operator, 2026-09-11, on `DISP-2026-07CC85`: *"The talk group was wrong... It missed Combined Venue Port Mann, and defaulted to combined response coquitlam. STT problem or something else?"* — then, decisively: *"I just listened to the audio again, and this is the exact wording."* |
 
 [← punch list index](../debug_and_qa_punchlist.md)
@@ -58,7 +58,7 @@ The transit channel is renamed on the same ruling, by pattern. **No call in the 
 ever used it**, so that rename rests on the operator's knowledge of the roster, not on a
 measurement. Recorded as such rather than presented as verified.
 
-### 2. Whisper drops the "10" from channel 10 on ~9 % of calls
+### 2. Whisper drops the "10" from channel 10 on 8.5 % of calls
 
 Measured 2026-09-11, and the reason the fix in fault 3 has the shape it does:
 
@@ -88,26 +88,49 @@ moving Port Mann to the front, which flips the answer with the input unchanged. 
 **same defect class #19a was closing**: that fix removed a `token_set_ratio` stage whose
 failure was order dependence and left an order dependence one stage earlier.
 
-**Fix, in two steps.** `1616c01` scored only the channels named by a word of their own. The
-corrected names then broke that gate — `Combined Response Venue Port Mann` and `10 Combined
+**Fix, in three attempts.** `1616c01` scored only the channels named by a word of their own.
+The corrected names then broke that gate — `Combined Response Venue Port Mann` and `10 Combined
 Response Coquitlam` share `combined` and `response`, so channel 10 has no distinguishing word
-left but its digit, and fault 2 says that digit is missing 9 % of the time. So the gate is
-gone: every channel is scored on plain word overlap and the winner must win outright.
-`combined response coquitlam` still names channel 10, three words to Port Mann's two.
+left but its digit, and fault 2 says that digit is missing 8.5 % of the time. Plain word
+overlap across the whole roster replaced it, and got the right answers by arithmetic while
+dropping 10 correct channels to unresolved.
 
-**What overlap cannot separate, it does not pretend to.** Degraded to bare `combined
-response`, a fragment names both channels equally → `None`. Operator ruling: unresolved, not
-a frequency tiebreak, because channel 10 outnumbering Port Mann 460 to 2 is not evidence about
-the call in hand (§6.1). **Unresolved is not "no talk group"** — a dispatch with no channel is
-a valid dispatch, and the pipeline does not yet distinguish the two → #80.
+**The operator replaced it with a cascade**, which is both better and checkable:
 
-**Measured before each change (§7.6)** — all 624 stored `raw_transcript`s replayed through the
-parser on the kiosk, rules diffed over the 1029 fragments that reach the function:
+> *"If I were looking to differentiate the two, I would be looking for a number first and
+> foremost with a following coquitlam... Then if no number, or unsure, check if it says venue.
+> If it says venue look for Port Mann, or Transit System."*
 
-| | fragments | per call (584) |
-|:--|--:|--:|
-| first-in-list → overlap, old names | 1026 same / 3 changed | — |
-| deployed → overlap + corrected names | 1015 same / 14 changed | 572 same · **2 corrected to Port Mann** · **10 unresolved** |
+| Step | Why it holds |
+|:--|:--|
+| **1. The number** | Every Coquitlam channel is announced with one, and across **148 calls on channels 5, 6 and 7 the digit survived the STT every single time**. A digit no channel carries falls through to the words rather than abandoning the fragment; two channels' digits at once is a contradiction and returns `None`. |
+| **2. `venue`** | It appears in the venue channels **and nowhere else in the domain** — verified (§7.3a) as 0 of `road_names`, 0 of `parcels.street`, 0 of every other vocabulary category, and 2 of 624 raw transcripts, both of them the Port Mann calls. "Avenue" is a single token and does not collide. Heard, it restricts the answer to the venue channels; absent, it rules them out. **This is the step that was missing** — a venue channel used to have to outscore channel 10 across the whole roster, and lost. |
+| **3. What is left** | Within whichever half step 2 chose: `port mann` against `transit system`, or `combined response coquitlam` against the bare numbered channels. A tie is `None`. |
+
+**Bare `combined response` resolves to channel 10** — operator ruling, and it falls out of the
+cascade rather than being special-cased: no `venue` excludes the venue channels, and no
+numbered channel carries those words. Taken on the measurement that it happens on **17 of 436
+channel-10 calls (3.9 %)**, that all 17 verify to channel 10, and that `venue` survived in both
+Port Mann calls on record. **The residual risk is recorded, not hidden:** two calls is thin
+evidence, and if a Port Mann call ever loses all three of `venue port mann` a crew goes to a
+bridge incident on the wrong net and cannot tell. The ruling was made knowing that.
+
+**Measured against the operator's verified transcripts (§7.6)** — 587 calls replayed through
+the parser on the kiosk:
+
+| | with ground truth | correct | wrong | unresolved |
+|:--|--:|--:|--:|--:|
+| **cascade (shipped)** | 537 | **536** | **0** | 1 |
+
+All **14** calls that differ from the stored value are improvements: 11 had no channel and now
+get the right one, **2 were on the wrong channel** (`DISP-2026-90674A` filed as 5 Coquitlam,
+`DISP-2026-F24935` as 6 Coquitlam), and `DISP-2026-07CC85` moves to Port Mann. Nothing
+regressed. The one unresolved call is `DISP-2026-747823`, where the STT lost the talk-group
+clause entirely — there is nothing in the fragment to match.
+
+Adding a channel needs no code: a new venue is found by step 2 and named by step 3 from
+`public.vocabulary` alone. **Skytrain**, which the operator flagged as a name still to verify,
+is covered by a test and deliberately not added to the list.
 
 Script: [`tools/oneshot/2026-09-11_replay_channel_match.py`](../../tools/oneshot/2026-09-11_replay_channel_match.py).
 
@@ -148,9 +171,10 @@ canonical terms the branch collapses to `use talk group {term}`.
   — `combined venue port moody` returns Combined Response Venue Port Mann. Not a regression:
   the pre-#79 rule does the same. Only the list can close it → backlog.
 * **Why Whisper drops the "10"** — measured, unexplained, not guessed → backlog.
-* The 10 calls whose channel is now unresolved keep their stored channel 10. Those rows record
-  what the system produced; re-deciding a stored dispatch is a re-parse, not a
-  canonicalisation (§6.6).
+* **Stored channels are not re-decided.** 14 historical calls would parse differently under
+  the cascade, 2 of them off a wrong channel. Those rows record what the system produced at
+  the time; rewriting them is a re-parse, not a canonicalisation (§6.6). The operator can
+  correct any of them in review.
 * `DISP-2026-07CC85` also parsed its address as `4453 Port Man Bridge`, which is not a civic
   address → backlog.
 * The fallback talk-group regex is bounded by `map grid` **or end of text**, so a transcript

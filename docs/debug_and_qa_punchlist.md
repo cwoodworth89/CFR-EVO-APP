@@ -24,7 +24,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **80** | 🔴 crew-visible | OPEN (measured, wording is the operator's) | [An unresolved talk group looks exactly like a dispatch with no talk group](punchlist/80-an-unresolved-talk-group-looks-like-a-dispatch-with-no-talk-group.md) |
-| **79** | 🔴 crew-visible | Matcher FIXED + deployed `1616c01`; venue-name correction pending migration `2026-09-11b` | [A venue talk group loses to channel 10, and the venue's name in the vocabulary was wrong](punchlist/79-a-venue-talk-group-loses-to-channel-10-on-list-order.md) |
+| **79** | 🔴 crew-visible | FIXED, migrations applied; awaiting agent restart | [A venue talk group loses to channel 10, and the venue's name in the vocabulary was wrong](punchlist/79-a-venue-talk-group-loses-to-channel-10-on-list-order.md) |
 | **77** | 🔴 crew-visible | FIXED `ec34d27`, awaiting kiosk restart | [An arrival point is saved to one parcel row and read from another](punchlist/77-an-arrival-point-is-saved-to-one-parcel-row-and-read-from-another.md) |
 | **78** | 🔴 crew-visible | CLOSED — confirmed on the running system | [Saving a Street View overwrites the parcel's computed frontage](punchlist/78-saving-a-street-view-overwrites-the-parcels-computed-frontage.md) |
 | **76** | 🔴 crew-visible | OPEN | [A dispatched block lands on one civic number at the block's end, and the route U-turns past it](punchlist/76-a-dispatched-block-lands-on-one-civic-number-the-route-u-turns.md) |

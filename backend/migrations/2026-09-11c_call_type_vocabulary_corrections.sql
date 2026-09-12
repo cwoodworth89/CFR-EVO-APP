@@ -10,9 +10,11 @@
 --    phrasing the Locution dispatcher actually reads, so terms are added as verified calls
 --    reveal them.
 --
--- 2. `Wildland Fire - Smoldering` (US spelling) is removed. It was never in the live database
---    -- only in the seed -- but it would come back on any fresh import. **No alias replaces
---    it** (operator ruling: "No alias, I'll do better next time to get it right").
+-- 2. `Wildland Fire - Smoldering` (US spelling) is removed. It was in the table with
+--    is_active = FALSE -- deactivated at some point rather than deleted, which is why it did
+--    not show up in an is_active query and why this note first said it was absent. The seed
+--    would also have recreated it on a fresh import. **No alias replaces it** (operator
+--    ruling: "No alias, I'll do better next time to get it right").
 --
 --    Checked before removing it, because Whisper writes American English (punch-list #43) and
 --    losing a recognition spelling could have cost real calls: of the 8 raw transcripts that

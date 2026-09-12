@@ -1,10 +1,47 @@
 # cfr_dispatch/parser/location.py
-# Street suffix normalisation, location text cleaning, subaddress extraction,
-# and fuzzy street correction against the known-streets vocabulary.
+# Street suffix normalisation, location text cleaning, and subaddress extraction.
+#
+# Street names are NOT corrected here. fuzzy_correct_street, fuzzy_correct_x_streets,
+# split_street_base_suffix and _same_suffix were removed on 2026-09-11: punch-list #56
+# moved cross streets onto the address's own resolution path on 2026-09-05 (89e25d4) --
+# resolved against the roads near the placed address, and reported rather than rewritten
+# -- and left these behind with no caller.
+#
+# They are not worth reviving. The threshold they ran on could not work: measured over
+# the 1,079 municipal street names, 938 of them (86.9 %) have a DIFFERENT real Coquitlam
+# street scoring >= 75 on fuzz.ratio, so accepting the best match above 75 separates
+# almost nothing. Resolution belongs against PostGIS, which is the authority for what
+# streets exist and where (CLAUDE.md 6.2).
 
 import regex as re
 from typing import List, Tuple, Optional
-from thefuzz import fuzz
+
+# Suffix equivalences: the one list the parser folds street types against, so "glen pine crt",
+# "Glen Pine Crt" and "Glen Pine Court" all compare equal. Read by clean_location_text,
+# _street_key and extract_subaddress_info -- it used to sit at the bottom of the file, below
+# its own callers, next to the fuzzy matcher deleted on 2026-09-11.
+#
+# PROVENANCE (CLAUDE.md 6.3): canonical forms come from `public.roads.roadtype` via the
+# street_suffix vocabulary (docs/standards/README.md, "Street suffix canonical forms"). This
+# map only decides equality -- it never renames anything, and it is not the source of the
+# canonical spelling.
+_SUFFIX_EQUIV = {
+    "street": "st", "st": "st",
+    "avenue": "ave", "ave": "ave",
+    "drive": "dr", "dr": "dr",
+    "road": "rd", "rd": "rd",
+    "crescent": "cres", "cres": "cres",
+    "boulevard": "blvd", "blvd": "blvd",
+    "place": "pl", "pl": "pl",
+    "court": "crt", "crt": "crt", "ct": "crt",
+    "highway": "hwy", "hwy": "hwy",
+    "lane": "ln", "ln": "ln",
+    "way": "way", "wy": "way",
+    "close": "cl", "cl": "cl",
+    "gate": "gt", "gt": "gt",
+    "drv": "dr",          # accepted by the old extractor regex; kept so nothing regresses
+}
+
 
 def normalize_street_suffix(text: str) -> str:
     """Normalizes and capitalizes street type suffixes to standardized casings (e.g., Crescent -> Cres)."""
@@ -256,106 +293,3 @@ def extract_subaddress_info(address_text: str,
             return cleaned_addr, sub_val.title()
 
     return address_text, None
-
-def split_street_base_suffix(street_text: str) -> Tuple[str, str]:
-    """Splits a street name (e.g. 'Austin Ave') into ('Austin', 'Ave')."""
-    words = street_text.strip().split()
-    if not words:
-        return "", ""
-    # One suffix list, not a third hand-typed copy (this one lacked "crt" too).
-    if len(words) >= 2 and words[-1].lower() in _SUFFIX_EQUIV:
-        return " ".join(words[:-1]), words[-1]
-    return street_text, ""
-
-# Suffix equivalences, for deciding whether an announced suffix agrees with a municipal
-# one. Canonical forms come from `public.roads.roadtype` via the street_suffix vocabulary
-# (docs/standards/README.md, "Street suffix canonical forms") -- this map only decides
-# equality, it never renames anything.
-_SUFFIX_EQUIV = {
-    "street": "st", "st": "st",
-    "avenue": "ave", "ave": "ave",
-    "drive": "dr", "dr": "dr",
-    "road": "rd", "rd": "rd",
-    "crescent": "cres", "cres": "cres",
-    "boulevard": "blvd", "blvd": "blvd",
-    "place": "pl", "pl": "pl",
-    "court": "crt", "crt": "crt", "ct": "crt",
-    "highway": "hwy", "hwy": "hwy",
-    "lane": "ln", "ln": "ln",
-    "way": "way", "wy": "way",
-    "close": "cl", "cl": "cl",
-    "gate": "gt", "gt": "gt",
-    "drv": "dr",          # accepted by the old extractor regex; kept so nothing regresses
-}
-
-
-def _same_suffix(a: str, b: str) -> bool:
-    a, b = (a or "").strip().lower(), (b or "").strip().lower()
-    if not a or not b:
-        return False
-    return _SUFFIX_EQUIV.get(a, a) == _SUFFIX_EQUIV.get(b, b)
-
-
-def fuzzy_correct_street(street_name: str, known_streets: List[str]) -> str:
-    """Fuzzy corrects a single street name against the known Coquitlam street names.
-
-    `known_streets` holds FULL municipal names ("Christmas Way", "King Edward Street"),
-    not bare bases -- the docstring used to say "base street names" and the code trusted
-    that (CLAUDE.md §7.3a: the name is not the contract). It split the announced name into
-    base + suffix, scored the **base** against those **full** names, and then re-appended
-    the caller's suffix to the winner. So "Christmas Way" resolved to "Christmas Way Way"
-    and "King Edward Street" to "King Edward Street Street" -- 10 of the 23 unmatched
-    cross streets in the corpus were this, all of them real streets (punch-list #56).
-
-    Now scores base against base and returns the **municipal** name, so the suffix comes
-    from the authoritative record rather than from the transcript.
-    """
-    if not street_name or not known_streets:
-        return street_name
-    base, suffix = split_street_base_suffix(street_name)
-    clean_base = base.strip().lower()
-    clean_base = re.sub(r'^(?:near|at)\s+', '', clean_base, flags=re.IGNORECASE).strip()
-    if not clean_base:
-        return street_name
-
-    # Short street names collide easily under fuzzy matching (e.g. "Oak" vs "Oaks"),
-    # so they demand a stricter score.
-    # PROVENANCE REQUIRED (CLAUDE.md §6.3): 90/75 and the 4-character boundary are
-    # inherited and uncited. Failing the threshold returns the street name unchanged,
-    # so a miss degrades to raw text rather than a wrong street.
-    #
-    # NOTE: 938 of the 1,079 real street names have a DIFFERENT real Coquitlam street
-    # scoring >= 75, so this threshold separates almost nothing. Replacing this whole
-    # function with the resolution path the main address already uses is punch-list #56;
-    # this fix is the suffix bug only, and does not make the threshold safe.
-    threshold = 90 if len(clean_base) <= 4 else 75
-
-    best_match = None
-    best_key = (-1, -1)
-    for ks in known_streets:
-        ks_base, ks_suffix = split_street_base_suffix(ks)
-        score = fuzz.ratio(clean_base, ks_base.strip().lower())
-        # Suffix agreement breaks ties, so "Pinetree Way" cannot be answered with
-        # "Pinetree Close" -- both bases score 100 and the order of the vocabulary
-        # would otherwise decide.
-        key = (score, 1 if _same_suffix(suffix, ks_suffix) else 0)
-        if key > best_key:
-            best_key = key
-            best_match = ks
-    if best_key[0] >= threshold:
-        # Municipal names are stored expanded ("Austin Avenue"); the parser's house form
-        # is abbreviated ("Austin Ave"), and callers normalise before this runs rather
-        # than after. Normalising the winner keeps the output shape exactly as it was, so
-        # this change fixes the doubling and alters nothing else downstream.
-        return normalize_street_suffix(best_match)
-    return street_name
-
-def fuzzy_correct_x_streets(x_streets_text: str, known_streets: List[str]) -> str:
-    """Corrects misspelled street names inside cross road intersections."""
-    if not x_streets_text or not known_streets:
-        return x_streets_text
-    parts = re.split(r'\s+(?:and|at|&)\s+', x_streets_text, flags=re.IGNORECASE)
-    corrected_parts = []
-    for part in parts:
-        corrected_parts.append(fuzzy_correct_street(part, known_streets))
-    return " and ".join(corrected_parts)

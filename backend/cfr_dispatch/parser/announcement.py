@@ -24,7 +24,6 @@ from .location import (
     normalize_street_suffix,
     clean_location_text,
     extract_subaddress_info,
-    fuzzy_correct_x_streets,
 )
 
 def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) -> List[DispatchData]:
@@ -121,10 +120,11 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 x_streets_raw = remainder[x_streets_start:x_streets_end].strip()
                 x_streets_clean = clean_location_text(x_streets_raw, CALL_TYPES, units_vocab)
                 # What was heard, suffix-normalised and nothing more. The city-wide fuzzy
-                # rewrite that used to run here (fuzzy_correct_x_streets, threshold 75) could
-                # swap one real street for another on 87 % of the city's names; the near roads
-                # are now resolved against the roads near the placed address, in the payload
-                # builder, and a substitution is flagged (punch-list #56, 2026-09-05).
+                # rewrite that used to run here could swap one real street for another on
+                # 87 % of the city's names; the near roads are now resolved against the roads
+                # near the placed address, in the payload builder, and a substitution is
+                # flagged (punch-list #56, 2026-09-05). The dead functions it left behind
+                # were deleted 2026-09-11.
                 x_streets_str = " and ".join(
                     normalize_street_suffix(part) for part in
                     re.split(r'\s+(?:and|at|&)\s+', x_streets_clean, flags=re.IGNORECASE) if part.strip())

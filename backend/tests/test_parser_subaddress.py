@@ -25,7 +25,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from cfr_dispatch.parser.location import (  # noqa: E402
     clean_location_text,
     extract_subaddress_info,
-    split_street_base_suffix,
 )
 
 # Real Coquitlam street names (public.road_names shape: full municipal form), plus one
@@ -95,7 +94,3 @@ def test_clean_location_text_does_not_recut_a_known_street_at_its_first_suffix_w
     # The strip still applies when no municipal name matches.
     assert clean_location_text("burlington drive 105", [], [], KNOWN) == "burlington drive"
 
-
-def test_split_street_base_suffix_knows_crt():
-    assert split_street_base_suffix("Glen Pine Crt") == ("Glen Pine", "Crt")
-    assert split_street_base_suffix("Glen Pine Court") == ("Glen Pine", "Court")

@@ -50,7 +50,7 @@ FLAG_LABELS = {
     LOCATION_SUBSTITUTED: "Location was substituted by the resolver",
     STREET_SECTION_ONLY: "Street section only — no point location",
     BLOCK_MIDPOINT: "Announced as a block; the pin is the block's middle, not an address",
-    NO_TALK_GROUP: "No talk group announced or transcribed",
+    NO_TALK_GROUP: "Talk group unknown — none announced, or not transcribed",
     NO_MAP_GRID: "No map grid announced or transcribed",
     GRID_MISMATCH: "Announced map grid differs from the zone the address sits in",
     XSTREET_UNRESOLVED: "A near road as heard matches no road near the address",

@@ -280,10 +280,22 @@ export default function ActiveAlertBanner({
             </span>
           )}
 
-          {talkGroup && (
+          {/* A missing talk group is a warning, not a blank. This used to render nothing at
+              all, so a call whose channel was announced and lost looked exactly like a call
+              with no channel -- and a crew has no way to tell those apart from an empty row
+              (punch-list #80). Operator ruling 2026-09-11: "It's so rare that a TG is not
+              assigned, it's more likely an error. So just throw the warning and display
+              Unknown talk group" -- it sends the driver to the run sheet. 48 of 629 calls.
+              The amber chip is the same one "Response unknown" uses: a flagged condition,
+              not a third tone of the same thing (#31, CLAUDE.md s6.1). */}
+          {talkGroup ? (
             <span className="flex items-baseline gap-1.5 min-w-0">
               <span className={LABEL}>TG</span>
               <span className="font-bold uppercase text-white text-sm lg:text-[clamp(0.85rem,1.9vh,1.3rem)] truncate">{String(talkGroup)}</span>
+            </span>
+          ) : (
+            <span className="bg-amber-500 text-slate-950 rounded px-2 py-0.5 font-extrabold text-[10px] lg:text-[11px] tracking-[0.14em] uppercase whitespace-nowrap">
+              Unknown talk group
             </span>
           )}
 

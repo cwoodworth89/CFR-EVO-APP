@@ -273,17 +273,38 @@ export default function ActiveAlertBanner({
             green is the worst pairing for that. It is a word in the cluster now: no badge, no
             pulse, no height. Punch-list #31 and CLAUDE.md s6.1. */}
         <div className="pt-0.5 w-full flex items-center gap-x-3 gap-y-1.5 flex-wrap font-mono leading-none">
-          {gridValue && (
+          {/* Missing is a warning, not a blank -- the talk group's rule applied to the grid
+              (operator, 2026-09-11: "do the map grid the same way"). 31 of 629 calls, and
+              26 of those are also missing the talk group, so a badly-transcribed call shows
+              both chips: two unknowns, said twice, which is what has happened. The row
+              wraps. Punch-list #80. */}
+          {gridValue ? (
             <span className="flex items-baseline gap-1.5 whitespace-nowrap">
               <span className={LABEL}>Grid</span>
               <span className="font-bold text-amber-400 text-sm lg:text-[clamp(0.85rem,1.9vh,1.3rem)]">{gridValue}</span>
             </span>
+          ) : (
+            <span className="bg-amber-500 text-slate-950 rounded px-2 py-0.5 font-extrabold text-[10px] lg:text-[11px] tracking-[0.14em] uppercase whitespace-nowrap">
+              Unknown map grid
+            </span>
           )}
 
-          {talkGroup && (
+          {/* A missing talk group is a warning, not a blank. This used to render nothing at
+              all, so a call whose channel was announced and lost looked exactly like a call
+              with no channel -- and a crew has no way to tell those apart from an empty row
+              (punch-list #80). Operator ruling 2026-09-11: "It's so rare that a TG is not
+              assigned, it's more likely an error. So just throw the warning and display
+              Unknown talk group" -- it sends the driver to the run sheet. 48 of 629 calls.
+              The amber chip is the same one "Response unknown" uses: a flagged condition,
+              not a third tone of the same thing (#31, CLAUDE.md s6.1). */}
+          {talkGroup ? (
             <span className="flex items-baseline gap-1.5 min-w-0">
               <span className={LABEL}>TG</span>
               <span className="font-bold uppercase text-white text-sm lg:text-[clamp(0.85rem,1.9vh,1.3rem)] truncate">{String(talkGroup)}</span>
+            </span>
+          ) : (
+            <span className="bg-amber-500 text-slate-950 rounded px-2 py-0.5 font-extrabold text-[10px] lg:text-[11px] tracking-[0.14em] uppercase whitespace-nowrap">
+              Unknown talk group
             </span>
           )}
 

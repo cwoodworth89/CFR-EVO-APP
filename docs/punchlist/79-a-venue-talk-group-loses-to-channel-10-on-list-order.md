@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | FIXED in the tree; migrations `2026-09-11` and `2026-09-11b` both applied. **The running agent is still on the earlier matcher** — the operator holds the restart. |
+| **Status** | FIXED, **deployed and running**. Both migrations applied; `cfr-agent` restarted 2026-09-11 22:50:49 behind `tools/kiosk_capture_state.sh` (SAFE, nothing lost) and verified resolving both Port Mann fragments against the live vocabulary. **Behaviour on a live call is confirmed at the next Port Mann dispatch** — not fabricated to close this out (§6.5). |
 | **Severity** | 🔴 crew-visible |
 | **Area** | 🎙️ Parser / talk group · 🗄️ Vocabulary · 🖥️ HITL review |
 | **Ruling** | Operator, 2026-09-11: (a) `Talk Group` is not part of a channel's name — canonical is `5 Coquitlam`, `10 Combined Response Coquitlam`; (b) from the audio, the venue channels are **`Combined Response Venue Port Mann`** and `Combined Response Venue Transit System`; (c) the matcher is a cascade, not a score — *"looking for a number first and foremost with a following coquitlam... Then if no number, or unsure, check if it says venue"*; (d) a fragment degraded to bare `combined response` resolves to channel 10. *Unresolved* is not *no talk group*, which is a valid dispatch (→ #80). The list holds the channels that matter and is knowingly not the full roster. |

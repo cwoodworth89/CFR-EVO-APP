@@ -1,74 +1,67 @@
-# Punch list #80 — An unresolved talk group looks exactly like a dispatch with no talk group
+# Punch list #80 — An unresolved talk group looked exactly like a dispatch with no talk group
 
 | | |
 |:--|:--|
-| **Status** | OPEN. Measured, not built — the kiosk wording is the operator's to set. |
+| **Status** | FIXED in the tree and built on the kiosk (`310f77a3`). **Not visually confirmed** — the chip renders only on a call with no talk group, so it waits on the operator's eye or the next such dispatch (§6.6). |
 | **Severity** | 🔴 crew-visible |
-| **Area** | 🎙️ Parser / talk group · 🖥️ Kiosk HUD · 🏷️ Review flags |
-| **Ruling** | Operator, 2026-09-11: *"Well, not NO talk group. Unknown talk group. No talk group is a valid form of dispatch."* |
-| **Origin** | Raised by the operator while reviewing #79, on the wording of the state the matcher returns. |
+| **Area** | 🖥️ Kiosk HUD · 🏷️ Review flags |
+| **Ruling** | Operator, 2026-09-11: *"I actually think we can just [go] with unknown. It'll flag the driver to check the run sheet. It's so rare that a TG is not assigned, it's more likely an error. So just throw the warning and display Unknown talk group."* |
+| **Origin** | Operator, 2026-09-11, on the wording in #79: *"Well, not NO talk group. Unknown talk group. No talk group is a valid form of dispatch."* |
 
 [← punch list index](../debug_and_qa_punchlist.md)
 
 ---
 
-## The two facts the system collapses into one
+## The problem
 
-| | What happened | Today |
-|:--|:--|:--|
-| **No talk group** | The dispatcher announced none. **A valid dispatch.** | `radio_channel = NULL` |
-| **Unknown talk group** | One was announced and the pipeline could not read it. **A gap.** | `radio_channel = NULL` |
+[`ActiveAlertBanner.jsx`](../../frontend/src/components/hud/ActiveAlertBanner.jsx) rendered
+the talk group as `{talkGroup && (…)}`, so when there was no channel **the field vanished
+entirely**. A call whose channel was announced and lost looked identical to a call with none:
+both an empty row, and a crew has no way to tell one from the other.
 
-Both raise the same flag, `NO_TALK_GROUP` — whose label, *"No talk group announced or
-transcribed"*, states the conflation outright — and
-[`ActiveAlertBanner.jsx:283`](../../frontend/src/components/hud/ActiveAlertBanner.jsx:283)
-renders the field as `{talkGroup && (…)}`, so **the kiosk hides it in both cases**.
+This is §6.1 in its less obvious direction. The rule is usually read as *don't print a number
+you don't have*; it equally says **don't let a gap wear the appearance of a valid state**. An
+unknown rendered as a legitimate blank is a plausible wrong answer a crew can't see through.
 
-## Why this is crew-visible
+**48 of 629 calls** carry no talk group.
 
-On a call where a channel *was* announced and the pipeline lost it, the crew sees a HUD with
-no talk group on it — which is a normal, valid sight. Nothing tells them a channel exists and
-they do not have it. They stay on their default net, and the call is on another.
+## The ruling collapsed the two states rather than separating them
 
-This is §6.1 in its less obvious direction. The rule is usually read as *do not print a number
-you do not have*; the same rule says **do not let a gap wear the appearance of a valid state.**
-An unknown rendered as a legitimate "no channel" is a plausible wrong answer a crew cannot see
-through, exactly like an invented one.
+An earlier version of this entry proposed splitting `NO_TALK_GROUP` into "none announced"
+(valid) and `UNKNOWN_TALK_GROUP` (a gap), and carrying a new boolean from the parser to do it.
+The operator ruled that unnecessary: a dispatch genuinely without a talk group is so rare that
+**a blank is more likely an error than a fact**, so both cases get the same treatment — warn,
+and say unknown. One state, no new parser field, no migration.
 
-## Measured, 2026-09-11 (624 stored transcripts)
+That is a smaller change than the one proposed, and a better one: the distinction would have
+cost a `DispatchData` field, a second flag and a frontend branch to tell a crew something that
+does not change what they do. Either way they check the run sheet.
 
-| | calls |
-|:--|--:|
-| Resolved to a channel | 576 |
-| **No talk-group clause in the transcript at all** — none announced, or the whole clause lost | **39** |
-| **Talk-group clause present, channel unresolved** | **12** |
+## What changed
 
-The 12 will grow: #79's ruling sends a fragment degraded to bare `combined response` to
-unresolved, which is 10 further calls in the corpus.
+* The HUD shows an amber **`Unknown talk group`** chip in place of the empty row — the same
+  chip `Response unknown` already uses two elements along. A flagged condition, not a third
+  tone of the same thing (#31), and amber is the established warning colour
+  (`kiosk-responsive-ergonomics`). Nothing new was invented for it.
+* The `NO_TALK_GROUP` label read *"No talk group announced or transcribed"*, which stated the
+  conflation in its own wording. Now *"Talk group unknown — none announced, or not
+  transcribed"*, in both copies (`review_flags.py` and `reviewFlags.js`).
 
-## The distinction is already available, unused
+The **identifier** `NO_TALK_GROUP` is deliberately unchanged: the HITL confirm/refute record
+keys off it, and `review_flags.py` says to rename only with a migration. The label is prose;
+the name is a contract.
 
-[`announcement.py:132`](../../backend/cfr_dispatch/parser/announcement.py:132) already knows
-which case it is and throws the knowledge away:
+## Verified so far
 
-* `talk_group_match` is `None` → the phrase was never spoken → **no talk group**
-* `talk_group_match` is set but `match_radio_channel` returns `None` → **unknown talk group**
+| | |
+|:--|:--|
+| `npm run lint:crash` | clean (the pre-commit crash-class gate) |
+| `npm run build` on the kiosk | built, and `Unknown talk group` is present in `dist/assets/index-*.js` |
+| `test_review_flags.py` | 26 passed, including the every-flag-has-wording check |
+| **The chip on screen** | **not confirmed** — needs a call with no talk group |
 
-Both currently leave `radio_channel = None`. Nothing else needs to be inferred or measured;
-the parser only has to carry the boolean it already computed.
+## Not done here
 
-## Shape of the fix
-
-1. `DispatchData` carries whether a talk-group clause was announced.
-2. `review_flags.py` splits `NO_TALK_GROUP` into two: one for "none announced" (arguably not a
-   review flag at all, since it is a valid dispatch — **operator to rule**) and
-   `UNKNOWN_TALK_GROUP` for announced-but-unread.
-3. The kiosk renders the unknown case explicitly instead of hiding the field. **Wording is the
-   operator's to set** — it is what a crew reads at 03:00 and §7.2 says a domain model is not
-   improvised.
-
-## Not to be done here
-
-Do **not** close this by writing a sentinel string into `radio_channel` (`"UNKNOWN"`,
-`"NONE"`). That is a placeholder that reads as real data — §6.1 names the pattern directly.
-The state belongs beside the value, not inside it.
+The same `{value && …}` pattern hides the **map grid** when it is missing (31 of 629 calls),
+and `NO_MAP_GRID` is a flag for the same reason `NO_TALK_GROUP` is. Whether a missing grid
+deserves the same amber chip is the operator's call and has not been asked → backlog.

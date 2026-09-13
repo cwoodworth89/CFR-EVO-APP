@@ -88,3 +88,15 @@ call since 2026-08-30. With it answering again, `2905` and `2929 Lougheed Hwy` r
 `2950 Lougheed Hwy` with the substitution note instead of the street centroid. The other
 three street-centroid placements (`39 United Blvd` twice, `4992 Upper Harper Rd`) still fall
 through: their nearest numbers are in another 100-block, which step 4b refuses by design.
+
+**2026-09-13, a seventeenth: `2973 Glen Dr` (DISP-2026-E301A3).** Phase 1 withheld it (#72,
+no parcel) and phase 2 placed it from the block's address range; the operator reports that
+placement correct. The operator also reports 2973 as a parcel on a cadastral map. It is not in
+`Addresses.shp` (extract 2025-06-22, checked the same day), and not in `public.parcels` under
+any street. The corner lot is **2963 Glen Dr, Lot 1 Plan 83167**, whose legal description reads
+*"except airspace parcel A, airspace plan BCP9580"*; that 2973 is the airspace parcel's civic
+number is a guess, **not verified**. Open: which map the operator's screenshot came from. Our
+basemap draws no house numbers, so if it is the City's current web map, a fresh extract may
+carry 2973 and some of the sixteen above.
+
+- [ ] 2973 Glen Dr — lot is 2963 Glen Dr with airspace parcel A (BCP9580)

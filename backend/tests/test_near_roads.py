@@ -36,6 +36,15 @@ def test_exact_and_base_name_matches():
 
 
 @NEEDS_DB
+def test_a_name_heard_with_a_space_it_does_not_have_is_exact():
+    # DISP-2026-56F11A: STT wrote "Eagle Ridge Drive" and the kiosk showed "EAGLERIDGE DRIVE (?)".
+    # Operator ruling 2026-09-13: spaces inside a street name are ignored.
+    nearby = ["Eagleridge Drive", "Guildford Way", "Sparrow Court"]
+    assert match_heard_road("Eagle Ridge Drive", nearby) == ("Eagleridge Drive", "exact")
+    assert match_heard_road("Eagle Ridge", nearby) == ("Eagleridge Drive", "base")
+
+
+@NEEDS_DB
 def test_two_suffix_forms_of_one_name_are_ambiguous_not_guessed():
     resolved, how = match_heard_road("Chartwell Rd", NEARBY)
     assert resolved is None and how == "ambiguous"
@@ -161,10 +170,20 @@ def test_a_street_wins_over_a_descriptor():
 def test_a_mistranscription_is_still_flagged():
     from cfr_dispatch.pipeline.near_roads import resolve_near_roads
     # Not in the vocabulary and not a road nearby: exactly what the flag is for.
-    for heard in ("Nice Drum Crt", "Lorension Cres", "A Gate"):
+    for heard in ("Nice Drum Crt", "Lorension Cres"):
         out = resolve_near_roads([heard], _Validator(["Agate", "Diamond", "Panorama"]), 49.30, -122.81)
         assert out[0]["how"] != "descriptor", heard
         assert out[0]["resolved"] is None, heard
+
+
+def test_a_gate_is_agate_once_spaces_are_ignored():
+    # "A Gate" was pinned unresolved above until 2026-09-13, when spaces inside street names
+    # stopped counting (operator ruling, DISP-2026-56F11A). Every "near a gate place" in the
+    # corpus is 2573 Diamond Cres, and the operator verified Agate Pl on both reviewed calls
+    # (DISP-2026-5317C5, DISP-2026-859C77), so resolving it is the right answer, not a guess.
+    from cfr_dispatch.pipeline.near_roads import resolve_near_roads
+    out = resolve_near_roads(["A Gate"], _Validator(["Agate", "Diamond", "Panorama"]), 49.30, -122.81)
+    assert out[0]["resolved"] == "Agate" and out[0]["how"] == "exact"
 
 
 def test_a_term_absent_from_the_vocabulary_still_flags():

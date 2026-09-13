@@ -15,14 +15,15 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**9 open** (6 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**10 open** (7 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 9
+## Open — 10
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **81** | 🔴 crew-visible | FIXED in the tree 2026-09-13; needs a `cfr-agent` restart, not seen on screen | [A split street name raised a false warning, and a fuzzy junction passed the phase 1 gate](punchlist/81-a-split-street-name-and-a-fuzzy-junction-reached-the-crew-as-a-warning-and-a-place.md) |
 | **80** | 🔴 crew-visible | FIXED `310f77a3`, built; chip not yet seen on screen | [An unresolved talk group looks exactly like a dispatch with no talk group](punchlist/80-an-unresolved-talk-group-looks-like-a-dispatch-with-no-talk-group.md) |
 | **79** | 🔴 crew-visible | FIXED `c59a376`, deployed and running 2026-09-11 | [A venue talk group loses to channel 10, and the venue's name in the vocabulary was wrong](punchlist/79-a-venue-talk-group-loses-to-channel-10-on-list-order.md) |
 | **77** | 🔴 crew-visible | FIXED `ec34d27`, awaiting kiosk restart | [An arrival point is saved to one parcel row and read from another](punchlist/77-an-arrival-point-is-saved-to-one-parcel-row-and-read-from-another.md) |

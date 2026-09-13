@@ -218,6 +218,10 @@ def build_dispatch_payload(
                 "zone_id": res.get("zone_id"),  # set only by an exact parcel match
                 "is_junction": "candidates" in res,  # the intersection resolver's payload shape
                 "is_ambiguous": res.get("is_ambiguous", False),
+                # The intersection resolver's near-miss: junctions offered for a street pair
+                # that matched no junction key. It marks these ambiguous so the operator picks.
+                "is_suggestion": any(c.get("match_type") == "suggested"
+                                     for c in (res.get("candidates") or []) if isinstance(c, dict)),
                 "confidence": res.get("confidence"),
             }
             # A "<street> and <street>" dispatch resolves to a street SECTION rather
@@ -253,8 +257,12 @@ def build_dispatch_payload(
         # fuzzy "suggested" pair scores lower and is a guess) or when several junctions exist
         # and the operator chooses on the map. Its resolution_note is not the test: the
         # resolver also uses it for information ("cross streets do not distinguish these").
+        # A suggestion is never solid, ambiguous or not: the resolver marks every near-miss
+        # ambiguous, so testing is_ambiguous alone let each one through (DISP-2026-56F11A,
+        # operator ruling 2026-09-13: hold back fuzzy junctions in phase 1).
         solid = bool(local_geocode_result.get("zone_id")) or (
             local_geocode_result.get("is_junction")
+            and not local_geocode_result.get("is_suggestion")
             and (float(local_geocode_result.get("confidence") or 0.0) >= 100.0
                  or local_geocode_result.get("is_ambiguous")))
         if not solid:

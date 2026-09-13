@@ -80,6 +80,14 @@ except ImportError:
 SUGGESTION_FLOOR = 85
 
 
+def _squash(street: str) -> str:
+    return street.replace(' ', '')
+
+
+def _squashed_pair(street1: str, street2: str) -> str:
+    return ' & '.join(sorted(_squash(normalize_street_name(s)) for s in (street1, street2)))
+
+
 class IntersectionResolver:
     def __init__(self, intersection_keys_cache: dict, confidence_threshold=80, engine=None):
         self._cache = intersection_keys_cache
@@ -115,6 +123,21 @@ class IntersectionResolver:
                      for c in self._cache[norm_key]]
             return cands, 100
 
+        # 1b. The same pair with the spaces inside the names ignored. STT writes one-word
+        #     street names as two words: "Eagle Ridge Drive" for Eagleridge Dr on 2 of the
+        #     3 verified Eagleridge calls, and DISP-2026-56F11A (2026-09-13) raised an
+        #     approximate-location banner on the right junction because of it. Operator
+        #     ruling 2026-09-13: street names match regardless of spaces, for every street.
+        #     Exact only when the squashed pair names ONE junction key; checked the same day,
+        #     no two public.intersections keys and no two public.roads names collide.
+        squashed_keys = self._squashed_index().get(_squashed_pair(s1, s2), ())
+        if len(squashed_keys) == 1:
+            key = next(iter(squashed_keys))
+            said_first = _squash(normalize_street_name(s1))
+            spoken = next((p for p in key.split(' & ') if _squash(p) == said_first), None)
+            cands = [dict(c, match_type='exact', spoken_first=spoken) for c in self._cache[key]]
+            return cands, 100
+
         # A street crossed with itself is a parser artifact, not a location. It used to
         # score 100 against any key containing that street via the token_set_ratio
         # subset trap. It is not resolvable and produces no suggestions.
@@ -132,6 +155,17 @@ class IntersectionResolver:
         if suggestions:
             return suggestions, max(s['match_score'] for s in suggestions)
         return None, 0
+
+    def _squashed_index(self) -> dict:
+        """Cache key per pair of space-free street names; several keys where names collide."""
+        if not hasattr(self, '_squashed_cache'):
+            index = {}
+            for key in self._cache:
+                parts = [p.strip() for p in key.split(' & ')]
+                if len(parts) == 2:
+                    index.setdefault(' & '.join(sorted(_squash(p) for p in parts)), set()).add(key)
+            self._squashed_cache = index
+        return self._squashed_cache
 
     def _street_universe(self) -> set:
         if not hasattr(self, '_streets_cache'):
@@ -250,7 +284,9 @@ class IntersectionResolver:
         as close to them, the candidates are returned unchanged with a note. An
         uninformative signal is not grounds for discarding a real junction.
         """
-        if not x_streets or self._engine is None:
+        # One junction has nothing to narrow. Without this every single-junction call read
+        # "cross street(s) ... do not distinguish these junctions" (DISP-2026-56F11A).
+        if not x_streets or self._engine is None or len(candidates) < 2:
             return candidates, None
 
         names = [normalize_intersection_key(c, c).split(' & ')[0]

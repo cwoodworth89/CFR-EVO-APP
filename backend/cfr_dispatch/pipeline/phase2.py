@@ -318,6 +318,12 @@ def process_phase_2_finalize(
                     "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") == "parcel-zone" else None,
                     "radio_channel": p2_channel
                 }
+                # The full recording's unit number, not the chunk's. Left to the spread above,
+                # phase 1's "Number 505 Nearly 505" stayed on the kiosk for the whole call while
+                # phase 2 had parsed "Number 505" (DISP-2026-E301A3, 2026-09-13). p2_subaddress
+                # already falls back to phase 1's when the full recording carries none.
+                if p2_subaddress:
+                    target_payload["subaddress"] = p2_subaddress
 
                 # The ETAs follow the coordinates. On this path phase 1 may have WITHHELD
                 # the location (rule A) and phase 2 placed it just above, which moves the

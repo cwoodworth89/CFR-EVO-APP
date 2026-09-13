@@ -58,17 +58,24 @@ def _base(norm: str) -> str:
     return norm
 
 
+def _squash(name: str) -> str:
+    return name.replace(" ", "")
+
+
 def match_heard_road(heard: str, candidates: List[str]) -> tuple:
     """(resolved candidate or None, how). how: exact | base | nearby-fuzzy | ambiguous | unresolved."""
     h = _norm(heard)
     if not h:
         return None, "unresolved"
     normed = [(c, _norm(c)) for c in candidates if c]
-    exact = [c for c, n in normed if n == h]
+    # Spaces inside a name are ignored: STT writes "Eagle Ridge Drive" for Eagleridge Dr
+    # (operator ruling 2026-09-13, DISP-2026-56F11A). No two public.roads names collide
+    # with their spaces removed, checked the same day.
+    exact = [c for c, n in normed if _squash(n) == _squash(h)]
     if exact:
         return exact[0], "exact"
     hb = _base(h)
-    base_hits = sorted({c for c, n in normed if _base(n) == hb})
+    base_hits = sorted({c for c, n in normed if _squash(_base(n)) == _squash(hb)})
     if len(base_hits) == 1:
         return base_hits[0], "base"
     if len(base_hits) > 1:

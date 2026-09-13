@@ -35,6 +35,13 @@ TWO_JUNCTIONS = ("coquitlam engine 1 respond emergency motor vehicle incident we
                  "highway use talk group 10 combined response coquitlam map grid 82")
 BLOCK_ONLY = ("coquitlam engine 1 respond emergency medical aid 2905 lougheed highway near turning lane "
               "use talk group 10 combined response coquitlam map grid 82")   # no 2905 parcel (#64)
+# DISP-2026-56F11A, 2026-09-13: STT split Eagleridge into two words.
+SPLIT_NAME = ("coquitlam engine 1 rescue 2 respond emergency motor vehicle incident cyclist struck eagle ridge "
+              "drive and guildford way near eagle ridge drive and guildford way use talk group 10 combined "
+              "response coquitlam map grid 70")
+# A misspelled leg of a real junction (Johnson St & Guildford Way): offered as a suggestion only.
+FUZZY_JUNCTION = ("coquitlam engine 1 respond emergency motor vehicle incident jonson street and guildford way "
+                  "use talk group 10 combined response coquitlam map grid 70")
 
 
 @pytest.fixture(scope="module")
@@ -75,6 +82,23 @@ def test_an_exact_junction_goes_out(validator):
 def test_several_junctions_go_out_for_the_operator_to_choose(validator):
     t = preliminary(validator, TWO_JUNCTIONS)
     assert t["location_pending"] is False and t["lat"] is not None
+
+
+def test_a_junction_named_with_a_split_word_goes_out_exact(validator):
+    # Operator ruling 2026-09-13: street names match regardless of spaces.
+    t = preliminary(validator, SPLIT_NAME)
+    assert t["location_pending"] is False and t["lat"] is not None
+    assert t["address"] == "Eagleridge Dr & Guildford Way"
+    assert not t.get("resolution_note")
+    assert LOCATION_SUBSTITUTED not in t["review_flags"]
+    assert t["x_street_1"] == "Eagleridge Drive" and t["x_streets_how"][0] == "exact"
+
+
+def test_a_suggested_junction_is_withheld(validator):
+    # The resolver marks every near-miss ambiguous; phase 1 must not publish it as a place
+    # (operator ruling 2026-09-13, DISP-2026-56F11A).
+    t = preliminary(validator, FUZZY_JUNCTION)
+    assert t["location_pending"] is True and t["lat"] is None
 
 
 def test_a_number_the_city_does_not_have_is_withheld(validator):

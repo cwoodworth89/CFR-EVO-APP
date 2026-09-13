@@ -22,6 +22,11 @@ import React from 'react';
  * methods rather than trusting a pin that has no business being trusted.
  *
  * Tier 1 (no coordinates at all) is a separate, louder state that pauses routing.
+ *
+ * Written for the crew, not the dispatcher (operator, 2026-09-13): the header sends them to
+ * the run sheet and map grid, and the only body line is what was dispatched against where
+ * the pin is, when those differ. The resolver's note ("... Confirm before dispatching")
+ * explains the substitution to a reviewer; it stays on the record and off this screen.
  */
 export default function ApproximateLocationBanner({ activeCall, compact = false }) {
   const note = activeCall?.resolution_note;
@@ -43,17 +48,14 @@ export default function ApproximateLocationBanner({ activeCall, compact = false 
         <span className="text-2xl leading-none mt-0.5" aria-hidden="true">⚠️</span>
         <div className="min-w-0">
           <h4 className="text-sm font-black uppercase tracking-wider text-amber-400 font-mono">
-            APPROXIMATE LOCATION — VERIFY ON ARRIVAL
+            APPROXIMATE LOCATION — VERIFY ON RUN SHEET AND MAP GRID
           </h4>
           {requested && actual && requested !== actual && (
             <p className={`font-mono text-slate-300 mt-1 leading-relaxed ${compact ? 'text-[10px]' : 'text-xs'}`}>
               Dispatched <span className="text-amber-300 font-bold">{requested}</span>
-              {' '}&middot; routed to <span className="text-amber-300 font-bold">{actual}</span>
+              {' '}&middot; shown at <span className="text-amber-300 font-bold">{actual}</span>
             </p>
           )}
-          <p className={`font-mono text-slate-400 mt-1 leading-relaxed ${compact ? 'text-[10px]' : 'text-xs'}`}>
-            {note}
-          </p>
         </div>
       </div>
     </div>

@@ -91,12 +91,21 @@ through: their nearest numbers are in another 100-block, which step 4b refuses b
 
 **2026-09-13, a seventeenth: `2973 Glen Dr` (DISP-2026-E301A3).** Phase 1 withheld it (#72,
 no parcel) and phase 2 placed it from the block's address range; the operator reports that
-placement correct. The operator also reports 2973 as a parcel on a cadastral map. It is not in
-`Addresses.shp` (extract 2025-06-22, checked the same day), and not in `public.parcels` under
-any street. The corner lot is **2963 Glen Dr, Lot 1 Plan 83167**, whose legal description reads
-*"except airspace parcel A, airspace plan BCP9580"*; that 2973 is the airspace parcel's civic
-number is a guess, **not verified**. Open: which map the operator's screenshot came from. Our
-basemap draws no house numbers, so if it is the City's current web map, a fresh extract may
-carry 2973 and some of the sixteen above.
+placement correct. It is not in `Addresses.shp` (extract 2025-06-22, checked the same day), and
+not in `public.parcels` under any street.
 
-- [ ] 2973 Glen Dr — lot is 2963 Glen Dr with airspace parcel A (BCP9580)
+**Yet the kiosk's own cadastral overlay labels it.** The operator's screenshot is our overlay,
+and the overlay is not drawn from `public.parcels`: `backend/scripts/crawl_cadastral_tiles.py`
+saves rendered PNG tiles from the City's live ArcGIS Cadastral MapServer, address labels
+included (`cadastral.mbtiles`, written 2026-08-28). Drawing the `public.parcels` outlines over
+those tiles (2026-09-13) puts **both "2963" and "2973" inside one lot**, the one the parcel table
+holds as 2963 Glen Dr (`!4200377`, Lot 1 Plan 83167, legal description *"except airspace parcel A,
+airspace plan BCP9580"*). So 2973 is a second civic number on that lot that the City's live
+address layer carries and the 2025-06-22 Open Data extract does not.
+
+This means the kiosk shows crews two City products that disagree: the overlay (live GIS, as of
+the crawl) and the geocoder (the Open Data file). Whether a newer Open Data extract carries 2973,
+and how many of the sixteen above it would also resolve, is unchecked: both need a request to the
+City, which needs the operator's permission (CLAUDE.md §1).
+
+- [ ] 2973 Glen Dr — the City's live address labels put it on the 2963 Glen Dr lot

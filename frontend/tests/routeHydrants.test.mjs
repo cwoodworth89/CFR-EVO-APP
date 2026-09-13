@@ -95,6 +95,25 @@ test('nothing within 1,000 ft is the warning, and a NOT READY hydrant never coun
   assert.deepEqual(r.picks, []);
 });
 
+test('a hydrant past the end of the route is not on the route to the marker (DISP-2026-56F11A, M-462)', () => {
+  // Operator, 2026-09-13: "Hydrants should be along the route to the marker." A hydrant 10 m
+  // east and 12 m south, beyond a route arriving from the west, used to clamp onto the route's
+  // last point and read 0 ft before arrival.
+  const hydrants = [hyd('PASTEND', north(-12), east(10))];
+  const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
+  assert.equal(r.tier, TIER.NEAR);
+  assert.equal(r.picks[0].how, TIER.NEAR);
+  assert.equal(r.picks[0].distance, 16);
+});
+
+test('the on-route distance runs to the marker, not to where the route line stops', () => {
+  // OSRM ends the line at the road snap; here 9 m short of the marker, on the same bearing.
+  const short = [{ lat: 49.3, lng: east(-2000) }, { lat: 49.3, lng: east(-500) }, { lat: 49.3, lng: east(-9) }];
+  const r = pickRouteHydrants({ hydrants: [hyd('H40', north(6), east(-40))], routeCoords: short, destination: DEST });
+  assert.equal(r.tier, TIER.APPROACH);
+  assert.equal(r.picks[0].beforeArrivalM, 40);
+});
+
 test('no route yet: the straight-line tiers still answer, and say the route was not used', () => {
   const hydrants = [hyd('H40', north(6), east(-40))];
   const r = pickRouteHydrants({ hydrants, routeCoords: [], destination: DEST });

@@ -78,19 +78,17 @@ function projector(lat0, lng0) {
   return (lat, lng) => [(lng - lng0) * kx, (lat - lat0) * M_PER_DEG_LAT];
 }
 
-/** Nearest point on segment ab to p, as [distance, t] with t in [0, 1]. */
+/** Nearest point on segment ab to p, as [distance, t, rawT]: t clamped to [0, 1], rawT not. */
 function segmentDistance(p, a, b) {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const len2 = dx * dx + dy * dy;
-  let t = 0;
-  if (len2 > 0) {
-    t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
-    t = Math.max(0, Math.min(1, t));
-  }
+  let raw = 0;
+  if (len2 > 0) raw = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+  const t = Math.max(0, Math.min(1, raw));
   const cx = a[0] + t * dx;
   const cy = a[1] + t * dy;
-  return [Math.hypot(p[0] - cx, p[1] - cy), t];
+  return [Math.hypot(p[0] - cx, p[1] - cy), t, raw];
 }
 
 function usable(h) {
@@ -128,7 +126,17 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
     .map(e => ({ ...e.h, how: TIER.DOORSTEP, distance: Math.round(e.straight) }));
   const taken = new Set(doorstep.map(h => h.gisId));
 
-  // Tier 1: along the route, within ROUTE_WINDOW_M of arrival.
+  // Tier 1: along the route to the marker, within ROUTE_WINDOW_M of it.
+  //
+  // Operator, 2026-09-13: "Hydrants should be along the route to the marker." Two things follow.
+  // The distance runs to the marker, not to where the OSRM line stops: the line ends at the
+  // road snap, so the leg from there to the marker is added, straight (the falsifier is a
+  // marker set far back from its road, #49). And a hydrant past the end of the line is not on
+  // the route to the marker at all. DISP-2026-56F11A: M-462 sat 12 m south and 10 m east of
+  // the junction, beyond a route arriving from the north; its projection clamped to the last
+  // point and the card read "0 ft, before arrival, on the route" for a hydrant 51 ft away past
+  // the address. Those fall to the doorstep and straight-line tiers, which exist for exactly
+  // "sometimes it's just past the address".
   if (routeKnown) {
     const pts = routeCoords.map(c => project(Number(c.lat), Number(c.lng)));
     const cum = [0];
@@ -136,19 +144,21 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
       cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
     }
     const total = cum[cum.length - 1];
+    const last = pts[pts.length - 1];
+    const endToMarkerM = Math.hypot(last[0], last[1]);   // the marker is the projection's origin
     const approach = [];
     for (const e of pool) {
       if (taken.has(e.h.gisId)) continue;
       let best = null;
       for (let i = 1; i < pts.length; i++) {
-        const [d, t] = segmentDistance([e.x, e.y], pts[i - 1], pts[i]);
+        const [d, t, raw] = segmentDistance([e.x, e.y], pts[i - 1], pts[i]);
         if (best === null || d < best.d) {
           const along = cum[i - 1] + t * (cum[i] - cum[i - 1]);
-          best = { d, along };
+          best = { d, along, pastEnd: i === pts.length - 1 && raw > 1 };
         }
       }
-      if (!best || best.d > ROUTE_BAND_M) continue;
-      const beforeArrivalM = Math.round(total - best.along);
+      if (!best || best.d > ROUTE_BAND_M || best.pastEnd) continue;
+      const beforeArrivalM = Math.round(total - best.along + endToMarkerM);
       if (beforeArrivalM > ROUTE_WINDOW_M) continue;
       approach.push({
         ...e.h, how: TIER.APPROACH, distance: beforeArrivalM,

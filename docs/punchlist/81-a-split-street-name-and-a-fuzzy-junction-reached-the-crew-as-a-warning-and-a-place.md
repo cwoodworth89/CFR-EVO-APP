@@ -74,6 +74,22 @@ the NEAR line read `EAGLERIDGE DRIVE (?)`.
 | 8 | The publisher runs the network loop, and a publish not acknowledged in 3 s is logged and returns False. | `services/dispatch_notifications/src/notification_service/mqtt_broker.py` |
 | — | Banner header "APPROXIMATE LOCATION — VERIFY ON RUN SHEET AND MAP GRID"; the resolver's note is off the crew screen (still on the record); body is "Dispatched X · shown at Y" when they differ. | `frontend/src/components/kiosk/ApproximateLocationBanner.jsx` |
 
+### Hydrant "0 ft" (added 2026-09-13, second commit)
+
+Operator: *"Hydrants should be along the route to the marker."* M-462 stood 12 m south and 10 m
+east of the junction, past the end of a route arriving from the north. The picker projects each
+hydrant onto the route and clamped this one to the last point, so the card read **0 ft, before
+arrival, on the route** for a hydrant 51 ft away beyond the address. Now a hydrant past the end
+of the line is not on the route to the marker and falls to the doorstep and straight-line tiers,
+and the on-route distance runs to the marker (the route's end to the marker is added, straight;
+1.6 m on this call). `frontend/src/utils/routeHydrants.js`, two tests in
+`frontend/tests/routeHydrants.test.mjs` that fail on the old picker.
+
+Replayed on the real route and the 301 hydrants within 1.3 km, the card for this call changes
+from *FIRST HYDRANT M-462 0 ft* to **LONG LAY: M-463 548 ft on the route, M-462 52 ft from the
+address, off route, the closer option**, which is what the existing rules say (on-route beats
+off-route, 808 Miller Ave; a lay over 500 ft lists the closer hydrant beside it).
+
 **A test pinned the old behaviour and was wrong.** `test_a_mistranscription_is_still_flagged`
 required the heard "A Gate" to stay unresolved beside Agate. With spaces ignored it resolves to
 Agate — and every "near a gate place" in the corpus is 2573 Diamond Cres, verified **Agate Pl**

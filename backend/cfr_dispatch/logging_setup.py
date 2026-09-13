@@ -53,11 +53,14 @@ def setup_logging(log_file: str = 'dispatch.log'):
     if logger.hasHandlers():
         logger.handlers.clear()
 
+    # backupCount counts rotated FILES, not days. Operator ruling 2026-09-13: keep 30 while
+    # developing, so a call reviewed weeks later still has its log. Measured on the kiosk the
+    # same day: 10 files of each log came to ~2.3 MB, so 30 is under ~10 MB.
     file_handler = TimedRotatingFileHandler(
         log_file,
         when='D',
         interval=1,
-        backupCount=10,
+        backupCount=30,
         atTime=datetime.time(8, 0, 0)
     )
     file_handler.setLevel(logging.DEBUG if VERBOSITY_LEVEL >= 2 else logging.INFO)

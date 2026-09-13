@@ -67,11 +67,12 @@ already knew was missing. A gap the system flagged is a different impact from a 
 
 On the kiosk, from `/home/tcfire/CFR-EVO-APP/backend/` (the `cfr-agent` working directory):
 `dispatch.log` (orchestrator) and `dispatch-worker.log` (phase 2, geocoder notes,
-`[METRICS]`). Each keeps **10 rotated files**, not 10 days
-(`backend/cfr_dispatch/logging_setup.py:56`, `backupCount=10`).
+`[METRICS]`). Each keeps a fixed number of **rotated files**, not days — `backupCount` in
+`backend/cfr_dispatch/logging_setup.py`. It was raised from 10 to 30 on 2026-09-13; the
+change applies once `cfr-agent` has been restarted.
 
 Checked on the kiosk 2026-09-13:
-* The 10 files reached back to **2026-08-23**, with whole days missing between them.
+* The 10 files then kept reached back to **2026-08-23**, with whole days missing between them.
 * **A file's date suffix is not the date of the calls in it.** `DISP-2026-472A05`
   (2026-09-11 13:04 UTC) was in the `.2026-09-12` files, and in no other file.
 

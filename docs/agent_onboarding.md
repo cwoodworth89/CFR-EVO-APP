@@ -158,7 +158,7 @@ CFR EVO is equipped with a set of specialized **custom skills** and **sub-agents
 
 ### 🛠️ Specialized Sub-agents
 When spawning helper sub-agents, inherit from these type specifications:
-* **`call-review-analyst`**: Specialist in auditing dispatch call logs, triaging HITL reviews, diagnosing audio transcripts, and phonetic ambiguity analysis.
+* **`call-review-analyst`**: Intake for the operator's call reviews. Give it a `dispatch_id` and notes on what went right and wrong; it names the stage that broke, the crew impact, any matching punch-list item, and recommends whether it goes to QA. Stage + evidence only — no code, no fixes, writes nothing.
 * **`performance-metrics-analyst`**: Specialist in operational metrics analytics (Turnout Lead Time, Parsing Accuracy %, Stage Latency) and executive HUD telemetry design.
 * **`frontend-kiosk-architect`**, **`gis-spatial-engineer`**, **`kiosk-remote-operator`**, **`pipeline-core-engineer`**, **`stt-mlops-evaluator`**: see [`.claude/agents/`](../.claude/agents) for the full roster.
 

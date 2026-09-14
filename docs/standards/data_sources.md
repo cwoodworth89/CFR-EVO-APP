@@ -127,3 +127,11 @@ batch the server cannot answer is not known.
 
 **Not decided, and not to be improvised:** taking a street name for an Address Labels point from
 the lot it falls in. The 35 collisions above are the evidence against doing it blindly.
+
+**Where this went (2026-09-13).** Checked against every reachable source — the live City layer,
+the City's locator, Address Labels, Esri — 24 of the 306 distinct civic addresses ECOMM has
+dispatched are in none of them as an address the City holds. No change of source closes that.
+The agreed response is human placement in a CFR-owned table, punch-list
+[#82](../punchlist/82-a-dispatched-address-no-city-source-holds-is-only-ever-estimated.md);
+refreshing from the live `Parcel_Addresses` layer remains worth doing, and is blocked on the
+parcel-import risks in [`../post_freeze_backlog.md`](../post_freeze_backlog.md).

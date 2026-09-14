@@ -115,3 +115,7 @@ dataset is the authority for a civic address, is
 [`../standards/data_sources.md`](../standards/data_sources.md) §2–3.
 
 - [ ] 2973 Glen Dr — the City's live address labels put it on the 2963 Glen Dr lot
+
+**Our side of the fix is #82** (2026-09-13): across the whole corpus, 24 dispatched civic
+addresses are in no City source, and the operator ruled that a person places them, with
+evidence, in a CFR-owned table. This item stays the question for the City.

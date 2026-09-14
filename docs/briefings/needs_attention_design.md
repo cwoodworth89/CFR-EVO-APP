@@ -127,3 +127,19 @@ centroid). Used as a default pin it would place 28 civic numbers on the same poi
 mountain parcel behind the Harper Rd FSR gate: a plausible wrong answer (CLAUDE.md §6.1), and against
 request ruling 2. It shows as a hollow *suggestion* marker, like any other. The placer sets an
 arrival point per address, so as built these are 28 placements.
+
+## Operator notes on the list, 2026-09-14
+
+From a review map of the 40 addresses on the City aerial.
+
+* **Fremont St (5).** City-addressed on Fremont St, **reached from Devon St, through Port
+  Coquitlam.** The City's own parcel popup still names them on Fremont (checked: `1165 Fremont St`,
+  Plan 2320, Lot 43).
+* **Coronation Cres (7).** **Reached through Port Moody.** The crescent itself has not opened: it is
+  future highrise development (operator, from City data and online). The 2025 aerial shows the
+  curve of it cut through the lots, which is why the lots exist while no City road carries the name.
+* **Pinecone Burke Mtn (28).** Each is a numbered lease lot: legal description *Lot N, Burke Mtn.
+  Lease*, lot number equal to the civic number, folio `38175` + the lot number padded to three digits
+  (`38175012` … `38175362`), zoned A-3. The exception is **67, legal description `Lot 67C`, folio
+  `38175386`**. The City gives them one shared outline, `!8180021`, and no position of their own. The
+  operator is looking them up to decide whether they can share one access.

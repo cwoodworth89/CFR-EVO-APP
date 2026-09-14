@@ -31,12 +31,25 @@ through `opendata.arcgis.com`.
 **The Open Data Cadastral dataset**, identified by the operator 2026-09-13: map
 `https://data.coquitlam.ca/maps/c72d39364d8b4e3796dc90b193a2f9b6/about`, dataset
 `https://data.coquitlam.ca/datasets/Coquitlam::cadastral-1/about?layer=N` with **layer 13
-Parcels, layer 15 Buildings, layer 16 Property Information**. Whether these portal layer numbers
-are the map service's layer ids is **unconfirmed**: the overlay row below calls service layer 16
-"Parcels", which would conflict with portal layer 16 being Property Information. One read of the
-service's layer list settles it. **For Buildings they differ**: the map service's layer list, read
-2026-09-13, has `Buildings` at service layer **17** and `Address Labels` at 1; the rest of that list
-was not recorded.
+Parcels, layer 15 Buildings, layer 16 Property Information**.
+
+**The portal's layer numbers are not the service's layer ids.** The full layer list of
+`DynamicServices/Cadastral/MapServer`, read 2026-09-13 with the operator's permission (version
+10.91, EPSG:3857):
+
+| Id | Layer | | Id | Layer |
+|--:|:--|:--|--:|:--|
+| 0 | Road Labels | | 12 | Covenants |
+| 1 | Address Labels | | 13 | Easements |
+| 2 | Road ROW | | 14 | City Boundary |
+| 3 | Rights of Way (group: 4 City of Coquitlam, 5 Communications, 6 Gas, 7 GVSDD, 8 GVWD, 9 Hydro, 10 Oil, 11 Rail) | | 15 | **Property Information** |
+| | | | 16 | **Parcel Boundaries** |
+| | | | 17 | **Buildings** |
+
+So portal 13 Parcels is service **16**, portal 15 Buildings is service **17**, and portal 16
+Property Information is service **15**; service 13 is Easements. **Code and queries cite the
+service id.** A portal number used against the service fetches the wrong layer. The overlay row's
+`show:0,1,16` is Road Labels, Address Labels and Parcel Boundaries, as it says.
 
 | Layer | Authority for | Source | Copy we hold | Loaded into | Refresh |
 |:--|:--|:--|:--|:--|:--|

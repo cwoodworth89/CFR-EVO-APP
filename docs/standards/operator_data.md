@@ -49,6 +49,18 @@ marked **not built** or **proposed**.
     2026-09-13, §5). The June `Emergency_Response_Zones.shp` is no longer read.
 17. **A junction a person pins lives with the other hand-entered locations** in the `cfr`
     schema, attributed to whoever placed it. `public.intersections` holds derived junctions only.
+18. **Initials are required; evidence is optional.** An operator may review or place an address
+    without a call having used it first. Operator: *"it's don't require an incident to trigger a
+    review."* This relaxes #82 ruling 2's "at least one piece of evidence". Recorded with the UX
+    design in [`../briefings/needs_attention_design.md`](../briefings/needs_attention_design.md).
+19. **A tied lot is drawn on the kiosk dispatch display**, dashed and labelled with the lot's own
+    address, so the tie can be reviewed (same design document).
+20. **The 1,660 base sites without an arrival point are reviewed slowly over time**, not worked
+    as a queue. A locked gate is recorded in the arrival point's note (same design document).
+21. **Build map-grid retention**, so a grid you verified on past calls is what the next call to
+    that address shows first. Operator: *"We should build out the map grid retention so the
+    system gets better over time."* The agreement figure will fall as more calls are compared,
+    since comparison is recent. Design and backtest in §5; not built.
 
 ---
 
@@ -133,10 +145,10 @@ A `cfr` schema in the same database, holding only what people enter:
 
 | Table (names open, #82 ruling 6) | One row per | Holds |
 |:--|:--|:--|
-| Added addresses | civic number the City does not hold | house, street, suffix, as dispatched; status `pending / active / rejected / retired`; arrival point; optional tie to a City site's address; placer, date, evidence |
+| Added addresses | civic number the City does not hold | house, street, suffix, as dispatched; status `pending / active / rejected / retired`; arrival point; optional tie to a City site's address; placer's initials (required), date, evidence (optional, ruling 18) |
 | Site details | address key: a site, or a unit where one is ever needed | arrival point, Street View view, lockbox, hazards, pre-plan, construction, floors; who and when |
 | Halls | hall | location, recorded by, date |
-| Placed junctions | junction a person pins (ruling 17) | point, reason, who, when, evidence |
+| Placed junctions | junction a person pins (ruling 17) | point, reason, initials, when, evidence (optional) |
 
 Each refresh runs under a database role with **no privilege on `cfr`**, so the protection comes
 from the database rather than from a WHERE clause.
@@ -248,9 +260,10 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
     E-Comm used the lot's grid 92 times and the neighbouring grid 14 times.
   * **The 18 disagreements fall on 10 addresses, and E-Comm repeats itself where it has
     repeated:** 1300 Pinetree Way 86 on 6 of 6 (lot 87, entirely inside it), 1210 Pinetree Way
-    86 on 2 of 2 (lot 85), 2960 Walton Ave 87 on 2 of 2 (lot 85). 2601 Lougheed Hwy is the
-    exception: E-Comm itself said 55, 53, 55, 55, 53 (lot 55). The other six have one dispatch
-    each.
+    86 on 2 of 2 (lot 85), 2960 Walton Ave 87 on 2 of 2 (lot 85). 2601 Lougheed Hwy looks
+    inconsistent (55, 53, 55, 55, 53; lot 55) but follows the unit: `Number 24` was 53 both
+    times, `Number 29` 55 both times, no unit 55. **E-Comm's grid can differ by unit within one
+    site.** The other six addresses have one dispatch each.
   * **Where E-Comm's grid comes from is not known.** The cheapest check is whether EG1's map
     puts 1300 Pinetree Way in 86 or 87.
   * **A correction does not persist today.** The review screen writes
@@ -258,10 +271,26 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
     display read it; the pipeline does not. The next call to the same address shows the lot's
     grid in phase 1 (`parcel-zone`), then the spoken grid in phase 2 with `GRID_MISMATCH`
     (`payload_builder.py`, `phase2.py`).
-  * **Proposed, not ruled:** an address-level grid, recorded as hand-entered data in the site
-    details with the dispatches as evidence, which phase 1 reads before the lot's grid. The
-    candidates with repeat evidence are the three above. It would never be applied
-    automatically.
+  * **Map-grid retention (ruling 21, not built). Proposed design:**
+    * **Evidence** is the grids you verified (`dispatches.verified_map_grid`), never the parsed
+      grid, which is where the missing-digit errors came from.
+    * **Keyed by the dispatched address and its unit.**
+    * **Phase 1 order:** the unit's verified history, then the site's, then the lot's grid. Phase
+      2 is unchanged: the spoken grid wins.
+    * **Computed from the dispatch records at read time**, not copied into a table, so it
+      improves the moment a call is verified and cannot go stale (§6.6).
+  * **Backtest, 2026-09-13.** The 465 verified calls on a lot, in time order, each allowed only
+    the calls verified before it:
+    * the lot's grid is right on 447;
+    * "earlier verified grid first, when those earlier calls all agree" is right on **454**;
+    * it makes **0** wrong that the lot's grid had right;
+    * 3 calls had earlier calls that disagreed and fall back to the lot's grid.
+
+    That run keyed by site with any unit removed. Keyed by unit, 2601 Lougheed Hwy's two units stop
+    conflicting.
+  * **Open before building:** how many agreeing verified calls before phase 1 uses one; what
+    phase 1 shows when a site's history disagrees; how the screen labels a grid taken from past
+    calls.
   * **The "missing last digit" grids (12, 2026-07-18 to 08-31) are a different stage.** In 5 the
     raw transcript already has the short number; in 2 the transcript has the full number and the
     parsed grid kept one digit. None since 2026-08-31.

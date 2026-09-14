@@ -30,6 +30,18 @@ marked **not built** or **proposed**.
 9. **The front point stays: lot outline to the centreline of the street the address names.** The
    front point is computed; the arrival point is hand-curated. They do not change each other
    (#78).
+10. **The console keeps its zone colours, and `zones.json` goes.** How the colours are sourced
+    is open (§5).
+11. **The Lougheed Hwy & Mariner Way manual junction is kept.** Measured the same day: the live
+    resolver returns *unresolved* for that phrase without it (§5).
+12. **A lot's centre point becomes its pole of inaccessibility.** Approved; applied only after
+    the diff in §5 is agreed (ruling 3).
+13. **Refresh diffs are reviewed through an agent.** The refresh writes a diff that an agent
+    reads and summarizes for the operator.
+14. **The Pinecone Burke Mtn lots are served by Harper Rd, which becomes a forest service road
+    behind locked gates.** They need manual attention. The design for working lots like these
+    goes to the UX agent
+    ([`../briefings/needs_attention_design_request.md`](../briefings/needs_attention_design_request.md)).
 
 ---
 
@@ -157,7 +169,8 @@ live table (added, removed, changed) and against hand data:
 * **retirements:** added addresses the City now holds;
 * **moved computed points:** front points that move.
 
-An operator agrees or disagrees, the apply runs in one transaction, and the layer's row in
+The diff is written to a file that an agent reads and summarizes (ruling 13). The operator
+agrees or disagrees, the apply runs in one transaction, and the layer's row in
 [`data_sources.md`](data_sources.md) gets its new copy date in the same commit.
 
 ### The key, measured
@@ -186,28 +199,55 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
 
   `zones.json` is not an old map: its 134 grids match `public.zones` with areas within 0.33%
   (median; worst 2.2%, grid 68) and centres within 5 m, simplified to 2,090 vertices from 20,461.
-  **Decide:** keep the assignment, sourced to EG1 with its revision, or drop it and draw grid
-  outlines from `public.zones`.
+  Ruling 10 keeps the colours and removes the file. **Two ways to source the colours:**
+  * **EG1 as data.** The 134-row grid → first-due unit → hall assignment moves to the `cfr`
+    schema, cited to Emergency Guideline 1 and its revision. Outlines come from `public.zones`
+    through the API. The map looks exactly as it does now, and closures-by-hall starts working.
+  * **Computed.** Colour each grid by the hall with the shortest OSRM drive, from each hall's
+    front apron to the grid's pole of inaccessibility, on the production graph. No data to
+    maintain. Measured 2026-09-13: 127 of 134 grids keep their colour. Grids 21, 23, 37, 43, 50
+    and 51 turn from Hall 2 to Hall 3, and grid 131 from Hall 4 to Hall 1. Grids 21 and 43 are
+    near-ties (9 s and 20 s) that could flip with a different point in the grid.
 * **Map grid of a lot.** The City's property data carries no grid. `Addresses.shp` and
   `Parcel_Addresses` have `ZONETYPE1–3` (land-use zoning such as `R-1`) and `PLAN_AREA` (36
-  planning areas, each spanning about 5 grids). **Proposed:** take a lot's grid from
-  `zone_for_point()` on `public.zones`, as base sites already do, and drop the June
-  `Emergency_Response_Zones.shp` path. The two agree on all 27,855 lots checked, so nothing on
-  screen changes.
-* **The lot's centre point.** 233 City lots have a centroid outside the lot. A pole of
-  inaccessibility (`ST_MaximumInscribedCircle`, computed in EPSG:26910) is inside all 233, moving
-  the point 115 m on average and 612 m at most. The console's grid labels already use one
-  (`polylabel`, `frontend/src/components/map/mapGeometry.js`). This point is the third fallback
-  pin and the pin for a substituted nearest number. Run time on 71,213 outlines is not measured.
+  planning areas, each spanning about 5 grids). Today a City lot's grid is the June
+  `Emergency_Response_Zones.shp` polygon containing its centroid, **even when the centroid is
+  outside the lot**. **Proposed:** take the grid from `zone_for_point()` on `public.zones` at the
+  lot's new centre point (ruling 12), as base sites already do, and drop the shapefile path. That
+  makes one source and one point. Measured 2026-09-13, it would change:
+  * **11 of 69,541 City lots**, 5 of them addressed: 1046 United Blvd 14→31, 1085 Falcon Dr
+    64→69, 3305 David Ave 102→96, 4124 Cedar Dr 116→118, 4300 Oliver Rd 117→118. 2 unaddressed
+    lots would have no grid.
+  * **3 of 1,671 base sites:** 1331 Gabriola Dr 100→102, 2885 Lansdowne Dr 79→78, 2995 Robson Dr
+    88→90.
+  * **No dispatch in the corpus** went to any of them, so nothing says which grid E-Comm uses for
+    a lot that straddles two.
+* **The lot's centre point (ruling 12, not yet applied).** The pole of inaccessibility, computed
+  in metres (see [`dependency-behaviour.md`](dependency-behaviour.md)), is inside all 71,212
+  outlines; the centroid is outside 233.
+  * **City lots:** the point moves a median 7.2 m (p90 30.6 m, max 611.6 m); 3,498 move more than
+    50 m.
+  * **Base sites** (today `ST_PointOnSurface`): a median 9.0 m (p90 42.4 m, max 758.4 m); 146
+    move more than 50 m.
+
+  It is the third fallback pin, the pin for a substituted nearest number, and the input to the
+  street-centre fallback. Front points and arrival points do not move. Applying it means a
+  migration for the stored values plus the same computation in `import_parcels.py`, so the next
+  import cannot revert it.
 * **The 160 City lots with no front point.** About 116 carry no house number: water, rail, parks,
   and descriptions such as `N/O Quarry Rd`. The addressed ones are on streets with no City
   centreline: Pinecone Burke Mtn (28 rows), Coronation Cres (7) and Fremont St (5 numbers). The
-  last two are [`../city_gis_data_register.md`](../city_gis_data_register.md) §3.
-* **Lougheed Hwy & Mariner Way.** No dispatch in 641 has used it. It was added 2026-08-22 because
-  the fuzzy matcher sent that phrase to Lougheed & Pinetree, 4.3 km away. Fuzzy matching is now
-  a suggestion only (`intersection_resolver.py`), so that failure cannot recur. Without the row, a
-  call naming the interchange gets no junction pin.
-* **Where the refresh diff is reviewed:** a report and a command, or the console.
+  last two are [`../city_gis_data_register.md`](../city_gis_data_register.md) §3. Pinecone Burke
+  Mtn is reached by Harper Rd, which becomes a forest service road behind locked gates (ruling
+  14): those lots need arrival points and access notes set by hand.
+* **Lougheed Hwy & Mariner Way (kept, ruling 11).** No dispatch in 641 has used it. It was added
+  2026-08-22 because the fuzzy matcher sent that phrase to Lougheed & Pinetree, 4.3 km away;
+  fuzzy matching is now a suggestion only (`intersection_resolver.py`). Measured with the live
+  resolver on the kiosk, 2026-09-13:
+  * with the row, both word orders resolve to the interchange, grid 49, at confidence 100;
+  * without it, both return **unresolved**.
+
+  The resolver removed the wrong answer, but did not replace the row.
 * **The workstation's search path ignores the arrival point.** Search results carry `front_lat`
   (front point, else centroid) and only a `has_arrival_point` flag, and `MapBoard.jsx` routes to
   `front_lat || lat`. A searched address with an arrival point routes to the front point until

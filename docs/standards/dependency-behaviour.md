@@ -46,6 +46,32 @@ shows about 127 degrees where the compact tile draws 120.
 nest -- and only one of them is written down.
 
 
+## `ST_MaximumInscribedCircle` measures in the geometry's own units
+
+**Measured 2026-09-13** on the kiosk, PostGIS 3.4.3.
+
+Its `center` is the interior point furthest from any edge, the pole of inaccessibility. That
+is the operator-approved centre point for a lot, replacing the centroid, which fell outside
+233 lots ([`operator_data.md`](operator_data.md)).
+
+It measures in whatever units the geometry is in. Handed lat/lng, it measures in degrees, and
+a degree of longitude is shorter on the ground than a degree of latitude, so "furthest from an
+edge" is judged in a stretched space. The two answers differ on a sample of 1,987 City lots
+(every 35th id):
+
+| Computed on | vs projected first |
+|:--|:--|
+| Centre more than 1 m apart | 1,669 lots |
+| More than 10 m apart | 580 lots |
+| Largest difference | 245.8 m |
+
+**Consequence for CFR EVO:** always project to metres first:
+`ST_Transform((ST_MaximumInscribedCircle(ST_Transform(geom, 26910))).center, 4326)`.
+Computed that way, the centre is inside its own outline for all 71,212 lots and base sites, in
+about 22 seconds on the kiosk. The console's grid labels solve the same problem for `polylabel`
+by scaling longitude before the search (`frontend/src/components/map/mapGeometry.js`).
+
+
 ## The pattern: the API name is not the contract
 
 Every library defect found so far had the same shape — **the name described the intent,

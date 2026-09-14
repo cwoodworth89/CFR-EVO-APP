@@ -15,14 +15,16 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**11 open** (8 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**13 open** (9 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 11
+## Open — 13
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **84** | 🔴 crew-visible | OPEN — ruled 2026-09-13: remove; not built | [`KNOWN_BUILDINGS`: eight hand-coded buildings override console pins, three of them wrong](punchlist/84-known-buildings-hand-coded-coordinates-override-console-pins.md) |
+| **83** | ⚪ hygiene | OPEN — not built | [Phase 1's transcript is deleted, so the first screen crews see cannot be measured](punchlist/83-phase-1s-transcript-is-deleted-so-the-first-screen-cannot-be-measured.md) |
 | **82** | 🔴 crew-visible | OPEN — design agreed 2026-09-13, not built | [A dispatched address that no City source holds is only ever estimated](punchlist/82-a-dispatched-address-no-city-source-holds-is-only-ever-estimated.md) |
 | **81** | 🔴 crew-visible | FIXED in the tree 2026-09-13; needs a `cfr-agent` restart, not seen on screen | [A split street name raised a false warning, and a fuzzy junction passed the phase 1 gate](punchlist/81-a-split-street-name-and-a-fuzzy-junction-reached-the-crew-as-a-warning-and-a-place.md) |
 | **80** | 🔴 crew-visible | FIXED `310f77a3`, built; chip not yet seen on screen | [An unresolved talk group looks exactly like a dispatch with no talk group](punchlist/80-an-unresolved-talk-group-looks-like-a-dispatch-with-no-talk-group.md) |

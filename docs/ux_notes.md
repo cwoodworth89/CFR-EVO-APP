@@ -203,7 +203,7 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
   and *INTERACTIVE VIEW UNAVAILABLE* are amber; *OPERATOR-SET*, *● saved*, and a ruled flag
   are green.
 * **Say how a value was obtained, next to the value.** *(as heard)* and *(?)* on near roads;
-  *FROM ADDRESS* on a phase-1 grid; *before arrival, on the route* / *within a 50 ft roll* /
+  *FROM ADDRESS* on a phase-1 grid; *before arrival, on the route* / *within 100 ft of the address* /
   *supply lay* on hydrants; *straight-line* on a distance that is one.
 * **The tile is the picture.** A compact panel shows the thing and a small header; controls
   live in the expanded view.
@@ -235,8 +235,11 @@ Keep these unless a redesign deliberately changes them; each came from a defect.
 
 ### Hydrants, as ruled
 
-A hydrant within 50 ft of the marker, any direction, first ("we carry short, 50ft supply line
-rolls"); then along the route of travel within the 1,000 ft supply lay, the last one passed
+**Any hydrant within 100 ft of the marker**, any direction, first (operator, 2026-09-13: *"ANY
+hydrant within 100ft of the marker is the first option"*; it replaced the 50 ft of 2026-09-06,
+*"we carry short, 50ft supply line rolls"*, after DISP-2026-56F11A led with a 548 ft long lay
+while M-462 stood 52 ft from the junction). If that nearest hydrant is private, the next best
+City hydrant is shown beside it (**PRIVATE IS CLOSER**). Then along the route of travel within the 1,000 ft supply lay, the last one passed
 first, a lay past 500 ft marked LONG LAY with the closer off-route option beside it ("we'd lay
 300–500 feet of supply line all day. It's when it gets further we need to think about relay
 pumping, or finding something closer"); then within 300 ft of the address straight-line; then

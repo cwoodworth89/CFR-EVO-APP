@@ -2,9 +2,8 @@
  * Which hydrants to show a driver for a call, in the order the operator asked for
  * (department operational policy, operator 2026-09-06, punch-list #74):
  *
- *   0. A hydrant within 50 ft of the address marker, any direction, comes first regardless
- *      of the route: the engines carry short 50 ft supply line rolls (operator, later the
- *      same day).
+ *   0. A hydrant within 100 ft of the address marker, any direction, comes first regardless
+ *      of the route (operator ruling 2026-09-13, replacing the 50 ft of 2026-09-06).
  *   1. "Choice #1 and #2": the two hydrants ALONG THE ROUTE OF TRAVEL closest to the call,
  *      within the 1,000 ft supply lay of arrival, measured along the route. The last hydrant
  *      the apparatus passes is #1. A doorstep hydrant takes #1 and the route supplies the
@@ -23,13 +22,15 @@
  * well under one percent of the distances involved.
  */
 
-// 50 ft. Operator 2026-09-06: "if a hydrant is within 50ish ft of the address marker in any
-// direction it should be prioritized, regardless of route. We carry short, 50ft supply line
-// rolls." Measured from the marker because that is where the truck stops (operator: "the
-// truck is going to stop at the marker, not the door"). The assumption underneath is that
-// the marker IS the arrival point on the street; a large parcel placed at its centroid
-// (punch-list #49) would put the truck somewhere else, and that is the falsifier.
-export const DOORSTEP_M = 15.24;
+// 100 ft. Operator ruling 2026-09-13: "ANY hydrant within 100ft of the marker is the first
+// option." It replaces the 50 ft of 2026-09-06 ("within 50ish ft ... We carry short, 50ft
+// supply line rolls"), which DISP-2026-56F11A missed by 2 ft: M-462 stood 52 ft from the
+// junction, and the card led with M-463, a 548 ft long lay, instead. Measured from the marker
+// because that is where the truck stops (operator: "the truck is going to stop at the marker,
+// not the door"). The assumption underneath is that the marker IS the arrival point on the
+// street; a large parcel placed at its centroid (punch-list #49) would put the truck somewhere
+// else, and that is the falsifier.
+export const DOORSTEP_M = 30.48;
 
 // 300 ft. Operator 2026-09-06: "If there's no hydrant within 300ft of the route, check if
 // there is one (sometimes it's just past the address). If nothing within 300ft warn the driver."
@@ -119,7 +120,7 @@ export function pickRouteHydrants({ hydrants = [], routeCoords = [], destination
 
   const routeKnown = Array.isArray(routeCoords) && routeCoords.length > 1;
 
-  // Tier 0: within a 50 ft roll of the address marker, any direction, before the route.
+  // Tier 0: within 100 ft of the address marker, any direction, before the route.
   const doorstep = pool.filter(e => e.straight <= DOORSTEP_M)
     .sort((a, b) => a.straight - b.straight)
     .slice(0, 2)

@@ -41,7 +41,7 @@ test('808 Miller Ave: an on-route hydrant 95 m back beats off-route ones at 64 m
   assert.equal(r.picks[0].how, TIER.APPROACH);
 });
 
-test('a hydrant within a 50 ft roll of the marker is #1 regardless of the route; the route fills #2', () => {
+test('a hydrant within 100 ft of the marker is #1 regardless of the route; the route fills #2', () => {
   const hydrants = [
     hyd('H40', north(6), east(-40)),      // on the approach, 40 m out
     hyd('ROLL', north(-12), east(8)),     // 14 m from the marker, just past the address, off the far side
@@ -96,14 +96,26 @@ test('nothing within 1,000 ft is the warning, and a NOT READY hydrant never coun
 });
 
 test('a hydrant past the end of the route is not on the route to the marker (DISP-2026-56F11A, M-462)', () => {
-  // Operator, 2026-09-13: "Hydrants should be along the route to the marker." A hydrant 10 m
-  // east and 12 m south, beyond a route arriving from the west, used to clamp onto the route's
-  // last point and read 0 ft before arrival.
-  const hydrants = [hyd('PASTEND', north(-12), east(10))];
+  // Operator, 2026-09-13: "Hydrants should be along the route to the marker." A hydrant past
+  // the end of a route arriving from the west used to clamp onto the route's last point and
+  // read 0 ft before arrival. 40 m out, past the 100 ft first option, it is found straight-line.
+  const hydrants = [hyd('PASTEND', north(-24), east(32))];
   const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
   assert.equal(r.tier, TIER.NEAR);
   assert.equal(r.picks[0].how, TIER.NEAR);
-  assert.equal(r.picks[0].distance, 16);
+  assert.equal(r.picks[0].distance, 40);
+});
+
+test('DISP-2026-56F11A: a hydrant 52 ft from the junction leads, not the 548 ft long lay on the route', () => {
+  // Operator ruling 2026-09-13: "ANY hydrant within 100ft of the marker is the first option."
+  // Under the 50 ft rule of 2026-09-06, M-462 at 52 ft missed by 2 ft and M-463 led.
+  const hydrants = [hyd('M-462', north(-12), east(10)), hyd('M-463', north(5), east(-167))];
+  const r = pickRouteHydrants({ hydrants, routeCoords: route, destination: DEST });
+  assert.equal(r.tier, TIER.DOORSTEP);
+  assert.deepEqual(r.picks.map(p => p.gisId), ['M-462', 'M-463']);
+  assert.ok(r.picks[0].distance <= DOORSTEP_M);
+  assert.equal(r.picks[1].how, TIER.APPROACH);
+  assert.equal(r.picks[1].longLay, true);
 });
 
 test('the on-route distance runs to the marker, not to where the route line stops', () => {

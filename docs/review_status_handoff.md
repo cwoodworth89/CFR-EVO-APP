@@ -112,8 +112,9 @@ live; the four round-2 rows in `evaluation_history` carry the verdict in their n
 
 ### Rulings recorded today, so nobody re-derives them
 
-* **Hydrants**: a hydrant within 50 ft of the marker first ("we carry short, 50ft supply line
-  rolls"); then along the route of travel within the 1,000 ft supply lay, last passed first, a
+* **Hydrants**: any hydrant within 100 ft of the marker first (operator, 2026-09-13, replacing
+  the 50 ft "short supply line rolls" rule of 2026-09-06); a private nearest one is shown with the
+  next best City hydrant beside it; then along the route of travel within the 1,000 ft supply lay, last passed first, a
   lay past 500 ft marked long with the closer off-route option beside it; then within 300 ft
   of the address; then anything within 1,000 ft; else warn. Standards index row.
 * **The marker is where the truck stops**, the city-to-private transition; private hydrants

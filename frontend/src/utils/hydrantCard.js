@@ -17,7 +17,7 @@ import { TIER } from './routeHydrants.js';
 
 // 1 ft = 0.3048 m exactly (international foot, 1959 agreement between the English-speaking
 // standards bodies). The picker measures in metres; the crew's own rule is stated in feet
-// (50 ft roll, 300 ft, 1,000 ft supply lay), and the canvas shows feet.
+// (100 ft first option, 300 ft, 1,000 ft supply lay), and the canvas shows feet.
 export const M_PER_FT = 0.3048;
 
 export function metresToFeet(m) {
@@ -47,7 +47,7 @@ export function hydrantHow(pick, { first = true, routeKnown = true } = {}) {
   if (!pick) return '';
   switch (pick.how) {
     case TIER.DOORSTEP:
-      return 'within a 50 ft roll of the address';
+      return 'within 100 ft of the address';
     case TIER.APPROACH:
       return 'before arrival, on the route';
     case TIER.NEAR:

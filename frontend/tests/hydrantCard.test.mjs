@@ -94,7 +94,7 @@ test('a long lay with no closer option is one amber row, and the chip is the who
 });
 
 test('every tier has a how line and unknown tiers have none', () => {
-  assert.equal(hydrantHow({ how: TIER.DOORSTEP }), 'within a 50 ft roll of the address');
+  assert.equal(hydrantHow({ how: TIER.DOORSTEP }), 'within 100 ft of the address');
   assert.equal(hydrantHow({ how: TIER.SUPPLY }), 'within the 1,000 ft supply lay; none within 300 ft');
   assert.equal(hydrantHow({ how: 'something-else' }), '');
 });

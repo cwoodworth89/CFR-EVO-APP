@@ -106,11 +106,18 @@ authority for a civic address**, and in what form we should take it. What is kno
 |:--|:--|
 | `where=PROPHOUSE='2973' AND UPPER(PROPSTREET) LIKE 'GLEN%'`, no geometry | **0 records**, no error |
 | `where=1=1`, count only | **73,300** records, against 69,708 rows in our 2025-06-22 file (+3,592) |
+| Control: the first query for `2963` | **19 records**, lot `!4200377`, the main record and 18 units — the same 19 rows `public.parcels` holds for that lot, same PID, plan, lot and legal description |
 
-**The zero is not yet a result.** The same query has not been run for an address known to be in
-the layer, so a stored form the clause does not match (a padded house number, a different
-street spelling) is not ruled out. The control is the identical query for 2963 Glen Dr, which
-our file holds. The larger count fits a newer copy of the same data but does not show it.
+**The zero is real.** The control shows the query form matches how the layer stores addresses.
+So 2973 Glen Dr is **in neither City address layer** and only in the label layer: an
+inconsistency in the City's own data, raised as
+[`../city_gis_data_register.md`](../city_gis_data_register.md) §16.
+
+**What this settles about the best form of address data:** `Parcel_Addresses` is the live
+counterpart of Property Information — same lot, same records, same fields — and our copy is
+older by 3,592 records. It is the source to refresh from. It would not have fixed this call.
+Whether a fresh pull fixes any of #64's other fifteen is unchecked: it needs the whole layer
+(74 pages of 1,000) or fifteen lookups, both data requests to the City.
 
 **Not decided, and not to be improvised:** taking a street name for an Address Labels point from
 the lot it falls in. The 35 collisions above are the evidence against doing it blindly.

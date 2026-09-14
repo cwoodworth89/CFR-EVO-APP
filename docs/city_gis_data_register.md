@@ -395,6 +395,34 @@ Hwy`, `4992 Upper Harper Rd`. The full table with the nearest numbers is punch-l
 (strata units, large-site secondary numbers, recent assignments) that carries these? Until
 then the kiosk places them on the block or the street, labelled as such.
 
+## 16. `2973 Glen Dr` is on the City's map labels but not in its address layers
+
+**Status: OPEN.** Found 2026-09-13 from DISP-2026-E301A3 (punch-list #64). Dispatched and
+verified as 2973 Glen Dr; the operator reports the call placed correctly.
+
+**It is a real address.** Operator, 2026-09-13: *"2973 is a valid coquitlam address, it visibly
+has 2973 in streetview, and most important ECOMM dispatches to that address. People are going to
+use 2973 as a valid address."* The gap is in the City's address layers, not in the address.
+
+| City layer | 2973 Glen Dr? | Checked |
+|:--|:--|:--|
+| `DynamicServices/AddressSearch/MapServer/1` **Parcel_Addresses** (live, 73,300 records) | **no** — `PROPHOUSE='2973' AND UPPER(PROPSTREET) LIKE 'GLEN%'` returns 0 | 2026-09-13; the identical query for 2963 returns 19 records, so the query form is not the cause |
+| Open Data Property Information (`Addresses.shp`, 2025-06-22) | no | 2026-09-13 |
+| `DynamicServices/Cadastral/MapServer/1` **Address Labels** (live) and its Open Data copy | **yes** — a `2973` label point inside lot `!4200377` | 2026-09-13; drawn on our cadastral overlay |
+
+Lot `!4200377` is **2963 Glen Dr**, Lot 1 Plan 83167, PID 015-029-867, 18 units, legal description
+*"except airspace parcel A, airspace plan BCP9580, DL 386"*. The address layers hold only 2963
+for it; the label layer carries both 2963 and 2973. That 2973 belongs to the airspace parcel is a
+guess, not verified.
+
+**Question for the City:** is 2973 Glen Dr an assigned civic address, and if so, why is it in the
+label layer and not in `Parcel_Addresses`? The same comparison across the whole city (Address
+Labels against our lots, [`standards/data_sources.md`](standards/data_sources.md) §2) found 143
+label numbers that the lot they sit on does not carry; this may be one of a class.
+
+**Workaround today:** phase 1 withholds the location (no parcel); phase 2 places it from the
+block's address range with the approximate-location banner.
+
 ## 15. Dispatch says "Chartwell Rd"; the City's layers name it Chartwell Green
 
 **Found 2026-09-05.** DISP-2026-EC4501, verified from the audio as `3305 Chartwell Rd`. The

@@ -81,12 +81,28 @@ authority for a civic address**, and in what form we should take it. What is kno
 |:--|:--|:--|:--|:--|
 | Open Data **Property Information** (in use) | yes | yes | **no** (2025-06-22) | shapefile download |
 | Open Data **Address Labels** | **no** — one field, `LABEL`, the number; every point stored twice | no | yes | shapefile download (done) |
-| Map service **Cadastral layer 1 Address Labels** (the overlay's source) | **unconfirmed** — the layer's fields have not been read | unconfirmed | yes (seen on the overlay) | a `query` on the layer |
-| Map service **AddressSearch** (layer 2 is already our road names) | **unconfirmed** — the service's other layers have not been listed | unconfirmed | unconfirmed | a `query` on the layer |
+| Map service **Cadastral layer 1 Address Labels** (the overlay's source) | **no** — fields `OBJECTID, SHAPE, LABEL` (String 20), points, drawn at 1:5,000 and closer. The same data as the Open Data set | no | yes (seen on the overlay) | — |
+| Map service **AddressSearch layer 1 `Parcel_Addresses`** | **yes** — `PROPHOUSE, PROPSTREET, PROPSTREETTYPE`, plus `ADDRESS` and `ROADNAME` | **yes** — `PROPUNIT, PROPUNITTYPE` | **unconfirmed** — the layer's data has not been queried | `query`, 1,000 records a page |
 
-Reading the two map-service layer definitions (`…/Cadastral/MapServer/1?f=json`,
-`…/AddressSearch/MapServer?f=json`) would settle the unconfirmed cells. Each is a request to the
-City and needs the operator's permission (CLAUDE.md §1).
+**The layer definitions, read 2026-09-13 with the operator's permission** (`…/Cadastral/MapServer/1?f=json`,
+`…/AddressSearch/MapServer?f=json`, `…/AddressSearch/MapServer/1?f=json`):
+
+* `AddressSearch` is *"features to support address searching in the City of Coquitlam"*: layer 0
+  `Roads` (lines), layer 1 `Parcel_Addresses` (polygons), table 2 `Road_Names` (already our
+  road-name source).
+* `Parcel_Addresses` carries every field our `Addresses.shp` has under a `PROP` prefix
+  (`PROPHOUSE, PROPSTREET, PROPSTREETTYPE, PROPUNIT, PROPUNITTYPE, PROPPOSTAL, PROPBLOCK,
+  PROPPLAN, PROPLOT, LEGALDESC, PLAN_AREA, ZONETYPE1–3, GIS_ID`, with `ROLL_NUMBER` where the file
+  has `FOLIO`), and adds `ADDRESS, ROADNAME, PROPERTYRSN, PID, layer, CEDMS_LSP` and the
+  SC card URLs. That it is the **live counterpart of Property Information** is a reading of the
+  schema, **unconfirmed** until its rows are compared with the file.
+* The Address Labels layer's description is *"address labels for City of Coquitlam parcels"* and
+  carries the City's standard disclaimer of accuracy. It is a labelling layer, not an address
+  register.
+
+What would settle it: whether `Parcel_Addresses` holds 2973 Glen Dr, and how its record count
+compares with the 69,708 rows of the file. Both are data queries against the City, not
+descriptions, and need the operator's permission.
 
 **Not decided, and not to be improvised:** taking a street name for an Address Labels point from
 the lot it falls in. The 35 collisions above are the evidence against doing it blindly.

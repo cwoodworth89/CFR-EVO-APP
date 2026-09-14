@@ -1,4 +1,6 @@
-"""Recompute per-unit ETAs for dispatches whose stored metrics never followed their coordinates.
+"""ALREADY RUN, 2026-09-11: 19 records repaired, 522 already correct, 0 skipped. Kept for provenance.
+
+Recompute per-unit ETAs for dispatches whose stored metrics never followed their coordinates.
 
 WHY
     `routing_metrics` was computed once, in phase 1, and only when phase 1 itself geocoded
@@ -24,7 +26,7 @@ RUN IT ON THE KIOSK
     initialises PortAudio, so:
 
         ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && \\
-          XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python backend/scripts/backfill_routing_metrics.py"
+          XDG_RUNTIME_DIR=/run/user/1000 .venv/bin/python tools/oneshot/2026-09-11_backfill_routing_metrics_after_phase2.py"
 
     Dry run by default -- it prints what it would change and writes nothing. Add --apply
     to commit. --limit N caps the number of rows considered, for a cautious first pass.
@@ -37,9 +39,12 @@ import logging
 import argparse
 from pathlib import Path
 
-# backend/ on the path, so `cfr_dispatch` imports and injects the sibling service paths
-# (CLAUDE.md 2 -- do not "fix" the gis_service import inside payload_builder).
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# backend/ on the path via tools/_repo, so `cfr_dispatch` imports and injects the sibling service
+# paths (CLAUDE.md 2 -- do not "fix" the gis_service import inside payload_builder).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # tools/, for _repo
+from _repo import BACKEND  # noqa: E402
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
 
 from cfr_dispatch.pipeline.payload_builder import (  # noqa: E402
     compute_routing_metrics, _routing_matches_destination)

@@ -119,5 +119,11 @@ older by 3,592 records. It is the source to refresh from. It would not have fixe
 Whether a fresh pull fixes any of #64's other fifteen is unchecked: it needs the whole layer
 (74 pages of 1,000) or fifteen lookups, both data requests to the City.
 
+**The full pull failed twice at the same records, 2026-09-13.** Paging by `resultOffset` and
+paging by `OBJECTID > n` both returned HTTP 400 *"Failed to execute query."* (three tries each)
+for the batch after OBJECTID 39,000, as GeoJSON in EPSG:4326 with geometry. Records 1–39,000 are
+saved (dev laptop scratch, not yet on the kiosk). The paging method is ruled out; what in that
+batch the server cannot answer is not known.
+
 **Not decided, and not to be improvised:** taking a street name for an Address Labels point from
 the lot it falls in. The 35 collisions above are the evidence against doing it blindly.

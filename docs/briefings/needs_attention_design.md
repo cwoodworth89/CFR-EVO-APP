@@ -16,7 +16,7 @@ Street View tiles on the right, with a work panel under the tiles. No new screen
 ┌ CONSOLE · ADMIN ──────────────────────────────────────────────────────────────────┐
 │ NEEDS ATTENTION          │                                    │ AERIAL             │
 │ ───────────────────────  │                                    │   [lot outline]    │
-│ No City road         44  │                                    ├────────────────────┤
+│ No City road         40  │                                    ├────────────────────┤
 │ Not in City data     24  │               MAP                  │ STREET VIEW        │
 │ After refresh         —  │                                    │                    │
 │ ───────────────────────  │    ○  suggestion — not placed      ├────────────────────┤
@@ -32,7 +32,8 @@ Street View tiles on the right, with a work panel under the tiles. No new screen
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Counts are the request's measurements of 2026-09-13. The 1,660 base sites without an arrival
+Counts measured on the kiosk 2026-09-13. **No City road is 40 addresses**, not the 44 a first
+reading of the request's table gave: Fremont St has nine lots but only five carry a number. The 1,660 base sites without an arrival
 point are not a heading (operator answer 1).
 
 ## Working one item
@@ -85,8 +86,31 @@ Follows the `kiosk-responsive-ergonomics` skill.
 
 | Part | Needs | Buildable now |
 |:--|:--|:--|
-| The queue list, heading **No City road** (44 lots) | A read-only query; nothing stored | Yes |
+| The queue list, heading **No City road** (40 addresses) | A read-only query; nothing stored | Yes |
 | Working those lots | The arrival point on `public.parcels` (`entrance_*`), already built and live | Yes — but it is today's storage; ruling 1 moves hand data to `cfr` |
 | **Not in City data** (24 addresses, #82), ties to lots, PENDING / REJECTED with a reason, evidence | The `cfr` schema | No |
 | **After refresh** | The semi-manual refresh (ruling 3) | No |
 | Base sites (1,660) | — | Deferred (answer 1) |
+
+## The No City road list, until there is a screen
+
+Operator decision 2026-09-13: **the list now, the queue screen once `cfr` exists.** Arrival points
+on these addresses are placed through Explore search and the existing placer, which already records
+the initials (`entrance_set_by`). The list is this query, not a copy, so it cannot go stale — a
+placed arrival point drops the row out:
+
+```sql
+SELECT street || ' ' || streettype AS street, house, address, gis_id
+FROM public.parcels
+WHERE NOT is_base_site
+  AND front_lat IS NULL
+  AND NULLIF(TRIM(house::text), '') IS NOT NULL
+  AND entrance_lat IS NULL
+ORDER BY street, NULLIF(regexp_replace(house::text, '\D', '', 'g'), '')::int NULLS LAST, house;
+```
+
+On 2026-09-13 it returned **40 rows, none with an arrival point**, matching the counts in
+`operator_data.md` §5 (Pinecone Burke Mtn 28, Coronation Cres 7, Fremont St 5). **All 28 Pinecone
+Burke Mtn addresses share one City lot, `!8180021`** — one parcel behind the Harper Rd FSR gate
+carrying 28 civic numbers. The placer sets an arrival point per address, so as built that is 28
+placements.

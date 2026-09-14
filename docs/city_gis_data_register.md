@@ -404,6 +404,15 @@ verified as 2973 Glen Dr; the operator reports the call placed correctly.
 has 2973 in streetview, and most important ECOMM dispatches to that address. People are going to
 use 2973 as a valid address."* The gap is in the City's address layers, not in the address.
 
+**The City's own web map finds it only through Esri.** Operator screenshot, QtheMap, 2026-09-13:
+searching `2973` lists City results, then under **Esri World Geocoder** `2973 Glen Dr, Coquitlam,
+BC, V3B 2P7`. Absence from QtheMap's City list is **not** evidence on its own: it showed six
+results in both screenshots taken that day, and `public.parcels` holds eleven streets with a
+2973 (Burlington, Cliffrose, Forestridge, Pinetree Close and Robson were not shown), so the list
+is cut off. The evidence of absence is the `Parcel_Addresses` query below. The same screenshot
+check for `1179 The High St` showed it only under Esri too, but `public.parcels` does hold it
+(lot `!4200241`, one row) — that one is the six-result cut-off, not a gap.
+
 | City layer | 2973 Glen Dr? | Checked |
 |:--|:--|:--|
 | `DynamicServices/AddressSearch/MapServer/1` **Parcel_Addresses** (live, 73,300 records) | **no** — `PROPHOUSE='2973' AND UPPER(PROPSTREET) LIKE 'GLEN%'` returns 0 | 2026-09-13; the identical query for 2963 returns 19 records, so the query form is not the cause |

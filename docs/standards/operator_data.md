@@ -241,6 +241,30 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
     * 1300 Pinetree Way (twice) and 3501 David Ave calculate 87 and 112 where E-Comm said 86 and
       111, and the new centre gives the same answer;
     * 2 are addresses no City source holds.
+* **E-Comm's grid against the lot's grid, and whether a correction persists.** Measured
+  2026-09-13 on the 465 verified dispatches matched to a lot: E-Comm's grid is the lot's grid on
+  447 (96.1%).
+  * **Not a boundary-street rule.** Of the 108 whose front point sits within 3 m of another grid,
+    E-Comm used the lot's grid 92 times and the neighbouring grid 14 times.
+  * **The 18 disagreements fall on 10 addresses, and E-Comm repeats itself where it has
+    repeated:** 1300 Pinetree Way 86 on 6 of 6 (lot 87, entirely inside it), 1210 Pinetree Way
+    86 on 2 of 2 (lot 85), 2960 Walton Ave 87 on 2 of 2 (lot 85). 2601 Lougheed Hwy is the
+    exception: E-Comm itself said 55, 53, 55, 55, 53 (lot 55). The other six have one dispatch
+    each.
+  * **Where E-Comm's grid comes from is not known.** The cheapest check is whether EG1's map
+    puts 1300 Pinetree Way in 86 or 87.
+  * **A correction does not persist today.** The review screen writes
+    `dispatches.verified_map_grid` for that one call. The backtests, harnesses and the review
+    display read it; the pipeline does not. The next call to the same address shows the lot's
+    grid in phase 1 (`parcel-zone`), then the spoken grid in phase 2 with `GRID_MISMATCH`
+    (`payload_builder.py`, `phase2.py`).
+  * **Proposed, not ruled:** an address-level grid, recorded as hand-entered data in the site
+    details with the dispatches as evidence, which phase 1 reads before the lot's grid. The
+    candidates with repeat evidence are the three above. It would never be applied
+    automatically.
+  * **The "missing last digit" grids (12, 2026-07-18 to 08-31) are a different stage.** In 5 the
+    raw transcript already has the short number; in 2 the transcript has the full number and the
+    parsed grid kept one digit. None since 2026-08-31.
 * **The 160 City lots with no front point.** About 116 carry no house number: water, rail, parks,
   and descriptions such as `N/O Quarry Rd`. The addressed ones are on streets with no City
   centreline: Pinecone Burke Mtn (28 rows), Coronation Cres (7) and Fremont St (5 numbers). The

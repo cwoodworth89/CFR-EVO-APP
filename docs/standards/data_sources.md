@@ -28,10 +28,20 @@ City services are under `https://geodata.coquitlam.ca/arcgis/rest/services/`; th
 off below. Hub datasets are on the City's Open Data portal (`data.coquitlam.ca`), downloaded
 through `opendata.arcgis.com`.
 
+**The Open Data Cadastral dataset**, identified by the operator 2026-09-13: map
+`https://data.coquitlam.ca/maps/c72d39364d8b4e3796dc90b193a2f9b6/about`, dataset
+`https://data.coquitlam.ca/datasets/Coquitlam::cadastral-1/about?layer=N` with **layer 13
+Parcels, layer 15 Buildings, layer 16 Property Information**. Whether these portal layer numbers
+are the map service's layer ids is **unconfirmed**: the overlay row below calls service layer 16
+"Parcels", which would conflict with portal layer 16 being Property Information. One read of the
+service's layer list settles it.
+
 | Layer | Authority for | Source | Copy we hold | Loaded into | Refresh |
 |:--|:--|:--|:--|:--|:--|
 | **Lots and their addresses** | Lot outlines, the civic numbers and units the City's property records carry, folio, legal description | Open Data **Property Information** (the Cadastral set, portal layer 16), shapefile. Hub dataset `3df0090289aa4503bd8d234d7ee0c182_0` in `update_gis_data.py` — that this ID *is* Property Information is **unconfirmed**; the fields match (`GIS_ID, ADDRESS, HOUSE, UNIT, LEGALDESC, FOLIO, ZONETYPE…`) and so does the 2963-not-2973 lot | `backend/data/Property_Information/Addresses.shp`, 69,708 rows, `EXTRACT_DT` **2025-06-22**, on disk since 2026-06-19 | `public.parcels` (71,213 rows: 69,542 City rows + 1,671 base sites) by `backend/scripts/import_parcels.py` | `update_gis_data.py` (never run on the kiosk: no `last_gis_update.timestamp`) |
 | **Address label points** | Nothing yet — **not loaded** | Open Data **Address Labels** (`data.coquitlam.ca/datasets/Coquitlam::address-labels-1`), shapefile, EPSG:3857 | `backend/data/staging/Address_Labels_2026-09-13/`, downloaded by the operator **2026-09-13**, 58,220 points | — | by hand |
+| Address label points, second copy | Nothing yet — **not loaded** | A paged service query by another session on 2026-09-13; **the endpoint is not recorded**. Its fields are `OBJECTID, LABEL`, the same as Cadastral service layer 1 Address Labels (§3), so it is probably the same data as the row above, **unconfirmed** | `backend/data/staging/EPW_Address_Labels_2026-09-13/`, 30 pages, 29,111 points | — | — |
+| **Buildings** | Building outlines and heights; nothing yet, **not loaded** | Open Data Cadastral dataset **layer 15 Buildings** (operator, 2026-09-13), pulled as a paged service query by another session; **the endpoint is not recorded** | `backend/data/staging/Buildings_2026-09-13/`, 34 pages, 33,766 polygons, fields `OBJECTID, FCODE, GENERIC_NAME, HEIGHT, PERIMETER` | — | — |
 | **Cadastral overlay** (the parcel lines and house numbers drawn on the kiosk map) | **Display only.** Images; the system cannot read an address from it | City map service `DynamicServices/Cadastral/MapServer/export`, `layers=show:0,1,16` — **layer 0 Road Labels, layer 1 Address Labels, layer 16 Parcels** — rendered by the City and saved as PNG | `backend/data/tiles/cadastral.mbtiles`, written **2026-08-28**, z14–20 | served by `cfr_tiles` | `backend/scripts/crawl_cadastral_tiles.py` |
 | **Response zones** | Map grid (1–134) for a point | City map service `DynamicServices/Planning/MapServer/6`, GeoJSON; and a second copy, Hub dataset `109ad5fa4cb149ab93a1f9a2de88f34d_0`, shapefile | GeoJSON `backend/data/staging/emergency_zones.geojson` **2026-08-20**; shapefile `backend/data/Emergency_Response_Zones/` on disk since **2026-06-19** | GeoJSON → `public.zones` (134) by `import_gis_data.py`. The shapefile is **no longer read**: since 2026-09-13 `public.parcels.zone_id` is `zone_for_point()` on `public.zones` at each lot's centre point (`import_parcels.py`) | `download_gis_data.py`; `update_gis_data.py` |
 | **City boundary** | In or out of Coquitlam | `DynamicServices/Cadastral/MapServer/14` | `staging/city_boundary.geojson` **2026-08-20** | `public.city_boundary` (1) | `download_gis_data.py` |
@@ -50,8 +60,9 @@ Licences: City data is under the Open Government Licence — City of Coquitlam, 
 [`basemap/`](basemap/).
 
 **Not in the database at all:** building footprints. CLAUDE.md §1 names LiDAR-height building
-footprints; they exist only inside basemap tiles (checked 2026-09-10,
-[`../city_gis_data_register.md`](../city_gis_data_register.md)).
+footprints; until 2026-09-13 they existed only inside basemap tiles (checked 2026-09-10,
+[`../city_gis_data_register.md`](../city_gis_data_register.md)). A City copy is now staged (the
+Buildings row), not loaded.
 
 ---
 
@@ -124,6 +135,10 @@ paging by `OBJECTID > n` both returned HTTP 400 *"Failed to execute query."* (th
 for the batch after OBJECTID 39,000, as GeoJSON in EPSG:4326 with geometry. Records 1–39,000 are
 saved (dev laptop scratch, not yet on the kiosk). The paging method is ruled out; what in that
 batch the server cannot answer is not known.
+
+**It completed later the same day.** Counted on the kiosk: `backend/data/staging/Parcel_Addresses_2026-09-13/`
+holds 73,299 features in 74 GeoJSON pages, plus OBJECTID 39,699 saved separately as Esri JSON
+(`oid_39699.esrijson`), making 73,300, the layer's own count.
 
 **Not decided, and not to be improvised:** taking a street name for an Address Labels point from
 the lot it falls in. The 35 collisions above are the evidence against doing it blindly.

@@ -8,6 +8,10 @@ The system is offline-first, so obtained standards are **vendored into this dire
 with their revision recorded — not linked. A link is not available at 3am on a kiosk with
 no WAN.
 
+> **Where each data layer comes from is [`data_sources.md`](data_sources.md)**: the City
+> dataset or service behind every table and tile set, the date of our copy, what it is the
+> authority for, and which layers disagree.
+>
 > **Municipal data gaps are tracked separately.** Where the City of Coquitlam's own data is
 > missing, inconsistent, or disagrees with dispatch, the question belongs in
 > [`../city_gis_data_register.md`](../city_gis_data_register.md) — not here, and never in code.

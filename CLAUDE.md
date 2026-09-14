@@ -12,13 +12,17 @@ This rule file defines domain constraints, runtime environments, and workflow st
   geocoding. Everything persists to containerized PostgreSQL 16 + PostGIS 3.4
   (`postgis/postgis:16-3.4-alpine`, `localhost:5432`).
 * **PostGIS is the single source of truth.** Parcels, roads, intersections, zones, city
-  boundary, road names, `custom_places`, hydrants and vocabulary all live in Postgres.
+  boundary, road names, hydrants and vocabulary all live in Postgres.
   In-memory shapefile loading was eliminated. Import scripts: `backend/scripts/
   import_parcels.py`, `import_gis_data.py`.
-* **Municipal data authority** — City of Coquitlam Open Data Portal, Open Government
-  Licence: 65,401 parcels (`Cadastral.shp` + `Addresses.shp`), 118 active response zones
-  (1–134), NFPA 291 hydrants with GPM ratings, LiDAR-height building footprints, and the
-  2025 7.5cm aerial orthophotos.
+* **Municipal data authority** — City of Coquitlam, Open Government Licence: property
+  records and addresses, response zones, roads, road names, the city boundary, NFPA 291
+  hydrants, and the 2025 7.5cm orthophotos. **Which City dataset each layer comes from, the
+  date of our copy, what it is the authority for, and where two layers disagree is
+  [`docs/standards/data_sources.md`](docs/standards/data_sources.md).** Read it before
+  trusting or replacing a layer, and update its row when a copy is refreshed. The kiosk map
+  and the geocoder are built from different City products and do not agree on every
+  address (#64).
 
 > [!CAUTION]
 > **The Open Government Licence covers City data only.** It does not reach

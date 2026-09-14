@@ -1,7 +1,8 @@
 # ==============================================================================
 # update_gis_data.py
 # Monthly Maintenance Script to Update Coquitlam GIS Shapefiles (100% Offline)
-# NOTE: For dataset IDs, REST URLs, and update details, see docs/gis_endpoints.md
+# NOTE: What each dataset is and when our copy was taken: docs/standards/data_sources.md
+# (docs/gis_endpoints.md, named here until 2026-09-13, never existed)
 # ==============================================================================
 import os
 import sys

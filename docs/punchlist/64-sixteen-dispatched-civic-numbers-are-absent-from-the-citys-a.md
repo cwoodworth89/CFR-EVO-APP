@@ -108,4 +108,10 @@ the crawl) and the geocoder (the Open Data file). Whether a newer Open Data extr
 and how many of the sixteen above it would also resolve, is unchecked: both need a request to the
 City, which needs the operator's permission (CLAUDE.md §1).
 
+**Later on 2026-09-13:** the operator downloaded the Open Data **Address Labels** set. It holds
+2973 at this lot, but only as a number (one field, `LABEL`, no street), and of the sixteen above
+it holds only 629 Cottonwood Ave. The full comparison, and the open decision on which City
+dataset is the authority for a civic address, is
+[`../standards/data_sources.md`](../standards/data_sources.md) §2–3.
+
 - [ ] 2973 Glen Dr — the City's live address labels put it on the 2963 Glen Dr lot

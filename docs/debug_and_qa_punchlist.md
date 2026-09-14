@@ -15,14 +15,15 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**13 open** (9 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**14 open** (10 crew-visible) · **81 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 13
+## Open — 14
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **85** | 🔴 crew-visible | OPEN — found 2026-09-13, not built; no call has hit it | [A lot with no road of its street's name pins at the lot's centre, with no notice](punchlist/85-a-lot-with-no-road-of-its-streets-name-pins-at-the-lot-centre-with-no-notice.md) |
 | **84** | 🔴 crew-visible | OPEN — ruled 2026-09-13: remove; not built | [`KNOWN_BUILDINGS`: eight hand-coded buildings override console pins, three of them wrong](punchlist/84-known-buildings-hand-coded-coordinates-override-console-pins.md) |
 | **83** | ⚪ hygiene | OPEN — not built | [Phase 1's transcript is deleted, so the first screen crews see cannot be measured](punchlist/83-phase-1s-transcript-is-deleted-so-the-first-screen-cannot-be-measured.md) |
 | **82** | 🔴 crew-visible | OPEN — design agreed 2026-09-13, not built | [A dispatched address that no City source holds is only ever estimated](punchlist/82-a-dispatched-address-no-city-source-holds-is-only-ever-estimated.md) |

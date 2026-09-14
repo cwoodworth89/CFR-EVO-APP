@@ -247,6 +247,10 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
       2885 Lansdowne Dr 79→78, 2995 Robson Dr 88→90.
     * Two lots fall in no zone, as before.
     * Front points, arrival points and Street View views are untouched.
+  * **The centre point is never a default for placing a pin.** Many addresses can share one lot:
+    all 28 Pinecone Burke Mtn addresses are on one 24 ha lot with one centre. The needs-attention
+    design shows the centre as a suggestion only. At dispatch it is still the geocoder's last
+    resort, and the kiosk shows it with no notice (punch-list #85).
   * **Wrong grids in past dispatches are not fixed by this.** None of the 14 lots was ever
     dispatched to. Of the 29 dispatches whose system grid differs from the verified one:
     * 12 (July–August) show the verified number missing its last digit;

@@ -97,20 +97,33 @@ Follows the `kiosk-responsive-ergonomics` skill.
 Operator decision 2026-09-13: **the list now, the queue screen once `cfr` exists.** Arrival points
 on these addresses are placed through Explore search and the existing placer, which already records
 the initials (`entrance_set_by`). The list is this query, not a copy, so it cannot go stale — a
-placed arrival point drops the row out:
+placed arrival point drops the row out. It is the GIS data review's definition: a street **no City
+road carries by name**, the same match `backend/scripts/import_parcels.py` `backfill_parcel_frontage`
+uses when it leaves `front_lat` empty. (A first version here tested only for a missing front point
+and a house number; it returned the same 40 rows, but would file a lot missing its front point for
+any other reason under this heading.)
 
 ```sql
-SELECT street || ' ' || streettype AS street, house, address, gis_id
-FROM public.parcels
-WHERE NOT is_base_site
-  AND front_lat IS NULL
-  AND NULLIF(TRIM(house::text), '') IS NOT NULL
-  AND entrance_lat IS NULL
-ORDER BY street, NULLIF(regexp_replace(house::text, '\D', '', 'g'), '')::int NULLS LAST, house;
+SELECT p.id, p.address, p.house, p.street, p.streettype, p.unit, p.zone_id,
+       p.centroid_lat, p.centroid_lng, p.entrance_lat, p.entrance_set_by
+FROM public.parcels p
+WHERE NOT p.is_base_site AND p.front_lat IS NULL AND p.geom IS NOT NULL
+  AND p.street IS NOT NULL AND btrim(p.street) <> ''
+  AND p.house IS NOT NULL AND btrim(p.house) <> ''
+  AND p.entrance_lat IS NULL
+  AND NOT EXISTS (SELECT 1 FROM public.roads r
+                  WHERE upper(replace(r.roadname, '''', '')) = upper(replace(p.street, '''', '')))
+ORDER BY p.street, p.house NULLS LAST;
 ```
 
-On 2026-09-13 it returned **40 rows, none with an arrival point**, matching the counts in
-`operator_data.md` §5 (Pinecone Burke Mtn 28, Coronation Cres 7, Fremont St 5). **All 28 Pinecone
-Burke Mtn addresses share one City lot, `!8180021`** — one parcel behind the Harper Rd FSR gate
-carrying 28 civic numbers. The placer sets an arrival point per address, so as built that is 28
-placements.
+On 2026-09-13 it returned **40 rows, none with an arrival point**: Pinecone Burke Mtn 28, Coronation
+Cres 7, Fremont St 5. Without the `house` line it returns every row on a street no road carries,
+including unnumbered land such as `N/O Quarry Rd`.
+
+**The lot centre is a suggestion, never the pin.** `centroid_lat/lng` became each lot's pole of
+inaccessibility on 2026-09-13, so it always falls inside the lot — but **all 28 Pinecone Burke Mtn
+addresses share one City lot, `!8180021`, and so one centre** (measured: 28 rows, 1 distinct
+centroid). Used as a default pin it would place 28 civic numbers on the same point in the middle of a
+mountain parcel behind the Harper Rd FSR gate: a plausible wrong answer (CLAUDE.md §6.1), and against
+request ruling 2. It shows as a hollow *suggestion* marker, like any other. The placer sets an
+arrival point per address, so as built these are 28 placements.

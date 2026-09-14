@@ -8,7 +8,10 @@ Features:
 - Non-destructive UPSERT (ON CONFLICT address): preserves operational data (pre-plans, lockbox notes,
   hazards, custom frontage/entrance coordinates, streetview headings) while refreshing municipal GIS attributes.
 - Full Polygon/MultiPolygon geometry ingestion into `geom geometry(Geometry, 4326)` with GiST spatial indexing.
-- Pre-computes emergency response zone_id (1..134) via spatial point-in-polygon intersection against Emergency_Response_Zones.shp.
+- Centre point and map grid set in PostGIS after the load (set_lot_centres_and_grids): each lot's
+  centre is its pole of inaccessibility, and its zone_id is public.zone_for_point() at that point,
+  read from public.zones. Load the zones first (import_gis_data.py). Operator ruling 2026-09-13,
+  docs/standards/operator_data.md.
 - Road Frontage Calculation: Computes actual road-facing frontage coordinates (front_lat, front_lng)
   via PostGIS `ST_ClosestPoint` to nearest road centrelines in `public.roads`.
 """
@@ -116,14 +119,16 @@ def create_parcels_table(engine, drop_existing: bool = False):
             --             populated for all 65,401 parcels by
             --             backfill_parcel_frontage.
             --
-            -- centroid_*  PARCEL POLYGON CENTROID, computed by us from geom -- it is
-            --             not supplied by the City. Used for the zone point-in-polygon
-            --             join, for map centring, and for simple script work that just
-            --             needs one point per parcel. It is ALSO the last-resort
-            --             arrival position, and a poor one: on 177 parcels it falls
-            --             outside the parcel entirely, and on 2865 Glen Dr it sits
-            --             135.6 m from Glen Drive. Never copy it into front_* or
-            --             entrance_* -- that is exactly the defect #50 fixed.
+            -- centroid_*  THE LOT'S CENTRE POINT, computed by us from geom -- not supplied
+            --             by the City, and despite the name NOT a centroid since
+            --             2026-09-13: it is the pole of inaccessibility, the interior
+            --             point furthest from any edge (set_lot_centres_and_grids), so it
+            --             is always inside the lot. zone_id is the zone at this point.
+            --             Used for map centring and for script work that needs one point
+            --             per parcel. It is ALSO the last-resort arrival position, and a
+            --             poor one for a crew: inside the lot is not the way in. Never
+            --             copy it into front_* or entrance_* -- that is exactly the defect
+            --             #50 fixed.
             --
             -- There used to be a fourth pair, centroid_lat/centroid_lng. It was a
             -- byte-identical duplicate of these on all 65,400 polygon rows, selected
@@ -396,9 +401,12 @@ def build_base_site_rows(engine) -> int:
       a multipolygon whose centre means nothing. They resolve at street level anyway.
     * Geometry is ST_Union of the members: the true property extent, which is also what
       fixes the kiosk outlining one lot of eight.
-    * ST_PointOnSurface, not ST_Centroid: the point is guaranteed to lie inside the
-      polygon. On 177 parcels citywide a centroid falls outside its own parcel, which is
-      how zone lookups and frontage snapping went wrong before.
+    * The centre point is the site's pole of inaccessibility, the interior point furthest
+      from any edge, and its grid is the zone at that point: the same definition as a City
+      lot (set_lot_centres_and_grids), computed in metres (EPSG:26910) because
+      ST_MaximumInscribedCircle measures in the geometry's units
+      (docs/standards/dependency-behaviour.md). It replaced ST_PointOnSurface on 2026-09-13.
+      A centroid can fall outside its own polygon: it did on 233 City lots.
     * The City's MASTER record is NOT used as the base site. Measured first: across 517
       properties it averages 10.3% of the summed unit area while spanning the whole site,
       because it is strata COMMON PROPERTY -- driveways and walkways between the units --
@@ -421,21 +429,27 @@ def build_base_site_rows(engine) -> int:
             geom, centroid_lat, centroid_lng, zone_id, is_base_site
         )
         SELECT
-            btrim(concat_ws(' ', p.house, p.street, p.streettype)),
-            p.house, p.street, p.streettype,
-            lower(btrim(concat_ws(' ', p.house, p.street, p.streettype))),
-            ST_Multi(ST_Union(p.geom)),
-            ST_Y(ST_PointOnSurface(ST_Union(p.geom))),
-            ST_X(ST_PointOnSurface(ST_Union(p.geom))),
-            public.zone_for_point(ST_PointOnSurface(ST_Union(p.geom))),
+            btrim(concat_ws(' ', g.house, g.street, g.streettype)),
+            g.house, g.street, g.streettype,
+            lower(btrim(concat_ws(' ', g.house, g.street, g.streettype))),
+            ST_Multi(g.site),
+            ST_Y(c.pt),
+            ST_X(c.pt),
+            public.zone_for_point(c.pt),
             TRUE
-        FROM public.parcels p
-        WHERE NOT p.is_base_site
-          AND p.house  IS NOT NULL AND btrim(p.house)  <> ''
-          AND p.street IS NOT NULL AND btrim(p.street) <> ''
-          AND p.geom   IS NOT NULL
-        GROUP BY p.house, p.street, p.streettype
-        HAVING count(*) > 1
+        FROM (
+            SELECT p.house, p.street, p.streettype, ST_Union(p.geom) AS site
+            FROM public.parcels p
+            WHERE NOT p.is_base_site
+              AND p.house  IS NOT NULL AND btrim(p.house)  <> ''
+              AND p.street IS NOT NULL AND btrim(p.street) <> ''
+              AND p.geom   IS NOT NULL
+            GROUP BY p.house, p.street, p.streettype
+            HAVING count(*) > 1
+        ) g
+        CROSS JOIN LATERAL (
+            SELECT ST_Transform((ST_MaximumInscribedCircle(ST_Transform(g.site, 26910))).center, 4326) AS pt
+        ) c
         ON CONFLICT (address) WHERE is_base_site DO UPDATE SET
             house              = EXCLUDED.house,
             street             = EXCLUDED.street,
@@ -467,29 +481,88 @@ def build_base_site_rows(engine) -> int:
         return 0
 
 
+# A City lot's centre point and map grid, set from its outline once it is loaded.
+#
+# The centre is the pole of inaccessibility: the interior point furthest from any edge, always
+# inside the lot. It replaced the GeoPandas centroid on 2026-09-13 (operator ruling,
+# docs/standards/operator_data.md), which fell outside 233 lots. ST_MaximumInscribedCircle
+# measures in the geometry's own units, so the outline is projected to metres (EPSG:26910)
+# first; computed on lat/lng the centre moved more than 10 m on 580 of 1,987 lots sampled
+# (docs/standards/dependency-behaviour.md).
+#
+# The grid is public.zone_for_point() at that same point: the one definition of which zone a
+# point is in, reading public.zones. It replaced a GeoPandas join against the June
+# Emergency_Response_Zones.shp at the centroid, which gave some lots the grid of a point outside
+# them. One source for the grid, one point for both values.
+LOT_CENTRE_AND_GRID_SQL = """
+UPDATE public.parcels p SET
+    centroid_lat = ST_Y(c.pt),
+    centroid_lng = ST_X(c.pt),
+    zone_id      = public.zone_for_point(c.pt)
+FROM (
+    SELECT id, ST_Transform((ST_MaximumInscribedCircle(ST_Transform(geom, 26910))).center, 4326) AS pt
+    FROM public.parcels
+    WHERE NOT is_base_site AND geom IS NOT NULL AND id BETWEEN :lo AND :hi
+) c
+WHERE p.id = c.id;
+"""
+
+
+def set_lot_centres_and_grids(engine, batch_size: int = 5000) -> int:
+    """Set centroid_lat/lng and zone_id on every City row from its outline (see the SQL above).
+
+    Runs after the City rows are loaded and before base sites and frontage, both of which read
+    the centre. Returns the number of rows updated.
+    """
+    from sqlalchemy import text
+    logging.info("=" * 60)
+    logging.info("Step: Setting each City lot's centre point and map grid...")
+
+    with engine.connect() as conn:
+        lo, hi = conn.execute(text(
+            "SELECT min(id), max(id) FROM public.parcels WHERE NOT is_base_site AND geom IS NOT NULL;"
+        )).fetchone()
+        zones_loaded = conn.execute(text("SELECT count(*) FROM public.zones;")).scalar()
+    if lo is None:
+        logging.warning("  No City rows with an outline; nothing to set.")
+        return 0
+    if not zones_loaded:
+        # Without zones every grid would be NULL. Stop rather than write that.
+        logging.error("  public.zones is empty. Load the zones (import_gis_data.py) before parcels.")
+        sys.exit(1)
+
+    updated = 0
+    for start in range(lo, hi + 1, batch_size):
+        with engine.begin() as conn:
+            updated += conn.execute(text(LOT_CENTRE_AND_GRID_SQL),
+                                    {"lo": start, "hi": start + batch_size - 1}).rowcount
+
+    with engine.connect() as conn:
+        no_grid = conn.execute(text(
+            "SELECT count(*) FROM public.parcels WHERE NOT is_base_site AND geom IS NOT NULL AND zone_id IS NULL;"
+        )).scalar()
+    logging.info(f"  Centre point and grid set on {updated} City rows; {no_grid} fall in no zone.")
+    return updated
+
+
 def run_import(
     address_shp_path: str,
-    zones_shp_path: str,
     drop_existing: bool = False,
     skip_frontage: bool = False,
     batch_size: int = 5000
 ):
-    """Executes the full GIS shapefile loading, spatial zone intersection, UPSERT ingestion, and frontage alignment."""
+    """Executes the full GIS shapefile loading, UPSERT ingestion, centre points and grids, and frontage alignment."""
     import geopandas as gpd
     from sqlalchemy import create_engine, text
 
     if not os.path.exists(address_shp_path):
         logging.error(f"Addresses shapefile not found at: {address_shp_path}")
         sys.exit(1)
-    if not os.path.exists(zones_shp_path):
-        logging.error(f"Emergency Response Zones shapefile not found at: {zones_shp_path}")
-        sys.exit(1)
 
     start_time = time.time()
     logging.info("=" * 60)
-    logging.info("CFR EVO: Ingesting Coquitlam Parcels & Pre-Computing Zones")
+    logging.info("CFR EVO: Ingesting Coquitlam Parcels")
     logging.info(f"Addresses source: {address_shp_path}")
-    logging.info(f"Zones source:     {zones_shp_path}")
     logging.info(f"Ingestion mode:   {'FORCE DROP & RECREATE' if drop_existing else 'NON-DESTRUCTIVE UPSERT'}")
     logging.info("=" * 60)
 
@@ -505,41 +578,18 @@ def run_import(
 
     # Transform geometry to standard EPSG:4326
     addr_wgs84 = addr_gdf.to_crs(epsg=4326)
-    centroids = addr_wgs84.geometry.centroid
-
-    addr_wgs84["lat"] = centroids.y
-    addr_wgs84["lng"] = centroids.x
     addr_wgs84["geom_wkt"] = addr_wgs84.geometry.apply(
         lambda g: g.wkt if g is not None and not g.is_empty else None
     )
 
-    # 2. Load Emergency Response Zones & Spatial Point-in-Polygon Join
-    logging.info("Reading Emergency Response Zones shapefile...")
-    zones_gdf = gpd.read_file(zones_shp_path)
-    logging.info(f"Loaded {len(zones_gdf)} response zones. Native CRS: {zones_gdf.crs}")
-
-    if zones_gdf.crs != addr_wgs84.crs:
-        logging.info("Re-projecting response zones to EPSG:4326...")
-        zones_gdf = zones_gdf.to_crs(epsg=4326)
-
-    logging.info("Performing spatial point-in-polygon join (Address centroids -> Response Zones)...")
-    # Use centroid points for spatial join to ensure clean point-in-polygon matching
-    addr_points_gdf = addr_wgs84.copy()
-    addr_points_gdf.geometry = centroids
-    joined = gpd.sjoin(
-        addr_points_gdf,
-        zones_gdf[["MAP_NAME", "geometry"]],
-        how="left",
-        predicate="within"
-    )
+    # 2. The centre point and map grid are not computed here. They are set in PostGIS once the
+    #    rows are loaded (set_lot_centres_and_grids), from public.zones rather than a shapefile.
 
     # 3. Clean & Format Data
     logging.info("Formatting records and normalizing addresses...")
     seen_addresses = set()
     duplicate_addresses = 0
     records_to_insert = []
-    zone_assigned_count = 0
-    missing_zone_count = 0
 
     def clean_str(val):
         if val is None:
@@ -549,7 +599,7 @@ def run_import(
             return None
         return s
 
-    for idx, row in joined.iterrows():
+    for idx, row in addr_wgs84.iterrows():
         raw_addr = clean_str(row.get("ADDRESS"))
         if not raw_addr:
             continue
@@ -599,17 +649,6 @@ def run_import(
             except Exception:
                 extract_dt = None
 
-        lat = float(row.get("lat", 0.0))
-        lng = float(row.get("lng", 0.0))
-
-        zone_val = row.get("MAP_NAME")
-        if zone_val is not None and str(zone_val).strip() != "" and str(zone_val) != "nan":
-            zone_id = str(zone_val).strip()
-            zone_assigned_count += 1
-        else:
-            zone_id = None
-            missing_zone_count += 1
-
         addr_norm = raw_addr.lower()
         geom_wkt = clean_str(row.get("geom_wkt"))
 
@@ -635,13 +674,15 @@ def run_import(
             "units": units,
             "sc_card": sc_card,
             "extract_dt": extract_dt,
-            "centroid_lat": lat,
-            "centroid_lng": lng,
-            "zone_id": zone_id,
+            # Centre, grid and front point are all computed from the outline after the load
+            # (set_lot_centres_and_grids, then backfill_parcel_frontage). NULL until then.
+            "centroid_lat": None,
+            "centroid_lng": None,
+            "zone_id": None,
             "address_normalized": addr_norm,
             "geom_wkt": geom_wkt,
-            "front_lat": lat,
-            "front_lng": lng,
+            "front_lat": None,
+            "front_lng": None,
             # entrance_* is DELIBERATELY ABSENT from this dict, and from the INSERT
             # column list below.
             #
@@ -671,7 +712,6 @@ def run_import(
 
     logging.info(f"Prepared {len(records_to_insert)} City records for ingestion "
                  f"({duplicate_addresses} share an address with another record and are all kept).")
-    logging.info(f"Emergency Zones assigned: {zone_assigned_count} | Unassigned (boundary edges): {missing_zone_count}")
 
     # 4. Connect to DB & Bulk UPSERT
     db_url = get_database_url()
@@ -736,11 +776,15 @@ def run_import(
             pct = (total_processed / len(records_to_insert)) * 100
             logging.info(f"  Ingested {total_processed}/{len(records_to_insert)} parcels ({pct:.1f}%)...")
 
-    # 5. Derive base_site rows -- must run before frontage, so each base site gets a front
+    # 5. Centre point and map grid of every City row, from its outline. Before base sites and
+    #    frontage: frontage only considers rows that have a centre.
+    set_lot_centres_and_grids(engine, batch_size=batch_size)
+
+    # 6. Derive base_site rows -- must run before frontage, so each base site gets a front
     #    point of its own from the street its address names.
     build_base_site_rows(engine)
 
-    # 6. Compute Road-Facing Frontage Coordinates
+    # 7. Compute Road-Facing Frontage Coordinates
     if not skip_frontage:
         backfill_parcel_frontage(engine, batch_size=batch_size)
     else:
@@ -751,7 +795,7 @@ def run_import(
     logging.info(f"SUCCESS: Ingested {total_processed} parcels in {elapsed_s:.2f}s ({(total_processed/elapsed_s):.0f} rows/sec).")
     logging.info("=" * 60)
 
-    # 6. Run Verification Queries
+    # 8. Run Verification Queries
     with engine.connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM public.parcels;")).scalar()
         poly_count = conn.execute(text("SELECT COUNT(*) FROM public.parcels WHERE geom IS NOT NULL;")).scalar()
@@ -794,11 +838,6 @@ if __name__ == "__main__":
         "--addresses",
         default=os.path.join(backend_dir, "data", "Property_Information", "Addresses.shp"),
         help="Path to Addresses.shp"
-    )
-    parser.add_argument(
-        "--zones",
-        default=os.path.join(backend_dir, "data", "Emergency_Response_Zones", "Emergency_Response_Zones.shp"),
-        help="Path to Emergency_Response_Zones.shp"
     )
     parser.add_argument(
         "--force-drop",
@@ -847,7 +886,6 @@ if __name__ == "__main__":
 
     run_import(
         address_shp_path=args.addresses,
-        zones_shp_path=args.zones,
         drop_existing=args.force_drop,
         skip_frontage=args.skip_frontage,
         batch_size=args.batch_size

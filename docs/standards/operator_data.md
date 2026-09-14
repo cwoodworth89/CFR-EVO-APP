@@ -30,18 +30,25 @@ marked **not built** or **proposed**.
 9. **The front point stays: lot outline to the centreline of the street the address names.** The
    front point is computed; the arrival point is hand-curated. They do not change each other
    (#78).
-10. **The console keeps its zone colours, and `zones.json` goes.** How the colours are sourced
-    is open (§5).
-11. **The Lougheed Hwy & Mariner Way manual junction is kept.** Measured the same day: the live
-    resolver returns *unresolved* for that phrase without it (§5).
-12. **A lot's centre point becomes its pole of inaccessibility.** Approved; applied only after
-    the diff in §5 is agreed (ruling 3).
+10. **The console keeps its zone colours, and `zones.json` goes.** The colours come from the
+    Emergency Guideline 1 assignment stored as data (ruling 15).
+11. **The Lougheed Hwy & Mariner Way junction row is removed** (applied 2026-09-13). It was
+    labelled `manual`, but a script generated its point and nobody confirmed it. Operator: *"I
+    hate that it's called manual as if I did it."* See §5.
+12. **A lot's centre point is its pole of inaccessibility** (applied 2026-09-13, §5).
 13. **Refresh diffs are reviewed through an agent.** The refresh writes a diff that an agent
     reads and summarizes for the operator.
 14. **The Pinecone Burke Mtn lots are served by Harper Rd, which becomes a forest service road
     behind locked gates.** They need manual attention. The design for working lots like these
     goes to the UX agent
     ([`../briefings/needs_attention_design_request.md`](../briefings/needs_attention_design_request.md)).
+15. **The grid → first-due unit → hall assignment is stored as data**, cited to Coquitlam
+    Fire/Rescue **Emergency Guideline 1, edition of 2025-01-09** (the latest). Not built. Before
+    it is stored, the 134 rows from `zones.json` are to be checked against that edition (§5).
+16. **A lot's map grid is `zone_for_point()` on `public.zones` at its centre point** (applied
+    2026-09-13, §5). The June `Emergency_Response_Zones.shp` is no longer read.
+17. **A junction a person pins lives with the other hand-entered locations** in the `cfr`
+    schema, attributed to whoever placed it. `public.intersections` holds derived junctions only.
 
 ---
 
@@ -54,7 +61,7 @@ clause is all that protects it today.
 |:--|:--|
 | **What** | CFR's own row in `public.parcels` for each civic address that has more than one City row. `is_base_site = true`. 1,671 rows. |
 | **Why** | The City's MASTER row is strata common property, not the site, so no City row can speak for a multi-parcel property ([`../briefings/base_site_rows_decision.md`](../briefings/base_site_rows_decision.md), 2026-08-31). |
-| **Built by** | `backend/scripts/import_parcels.py` `build_base_site_rows`: `INSERT … SELECT` over City rows `GROUP BY house, street, streettype HAVING count(*) > 1`. Outline `ST_Multi(ST_Union(geom))`, centre `ST_PointOnSurface(ST_Union(geom))`, zone `public.zone_for_point()`. |
+| **Built by** | `backend/scripts/import_parcels.py` `build_base_site_rows`: `INSERT … SELECT` over City rows `GROUP BY house, street, streettype HAVING count(*) > 1`. Outline `ST_Multi(ST_Union(geom))`, centre the union's pole of inaccessibility (since 2026-09-13; `ST_PointOnSurface` before), zone `public.zone_for_point()` at that centre. |
 | **Key** | Partial unique index `parcels_base_site_address_uniq ON public.parcels (address) WHERE is_base_site`. |
 | **Refresh** | `ON CONFLICT (address) WHERE is_base_site DO UPDATE` sets only `house, street, streettype, address_normalized, geom, centroid_lat, centroid_lng, zone_id, updated_at`. City rows are deleted with `DELETE FROM public.parcels WHERE NOT is_base_site`. The hand-entered columns survive because neither statement names them. |
 | **Read first** | The geocoder orders `is_base_site DESC` (`services/gis/src/gis_service/address_resolver.py`, exact-parcel step). Every API address lookup goes through `_address_row` with `_BASE_SITE_FIRST` (`backend/api/routers/parcels.py`), so a save and a read land on the same row (#77). |
@@ -88,7 +95,7 @@ clause is all that protects it today.
 | Street View views | `parcels.streetview_*` | 19: 10 base, 9 City | Base yes; City rows **no** |
 | Added addresses | not built (#82) | 24 waiting | — |
 | Lockbox, hazards, pre-plan, construction, floors | `parcels` columns | 0; nothing writes them | — |
-| Manual junctions | `intersections`, `source = 'manual'` | 1: Lougheed Hwy & Mariner Way | Yes: the rebuild deletes derived rows only |
+| Manual junctions | none: the one `source = 'manual'` row was script-generated and removed 2026-09-13 | 0 | — |
 | Vocabulary | `vocabulary` | 320 rows; 20 learned or operator-added | Yes: imports only add |
 | First-due unit per grid | `frontend/public/data/zones.json`; `zones.unit_id/station/hall_id` | 134 in the file, **0 in the database** | The database copy is emptied by every zones import (`TRUNCATE`, last 2026-08-26) |
 | Hall locations | code: `routing_engine.py` `FIRE_HALLS`, `MapConstants.js` `STATIONS`, a Hall 1 default in `RouteOverviewPanel.jsx` | 4 | Yes, as code |
@@ -129,7 +136,7 @@ A `cfr` schema in the same database, holding only what people enter:
 | Added addresses | civic number the City does not hold | house, street, suffix, as dispatched; status `pending / active / rejected / retired`; arrival point; optional tie to a City site's address; placer, date, evidence |
 | Site details | address key: a site, or a unit where one is ever needed | arrival point, Street View view, lockbox, hazards, pre-plan, construction, floors; who and when |
 | Halls | hall | location, recorded by, date |
-| Manual junctions | junction, if any are kept | point, reason, who, when |
+| Placed junctions | junction a person pins (ruling 17) | point, reason, who, when, evidence |
 
 Each refresh runs under a database role with **no privilege on `cfr`**, so the protection comes
 from the database rather than from a WHERE clause.
@@ -199,55 +206,60 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
 
   `zones.json` is not an old map: its 134 grids match `public.zones` with areas within 0.33%
   (median; worst 2.2%, grid 68) and centres within 5 m, simplified to 2,090 vertices from 20,461.
-  Ruling 10 keeps the colours and removes the file. **Two ways to source the colours:**
-  * **EG1 as data.** The 134-row grid → first-due unit → hall assignment moves to the `cfr`
-    schema, cited to Emergency Guideline 1 and its revision. Outlines come from `public.zones`
-    through the API. The map looks exactly as it does now, and closures-by-hall starts working.
-  * **Computed.** Colour each grid by the hall with the shortest OSRM drive, from each hall's
-    front apron to the grid's pole of inaccessibility, on the production graph. No data to
-    maintain. Measured 2026-09-13: 127 of 134 grids keep their colour. Grids 21, 23, 37, 43, 50
-    and 51 turn from Hall 2 to Hall 3, and grid 131 from Hall 4 to Hall 1. Grids 21 and 43 are
-    near-ties (9 s and 20 s) that could flip with a different point in the grid.
-* **Map grid of a lot.** The City's property data carries no grid. `Addresses.shp` and
-  `Parcel_Addresses` have `ZONETYPE1–3` (land-use zoning such as `R-1`) and `PLAN_AREA` (36
-  planning areas, each spanning about 5 grids). Today a City lot's grid is the June
-  `Emergency_Response_Zones.shp` polygon containing its centroid, **even when the centroid is
-  outside the lot**. **Proposed:** take the grid from `zone_for_point()` on `public.zones` at the
-  lot's new centre point (ruling 12), as base sites already do, and drop the shapefile path. That
-  makes one source and one point. Measured 2026-09-13, it would change:
-  * **11 of 69,541 City lots**, 5 of them addressed: 1046 United Blvd 14→31, 1085 Falcon Dr
-    64→69, 3305 David Ave 102→96, 4124 Cedar Dr 116→118, 4300 Oliver Rd 117→118. 2 unaddressed
-    lots would have no grid.
-  * **3 of 1,671 base sites:** 1331 Gabriola Dr 100→102, 2885 Lansdowne Dr 79→78, 2995 Robson Dr
-    88→90.
-  * **No dispatch in the corpus** went to any of them, so nothing says which grid E-Comm uses for
-    a lot that straddles two.
-* **The lot's centre point (ruling 12, not yet applied).** The pole of inaccessibility, computed
-  in metres (see [`dependency-behaviour.md`](dependency-behaviour.md)), is inside all 71,212
-  outlines; the centroid is outside 233.
-  * **City lots:** the point moves a median 7.2 m (p90 30.6 m, max 611.6 m); 3,498 move more than
-    50 m.
-  * **Base sites** (today `ST_PointOnSurface`): a median 9.0 m (p90 42.4 m, max 758.4 m); 146
-    move more than 50 m.
-
-  It is the third fallback pin, the pin for a substituted nearest number, and the input to the
-  street-centre fallback. Front points and arrival points do not move. Applying it means a
-  migration for the stored values plus the same computation in `import_parcels.py`, so the next
-  import cannot revert it.
+  **Decided (rulings 10, 15):** the assignment is stored as data in the `cfr` schema, cited to
+  EG1 of 2025-01-09. Grid outlines come from `public.zones` through the API, the console looks as
+  it does now, closures-by-hall starts working, and `zones.json` is deleted. Not built.
+  **Blocked on:** checking the 134 `zones.json` rows against that edition. Start with the seven
+  grids where the shortest OSRM drive disagrees with the file (measured 2026-09-13, from each
+  hall's front apron to the grid's pole of inaccessibility): 21, 23, 37, 43, 50 and 51 (file:
+  Hall 2, shortest drive: Hall 3) and 131 (file: Hall 4, shortest drive: Hall 1). The considered
+  alternative, colouring by shortest drive, was not chosen.
+* **Centre point and map grid: applied 2026-09-13** (rulings 12 and 16), by
+  `backend/migrations/2026-09-13_lot_centre_is_pole_of_inaccessibility.sql`. The import computes
+  the same values (`set_lot_centres_and_grids`, `build_base_site_rows`), so a re-run cannot
+  revert them. The City's property data carries no grid of its own: `ZONETYPE1–3` is land-use
+  zoning, and `PLAN_AREA` is 36 planning areas of about 5 grids each.
+  * **Before:** the GeoPandas centroid, outside 233 City lots. The grid came from the June
+    zones shapefile at that point; base sites used `ST_PointOnSurface`.
+  * **After:** the pole of inaccessibility, computed in metres
+    ([`dependency-behaviour.md`](dependency-behaviour.md)), and `zone_for_point()` on
+    `public.zones` at it.
+  * **Checked after applying**, against the rollback copy
+    `/home/tcfire/cfr-backups/operator-data-20260913/parcels_centre_and_grid_before_2026-09-13.csv`:
+    * 0 centres outside their outline.
+    * Centre points moved a median 7.2 m for City lots (p90 30.6 m) and 9.0 m for base sites.
+    * **14 grids changed**, exactly as measured beforehand. The 11 City lots are 1046 United Blvd
+      14→31, 1085 Falcon Dr 64→69, 3305 David Ave 102→96, 4124 Cedar Dr 116→118, 4300 Oliver Rd
+      117→118, and six unaddressed: Braid St and Brunette Ave 1→14, three Deboville Slough lots
+      123→118, Dewdney Trunk Rd 65→66. The 3 base sites are 1331 Gabriola Dr 100→102,
+      2885 Lansdowne Dr 79→78, 2995 Robson Dr 88→90.
+    * Two lots fall in no zone, as before.
+    * Front points, arrival points and Street View views are untouched.
+  * **Wrong grids in past dispatches are not fixed by this.** None of the 14 lots was ever
+    dispatched to. Of the 29 dispatches whose system grid differs from the verified one:
+    * 12 (July–August) show the verified number missing its last digit;
+    * 1300 Pinetree Way (twice) and 3501 David Ave calculate 87 and 112 where E-Comm said 86 and
+      111, and the new centre gives the same answer;
+    * 2 are addresses no City source holds.
 * **The 160 City lots with no front point.** About 116 carry no house number: water, rail, parks,
   and descriptions such as `N/O Quarry Rd`. The addressed ones are on streets with no City
   centreline: Pinecone Burke Mtn (28 rows), Coronation Cres (7) and Fremont St (5 numbers). The
   last two are [`../city_gis_data_register.md`](../city_gis_data_register.md) §3. Pinecone Burke
   Mtn is reached by Harper Rd, which becomes a forest service road behind locked gates (ruling
   14): those lots need arrival points and access notes set by hand.
-* **Lougheed Hwy & Mariner Way (kept, ruling 11).** No dispatch in 641 has used it. It was added
-  2026-08-22 because the fuzzy matcher sent that phrase to Lougheed & Pinetree, 4.3 km away;
-  fuzzy matching is now a suggestion only (`intersection_resolver.py`). Measured with the live
-  resolver on the kiosk, 2026-09-13:
-  * with the row, both word orders resolve to the interchange, grid 49, at confidence 100;
-  * without it, both return **unresolved**.
-
-  The resolver removed the wrong answer, but did not replace the row.
+* **Lougheed Hwy & Mariner Way: removed 2026-09-13** (ruling 11), by
+  `backend/migrations/2026-09-13b_remove_unconfirmed_lougheed_mariner_junction.sql`.
+  * **Origin.** Added 2026-08-22 because the fuzzy matcher sent that phrase to Lougheed &
+    Pinetree, 4.3 km away. Its point was a script-computed midpoint between the centrelines,
+    "NOT operationally confirmed".
+  * **Live resolver, measured before removal:** with the row, the interchange midpoint, grid 49,
+    confidence 100; without it, **unresolved**, so a call naming it shows the amber card and the
+    announced grid.
+  * **Scale of the problem.** No dispatch in 641 named it, and all 19 distinct junctions ever
+    dispatched resolve to derived rows. Fuzzy matching is now a suggestion only
+    (`intersection_resolver.py`), so the 4.3 km error cannot recur.
+  * **Restart.** The geocoder caches intersections at start, so a running `cfr-agent` keeps the
+    row until its next restart.
 * **The workstation's search path ignores the arrival point.** Search results carry `front_lat`
   (front point, else centroid) and only a `has_arrival_point` flag, and `MapBoard.jsx` routes to
   `front_lat || lat`. A searched address with an arrival point routes to the front point until

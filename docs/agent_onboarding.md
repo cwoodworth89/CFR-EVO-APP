@@ -65,7 +65,7 @@ A punch-list item is a **report**. The database is the system of record.
 | **`PYTHONIOENCODING=utf-8`** | Windows consoles default to cp1252. Any script printing an em-dash or emoji dies with `UnicodeEncodeError`. Prefix every `python` invocation that prints prose. |
 | **SSH can hang silently** | If the sandbox blocks the SSH binary it produces **zero output and never returns**, ignoring even `-o ConnectTimeout=10`. It is not a network problem. Confirm the host is alive by querying Postgres — that path is independent. |
 | **API changes need `--build`** | `docker compose up -d --build api`. A restart alone ships nothing. The compose service is `api`; the container is `cfr_api`. |
-| **Shapefiles are kiosk-only** | `backend/data/` is git-ignored (§3.6). Addresses live in `backend/data/Property_Information/`, zones in `backend/data/Emergency_Response_Zones/` — different directories, and the import's defaults already know both. |
+| **Shapefiles are kiosk-only** | `backend/data/` is git-ignored (§3.6). Addresses live in `backend/data/Property_Information/`, and the import's default already knows it. The zones shapefile in `backend/data/Emergency_Response_Zones/` is no longer read (2026-09-13): a lot's grid comes from `public.zones`, so load the zones before the parcels. |
 | **Run the full suite early** | `pytest backend/tests/` — three modules fail to collect on a dev laptop for missing `geopandas`, `pvporcupine`, `librosa` (punch-list #10); that is expected. On 2026-08-31 running it surfaced a live 500 in an endpoint nobody was working on. |
 
 ---

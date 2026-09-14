@@ -22,8 +22,8 @@ The parcel ingestion engine in [`backend/scripts/import_parcels.py`](../backend/
 ```mermaid
 flowchart TD
     A["Addresses.shp<br/>(69,708 rows, EPSG:26910)"] --> B["Reproject to WGS84<br/>(EPSG:4326)"]
-    B --> C["Extract True Polygon/MultiPolygon WKT<br/>& Compute Centroids (lat, lng)"]
-    D["Emergency_Response_Zones.shp<br/>(134 Zones)"] --> E["Spatial Join (sjoin)<br/>Point-in-Polygon Centroid Match"]
+    B --> C["Extract True Polygon/MultiPolygon WKT"]
+    D[("public.zones<br/>(134 Zones)")] --> E["Centre point (pole of inaccessibility)<br/>& zone_for_point() at it"]
     C --> E
     E --> F["Deduplicate by Normalized Address<br/>(65,401 unique property records)"]
     F --> G["Batch UPSERT into public.parcels<br/>(ON CONFLICT address DO UPDATE)"]
@@ -37,7 +37,7 @@ flowchart TD
    - Reads Coquitlam `Addresses.shp` (native UTM Zone 10N `EPSG:26910`) and reprojects to standard `EPSG:4326`.
    - Extracts complete Polygon / MultiPolygon boundaries as WKT into `geom geometry(Geometry, 4326)` with GiST spatial indexing (`idx_parcels_geom`), discarding zero geometric vertices.
 2. **Emergency Zone Pre-Computation**:
-   - Executes spatial point-in-polygon join (`gpd.sjoin`) between parcel centroids and `Emergency_Response_Zones.shp`, pre-assigning `zone_id` (1–134) to all parcels to eliminate runtime zone lookup overhead.
+   - Since 2026-09-13, after the load, each lot's centre point is set to its pole of inaccessibility (always inside the lot), and `zone_id` (1–134) to `public.zone_for_point()` at that point. This replaced a `gpd.sjoin` of centroids against `Emergency_Response_Zones.shp`, which gave some lots the grid of a point outside them (`docs/standards/operator_data.md`).
 3. **Non-Destructive UPSERT Protection**:
    - Default CLI mode is non-destructive (`ON CONFLICT (address) DO UPDATE SET ...`).
    - Refreshes municipal GIS fields while **strictly protecting operational firefighter columns** from ever being overwritten:

@@ -100,9 +100,17 @@ authority for a civic address**, and in what form we should take it. What is kno
   carries the City's standard disclaimer of accuracy. It is a labelling layer, not an address
   register.
 
-What would settle it: whether `Parcel_Addresses` holds 2973 Glen Dr, and how its record count
-compares with the 69,708 rows of the file. Both are data queries against the City, not
-descriptions, and need the operator's permission.
+**Two data queries, run 2026-09-13 with the operator's permission:**
+
+| Query | Result |
+|:--|:--|
+| `where=PROPHOUSE='2973' AND UPPER(PROPSTREET) LIKE 'GLEN%'`, no geometry | **0 records**, no error |
+| `where=1=1`, count only | **73,300** records, against 69,708 rows in our 2025-06-22 file (+3,592) |
+
+**The zero is not yet a result.** The same query has not been run for an address known to be in
+the layer, so a stored form the clause does not match (a padded house number, a different
+street spelling) is not ruled out. The control is the identical query for 2963 Glen Dr, which
+our file holds. The larger count fits a newer copy of the same data but does not show it.
 
 **Not decided, and not to be improvised:** taking a street name for an Address Labels point from
 the lot it falls in. The 35 collisions above are the evidence against doing it blindly.

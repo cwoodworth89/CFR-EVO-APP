@@ -7,7 +7,10 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple, Optional, Any
 
-# Official Coquitlam Fire Halls with verified driveway front-apron GPS coordinates
+# Coquitlam fire halls. Each point is the hall's driveway front apron, recorded by the operator
+# (CLAUDE.md 6.3 provenance 4, department operational knowledge; ruling 2026-09-13, date of
+# recording not kept). Mirrored in frontend/src/components/MapConstants.js STATIONS; keep the two
+# identical. Planned to move to the operator schema (docs/standards/operator_data.md).
 FIRE_HALLS: Dict[str, Dict[str, Any]] = {
     "1": {
         "id": 1,

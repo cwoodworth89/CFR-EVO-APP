@@ -99,7 +99,10 @@ export const UNIT_COLORS = {
 };
 
 // 🚒 COQUITLAM FIRE HALLS
-// Official municipal civic addresses with verified driveway front-apron GPS coordinates for emergency routing
+// Each point is the hall's driveway front apron, recorded by the operator (CLAUDE.md 6.3
+// provenance 4, department operational knowledge; ruling 2026-09-13, date of recording not
+// kept). Mirrors FIRE_HALLS in services/gis/src/gis_service/routing_engine.py; keep the two
+// identical. Planned to move to the operator schema (docs/standards/operator_data.md).
 export const STATIONS = [
   {
     id: "1",

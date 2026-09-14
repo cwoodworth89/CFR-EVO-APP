@@ -12,6 +12,10 @@ no WAN.
 > dataset or service behind every table and tile set, the date of our copy, what it is the
 > authority for, and which layers disagree.
 >
+> **What we enter ourselves is [`operator_data.md`](operator_data.md)**: base sites, arrival
+> points, Street View views, hall locations. It covers where each lives, what a City refresh does
+> to it, and the operator's 2026-09-13 rulings on giving it its own schema.
+>
 > **Municipal data gaps are tracked separately.** Where the City of Coquitlam's own data is
 > missing, inconsistent, or disagrees with dispatch, the question belongs in
 > [`../city_gis_data_register.md`](../city_gis_data_register.md) — not here, and never in code.

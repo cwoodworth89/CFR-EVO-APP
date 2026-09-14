@@ -67,6 +67,11 @@ ECOMM dispatches from is the one that holds them.
    share of cases (17 of 64 label-only numbers exist as that number on another lot).
 6. **Naming.** Not "verified" — `verified_*` is the HITL ground truth (`dispatches.verified_address`
    already exists). Not `custom_places` — the name of the dropped table. The name is open.
+7. **Later rulings the same day** ([`../standards/operator_data.md`](../standards/operator_data.md)):
+   the `cfr` schema holds *all* hand-entered data, not only these addresses; an added address is
+   its own visible entry and **may be tied to the City lot it sits inside**, taking that lot's
+   outline and City attributes while keeping its own arrival point and Street View view
+   (`2973 Glen Dr` → the `2963 Glen Dr` lot). That amends "no lot" in the design below.
 
 ## Design (agreed shape)
 

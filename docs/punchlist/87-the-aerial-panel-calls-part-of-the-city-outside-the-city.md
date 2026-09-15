@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | RULED 2026-09-15; being built (frontend-kiosk-architect). |
+| **Status** | FIXED in `1cdef5f4`, pulled on the kiosk; not live until the operator rebuilds the API and then builds the frontend |
 | **Severity** | 🔴 crew-visible: a real Coquitlam address would read "NOT AVAILABLE OUTSIDE OF CITY" |
 | **Area** | 🖥️ Kiosk · 🗺️ Geocoding |
 | **Origin** | Lead, 2026-09-15, while checking the basemap extract (#86) |
@@ -43,3 +43,24 @@ Note also that `ST_Contains` excludes the boundary itself (CLAUDE.md §7.3a).
 "Kiosk should use the city boundary. No fall backs should be needed on that." The kiosk's Tier 2 answer comes from
 `public.city_boundary`, with no box anywhere, including the backend's two box fallbacks. An unknown answer renders as
 unknown (§6.1). CLAUDE.md §5 and the `gis-pipeline-sync` skill are updated to match once the change lands.
+
+## Fix, 2026-09-15 (`1cdef5f4`)
+
+* `GET /api/parcels/within-city?lat=&lng=` (`backend/api/routers/parcels.py:192-211`) answers `true`, `false` or `null`
+  from `public.city_boundary`, asked per coordinate, so live calls, review replays and console search get one answer.
+* `is_within_city` (`services/gis/src/gis_service/spatial_queries.py:234-259`) uses `ST_Covers` (a point on the City
+  line is inside) and returns `None` on no coordinate, no boundary row or a database error. Both box fallbacks are gone.
+* `PropertySatellitePanel.jsx` shows Tier 2 only on `false`; an empty frame while pending; on `null` an amber card:
+  "City boundary check unavailable — Cannot confirm this location is inside the City of Coquitlam."
+  `isWithinCoquitlam` and its box are removed from `addressUtils.js`.
+* Tests (`backend/tests/test_within_city_polygon.py`, against the kiosk database): the eastmost parcel east of -122.70
+  is inside; 49.2626, -122.7811 (Port Coquitlam, inside the old box) is outside; a boundary vertex is inside; a
+  database error is `None`. 44 passed with the geocoder and PostGIS suites. `lint:crash` clean, build passed.
+  Not checked in a browser.
+
+**Deploy order matters:** the API image copies code at build time, so the new endpoint 404s until
+`docker compose up -d --build api`. A frontend build before that shows the amber unknown card on every call.
+
+**Closes when:** the API is rebuilt, the frontend built, and a call east of -122.70 shows its aerial tile on screen.
+
+Still using a box: `tools/osm_level_crossings.py:29` limits the OSM crossings it takes to a box ending at -122.70.

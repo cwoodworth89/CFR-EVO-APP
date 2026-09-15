@@ -212,3 +212,34 @@ locations withheld, the parcel and junction placements untouched.
 * **Intended direction, not built:** *"If we can fix the map grid system, I would switch it to accepting the database entry
   over the STT."* Conditional on pre-calculation being made right first; nothing changes until the operator rules again
   on the back of that work. Measurement of why announced and derived grids disagree: gis-spatial-engineer, 2026-09-15.
+
+## Why announced and derived grids disagree — measured 2026-09-15 (gis-spatial-engineer, kiosk database)
+
+**18 of 487 matched calls (3.7 %), on 10 of 256 addresses (3.9 %)**, using operator-verified grids against
+`parcels.zone_id`. Independently reproduces the 2026-09-13 count in `../standards/operator_data.md:260-270`.
+
+* **The centroid is not the cause.** In all 10 the lot centre is inside its own lot and its own zone, 31.5–188.9 m
+  from the nearest zone edge. No near-miss.
+* **The lot is not split, in 9 of 10.** Nine lots are 100.00 % inside their derived zone.
+* **The zone line runs down the address's own frontage — 7 addresses, 14 calls.** The front point sits 0.0 m from the
+  boundary shared by the derived and the announced zone, and E-Comm named the other side. Structural: 79.8 % of the
+  boundary length of the 11 zones involved lies within 10 m of a road centreline — the grids are divided by streets.
+  **Geometry cannot predict which side:** 58 of the 246 agreeing addresses also have a front point on a zone line.
+* **A multi-zone site resolved by unit — 2601 Lougheed Hwy, 2 calls.** 987,463 m² over five zones; `Number 24` is
+  dispatched 53 on both its calls, `Number 29` 55 on both, no unit 55. Not an address-level fact.
+* **Unexplained — 1173 The High St, 1 call.** Announced 82, lot wholly in 83, front point 74.8 m from the line. One
+  dispatch, no repeat, no review note. No evidence it was an E-Comm error.
+* **Possible E-Comm error: 0 of 18 show the signature.** Every repeated address is announced the same way every time.
+  Consistent with the operator's "exceedingly rare".
+
+**`zone_id` is one interior point, never the polygon** (`backend/scripts/import_parcels.py:497-508`, base sites `:438`):
+`public.zone_for_point` on the lot's pole of inaccessibility. The predicate is `ST_Intersects`, so the boundary is
+included (§7.3a avoided), but a point on a line is tie-broken to the **lowest-numbered** zone
+(`backend/migrations/2026-08-22_canonical_zone_for_point.sql:43`) — a numeric ordering standing in for a geographic
+decision. It rarely fires on a lot centre and constantly on front points: 6 of the 7 frontage cases above.
+A multi-zone lot gets one number and nothing records the others (§6.6, *do not store X*).
+
+**What would make pre-calculation right (not built, not ruled):** give a lot the *set* of zones it touches, and both
+sides for a frontage on a line — 7 of the 10 become a correct hedged answer instead of a wrong one. What geometry
+cannot fix: which side of a boundary street E-Comm names, and which grid a unit inside a multi-zone site gets. Those
+need the verified-history retention keyed by address **and unit**.

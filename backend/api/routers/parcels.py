@@ -189,6 +189,28 @@ def serialize_parcel(p: ParcelModel, rings=None) -> dict:
     }
 
 
+@router.get("/within-city")
+def within_city(lat: float, lng: float):
+    """Is this coordinate inside the City of Coquitlam? From public.city_boundary, nothing else.
+
+    `within_city` is true, false, or null when unknown (no boundary row, database error). The
+    kiosk's aerial tile shows its "not available outside of city" card only on false, and an
+    unknown as unknown (CLAUDE.md s6.1, punch-list #87). Computed on read, so a past record
+    gets the same answer as a live call.
+    """
+    try:
+        from gis_service.spatial_queries import SpatialQueryEngine
+        try:
+            from backend.api.database import engine
+        except ModuleNotFoundError:
+            from api.database import engine
+        answer = SpatialQueryEngine(engine).is_within_city(lat, lng)
+    except Exception as e:
+        logging.error(f"within-city check failed: {e}", exc_info=True)
+        answer = None
+    return {"within_city": answer}
+
+
 @router.get("/lookup")
 def lookup_parcel(query: str, db: Session = Depends(get_db)):
     """Searches for a parcel matching address string or GIS ID."""

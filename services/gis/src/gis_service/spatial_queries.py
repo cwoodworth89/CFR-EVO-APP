@@ -231,25 +231,32 @@ class SpatialQueryEngine:
             logging.error(f"Error fetching streets in grid '{grid_id}': {e}", exc_info=True)
             return []
 
-    def is_within_city(self, lat: float, lng: float = None, lon: float = None) -> bool:
-        """Determines whether a coordinate lies within authoritative City of Coquitlam municipal boundary."""
+    def is_within_city(self, lat: float, lng: float = None, lon: float = None) -> Optional[bool]:
+        """Whether a coordinate lies in public.city_boundary, the City of Coquitlam polygon.
+
+        True / False is the polygon's answer. None means unknown: no coordinate, no boundary
+        row, or a database error. There is no fallback (operator ruling 2026-09-15, punch-list
+        #87): the box this used to fall back to stopped at lng -122.70 while the City reaches
+        -122.621, so it called 158 City parcels outside.
+
+        ST_Covers, not ST_Contains: ST_Contains excludes the boundary itself
+        (docs/standards/dependency-behaviour.md), and a point on the City line is in the City.
+        """
         target_lng = lng if lng is not None else lon
         if lat is None or target_lng is None:
-            return False
+            return None
         try:
             with self.engine.connect() as conn:
                 res = conn.execute(text("""
-                    SELECT ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
-                    FROM public.city_boundary
-                    LIMIT 1;
+                    SELECT bool_or(ST_Covers(geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)))
+                    FROM public.city_boundary;
                 """), {"lat": float(lat), "lng": float(target_lng)}).fetchone()
-                if res and res[0] is not None:
-                    return bool(res[0])
-                # Fallback to municipal bounding box
-                return (49.20 <= float(lat) <= 49.39) and (-122.92 <= float(target_lng) <= -122.70)
+                if res is None or res[0] is None:
+                    return None
+                return bool(res[0])
         except Exception as e:
             logging.error(f"Error checking is_within_city: {e}", exc_info=True)
-            return (49.20 <= float(lat) <= 49.39) and (-122.92 <= float(target_lng) <= -122.70)
+            return None
 
     def get_all_road_names(self) -> List[str]:
         """Returns list of all known road names."""

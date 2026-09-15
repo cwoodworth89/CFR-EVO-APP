@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-l
 import L from 'leaflet';
 import { targetPinIcon } from '../map/mapIcons';
 import { BASE_LAYERS } from '../MapConstants';
-import { isWithinCoquitlam } from '../../utils/addressUtils';
+import { API_BASE_URL } from '../../apiClient';
 import TileFrame from './TileFrame';
 
 function StableAutoCenterAndResize({ lat, lng, polygonPositions, callKey }) {
@@ -76,7 +76,28 @@ export default function PropertySatellitePanel({ activeCall }) {
 
   const destLat = hasCoords ? Number(rawDestLat) : null;
   const destLng = hasCoords ? Number(rawDestLng) : null;
-  const inCoquitlam = hasCoords ? isWithinCoquitlam(destLat, destLng) : false;
+
+  // Inside the City is public.city_boundary's answer, asked of the API (punch-list #87,
+  // operator ruling 2026-09-15). There is no box and no client-side guess: `null` while the
+  // answer is pending or unknown, and an unknown renders as unknown, never as in or out.
+  const [cityCheck, setCityCheck] = useState({ key: null, within: null, settled: false });
+  const coordKey = hasCoords ? `${destLat},${destLng}` : null;
+  useEffect(() => {
+    if (coordKey == null) return undefined;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ lat: String(destLat), lng: String(destLng) });
+    fetch(`${API_BASE_URL}/api/parcels/within-city?${params}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : { within_city: null }))
+      .then((body) => {
+        const within = typeof body?.within_city === 'boolean' ? body.within_city : null;
+        setCityCheck({ key: coordKey, within, settled: true });
+      })
+      .catch((err) => {
+        if (err?.name !== 'AbortError') setCityCheck({ key: coordKey, within: null, settled: true });
+      });
+    return () => controller.abort();
+  }, [coordKey, destLat, destLng]);
+  const cityAnswer = cityCheck.key === coordKey ? cityCheck : { within: null, settled: false };
 
   const callKey = activeCall?.id ? String(activeCall.id) : (activeCall?.address || (hasCoords ? `${destLat},${destLng}` : 'satellite-panel'));
 
@@ -95,8 +116,24 @@ export default function PropertySatellitePanel({ activeCall }) {
     );
   }
 
-  // Tier 2 Error State: Not Available Outside of City
-  if (!inCoquitlam) {
+  // Waiting on the boundary answer: the empty frame, so neither card nor picture flashes.
+  if (!cityAnswer.settled) {
+    return <TileFrame label="Aerial" />;
+  }
+
+  // The boundary answer is unknown (API or database unreachable): say so. Not Tier 1, whose
+  // wording says the coordinates are unverified when they are not; not Tier 2, which would
+  // call the place outside the City (CLAUDE.md s6.1).
+  if (cityAnswer.within === null) {
+    return (
+      <TileFrame label="Aerial">
+        <TileMessage tone="amber" title="City boundary check unavailable" body="Cannot confirm this location is inside the City of Coquitlam." />
+      </TileFrame>
+    );
+  }
+
+  // Tier 2 Error State: Not Available Outside of City (public.city_boundary said no)
+  if (cityAnswer.within === false) {
     return (
       <TileFrame label="Aerial">
         <TileMessage tone="slate" title="Not available outside of city" body="7.5cm orthophotos and cadastral parcels cover the City of Coquitlam only." />

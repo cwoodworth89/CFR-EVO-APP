@@ -36,19 +36,6 @@ export function sanitizeAddress(rawAddr) {
 }
 
 
-/**
- * Validates if geographic coordinates fall within the municipal boundaries of Coquitlam
- * Bounding box: lat [49.20, 49.39], lng [-122.92, -122.70]
- */
-export function isWithinCoquitlam(lat, lng) {
-  if (lat == null || lng == null) return false;
-  const numLat = typeof lat === 'number' ? lat : parseFloat(lat);
-  const numLng = typeof lng === 'number' ? lng : parseFloat(lng);
-  if (isNaN(numLat) || isNaN(numLng)) return false;
-  return numLat >= 49.20 && numLat <= 49.39 && numLng >= -122.92 && numLng <= -122.70;
-}
-
-
 const NS_STREETS = [
   'COAST MERIDIAN', 'PINETREE', 'MARINER', 'JOHNSON', 'WESTWOOD', 'BLUE MOUNTAIN',
   'SCHOOLHOUSE', 'PIPELINE', 'FARROW', 'NORTH', 'GUTHE', 'GAUTHIER', 'SHESS',

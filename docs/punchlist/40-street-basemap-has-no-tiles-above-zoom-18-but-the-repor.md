@@ -425,3 +425,7 @@ resumable and would retry them, so a short re-run would show whether they are tr
 genuine gap.
 
 ---
+
+**2026-09-15, Carto retired.** The two Carto layers this item was about are no longer crawled or described
+(`compile_mbtiles.py`, CLAUDE.md §1, the standards docs; operator: "Remove all of it"). `street.mbtiles` and
+`street_nolabels.mbtiles` remain on the kiosk until the operator deletes them and restarts `cfr_tiles`. See #47b.

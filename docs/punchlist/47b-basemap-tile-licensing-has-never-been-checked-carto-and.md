@@ -164,3 +164,32 @@ stay on the kiosk's disk as the rollback until the operator says to delete them;
 watermarked z18 tiles they hold are no longer shown to anyone. The aerial layer's accepted
 risk is unchanged.
 
+### Carto retired, 2026-09-15
+
+Operator: "Remove all of it." In the working tree (not yet committed at the time of writing), the Carto crawl is gone from
+`compile_mbtiles.py`, where `ortho` is now the only layer, and CLAUDE.md §1, `external_calls.md`, the standards docs
+and the tile skills no longer describe Carto. **Reported, not confirmed on the kiosk:** `street.mbtiles` and
+`street_nolabels.mbtiles` are still on its disk until the operator deletes them and restarts `cfr_tiles`.
+The Carto half closes when that is done.
+
+### The Esri half, 2026-09-15: the record did not match the archive
+
+A read-only check (gis-spatial-engineer, confirmed against the kiosk and git) found:
+* The live `ortho.mbtiles` is the Esri World Imagery crawl from `60fe7d87` (511,118 tiles, z12–20), as this item
+  accepted. But `data_sources.md:67` and the `gis-pipeline-sync` §4.1 and `gis-spatial-analysis` skills described it as the City's
+  `Imagery_2025` crawl, and `external_calls.md` has no row for `server.arcgisonline.com`.
+* The tree cannot rebuild it: `compile_mbtiles.py` only crawls the City service; the Esri crawl scripts were deleted in `d4a04fc8`.
+* Imagery reaches beyond the City at every zoom: z12–16 cover the region, and at least 45,594 z20 tiles lie outside the
+  City's bounding box (Port Moody, Anmore, Belcarra, south of the Fraser). Those are not known to be City photographs.
+* Open with the operator: whether Esri's terms allow a bulk offline copy, and what covers the imagery outside the City.
+  **Status unchanged until he rules;** no crawl, swap or ortho doc change before then.
+* The archive may not be pure Esri. Its `metadata` holds a second key set written by the current City crawl script,
+  which skips existing tiles and fills gaps from the City service, so some gap tiles may be the City's. Unverified:
+  settling it means comparing tile bytes against both servers, an external call that needs the operator's permission.
+
+**Operator ruling, 2026-09-15.** The goal is City imagery. The 2026-08-31 City crawl was not a like-for-like
+reproduction of the photographs: it read as harsh and was unusable on the bay display, so Esri stayed as the fallback.
+Esri stays live until a new process gives City imagery at the quality he accepts. Finding that process is post-freeze
+work (backlog, 2026-09-15). One lead the history already holds: the City's `export` endpoint renders from the source
+imagery (`qa_handoff_2026-08-31.md:167-170`) and was never explored.
+

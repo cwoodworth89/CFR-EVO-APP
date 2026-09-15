@@ -72,7 +72,7 @@ cases, already draws a banner for. Counts are over **491 non-PA dispatches**.
 | `NO_MAP_GRID` | `map_grid` empty | **10** | No — only a −15 penalty |
 | `STREET_SECTION_ONLY` | `location_type = 'street_section'` | 0 | Yes — section banner |
 | `UNKNOWN_CALL_TYPE` | `incident_type` empty or generic | 0 | No |
-| `OUT_OF_BOUNDS` | fails `isWithinCoquitlam()` | — | Yes — §5 Tier 2 card |
+| `OUT_OF_BOUNDS` | `GET /api/parcels/within-city` answers false (`public.city_boundary`; a box check when this was written, replaced in #87) | — | Yes — §5 Tier 2 card |
 | `AMBIGUOUS_LOCATION` | `is_ambiguous` / multiple candidates | — | Yes — dual-junction selector |
 | `RESPONSE_TYPE_UNKNOWN` | `response_type` null | — | Pending #31 |
 

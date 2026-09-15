@@ -52,21 +52,21 @@ python backend/scripts/sync_hydrants.py
 Verify that CAD boundary slicing matches Coquitlam Emergency Response Zones
 ($1 \le N \le 134$).
 
-**Use the bounding box in CLAUDE.md §5 — `isWithinCoquitlam(lat, lng)` — as the single
-source. Do not restate it here.**
+**Inside or outside the City is `public.city_boundary`, and nothing else.** The kiosk asks
+`GET /api/parcels/within-city?lat=&lng=`, which answers `{"within_city": true | false | null}`
+from `SELECT bool_or(ST_Covers(geom, point)) FROM public.city_boundary`
+(`SpatialQueryEngine.is_within_city` in `services/gis/src/gis_service/spatial_queries.py`).
+`null` means unknown (no boundary row, or a database error), and the aerial panel shows it as an
+amber "City boundary check unavailable" card, never as inside or outside (CLAUDE.md §6.1). There
+is no bounding box and no fallback (punch-list #87).
 
 > [!WARNING]
-> **Corrected 2026-08-22.** This section previously stated a *narrower* box than CLAUDE.md
-> §5: lat `49.20`–`49.38` and lng `-122.88`–`-122.70`, against the canonical
-> `lat < 49.20 || lat > 49.39 || lng < -122.92 || lng > -122.70`.
->
-> Measured against `public.intersections`: **168 of 1,785 real intersections fall outside
-> the box this file used to state and inside the canonical one.** They are the entire
-> North Rd / Clarke Rd corridor — the Coquitlam/Burnaby boundary, a major arterial. An
-> agent following the old figures would have rejected the western edge of the city as
-> out-of-bounds.
->
-> This is why a boundary is defined in exactly one place.
+> **Do not reintroduce a box.** The one this section used to point to (lat 49.20–49.39,
+> lng -122.92 to -122.70) stopped at -122.70 while the City reaches -122.621, so it called 158
+> City parcels outside; #87 removed it on 2026-09-15. An earlier, narrower copy in this file had
+> rejected the whole North Rd / Clarke Rd corridor (168 of 1,785 intersections, corrected
+> 2026-08-22). Use `ST_Covers`, not `ST_Contains`, which leaves out the boundary line itself
+> (`docs/standards/dependency-behaviour.md`).
 
 ---
 

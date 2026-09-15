@@ -26,9 +26,10 @@ import sys
 import _repo  # noqa: F401  (repository root on sys.path)
 from harness_common import database_url  # noqa: E402
 
-# CLAUDE.md section 5, the authoritative City bounding box; kept in step with isWithinCoquitlam().
-# A first cut only: the polygon in public.city_boundary decides, and the box reaches into Port
-# Coquitlam, Port Moody, Burnaby, New Westminster and Surrey.
+# The City bounding box from CLAUDE.md section 5, which the kiosk's own check used until #87
+# replaced it with public.city_boundary (2026-09-15). A first cut only: the polygon in
+# public.city_boundary decides. The box reaches into Port Coquitlam, Port Moody, Burnaby, New
+# Westminster and Surrey, and stops at lng -122.70 while the City reaches -122.621.
 LAT_MIN, LAT_MAX = 49.20, 49.39
 LNG_MIN, LNG_MAX = -122.92, -122.70
 

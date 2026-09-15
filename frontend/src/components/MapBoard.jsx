@@ -249,9 +249,8 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
       if (newCall) {
         setActiveDispatch(newCall);
         // toMapTarget keeps unresolved coordinates null (CLAUDE.md 6.1 / 5). They used to
-        // fall back to COQUITLAM_CENTER here, which put the incident at City Centre inside
-        // the isWithinCoquitlam bounds check, so no Tier 1 warning fired and nothing told
-        // the crew.
+        // fall back to COQUITLAM_CENTER here, which put the incident at City Centre, inside
+        // the City, so no Tier 1 warning fired and nothing told the crew.
         const target = toMapTarget(newCall);
         if (target) {
           updateTargetAddress(target);

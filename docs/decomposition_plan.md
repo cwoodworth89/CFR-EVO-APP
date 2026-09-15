@@ -352,9 +352,9 @@ Per-case judgement; changes runtime behaviour; must not be bulk-edited.
 * ~~`destructive_parser.py` divergence review~~ — moot, file deleted 2026-09-04.
 * `EVORoutingConfigModal` controls reference values removed in `c332b81` and currently do
   nothing; rebuild against PROJECT_IDEAS #6.
-* `isWithinCoquitlam()` uses a bounding box that is 61.6% larger than the real municipal
-  polygon; the backend could return an authoritative `in_city` flag now that
-  `public.city_boundary` is queryable.
+* ~~`isWithinCoquitlam()` uses a bounding box that is 61.6% larger than the real municipal
+  polygon~~ — done 2026-09-15 (#87): the kiosk asks `GET /api/parcels/within-city`, which
+  answers from `public.city_boundary`, and the box is gone.
 
 <!-- audit-ok: backend/tests/audio_samples/ -- records that the directory was removed -->
 <!-- audit-ok: frontend/src/components/DashboardHUD.jsx -- §2.1 records its split into five components (4e9d578) -->

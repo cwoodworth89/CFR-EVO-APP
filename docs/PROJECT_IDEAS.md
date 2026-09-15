@@ -256,11 +256,11 @@ Every difference from `HydrantsLayer` is a simplification: no bbox query, no cac
 no nearest-neighbour computation, no `minZoom` gate, and **no bounds check of any kind**.
 At a few dozen rows the layer fetches all of them once and renders. Default toggle off.
 
-* **No boundary filtering**: many gates sit outside the City of Coquitlam. Note that
-  `isWithinCoquitlam()` ([`addressUtils.js:38`](../frontend/src/utils/addressUtils.js))
-  means *"orthophoto and cadastral coverage exists here"* — it is not a validity test
-  for curated data, and must not be applied to this layer. The §5 Tier 2 banner firing
-  on an out-of-city **incident** remains correct and should be left alone.
+* **No boundary filtering**: many gates sit outside the City of Coquitlam. The City check
+  (`GET /api/parcels/within-city`, answered from `public.city_boundary`, #87) decides whether
+  the aerial panel shows its out-of-City card — it is not a validity test for curated data,
+  and must not be applied to this layer. The §5 Tier 2 card firing on an out-of-city
+  **incident** remains correct and should be left alone.
 * **Tile coverage**: gates outside the municipal tile-coverage polygon will render over
   the "no map data" hatch. Tracked separately with the map/imagery work — the layer
   does not block on it.

@@ -243,3 +243,10 @@ A multi-zone lot gets one number and nothing records the others (§6.6, *do not 
 sides for a frontage on a line — 7 of the 10 become a correct hedged answer instead of a wrong one. What geometry
 cannot fix: which side of a boundary street E-Comm names, and which grid a unit inside a multi-zone site gets. Those
 need the verified-history retention keyed by address **and unit**.
+
+**The cause is recorded as unknown (operator, 2026-09-15).** He is unsure why the disagreements happen and will
+look into it on duty. The frontage-on-a-zone-line finding above is an **association, not a cause**: being on a line
+is exposure, not outcome. Two measurements say so — 58 of 246 agreeing addresses also sit on a line, and the
+2026-09-13 count in `../standards/operator_data.md:263-264` found E-Comm used the lot's own grid on 92 of 108
+dispatches whose front point lies within 3 m of another grid. Nothing here establishes a rule about which side
+E-Comm names.

@@ -23,7 +23,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
-| **88** | 🔴 crew-visible | BUILT `bdcea8bc`, frontend live; needs a `cfr-agent` and `cfr_api` restart | [A destination far from any road reaches the crew as an ordinary ETA: the snap distance is never read](punchlist/88-a-destination-far-from-any-road-reaches-the-crew-as-an-ordinary-eta.md) |
+| **88** | 🔴 crew-visible | BUILT `bdcea8bc`, live 2026-09-15 (`cfr-agent` 16:52, `cfr_api` restarted); no live call has raised it yet | [A destination far from any road reaches the crew as an ordinary ETA: the snap distance is never read](punchlist/88-a-destination-far-from-any-road-reaches-the-crew-as-an-ordinary-eta.md) |
 | **85** | 🔴 crew-visible | OPEN — found 2026-09-13, not built; no call has hit it | [A lot with no road of its street's name pins at the lot's centre, with no notice](punchlist/85-a-lot-with-no-road-of-its-streets-name-pins-at-the-lot-centre-with-no-notice.md) |
 | **84** | 🔴 crew-visible | OPEN — ruled 2026-09-13: remove; not built | [`KNOWN_BUILDINGS`: eight hand-coded buildings override console pins, three of them wrong](punchlist/84-known-buildings-hand-coded-coordinates-override-console-pins.md) |
 | **83** | ⚪ hygiene | OPEN — not built | [Phase 1's transcript is deleted, so the first screen crews see cannot be measured](punchlist/83-phase-1s-transcript-is-deleted-so-the-first-screen-cannot-be-measured.md) |

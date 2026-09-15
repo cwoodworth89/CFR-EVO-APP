@@ -3,14 +3,15 @@
 # graph being served, and record what built it.
 #
 #   backend/scripts/build_osrm_graph.sh backend/osrm/profiles/apparatus.lua apparatus
-#   CFR_CITY_LIMITS_FACTOR=0.25 backend/scripts/build_osrm_graph.sh backend/osrm/profiles/apparatus.lua apparatus city
+#   OSRM_PBF=backend/data/osrm/coquitlam_region.osm.pbf backend/scripts/build_osrm_graph.sh backend/osrm/profiles/apparatus.lua apparatus_city city
 #
 # A third argument "city" regenerates the City polygon (public.city_boundary + 100 m,
 # backend/scripts/export_routing_polygon.py) and passes it to osrm-extract as
 # --location-dependent-data; CFR_CITY_LIMITS_FACTOR is the rate factor the profile applies to
-# ways outside it (apparatus.lua, city_limits_factor). Both are recorded in <name>.build.txt.
+# ways outside it (apparatus.lua, city_limits_factor), 0.1 unless set (below). Both are
+# recorded in <name>.build.txt.
 #
-# Writes backend/data/osrm/<name>.osrm.* from backend/data/osrm/vancouver.osm.pbf, and
+# Writes backend/data/osrm/<name>.osrm.* from the extract (OSRM_PBF, below), and
 # backend/data/osrm/<name>.build.txt: image digest, profile md5, extract, command, time. The
 # graph that was serving on 2026-09-08 had none of that recorded (docs/standards/osrm/README.md).
 #
@@ -57,7 +58,16 @@ if [ "$WITH_CITY" = "city" ]; then
   POLY="$DATA/coquitlam_plus_100m.geojson"
   "$ROOT/.venv/bin/python" "${EXPORT_SCRIPT:-$ROOT/backend/scripts/export_routing_polygon.py}" --buffer-m 100 --out "$POLY"
   LOC_ARGS=(--location-dependent-data "/data/$(basename "$POLY")")
-  : "${CFR_CITY_LIMITS_FACTOR:?CFR_CITY_LIMITS_FACTOR must be set when building with the city polygon}"
+  # Operator ruling 2026-09-15: "I want to penalize routes that go outside the city unless
+  # that's the only option." 0.1 is the strongest factor measured on the corpus 2026-09-09
+  # (docs/briefs/osrm_routing_agent.md, "Stay in Coquitlam"); reading "only option" as 0.1 is
+  # an assumption put to the operator, not part of the ruling. The factor is multiplicative, so
+  # it approximates "only option" and does not enforce it: a way outside the polygon weighs
+  # 1/0.1 = 10 times its time, and an outside leg of t seconds is still chosen when every
+  # in-City alternative weighs more than 9t extra. Only applied with the polygon (a build
+  # without it must leave the factor off, apparatus.lua city_limits_factor); an explicit
+  # CFR_CITY_LIMITS_FACTOR overrides it, and <name>.build.txt records the value used.
+  CFR_CITY_LIMITS_FACTOR=${CFR_CITY_LIMITS_FACTOR:-0.1}
   ENV_ARGS=(-e "CFR_CITY_LIMITS_FACTOR=$CFR_CITY_LIMITS_FACTOR")
   POLY_NOTE="location data: $POLY md5 $(md5sum "$POLY" | cut -d' ' -f1); CFR_CITY_LIMITS_FACTOR=$CFR_CITY_LIMITS_FACTOR"
 fi

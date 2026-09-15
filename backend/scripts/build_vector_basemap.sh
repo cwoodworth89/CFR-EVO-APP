@@ -2,10 +2,9 @@
 # Build the self-hosted street basemap: OpenMapTiles-schema vector tiles from the OSM extract
 # the kiosk already routes on, served by cfr_tiles as /services/street_vector.
 #
-# Replaces the Carto raster crawl (compile_mbtiles.py --layer street*), whose licence the
-# project never held and whose tiles Carto began watermarking (punch-list #47b). Licences for
-# every input and tool here: docs/standards/basemap/README.md. The trial that sized this:
-# docs/briefings/vector_basemap_trial_2026-09-09.md (whole extract: 55 s, 32 MB, 1,251 tiles).
+# Licences for every input and tool here: docs/standards/basemap/README.md. The trial that
+# sized this: docs/briefings/vector_basemap_trial_2026-09-09.md (whole extract: 55 s, 32 MB,
+# 1,251 tiles).
 #
 # Runs on the kiosk. Planetiler is Java; the kiosk has none, so it runs as the pinned
 # container image below. The three auxiliary sources (water polygons, Natural Earth, lake
@@ -53,6 +52,14 @@ for arg in "$@"; do
   esac
 done
 
+# The container sees backend/data as /data, so the extract must sit under it. Until
+# 2026-09-15 the docker line hard-coded vancouver.osm.pbf and ignored EXTRACT, so the
+# 2026-09-09 archive was built from the BBBike extract and had no roads east of -122.655.
+case "$EXTRACT" in
+  "$REPO/backend/data/"*) EXTRACT_IN_CONTAINER="/data/${EXTRACT#"$REPO/backend/data/"}" ;;
+  *) echo "extract must be under $REPO/backend/data: $EXTRACT" >&2; exit 1 ;;
+esac
+
 for f in "$EXTRACT" "$SOURCES/water-polygons-split-3857.zip" "$SOURCES/natural_earth_vector.sqlite.zip" "$SOURCES/lake_centerline.shp.zip"; do
   [ -f "$f" ] || { echo "missing input: $f" >&2; exit 1; }
 done
@@ -76,7 +83,7 @@ echo "build started $(date -u +%FT%TZ)" | tee "$LOG"
 docker run --rm --name planetiler_build --user "$(id -u):$(id -g)" \
   --cpu-shares=128 --memory=6g -e JAVA_TOOL_OPTIONS=-Xmx3g \
   -v "$REPO/backend/data:/data" "$IMAGE" \
-  --osm_path=/data/osrm/vancouver.osm.pbf \
+  --osm_path="$EXTRACT_IN_CONTAINER" \
   --download_dir=/data/planetiler_sources \
   --water_polygons_path=/data/planetiler_sources/water-polygons-split-3857.zip \
   --natural_earth_path=/data/planetiler_sources/natural_earth_vector.sqlite.zip \

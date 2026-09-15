@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getUnitBadgeStyle, formatUnitEtaDisplay } from './unitFormat';
-import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
+import { getReviewFlags, flagLabel, flagDetail } from '../../utils/reviewFlags';
 import { hallColour, UNASSIGNED_HALL_COLOUR } from '../MapConstants';
 import HydrantCard from '../kiosk/HydrantCard';
 
@@ -246,7 +246,15 @@ export default function ActiveAlertBanner({
 
         {showFlags && flags.length > 0 && (
           <ul className="w-full bg-amber-950/70 border border-amber-700/70 rounded-lg px-3 py-2 text-xs lg:text-sm font-mono text-amber-100 flex flex-col gap-0.5 text-left">
-            {flags.map((f, i) => <li key={i}>• {flagLabel(f)}</li>)}
+            {flags.map((f, i) => (
+              <li key={i}>
+                • {flagLabel(f)}
+                {/* The measured number behind the flag, where one exists (#88). */}
+                {flagDetail(activeCall, f) && (
+                  <div className="pl-3 text-amber-200/80">{flagDetail(activeCall, f)}</div>
+                )}
+              </li>
+            ))}
           </ul>
         )}
         {showChanges && updatedFields.length > 0 && (

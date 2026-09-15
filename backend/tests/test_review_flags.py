@@ -15,8 +15,9 @@ from cfr_dispatch.pipeline.review_flags import (  # noqa: E402
     compute_review_flags,
     LOCATION_UNRESOLVED, LOCATION_SUBSTITUTED, STREET_SECTION_ONLY, BLOCK_MIDPOINT,
     NO_TALK_GROUP, NO_MAP_GRID, NO_UNITS, UNKNOWN_CALL_TYPE,
-    RESPONSE_TYPE_UNKNOWN, FLAG_LABELS,
+    RESPONSE_TYPE_UNKNOWN, ROUTE_SNAP_FAR, ROUTE_SNAP_FLAG_METRES, FLAG_LABELS,
 )
+from cfr_dispatch.pipeline.payload_builder import max_destination_snap_m  # noqa: E402
 
 CLEAN = dict(
     lat=49.2963, lng=-122.7802,
@@ -101,6 +102,72 @@ def test_every_flag_has_operator_facing_wording():
     for flag in emitted:
         assert flag in FLAG_LABELS, f"{flag} has no label"
     assert len(emitted) == 8, "expected every flag to fire on a worst-case dispatch"
+
+
+class TestRouteEndsAwayFromTheMarker:
+    """Punch-list #88. OSRM snaps the destination to the nearest road and reports how far
+    it moved it; above the operator's threshold that is a flag, not an ordinary ETA.
+
+    The two distances below are real, measured on the kiosk graph
+    `apparatus_bc_city01_20260915` on 2026-09-15 from the Hall 1 apron:
+
+      6000 Quarry Rd, centroid of the largest lot   1172.79 m
+      6000 Quarry Rd, the parcel's front point         0.49 m
+
+    Across the 578 corpus dispatches that carry a placed destination, the median snap is
+    5.73 m and the 90th percentile 34.55 m, so an ordinary call sits far below the
+    threshold and 24 (4.15%) sit above it.
+    """
+
+    FAR_SNAP_M = 1172.79        # 6000 Quarry Rd, largest lot centroid
+    ORDINARY_SNAP_M = 0.49      # 6000 Quarry Rd, parcel front point
+    CORPUS_MEDIAN_SNAP_M = 5.73
+
+    def test_a_far_snap_raises_the_flag(self):
+        flags = compute_review_flags(**CLEAN, destination_snap_m=self.FAR_SNAP_M)
+        assert flags == [ROUTE_SNAP_FAR]
+        assert ROUTE_SNAP_FAR in FLAG_LABELS
+
+    def test_an_ordinary_snap_raises_nothing(self):
+        assert compute_review_flags(**CLEAN,
+                                    destination_snap_m=self.ORDINARY_SNAP_M) == []
+        assert compute_review_flags(**CLEAN,
+                                    destination_snap_m=self.CORPUS_MEDIAN_SNAP_M) == []
+
+    def test_an_unknown_snap_raises_nothing(self):
+        """The router did not answer. No measurement is not a measurement of zero, and it
+        is not evidence the route ends on the address either -- so no flag, and the ETA is
+        already '--:--' on that path (CLAUDE.md 6.1)."""
+        assert compute_review_flags(**CLEAN, destination_snap_m=None) == []
+        assert compute_review_flags(**CLEAN) == []
+
+    def test_the_threshold_is_the_operators_number_and_is_exclusive(self):
+        assert ROUTE_SNAP_FLAG_METRES == 50   # operator ruling 2026-09-15
+        assert compute_review_flags(
+            **CLEAN, destination_snap_m=ROUTE_SNAP_FLAG_METRES) == []
+        assert compute_review_flags(
+            **CLEAN, destination_snap_m=ROUTE_SNAP_FLAG_METRES + 0.01) == [ROUTE_SNAP_FAR]
+
+    def test_the_flag_reads_the_routers_number_off_the_metrics(self):
+        """The pipeline passes what OSRM reported per unit, not a distance of its own.
+
+        A street-section dispatch routes each unit to a different end of the section, so
+        the values differ; the worst is what a crew could be handed.
+        """
+        metrics = [
+            {"unit": "E1", "destination_snap_m": self.ORDINARY_SNAP_M},
+            {"unit": "E3", "destination_snap_m": self.FAR_SNAP_M},
+        ]
+        assert max_destination_snap_m(metrics) == self.FAR_SNAP_M
+        assert ROUTE_SNAP_FAR in compute_review_flags(
+            **CLEAN, destination_snap_m=max_destination_snap_m(metrics))
+
+    def test_metrics_with_no_snap_at_all_stay_unknown(self):
+        """Records written before this field existed, and routes the router never answered."""
+        assert max_destination_snap_m([{"unit": "E1", "eta_minutes": 4}]) is None
+        assert max_destination_snap_m([{"unit": "E1", "destination_snap_m": None}]) is None
+        assert max_destination_snap_m([]) is None
+        assert max_destination_snap_m(None) is None
 
 
 class TestFlagLifecycle:

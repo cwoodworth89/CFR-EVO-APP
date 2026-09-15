@@ -187,8 +187,8 @@ class TestOSRMUrlConstructionAndPriorities:
 
     def test_fetch_osrm_route_empty_or_single_waypoint(self):
         engine = EVORoutingEngine()
-        assert engine._fetch_osrm_route([]) == (None, None, None)
-        assert engine._fetch_osrm_route([[49.2910, -122.7907]]) == (None, None, None)
+        assert engine._fetch_osrm_route([]) == (None, None, None, None)
+        assert engine._fetch_osrm_route([[49.2910, -122.7907]]) == (None, None, None, None)
 
 
 class TestPhase1RouteFindingAndAprons:
@@ -199,7 +199,7 @@ class TestPhase1RouteFindingAndAprons:
         dest_lng = -122.8150
 
         with patch.object(engine, "_fetch_osrm_route") as mock_osrm:
-            mock_osrm.return_value = (None, None, None)
+            mock_osrm.return_value = (None, None, None, None)
             res = engine.calculate_route(
                 dest_lat=dest_lat,
                 dest_lng=dest_lng,
@@ -224,7 +224,7 @@ class TestPhase1RouteFindingAndAprons:
         apron = [FIRE_HALLS["1"]["lat"], FIRE_HALLS["1"]["lng"]]
 
         for dest_lat, dest_lng in [(49.2850, -122.7930), (49.3100, -122.7800)]:
-            with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None)) as mock_osrm:
+            with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None, None)) as mock_osrm:
                 res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
                 called_waypoints = mock_osrm.call_args[0][0]
                 assert called_waypoints[0] == apron
@@ -241,7 +241,8 @@ class TestPhase1RouteFindingAndAprons:
             mock_osrm.return_value = (
                 [[49.2905, -122.7915], [49.2700, -122.8200], [49.2480, -122.8655]],
                 9.42,
-                14.8
+                14.8,
+                4.1,
             )
             res = engine.calculate_route(
                 dest_lat=dest_lat,
@@ -266,7 +267,7 @@ class TestPhase1RouteFindingAndAprons:
         dest_lng = -122.7930
 
         with patch.object(engine, "_fetch_osrm_route") as mock_osrm:
-            mock_osrm.return_value = ([[49.2905, -122.7915], [49.2800, -122.7930]], 1.45, 3.2)
+            mock_osrm.return_value = ([[49.2905, -122.7915], [49.2800, -122.7930]], 1.45, 3.2, 0.6)
             res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="1")
             assert res["status"] == "success"
             assert res["distance_km"] == 1.45
@@ -279,7 +280,7 @@ class TestPhase1RouteFindingAndAprons:
         dest_lng = -122.7661
 
         with patch.object(engine, "_fetch_osrm_route") as mock_osrm:
-            mock_osrm.return_value = (None, None, None)
+            mock_osrm.return_value = (None, None, None, None)
             res = engine.calculate_route(dest_lat=dest_lat, dest_lng=dest_lng, station_id="2")
             called_waypoints = mock_osrm.call_args[0][0]
             assert len(called_waypoints) == 2
@@ -294,7 +295,7 @@ class TestStockOSRMMetrics:
         engine = EVORoutingEngine()
         # OSRM reports 9.42 km / 14.8 min; the engine must report exactly that.
         with patch.object(engine, "_fetch_osrm_route",
-                          return_value=([[49.291, -122.790], [49.248, -122.865]], 9.42, 14.8)):
+                          return_value=([[49.291, -122.790], [49.248, -122.865]], 9.42, 14.8, 4.1)):
             res = engine.calculate_route(dest_lat=49.248, dest_lng=-122.865, station_id="1")
             assert res["distance_km"] == 9.42
             assert res["eta_minutes"] == 15  # round(14.8), not a speed/turn estimate
@@ -308,7 +309,7 @@ class TestStockOSRMMetrics:
         not applied at this stage.
         """
         engine = EVORoutingEngine()
-        with patch.object(engine, "_fetch_osrm_route", return_value=([[49.29, -122.79], [49.278, -122.785]], 4.0, 6.0)):
+        with patch.object(engine, "_fetch_osrm_route", return_value=([[49.29, -122.79], [49.278, -122.785]], 4.0, 6.0, 0.9)):
             light = engine.calculate_unit_metrics("SQ1", 49.2785, -122.7850)
             heavy = engine.calculate_unit_metrics("L1", 49.2785, -122.7850)
             assert light["eta_minutes"] == heavy["eta_minutes"] == 6
@@ -318,7 +319,7 @@ class TestStockOSRMMetrics:
     def test_unknown_eta_is_none_not_estimated(self):
         """If OSRM is unreachable, ETA is reported as unknown rather than guessed."""
         engine = EVORoutingEngine()
-        with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None)):
+        with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None, None)):
             res = engine.calculate_route(dest_lat=49.2622, dest_lng=-122.8174, station_id="1")
             assert res["eta_minutes"] is None
             assert res["status"] == "degraded"
@@ -331,7 +332,7 @@ class TestStockOSRMMetrics:
 
     def test_response_mode_label_is_reported(self):
         engine = EVORoutingEngine()
-        with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None)):
+        with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None, None)):
             assert engine.calculate_route(
                 dest_lat=49.2622, dest_lng=-122.8174, response_type="emergency"
             )["response_mode"] == "Emergency"
@@ -341,7 +342,7 @@ class TestStockOSRMMetrics:
 
     def test_unit_metrics_respects_supplied_road_distance(self):
         engine = EVORoutingEngine()
-        with patch.object(engine, "_fetch_osrm_route", return_value=([[0, 0], [1, 1]], 9.9, 12.0)):
+        with patch.object(engine, "_fetch_osrm_route", return_value=([[0, 0], [1, 1]], 9.9, 12.0, 0.4)):
             m = engine.calculate_unit_metrics("E1", 49.2785, -122.7850, road_distance_km=3.5)
             assert m["road_distance_km"] == 3.5
             assert m["eta_minutes"] == 12
@@ -465,7 +466,7 @@ class TestOSRMResponsesAndFallback:
         dest_lat = 49.2800
         dest_lng = -122.7700
 
-        with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None)):
+        with patch.object(engine, "_fetch_osrm_route", return_value=(None, None, None, None)):
             res = engine.calculate_route(
                 dest_lat=dest_lat,
                 dest_lng=dest_lng,
@@ -476,6 +477,120 @@ class TestOSRMResponsesAndFallback:
             assert res["origin"]["lng"] == custom_lng
             assert res["destination"]["lat"] == dest_lat
             assert res["destination"]["lng"] == dest_lng
+
+
+class TestDestinationSnapDistance:
+    """OSRM's `waypoints[-1].distance`: how far it moved the destination to reach a road.
+
+    Punch-list #88. Before this, the engine read distance and duration out of the response
+    and dropped the waypoints, so a route ending kilometres from the address arrived at the
+    crew as an ordinary ETA.
+
+    The figures below were measured on the kiosk graph `apparatus_bc_city01_20260915`
+    on 2026-09-15 (CLAUDE.md 6.3 provenance 3), Hall 1 apron as the origin:
+
+      6000 Quarry Rd, centroid of the largest lot (49.342893, -122.647690)
+          snap 1172.79 m, route 25.42 km, 36.56 min
+      6000 Quarry Rd, the parcel's front point   (49.325910, -122.672328)
+          snap    0.49 m, route 11.80 km, 17.16 min
+
+    Same address, same graph: the far one is the whole defect in one pair.
+    """
+
+    QUARRY_LOT_CENTROID = (49.342893137125934, -122.64768966516131)
+    QUARRY_FRONT_POINT = (49.32590960013036, -122.67232788963805)
+
+    @staticmethod
+    def _osrm_response(distance_m, duration_s, dest_snap_m, include_waypoints=True):
+        body = {
+            "code": "Ok",
+            "routes": [{
+                "geometry": {"coordinates": [[-122.7907, 49.2910], [-122.6477, 49.3429]]},
+                "distance": distance_m,
+                "duration": duration_s,
+            }],
+        }
+        if include_waypoints:
+            body["waypoints"] = [
+                {"location": [-122.790725, 49.291097], "distance": 0.07276810555},
+                {"location": [-122.659, 49.335], "distance": dest_snap_m},
+            ]
+        return body
+
+    def _patched(self, body):
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = json.dumps(body).encode("utf-8")
+        ctx = patch("urllib.request.urlopen")
+        mock_urlopen = ctx.start()
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+        return ctx
+
+    def test_far_snap_is_read_from_the_destination_waypoint(self):
+        """The lot centroid: OSRM reports 1,172.79 m and the engine must carry it."""
+        engine = EVORoutingEngine()
+        ctx = self._patched(self._osrm_response(25420.0, 2193.6, 1172.79))
+        try:
+            res = engine.calculate_route(dest_lat=self.QUARRY_LOT_CENTROID[0],
+                                         dest_lng=self.QUARRY_LOT_CENTROID[1],
+                                         station_id="1")
+        finally:
+            ctx.stop()
+        assert res["status"] == "success"
+        assert res["destination_snap_m"] == 1172.79
+        assert res["distance_km"] == 25.42          # still OSRM's own figures
+        assert res["eta_minutes"] == 37
+
+    def test_an_ordinary_front_point_snaps_under_a_metre(self):
+        engine = EVORoutingEngine()
+        ctx = self._patched(self._osrm_response(11800.0, 1029.6, 0.49))
+        try:
+            res = engine.calculate_route(dest_lat=self.QUARRY_FRONT_POINT[0],
+                                         dest_lng=self.QUARRY_FRONT_POINT[1],
+                                         station_id="1")
+        finally:
+            ctx.stop()
+        assert res["destination_snap_m"] == 0.49
+
+    def test_a_response_without_waypoints_leaves_the_snap_unknown(self):
+        """Unknown, not zero. Zero would read as 'the route ends on the address'."""
+        engine = EVORoutingEngine()
+        ctx = self._patched(self._osrm_response(11800.0, 1029.6, None,
+                                                include_waypoints=False))
+        try:
+            res = engine.calculate_route(dest_lat=self.QUARRY_FRONT_POINT[0],
+                                         dest_lng=self.QUARRY_FRONT_POINT[1],
+                                         station_id="1")
+        finally:
+            ctx.stop()
+        assert res["status"] == "success"
+        assert res["destination_snap_m"] is None
+
+    def test_a_degraded_route_reports_no_snap(self):
+        engine = EVORoutingEngine()
+        with patch("urllib.request.urlopen", side_effect=URLError("Connection refused")):
+            res = engine.calculate_route(dest_lat=49.2785, dest_lng=-122.7850, station_id="1")
+        assert res["status"] == "degraded"
+        assert res["destination_snap_m"] is None
+
+    def test_unit_metrics_carry_the_snap_alongside_distance_and_eta(self):
+        engine = EVORoutingEngine()
+        with patch.object(engine, "_fetch_osrm_route",
+                          return_value=([[49.29, -122.79], [49.34, -122.65]],
+                                        25.42, 36.56, 1172.79)):
+            m = engine.calculate_unit_metrics("E1", *self.QUARRY_LOT_CENTROID)
+        assert m["destination_snap_m"] == 1172.79
+        assert m["eta_minutes"] == 37
+
+    def test_the_snap_survives_a_caller_supplied_road_distance(self):
+        """That branch asks OSRM only for the duration; the snap must come back too."""
+        engine = EVORoutingEngine()
+        with patch.object(engine, "_fetch_osrm_route",
+                          return_value=([[0, 0], [1, 1]], 9.9, 12.0, 1172.79)):
+            m = engine.calculate_unit_metrics("E1", *self.QUARRY_LOT_CENTROID,
+                                              road_distance_km=3.5)
+        assert m["road_distance_km"] == 3.5
+        assert m["destination_snap_m"] == 1172.79
 
 
 class TestMunicipalIntersectionAuthorityAndDisambiguation:

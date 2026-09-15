@@ -43,6 +43,22 @@ XSTREET_SUBSTITUTED = "XSTREET_SUBSTITUTED"
 NO_UNITS = "NO_UNITS"
 UNKNOWN_CALL_TYPE = "UNKNOWN_CALL_TYPE"
 RESPONSE_TYPE_UNKNOWN = "RESPONSE_TYPE_UNKNOWN"
+ROUTE_SNAP_FAR = "ROUTE_SNAP_FAR"
+
+# Metres between the address marker and where OSRM ends the route, above which the
+# dispatch is flagged for a look.
+#
+# Operator ruling 2026-09-15, punch-list #88: "flag it when the route's destination is
+# more than 50 m from the address marker, and we can adjust from there" (CLAUDE.md 6.3
+# provenance 4, department operational policy). Adjustable: it is one number, changed
+# here, and the flag follows on the next phase-2 recompute.
+#
+# Measured against the corpus before adopting it (2026-09-15, kiosk OSRM
+# apparatus_bc_city01_20260915): over the 578 dispatches carrying a placed destination,
+# the destination snap is a median 5.73 m, 34.55 m at the 90th percentile, 475.19 m at
+# worst. 24 calls (4.15%), at 15 distinct addresses, sit above 50 m -- sparse enough
+# that the flag means something, which is the property this flag list is built on.
+ROUTE_SNAP_FLAG_METRES = 50
 
 # Operator-facing wording, kept beside the identifiers so the two cannot drift.
 FLAG_LABELS = {
@@ -58,6 +74,7 @@ FLAG_LABELS = {
     NO_UNITS: "No responding units identified",
     UNKNOWN_CALL_TYPE: "Call type missing or generic",
     RESPONSE_TYPE_UNKNOWN: "Response type not announced or not transcribed",
+    ROUTE_SNAP_FAR: "Route ends away from the address marker",
 }
 
 # Incident strings that mean "we did not get a call type" rather than naming one.
@@ -80,7 +97,8 @@ def _blank(value):
 def compute_review_flags(*, lat, lng, responding_units, incident_type,
                          map_grid, radio_channel, response_type,
                          resolution_note=None, location_type=None, derived_map_grid=None,
-                         xstreets_unresolved=0, xstreets_substituted=0):
+                         xstreets_unresolved=0, xstreets_substituted=0,
+                         destination_snap_m=None):
     """Return the sorted list of flags that apply to one dispatch.
 
     Pure and keyword-only: every input is passed explicitly so this can be tested
@@ -130,5 +148,14 @@ def compute_review_flags(*, lat, lng, responding_units, incident_type,
     # value to assume (punch-list #31).
     if _blank(response_type):
         flags.append(RESPONSE_TYPE_UNKNOWN)
+
+    # OSRM's own metres from the marker to where it ends the route (#88). It is the
+    # router's measurement, carried through routing_metrics; nothing here derives it.
+    #
+    # An UNKNOWN snap raises nothing. A flag asserts a measured condition, and there is
+    # no measurement when the router did not answer -- which is also the case where the
+    # ETA is already '--:--'. It is not evidence the route ends on the address.
+    if destination_snap_m is not None and float(destination_snap_m) > ROUTE_SNAP_FLAG_METRES:
+        flags.append(ROUTE_SNAP_FAR)
 
     return sorted(flags)

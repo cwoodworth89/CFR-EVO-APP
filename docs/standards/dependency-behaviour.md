@@ -489,6 +489,30 @@ Consequences: an ETA taken from `duration` is the true time along the route show
 holds; and a route that got slower after a profile change is not by itself a defect, it may be
 the lighter route. The earlier unverified entry for this is closed.
 
+### OSRM v26.8.0 — the route response says how far it moved your destination, in `waypoints[].distance`
+
+**Measured 2026-09-15** against the kiosk router (`apparatus_bc_city01_20260915`). A `/route`
+response carries a `waypoints` array beside `routes`, one entry per requested coordinate in
+order, each with the `location` OSRM snapped it to and a `distance` in **metres** from the
+coordinate as asked for. The last entry is the destination, so that number is the gap between
+the address marker and where the route actually ends. Same address, same graph, Hall 1 apron as
+the origin:
+
+```
+6000 Quarry Rd, centroid of the largest lot   snap 1172.79 m   route 25.42 km / 36.56 min
+6000 Quarry Rd, the parcel's front point      snap    0.49 m   route 11.80 km / 17.16 min
+```
+
+The name that misleads is `route.distance`: it is the length of the route *returned*, and it
+says nothing about whether the route reached the place asked for. Nothing in `routes` does —
+the far row above is a perfectly ordinary-looking 25.42 km / 37 min. The snap only ever appears
+in `waypoints`, and `skip_waypoints=true` removes the array entirely, so code that reads it must
+treat its absence as unknown rather than as zero. Consequence: the engine reads it once, from
+the same response it takes distance and duration from (CLAUDE.md §6.2), and carries it as
+`destination_snap_m`; over 50 m it raises the `ROUTE_SNAP_FAR` review flag (punch-list #88,
+operator ruling 2026-09-15). Across the 578 corpus dispatches with a placed destination the
+snap is a median 5.73 m and 34.55 m at the 90th percentile.
+
 ### Leaflet 1.9.4 — `fitBounds` with padding wider than the container gives zoom `NaN`
 
 ```

@@ -21,6 +21,7 @@ export const FLAG_LABELS = {
   NO_UNITS: 'No responding units identified',
   UNKNOWN_CALL_TYPE: 'Call type missing or generic',
   RESPONSE_TYPE_UNKNOWN: 'Response type not announced or not transcribed',
+  ROUTE_SNAP_FAR: 'Route ends away from the address marker',
 };
 
 /**
@@ -44,6 +45,9 @@ export const FLAG_RULED_BY = {
   LOCATION_SUBSTITUTED: 'verified_address',
   STREET_SECTION_ONLY: 'verified_address',
   BLOCK_MIDPOINT: 'verified_address',
+  // Where the route ends is a fact about the placement, so the operator's answer is the
+  // address box — the same box that rules the other location flags (#88).
+  ROUTE_SNAP_FAR: 'verified_address',
 };
 
 /** The box on the review form whose value rules a flag, in the operator's words. */
@@ -96,4 +100,40 @@ export function getRuledFlags(call) {
 /** Operator-facing label, falling back to the raw key so drift is visible. */
 export function flagLabel(flag) {
   return FLAG_LABELS[flag] || flag;
+}
+
+/**
+ * The largest distance OSRM moved this call's destination to reach a road, in metres.
+ *
+ * Read off the stored routing_metrics, where the backend carried the router's own
+ * `destination_snap_m` (services/gis/src/gis_service/routing_engine.py). Nothing here
+ * measures it. Null when no route reports one — the router did not answer, or the record
+ * predates the field. Null is unknown, never zero (CLAUDE.md §6.1). Punch-list #88.
+ */
+export function destinationSnapMetres(call) {
+  const metrics = call?.routing_metrics
+    ?? call?.target?.routing_metrics
+    ?? call?.rawRecord?.routing_metrics
+    ?? [];
+  const values = (Array.isArray(metrics) ? metrics : [])
+    .map(m => m?.destination_snap_m)
+    .filter(v => v != null && Number.isFinite(Number(v)))
+    .map(Number);
+  return values.length ? Math.max(...values) : null;
+}
+
+/**
+ * The second line under a flag, where the panel has room for a number. Null when the flag
+ * has no number to add, or when the number is unknown — the label alone still reads true.
+ *
+ * The metres are OSRM's measurement of the gap, rounded. It is deliberately NOT turned
+ * into extra minutes: nothing measured how long the last stretch takes, and an invented
+ * figure there is exactly what §6.1 forbids.
+ */
+export function flagDetail(call, flag) {
+  if (flag !== 'ROUTE_SNAP_FAR') return null;
+  const metres = destinationSnapMetres(call);
+  if (metres == null) return null;
+  return `The route stops at the nearest road, ${Math.round(metres)} m from the marker. `
+    + 'The ETA is to that point.';
 }

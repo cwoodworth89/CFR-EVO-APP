@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { toTitleCase } from './verificationConstants';
-import { getReviewFlags, getRuledFlags, flagLabel, flagRuledByLabel } from '../../utils/reviewFlags';
+import { getReviewFlags, getRuledFlags, flagLabel, flagRuledByLabel, flagDetail } from '../../utils/reviewFlags';
 
 // Shown only when the parser produced nothing for a field. These placeholders used to carry
 // worked examples ("e.g. 2648 Sandstone Cres", "e.g. Structure Fire", "e.g. E1, L1"), which
@@ -230,6 +230,10 @@ export default function VerificationSidebar({
                       <li key={f} className="text-[10px] font-mono text-amber-100/90 leading-snug">
                         • {flagLabel(f)}
                         {flagRuledByLabel(f) && <span className="text-amber-300/70"> — {flagRuledByLabel(f)}</span>}
+                        {/* The measured number behind the flag, where one exists (#88). */}
+                        {flagDetail(selectedCall, f) && (
+                          <div className="pl-2.5 text-amber-200/70">{flagDetail(selectedCall, f)}</div>
+                        )}
                       </li>
                     ))}
                   </ul>

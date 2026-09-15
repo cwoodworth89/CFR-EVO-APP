@@ -23,7 +23,8 @@ from cfr_dispatch.parser import (
 from cfr_dispatch.stt import transcribe_audio_local
 from cfr_dispatch.pipeline.models import Phase2Result, PipelineTimer
 from cfr_dispatch.pipeline.payload_builder import (
-    build_dispatch_payload, clean_address_string, refresh_routing_metrics)
+    build_dispatch_payload, clean_address_string, refresh_routing_metrics,
+    max_destination_snap_m)
 from audio_service import filter_known_tones
 from notification_service import (
     save_dispatch_record,
@@ -360,6 +361,9 @@ def process_phase_2_finalize(
                     derived_map_grid=target_payload.get("derived_map_grid"),
                     xstreets_unresolved=near["xstreets_unresolved"],
                     xstreets_substituted=near["xstreets_substituted"],
+                    # Read off the metrics just refreshed above, so the flag moves with
+                    # the destination instead of outliving it (#88, CLAUDE.md 6.6).
+                    destination_snap_m=max_destination_snap_m(target_payload["routing_metrics"]),
                 )
                 target_payload["review_flags"] = p2_flags
                 target_payload["review_flag_count"] = len(p2_flags)
@@ -497,6 +501,10 @@ def process_phase_2_finalize(
                             derived_map_grid=target_payload.get("derived_map_grid"),
                             xstreets_unresolved=near["xstreets_unresolved"],
                             xstreets_substituted=near["xstreets_substituted"],
+                            # The correction moved the destination; this is the snap for
+                            # the route to the new one, from the metrics just refreshed
+                            # above (#88).
+                            destination_snap_m=max_destination_snap_m(target_payload["routing_metrics"]),
                         )
                         target_payload["review_flags"] = p2_flags
                         target_payload["review_flag_count"] = len(p2_flags)

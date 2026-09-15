@@ -77,6 +77,29 @@ def compute_routing_metrics(dispatch_id, responding_units, lat, lng,
         return []
 
 
+def max_destination_snap_m(metrics):
+    """The largest distance OSRM moved a destination to reach a road, across these routes.
+
+    Each metric carries the router's own `destination_snap_m` for the point THAT unit was
+    routed to (CLAUDE.md 6.2). Usually every unit shares one destination and the values
+    agree; on a street-section dispatch each unit aims at the nearer end of the section,
+    so they differ. The largest is what a crew could be handed, so that is what the flag
+    is raised on.
+
+    Returns None when no metric reports one -- the router did not answer, or answered
+    without waypoints. Unknown stays unknown; it is never 0 (CLAUDE.md 6.1). #88.
+    """
+    values = []
+    for m in metrics or []:
+        snap = (m or {}).get("destination_snap_m")
+        if snap is not None:
+            try:
+                values.append(float(snap))
+            except (TypeError, ValueError):
+                continue
+    return max(values) if values else None
+
+
 def refresh_routing_metrics(dispatch_id, existing, responding_units, lat, lng,
                             response_type=None, destination_options=None):
     """Phase 2's ETAs, for the destination phase 2 settled on.
@@ -355,6 +378,18 @@ def build_dispatch_payload(
     # scored 85; a confidently WRONG address scored 100. The penalties had no
     # provenance, were not commensurable, and destroyed the very information they
     # consumed -- by the time the operator saw "85" the missing field was gone.
+    # Calculate per-unit routing metrics from home hall origins (accounting for Emergency vs Routine response)
+    # Phase 2 recomputes this against whatever destination it settles on; see
+    # refresh_routing_metrics above for why inheriting phase 1's answer is not safe.
+    #
+    # Ahead of the flags because ROUTE_SNAP_FAR is read off them: the distance OSRM moved
+    # the destination to reach a road is the router's own number, reported once here and
+    # carried, not measured a second time for the flag (#88).
+    routing_metrics = compute_routing_metrics(
+        dispatch_id, responding_units, lat, lng,
+        response_type=detected_resp,
+        destination_options=local_geocode_result.get("endpoints"))
+
     review_flags = compute_review_flags(
         lat=lat,
         lng=lng,
@@ -367,6 +402,7 @@ def build_dispatch_payload(
         location_type=local_geocode_result.get("location_type"),
         xstreets_unresolved=near["xstreets_unresolved"],
         xstreets_substituted=near["xstreets_substituted"],
+        destination_snap_m=max_destination_snap_m(routing_metrics),
     )
 
     # verify_location survives as the operator-facing "check this location" marker,
@@ -375,14 +411,6 @@ def build_dispatch_payload(
 
     if verify_location_override is not None:
         verify_location = verify_location_override
-        
-    # Calculate per-unit routing metrics from home hall origins (accounting for Emergency vs Routine response)
-    # Phase 2 recomputes this against whatever destination it settles on; see
-    # refresh_routing_metrics above for why inheriting phase 1's answer is not safe.
-    routing_metrics = compute_routing_metrics(
-        dispatch_id, responding_units, lat, lng,
-        response_type=detected_resp,
-        destination_options=local_geocode_result.get("endpoints"))
 
     target_payload = {
         "address": best_address,

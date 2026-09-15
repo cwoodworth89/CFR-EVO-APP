@@ -221,16 +221,25 @@ class EVORoutingEngine:
                 endpoints.append(f"{base}/route/v1/driving/{loc_str}?{query_params}")
         return endpoints
 
-    def _fetch_osrm_route(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float], Optional[float]]:
-        """Queries OSRM and returns (polyline, distance_km, duration_min) as reported by the router.
+    def _fetch_osrm_route(self, waypoints: List[List[float]]) -> Tuple[Optional[List[List[float]]], Optional[float], Optional[float], Optional[float]]:
+        """Queries OSRM and returns (polyline, distance_km, duration_min, destination_snap_m).
 
         OSRM computes duration from per-segment speeds, road classification, and real
         turn costs on the actual graph. It is the authoritative travel-time answer;
         we do not recompute it.
+
+        `destination_snap_m` is the same kind of figure: OSRM moves each requested
+        coordinate to the nearest routable road and reports how far it moved it, in
+        `waypoints[i].distance` (metres). The last waypoint is the destination, so that
+        value is the gap between the address marker and where the route actually ends.
+        It is READ, never recomputed here -- a distance we measured ourselves against
+        our own road table would be a different number from the one the route was built
+        on (CLAUDE.md 6.2). If OSRM does not report it, it is None and stays None; an
+        unmeasured snap is not a snap of zero (CLAUDE.md 6.1). Punch-list #88.
         """
         if not waypoints or len(waypoints) < 2:
-            return None, None, None
-        
+            return None, None, None, None
+
         # Format coordinates as lng,lat;lng,lat...
         loc_str = ";".join([f"{pt[1]},{pt[0]}" for pt in waypoints])
         endpoints = self._get_osrm_endpoints(loc_str)
@@ -252,11 +261,20 @@ class EVORoutingEngine:
                             lat_lngs = [[pt[1], pt[0]] for pt in coords]
                             dist_km = round(route["distance"] / 1000.0, 2)
                             dur_min = round(route["duration"] / 60.0, 2)
-                            return lat_lngs, dist_km, dur_min
+                            # The destination is the LAST waypoint. A response without
+                            # waypoints, or without a distance on that waypoint, leaves
+                            # this unknown rather than zero.
+                            snap_m = None
+                            osrm_waypoints = data.get("waypoints") or []
+                            if osrm_waypoints:
+                                raw_snap = osrm_waypoints[-1].get("distance")
+                                if isinstance(raw_snap, (int, float)):
+                                    snap_m = round(float(raw_snap), 2)
+                            return lat_lngs, dist_km, dur_min, snap_m
             except Exception as e:
                 logging.debug(f"OSRM query attempt failed for {url}: {e}")
 
-        return None, None, None
+        return None, None, None, None
 
     def calculate_unit_metrics(
         self,
@@ -293,11 +311,11 @@ class EVORoutingEngine:
         if road_distance_km is not None and road_distance_km > 0:
             # Caller already resolved the road distance via OSRM for this origin.
             road_km = round(road_distance_km, 2)
-            _, _, dur_min = self._fetch_osrm_route(
+            _, _, dur_min, snap_m = self._fetch_osrm_route(
                 [[hall["lat"], hall["lng"]], [dest_lat, dest_lng]]
             )
         else:
-            _, osrm_km, dur_min = self._fetch_osrm_route(
+            _, osrm_km, dur_min, snap_m = self._fetch_osrm_route(
                 [[hall["lat"], hall["lng"]], [dest_lat, dest_lng]]
             )
             road_km = osrm_km if osrm_km is not None else round(crow_km, 2)
@@ -317,6 +335,10 @@ class EVORoutingEngine:
             "crow_distance_km": round(crow_km, 2),
             "road_distance_km": road_km,
             "eta_minutes": eta_minutes,
+            # Metres OSRM moved this destination to reach a road: the gap between the
+            # address marker and where this unit's route actually ends. None when the
+            # router did not answer or did not report it -- unknown, not zero (#88).
+            "destination_snap_m": snap_m,
             "routing_source": routing_source,
             "response_mode": "Routine" if is_routine else "Emergency",
             "calculated_at": datetime.now(timezone.utc).isoformat()
@@ -431,7 +453,7 @@ class EVORoutingEngine:
         # Direction of travel is OSRM's job, not ours: the router decides how to
         # leave the apron based on the actual road network.
         waypoint_pts = [[start_lat, start_lng], [dest_lat, dest_lng]]
-        osrm_polyline, osrm_km, osrm_min = self._fetch_osrm_route(waypoint_pts)
+        osrm_polyline, osrm_km, osrm_min, osrm_snap_m = self._fetch_osrm_route(waypoint_pts)
 
         if osrm_polyline and len(osrm_polyline) >= 2:
             final_polyline = osrm_polyline
@@ -451,6 +473,10 @@ class EVORoutingEngine:
             "routing_source": routing_source,
             "distance_km": road_km,
             "eta_minutes": eta_minutes,
+            # OSRM's own metres from the requested destination to where the route ends
+            # (#88). None on the degraded path: with no route there is nothing snapped,
+            # and a placeholder straight line has not been near a road.
+            "destination_snap_m": osrm_snap_m if status == "success" else None,
             "response_mode": "Routine" if is_routine else "Emergency",
             "origin": {"lat": start_lat, "lng": start_lng},
             "destination": {"lat": dest_lat, "lng": dest_lng},

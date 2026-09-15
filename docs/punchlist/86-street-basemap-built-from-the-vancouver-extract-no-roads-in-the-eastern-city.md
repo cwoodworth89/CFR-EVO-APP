@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | FIXED in `86eee32e`; rebuild on the kiosk in progress 2026-09-15; `cfr_tiles` restart (operator) and an on-screen check pending |
+| **Status** | FIXED in `86eee32e`; rebuilt 2026-09-15 and `cfr_tiles` restarted by the operator; on-screen check at the east edge pending |
 | **Severity** | 🔴 crew-visible: tiles exist there, so the map looks complete; only the roads are missing |
 | **Area** | 🗺️ Basemap · 🖥️ Kiosk |
 | **Origin** | Scaffolding chat, 2026-09-15; confirmed by a read-only gis-spatial-engineer job against the kiosk the same day |
@@ -43,3 +43,15 @@ archive reaches z14 and MapLibre overzooms to 22.
 
 **Closes when:** the new build log shows `coquitlam_region.osm.pbf`, the operator has restarted
 `cfr_tiles`, and roads show at the east edge on screen.
+
+## Rebuild, 2026-09-15
+
+Kiosk, `kiosk-remote-operator`: pulled `86eee32e`; capture state SAFE; built 19:23:52–19:24:49Z, exit 0,
+no ERROR or WARN lines. `street_vector.build.log` now reads `osm_path=/data/osrm/coquitlam_region.osm.pbf`.
+The archive went from 32,960,512 to 39,923,712 bytes. The 6000 Quarry Rd z14 tile is 8,793 bytes (its earlier size
+was not recorded). `planetiler:osm:osmosisreplicationtime` now reads `1970-01-01T00:00:00Z`, because the regional
+extract carries no replication timestamp. The operator restarted `cfr_tiles` the same day.
+
+**Basemap and routing graph now use different extracts** until the regional graph is swapped in (operator ruling
+2026-09-15: move the graph to the regional extract, with the stay-in-Coquitlam penalty). The map may show eastern
+dykes and trails the live graph cannot route on.

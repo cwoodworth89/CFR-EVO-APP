@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | REPORTED, not fixed. No call has been checked against it. Needs the operator's ruling on CLAUDE.md §5. |
+| **Status** | RULED 2026-09-15; being built (frontend-kiosk-architect). |
 | **Severity** | 🔴 crew-visible: a real Coquitlam address would read "NOT AVAILABLE OUTSIDE OF CITY" |
 | **Area** | 🖥️ Kiosk · 🗺️ Geocoding |
 | **Origin** | Lead, 2026-09-15, while checking the basemap extract (#86) |
@@ -37,3 +37,9 @@ Whether the kiosk should take the backend's polygon answer (e.g. a flag on the p
 client-side test with corrected bounds. §5 names the box and says the `gis-pipeline-sync` skill
 depends on it, so either change is the operator's ruling. Owner once ruled: `gis-spatial-engineer`.
 Note also that `ST_Contains` excludes the boundary itself (CLAUDE.md §7.3a).
+
+## Operator ruling, 2026-09-15
+
+"Kiosk should use the city boundary. No fall backs should be needed on that." The kiosk's Tier 2 answer comes from
+`public.city_boundary`, with no box anywhere, including the backend's two box fallbacks. An unknown answer renders as
+unknown (§6.1). CLAUDE.md §5 and the `gis-pipeline-sync` skill are updated to match once the change lands.

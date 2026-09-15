@@ -268,8 +268,12 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
     inconsistent (55, 53, 55, 55, 53; lot 55) but follows the unit: `Number 24` was 53 both
     times, `Number 29` 55 both times, no unit 55. **E-Comm's grid can differ by unit within one
     site.** The other six addresses have one dispatch each.
-  * **Where E-Comm's grid comes from is not known.** The cheapest check is whether EG1's map
-    puts 1300 Pinetree Way in 86 or 87.
+  * **The two numberings are one** (operator, 2026-09-15): the City's response zones and the map
+    grid E-Comm announces are the same numbering. A disagreement is therefore about which zone an
+    address belongs to, not two different systems.
+  * **Why these 18 disagree is not known.** The operator said so on 2026-09-15 and is checking on
+    duty; record no cause until he reports. Whether EG1's map puts 1300 Pinetree Way in 86 or 87
+    is still the cheapest way to settle that address.
   * **A correction now persists (2026-09-15).** The review screen writes
     `dispatches.verified_map_grid` for that one call, and phase 1 reads that same column at call
     time (`pipeline/grid_history.py`), so a grid corrected in review is what phase 1 shows on the

@@ -13,6 +13,7 @@ from cfr_dispatch.parser import (
 )
 
 from cfr_dispatch.pipeline.near_roads import apply_near_roads
+from cfr_dispatch.pipeline.grid_history import verified_grid_for
 from cfr_dispatch.pipeline.review_flags import (
     compute_review_flags, LOCATION_UNRESOLVED, LOCATION_SUBSTITUTED,
 )
@@ -309,15 +310,26 @@ def build_dispatch_payload(
     #     Phase 2 replaces it with the spoken grid and flags a difference.
     #   otherwise (phase 2, the harnesses): the spoken grid first, and the zone containing
     #     the point only when nothing was spoken, as before.
+    #   Before the parcel's zone, phase 1 takes the grid E-Comm was verified to have dispatched
+    #   this address as on earlier calls (grid_history, operator ruling 2026-09-13): 1300
+    #   Pinetree Way was dispatched 86 on six of six calls while its lot lies wholly in 87.
     parsed_grid = next((d.map_grid for d in all_candidates if d.map_grid), None)
     if parsed_grid is not None and str(parsed_grid).lower() == "none":
         parsed_grid = None
+    subaddress = next((d.subaddress for d in all_candidates if d.subaddress), None)
     map_grid, map_grid_source = None, None
     if preliminary:
         if local_geocode_result.get("zone_id"):
-            map_grid, map_grid_source = str(local_geocode_result["zone_id"]), "parcel-zone"
-            logging.info(f"[{dispatch_id}] Phase 1 map grid {map_grid} is the parcel's zone, not the chunk's"
-                         + (f" ('{parsed_grid}')" if parsed_grid else ""))
+            retained = verified_grid_for(getattr(validator, "engine", None), local_geocode_result["address"],
+                                         subaddress, dispatch_id=dispatch_id)
+            if retained:
+                map_grid, map_grid_source = retained[0], "verified-history"
+                logging.info(f"[{dispatch_id}] Phase 1 map grid {map_grid} is this {retained[1]}'s verified grid "
+                             f"on {retained[2]} earlier call(s); the parcel's zone is {local_geocode_result['zone_id']}")
+            else:
+                map_grid, map_grid_source = str(local_geocode_result["zone_id"]), "parcel-zone"
+                logging.info(f"[{dispatch_id}] Phase 1 map grid {map_grid} is the parcel's zone, not the chunk's"
+                             + (f" ('{parsed_grid}')" if parsed_grid else ""))
     elif parsed_grid:
         map_grid, map_grid_source = str(parsed_grid), "announced"
     elif lat is not None and lng is not None and validator:
@@ -372,13 +384,13 @@ def build_dispatch_payload(
         response_type=detected_resp,
         destination_options=local_geocode_result.get("endpoints"))
 
-    subaddress = next((d.subaddress for d in all_candidates if d.subaddress), None)
     target_payload = {
         "address": best_address,
         "lat": lat,
         "lng": lng,
         "rings": rings,
         "map_grid": map_grid,
+        # "verified-history" (phase 1, the grid this address was verified to be dispatched as),
         # "parcel-zone" (phase 1, derived from the placed parcel), "announced" (spoken),
         # "point-zone" (nothing spoken; the zone containing the point), or None.
         "map_grid_source": map_grid_source,

@@ -52,7 +52,7 @@ FLAG_LABELS = {
     BLOCK_MIDPOINT: "Announced as a block; the pin is the block's middle, not an address",
     NO_TALK_GROUP: "Talk group unknown — none announced, or not transcribed",
     NO_MAP_GRID: "Map grid unknown — none announced, or not transcribed",
-    GRID_MISMATCH: "Announced map grid differs from the zone the address sits in",
+    GRID_MISMATCH: "Announced map grid differs from the grid first shown for this address",
     XSTREET_UNRESOLVED: "A near road as heard matches no road near the address",
     XSTREET_SUBSTITUTED: "A near road was matched to a nearby road by spelling; check it",
     NO_UNITS: "No responding units identified",
@@ -106,8 +106,9 @@ def compute_review_flags(*, lat, lng, responding_units, incident_type,
         flags.append(NO_TALK_GROUP)
     if _blank(map_grid):
         flags.append(NO_MAP_GRID)
-    # Phase 1 published the parcel's zone; phase 2 heard a different grid. Either the
-    # dispatcher assigned across a zone line or the transcript is wrong; a person decides
+    # Phase 1 published the parcel's zone, or the grid this address was verified to be
+    # dispatched as on earlier calls (grid_history); phase 2 heard a different grid. Either the
+    # dispatcher assigned it differently this time or the transcript is wrong; a person decides
     # (punch-list #72). Numeric strings compare without leading zeros, as round_comparison does.
     if (not _blank(map_grid) and not _blank(derived_map_grid)
             and str(map_grid).strip().lstrip("0") != str(derived_map_grid).strip().lstrip("0")):

@@ -70,7 +70,9 @@ def test_a_completion_that_is_not_a_place_is_withheld(validator):
 def test_a_parcel_goes_out(validator):
     t = preliminary(validator, PARCEL)
     assert t["location_pending"] is False and t["lat"] is not None
-    assert t["address"] == "3080 Lincoln Ave" and t["map_grid_source"] == "parcel-zone"
+    # The grid is phase 1's own either way: the lot's zone, or the address's verified grid once
+    # 3080 Lincoln Ave has verified calls (grid_history; it has two, both 82, as of 2026-09-13).
+    assert t["address"] == "3080 Lincoln Ave" and t["map_grid_source"] in ("parcel-zone", "verified-history")
 
 
 def test_an_exact_junction_goes_out(validator):

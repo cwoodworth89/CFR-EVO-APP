@@ -64,6 +64,13 @@ def save_and_upload_audio(dispatch_id: str, buffer: list, tone_name: str = None,
         logging.error(f"[{dispatch_id}] Error saving dispatch audio: {e}", exc_info=True)
         return None, 0.0
 
+# The phase 1 grid sources that are not the spoken grid. Phase 2 keeps phase 1's value as
+# derived_map_grid for these, so GRID_MISMATCH fires when the announcement differs from what the
+# crew was shown first: the lot's zone, or the grid this address was verified to be dispatched
+# as on earlier calls (grid_history, operator ruling 2026-09-13).
+PHASE_1_DERIVED_GRID_SOURCES = ("parcel-zone", "verified-history")
+
+
 def _grid_after_phase_2(all_candidates, lat, lng, validator):
     """The grid phase 2 publishes, and where it came from (punch-list #72).
 
@@ -315,7 +322,7 @@ def process_phase_2_finalize(
                     "map_grid": p2_grid,
                     "map_grid_source": p2_grid_source,
                     # Phase 1's derived grid, kept so the reviewer sees both when they differ.
-                    "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") == "parcel-zone" else None,
+                    "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") in PHASE_1_DERIVED_GRID_SOURCES else None,
                     "radio_channel": p2_channel
                 }
                 # The full recording's unit number, not the chunk's. Left to the spread above,
@@ -456,7 +463,7 @@ def process_phase_2_finalize(
                             "location_pending": False,
                             "map_grid": p2_grid,
                             "map_grid_source": p2_grid_source,
-                            "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") == "parcel-zone" else None,
+                            "derived_map_grid": p1_target.get("map_grid") if p1_target.get("map_grid_source") in PHASE_1_DERIVED_GRID_SOURCES else None,
                             "radio_channel": p2_channel
                         }
                         if p2_subaddress:

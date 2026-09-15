@@ -31,4 +31,6 @@ def test_no_derived_grid_means_nothing_to_compare():
 
 
 def test_the_flag_has_operator_wording():
-    assert GRID_MISMATCH in FLAG_LABELS and "zone" in FLAG_LABELS[GRID_MISMATCH]
+    # Phase 1's grid is the lot's zone or the address's verified grid (grid_history), so the label
+    # names neither: it says what the crew saw first.
+    assert GRID_MISMATCH in FLAG_LABELS and "first shown" in FLAG_LABELS[GRID_MISMATCH]

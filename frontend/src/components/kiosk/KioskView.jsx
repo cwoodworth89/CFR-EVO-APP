@@ -169,7 +169,9 @@ export default function KioskView({ kioskState }) {
   const gridLabel = rawMapGrid ? (rawMapGrid.toString().toUpperCase().startsWith('GRID') ? rawMapGrid.toString().toUpperCase() : `GRID ${rawMapGrid}`) : null;
   // Until phase 2 hears the grid, phase 1 shows the zone the placed parcel sits in and says so
   // (target.map_grid_source === 'parcel-zone', punch list #72). A derived value is labelled, never
-  // dressed as the announced one (CLAUDE.md section 6.1).
+  // dressed as the announced one (CLAUDE.md section 6.1). 'verified-history' -- the grid E-Comm was
+  // verified to have dispatched this address as on earlier calls -- is shown bare by operator ruling
+  // 2026-09-14: "The audio and the label will match no need to label." Phase 2 flags it if not.
   const gridSource = activeCall?.target?.map_grid_source || activeCall?.map_grid_source || null;
   const formattedGrid = gridLabel && gridSource === 'parcel-zone' ? `${gridLabel} · FROM ADDRESS` : gridLabel;
 

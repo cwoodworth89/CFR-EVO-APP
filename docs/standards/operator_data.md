@@ -270,12 +270,12 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
     site.** The other six addresses have one dispatch each.
   * **Where E-Comm's grid comes from is not known.** The cheapest check is whether EG1's map
     puts 1300 Pinetree Way in 86 or 87.
-  * **A correction does not persist today.** The review screen writes
-    `dispatches.verified_map_grid` for that one call. The backtests, harnesses and the review
-    display read it; the pipeline does not. The next call to the same address shows the lot's
-    grid in phase 1 (`parcel-zone`), then the spoken grid in phase 2 with `GRID_MISMATCH`
-    (`payload_builder.py`, `phase2.py`).
-  * **Map-grid retention (ruling 21, not built). Proposed design:**
+  * **A correction now persists (2026-09-15).** The review screen writes
+    `dispatches.verified_map_grid` for that one call, and phase 1 reads that same column at call
+    time (`pipeline/grid_history.py`), so a grid corrected in review is what phase 1 shows on the
+    next call to that address. Before this, the next call showed the lot's grid in phase 1
+    (`parcel-zone`), then the spoken grid in phase 2 with `GRID_MISMATCH`.
+  * **Map-grid retention (ruling 21, built 2026-09-15 in `pipeline/grid_history.py`):**
     * **Evidence** is the grids you verified (`dispatches.verified_map_grid`), never the parsed
       grid, which is where the missing-digit errors came from.
     * **Keyed by the dispatched address and its unit.**
@@ -292,9 +292,16 @@ Neither key is fully stable, which is why a refresh reports orphans rather than 
 
     That run keyed by site with any unit removed. Keyed by unit, 2601 Lougheed Hwy's two units stop
     conflicting.
-  * **Open before building:** how many agreeing verified calls before phase 1 uses one; what
-    phase 1 shows when a site's history disagrees; how the screen labels a grid taken from past
-    calls.
+  * **Settled before building (operator, 2026-09-14):** one verified call is enough; when the
+    calls consulted disagree there is no answer and phase 1 keeps the lot's grid; the kiosk shows
+    a retained grid bare — "the audio and the label will match no need to label", and phase 2
+    raises `GRID_MISMATCH` when it does not.
+  * **Measured on the corpus at build time, 2026-09-15** (569 dispatches with a numeric
+    `verified_map_grid`, 290 address keys, replayed in time order with each call allowed only the
+    calls verified before it): 233 calls across 70 addresses take a retained grid, 114 by unit and
+    119 by address. It differs from the lot's grid on 8 calls across 4 addresses — 1300 Pinetree
+    Way, 1210 Pinetree Way, 2960 Walton Ave and one `Number 24` at 2601 Lougheed Hwy. One address
+    has verified grids that disagree: 2601 Lougheed Hwy, which the unit scope resolves.
   * **The "missing last digit" grids (12, 2026-07-18 to 08-31) are a different stage.** In 5 the
     raw transcript already has the short number; in 2 the transcript has the full number and the
     parsed grid kept one digit. None since 2026-08-31.

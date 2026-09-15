@@ -58,7 +58,10 @@ def parcel_zone(validator, address_prefix):
     return str(row[0])
 
 
-def test_preliminary_grid_is_the_parcels_zone_not_the_chunks(validator):
+def test_preliminary_grid_is_the_parcels_zone_not_the_chunks(validator, monkeypatch):
+    # With no verified history for the address (retention switched off here), the lot's zone.
+    import cfr_dispatch.pipeline.payload_builder as pb
+    monkeypatch.setattr(pb, "verified_grid_for", lambda *a, **k: None)
     san, cands = candidates(CHUNK_19S)
     assert next(c.map_grid for c in cands if c.map_grid) == "68"  # what the chunk says
     payload, _ = build_dispatch_payload("TEST", CHUNK_19S, san, cands, validator, UNITS_VOCABULARY,
@@ -68,6 +71,32 @@ def test_preliminary_grid_is_the_parcels_zone_not_the_chunks(validator):
     assert target["map_grid"] == parcel_zone(validator, "3080 LINCOLN AVE")
     assert target["map_grid_source"] == "parcel-zone"
     assert target["map_grid"] != "68"
+
+
+# DISP-2026-2CD7C6's first round as transcribed. 1300 Pinetree Way was dispatched 86 on six of six
+# verified calls (2026-08-09 to 09-09) while its lot lies wholly in zone 87 (measured 2026-09-13).
+PINETREE_1300 = ("coquitlam engine 1 respond routine assist 1300 pinetree way near david avenue and pinewood avenue "
+                 "use talk group 10 combined response coquitlam map grid 86")
+
+
+def test_preliminary_grid_is_the_addresses_verified_grid_when_it_has_one(validator):
+    san, cands = candidates(PINETREE_1300)
+    payload, _ = build_dispatch_payload("DISP-2026-2CD7C6", PINETREE_1300, san, cands, validator,
+                                        UNITS_VOCABULARY, preliminary=True)
+    target = payload["target"]
+    assert target["address"] == "1300 Pinetree Way"
+    assert parcel_zone(validator, "1300 PINETREE WAY") == "87"
+    assert target["map_grid"] == "86" and target["map_grid_source"] == "verified-history"
+
+
+def test_verified_history_for_a_unit_falls_to_the_address(validator):
+    # DISP-2026-3E1426 is this chunk's own call (Number 2507, verified 82) and is left out; the other
+    # verified call at 3080 Lincoln Ave, DISP-2026-16D5FA, has no unit and was 82.
+    san, cands = candidates(CHUNK_19S)
+    payload, _ = build_dispatch_payload("DISP-2026-3E1426", CHUNK_19S, san, cands, validator,
+                                        UNITS_VOCABULARY, preliminary=True)
+    target = payload["target"]
+    assert target["map_grid"] == "82" and target["map_grid_source"] == "verified-history"
 
 
 def test_final_grid_is_the_spoken_one(validator):

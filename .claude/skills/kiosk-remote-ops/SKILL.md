@@ -54,6 +54,14 @@ ssh tcfire@100.95.146.94 "tail -n 50 /home/tcfire/CFR-EVO-APP/backend/dispatch.l
 
 ## 3. Daemon Control & Frontend Asset Compilation
 
+**The operator runs restarts; Claude Code cannot** (operator ruling 2026-09-14).
+`.claude/hooks/kiosk_restart_guard.py`, a PreToolUse hook in `.claude/settings.json`, denies any Bash
+or PowerShell command that restarts, stops or kills a kiosk service, recreates a container
+(`docker compose up`, `docker restart`), or reboots, including inside `ssh`, `bash -c`, heredocs and
+heredoc-written `.sh` scripts. An agent hands the operator the exact command instead. The frontend
+build below is not affected. `python .claude/hooks/kiosk_restart_guard.py --self-test` checks the
+matcher; each denial is logged to `~/.claude/kiosk-restart-guard.log`.
+
 Restart the audio listener daemon:
 ```bash
 ssh tcfire@100.95.146.94 "sudo systemctl restart cfr-agent"

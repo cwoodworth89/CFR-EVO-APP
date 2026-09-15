@@ -214,7 +214,9 @@ an STT failure; the parser never missed an address when the transcript was exact
 
 ## 5. Deploy
 
-Ask first — the restart drops the audio listener for a few seconds.
+The operator runs the restart, once `tools/kiosk_capture_state.sh` says SAFE: a restart during a
+broadcast loses the call (punch list #70), and `.claude/hooks/kiosk_restart_guard.py` blocks it
+for Claude Code.
 
 ```bash
 ssh tcfire@100.95.146.94 "cp -p /home/tcfire/CFR-EVO-APP/backend/.env /home/tcfire/CFR-EVO-APP/backend/.env.pre-deploy-\$(date +%Y%m%d-%H%M%S) && sed -i 's|^WHISPER_MODEL=.*|WHISPER_MODEL=/home/tcfire/CFR-EVO-APP/backend/models/whisper-base-cfr-ct2-vN|' /home/tcfire/CFR-EVO-APP/backend/.env"

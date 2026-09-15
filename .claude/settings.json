@@ -49,5 +49,19 @@
     "ask": [
       "Bash(sudo *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/kiosk_restart_guard.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

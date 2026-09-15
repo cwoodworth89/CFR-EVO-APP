@@ -11,7 +11,8 @@ This skill covers managing, verifying, and troubleshooting the containerized sta
 
 ## 1. Container Stack Management
 
-Start the local stack in background daemon mode:
+Start the stack in background daemon mode (the operator runs this;
+`.claude/hooks/kiosk_restart_guard.py` blocks `docker compose up` for Claude Code):
 ```powershell
 docker compose up -d
 ```
@@ -68,7 +69,8 @@ Quick service list check:
 ```powershell
 curl -s http://localhost:8081/services
 ```
-Restart tile container after adding or modifying archives in `backend/data/tiles/`:
+Restart tile container after adding or modifying archives in `backend/data/tiles/` (the operator runs
+this; `.claude/hooks/kiosk_restart_guard.py` blocks container restarts for Claude Code):
 ```powershell
 docker restart cfr_tiles
 ```

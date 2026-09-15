@@ -43,15 +43,18 @@ services:
     image: ghcr.io/project-osrm/osrm-backend@sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c
     container_name: cfr_osrm
     restart: always
-    # apparatus.osrm: the kiosk graph built 2026-09-09 from backend/osrm/profiles/apparatus.lua
-    # (turn restrictions off, fire lanes drivable; the operator's rulings in punch-list #1),
-    # deployed 2026-09-09 after the corpus measurement in that item. vancouver.osrm.* on the
-    # kiosk is the stock car.lua graph and the rollback: change the name back and `up -d osrm`.
+    # apparatus_bc_city01_20260915.osrm: built 2026-09-15 from the regional extract
+    # coquitlam_region.osm.pbf (the basemap's extract) with backend/osrm/profiles/apparatus.lua
+    # (turn restrictions off, fire lanes drivable; punch-list #1) and the stay-in-Coquitlam
+    # penalty at CFR_CITY_LIMITS_FACTOR=0.1 (operator ruling 2026-09-15, adjustable at build time;
+    # build record apparatus_bc_city01_20260915.build.txt; corpus measurement evaluation_history
+    # fbafb199). Rollback: apparatus.osrm (2026-09-09, vancouver.osm.pbf, no penalty) -- change
+    # the three names back and `docker compose up -d --no-deps osrm`.
     command: >
-      sh -c 'if [ -f /data/apparatus.osrm.timestamp ]; then
-        exec osrm-routed --algorithm mld /data/apparatus.osrm;
+      sh -c 'if [ -f /data/apparatus_bc_city01_20260915.osrm.timestamp ]; then
+        exec osrm-routed --algorithm mld /data/apparatus_bc_city01_20260915.osrm;
       else
-        echo "OSRM dataset not yet mounted in /data/apparatus.osrm. Standing by in fallback mode...";
+        echo "OSRM dataset not yet mounted in /data/apparatus_bc_city01_20260915.osrm. Standing by in fallback mode...";
         while true; do sleep 3600; done;
       fi'
     ports:

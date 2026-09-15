@@ -12,7 +12,10 @@ const SEARCH_RADII_M = [50, 100];
  * A Google Street View panorama in a container, driven by a view object.
  *
  *   const pano = useStreetViewPanorama({ containerRef, enabled, apiKey, view, containerKey });
- *   pano.status      'idle' | 'loading' | 'ready' | 'unavailable'
+ *   pano.status      'idle' | 'loading' | 'ready' | 'none' | 'unavailable'
+ *                    'none' = Google answered ZERO_RESULTS at every search radius: there is no
+ *                    imagery here. Only that answer sets it; a search that never answers
+ *                    stays 'loading' (no timeout guesses it, CLAUDE.md 6.1).
  *   pano.authFailed  Google rejected the key on this page (sticky)
  *   pano.readView()  what the operator is looking at now, as a view object, or null
  *
@@ -36,6 +39,8 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
   const liveRef = useRef(null);   // { heading, pitch, fov, lat, lng, panoId } as the SDK reports it
   const viewRef = useRef(view);   // the latest view, for the construction effect to read without re-running
   viewRef.current = view;
+  const aimRef = useRef(null);    // the live panorama's imagery search, for the apply effect
+  const noImageryRef = useRef(false);  // the last search ended ZERO_RESULTS; status_changed must not overwrite it
 
   useEffect(() => onGoogleMapsAuthFailure(() => setAuthFailed(true)), []);
 
@@ -68,10 +73,20 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
     const aimAt = (target) => {
       // Find imagery for a view with no panorama id: nearest outdoor panorama to the point.
       const svc = new mapsApi.StreetViewService();
+      // Every radius answered ZERO_RESULTS. Any other answer (an error, a quota) is not
+      // "no imagery" and keeps the old path.
+      let allZero = true;
       const tryRadius = (i) => {
         if (cancelled || !pano) return;
         if (i >= SEARCH_RADII_M.length) {
           console.warn('No outdoor Street View imagery within', SEARCH_RADII_M.at(-1), 'm of', target.lat, target.lng);
+          if (allZero) {
+            // Google's own answer, from the searches above: nothing here. No setPosition,
+            // which would only repeat the search inside the SDK and fire status_changed.
+            noImageryRef.current = true;
+            setStatus('none');
+            return;
+          }
           pano.setPosition({ lat: target.lat, lng: target.lng });
           setStatus('ready');
           return;
@@ -88,12 +103,15 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
             pano.setPov({ heading: target.heading, pitch: target.pitch });
             pano.setZoom(fovToZoom(target.fov));
             pano.setVisible(true);
+            noImageryRef.current = false;
             setStatus('ready');
           } else {
+            if (st !== mapsApi.StreetViewStatus.ZERO_RESULTS) allZero = false;
             tryRadius(i + 1);
           }
         });
       };
+      noImageryRef.current = false;
       tryRadius(0);
     };
 
@@ -132,7 +150,8 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
         if (id) record({ panoId: id, ...positionOf(pano) });
       });
       pano.addListener('position_changed', () => record(positionOf(pano)));
-      pano.addListener('status_changed', () => { if (!cancelled) setStatus('ready'); });
+      pano.addListener('status_changed', () => { if (!cancelled && !noImageryRef.current) setStatus('ready'); });
+      aimRef.current = aimAt;
 
       if (v.panoId) {
         pano.setVisible(true);
@@ -153,6 +172,8 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
       }
       panoRef.current = null;
       liveRef.current = null;
+      aimRef.current = null;
+      noImageryRef.current = false;
       if (container) container.innerHTML = '';
     };
     // The view is read through viewRef at construction; changes to it are applied by the
@@ -164,14 +185,22 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
   // Apply a changed view to the live panorama, unless it is already showing it.
   useEffect(() => {
     const pano = panoRef.current;
-    if (!pano || !view || status !== 'ready') return;
+    if (!pano || !view || (status !== 'ready' && status !== 'none')) return;
     if (viewsMatch(liveRef.current, view)) return;
     try {
       if (view.panoId) {
+        noImageryRef.current = false;
         pano.setPano(view.panoId);
         pano.setPov({ heading: view.heading, pitch: view.pitch });
         pano.setZoom(fovToZoom(view.fov));
         pano.setVisible(true);
+        if (status === 'none') setStatus('ready');
+      } else if (status === 'none' && aimRef.current) {
+        // The panel showed "no imagery" for the last point; a new point gets the same
+        // getPanorama search the construction path runs, so its verdict is Google's too.
+        liveRef.current = { ...(liveRef.current || {}), lat: view.lat, lng: view.lng };
+        setStatus('loading');
+        aimRef.current(view);
       } else {
         // No id: move the camera to the point and re-aim; the SDK snaps to the nearest
         // panorama itself, which is the same search the construction path runs.

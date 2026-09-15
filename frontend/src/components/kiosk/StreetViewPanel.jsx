@@ -166,6 +166,16 @@ export default function StreetViewPanel({ activeCall }) {
             <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider motion-safe:animate-pulse">Loading Street View…</div>
           </div>
         )}
+        {/* Google's answer, not a guess: every imagery search around the point came back
+            ZERO_RESULTS (hooks/useStreetViewPanorama.js). Distinct from loading (spinner),
+            offline ("needs the internet") and a rejected key (amber note + embed).
+            Operator's wording, 2026-09-15, 6000 Quarry Rd. */}
+        {!showStatic && !showEmbed && pano.status === 'none' && (
+          <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+            <p className="text-slate-200 text-sm font-mono font-bold">No Street View available</p>
+            <span className="text-[10px] text-slate-500 font-mono">Google has no imagery near this location</span>
+          </div>
+        )}
         {sdkDown && (
           <div className="absolute top-2 right-2 z-20 max-w-[60%] bg-amber-950/95 border border-amber-600 text-amber-200 px-2.5 py-1.5 rounded-lg text-[10px] font-mono leading-snug shadow-lg">
             <span className="font-bold">⚠️ INTERACTIVE VIEW UNAVAILABLE</span> — {pano.authFailed
@@ -263,7 +273,7 @@ export default function StreetViewPanel({ activeCall }) {
       {lookupFailed && (
         <span className="text-amber-300 font-mono text-[10px]" title="The parcel lookup failed; a saved view may exist and not be shown">saved view unknown</span>
       )}
-      {staticFailed && !sdkDown && (
+      {staticFailed && !sdkDown && pano.status !== 'none' && (
         <span className="text-slate-400 font-mono text-[10px]" title="No static image within 100 m of this point; the interactive panorama is shown instead">live</span>
       )}
       {!isOnline && <span className="bg-amber-900/80 text-amber-200 px-1.5 py-0.5 rounded text-[9px] font-mono">Offline</span>}

@@ -263,3 +263,11 @@ container `cfr_osrm_trial` was then removed. **Rollback**: the same compose edit
   ```
 
 ---
+
+**2026-09-15, regional graph with the stay-in-Coquitlam penalty deployed** (`64985d1d`). Operator ruling: penalize
+routes that leave the City unless it is the only option; 0.1 accepted as an adjustable build-time factor
+(`build_osrm_graph.sh:61-70`). `cfr_osrm` serves `apparatus_bc_city01_20260915.osrm`, built from
+`coquitlam_region.osm.pbf` (the basemap's extract), started 22:30:33Z and verified on the kiosk. Corpus measurement
+`evaluation_history` `fbafb199`: 2,464 routes, median unchanged, metres outside the City plus 100 m 87,244 → 2,727,
+largest slowdown +166 s (2500 Block Barnet Hwy from Hall 3). This supersedes the served-graph and rollback lines above:
+rollback is now `apparatus.osrm` (2026-09-09, `vancouver.osm.pbf`, no penalty) in `docker-compose.yml`.

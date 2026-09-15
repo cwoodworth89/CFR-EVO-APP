@@ -172,6 +172,9 @@ and the tile skills no longer describe Carto. **Reported, not confirmed on the k
 `street_nolabels.mbtiles` are still on its disk until the operator deletes them and restarts `cfr_tiles`.
 The Carto half closes when that is done.
 
+**Carto half closed, 2026-09-15.** The operator deleted both archives and restarted `cfr_tiles`; `/services` lists only
+`cadastral`, `ortho` and `street_vector` (checked read-only on the kiosk). The Esri half stays open.
+
 ### The Esri half, 2026-09-15: the record did not match the archive
 
 A read-only check (gis-spatial-engineer, confirmed against the kiosk and git) found:

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | FIXED in `1cdef5f4`, pulled on the kiosk; not live until the operator rebuilds the API and then builds the frontend |
+| **Status** | LIVE 2026-09-15: API rebuilt and frontend built on the kiosk; on-screen check pending |
 | **Severity** | 🔴 crew-visible: a real Coquitlam address would read "NOT AVAILABLE OUTSIDE OF CITY" |
 | **Area** | 🖥️ Kiosk · 🗺️ Geocoding |
 | **Origin** | Lead, 2026-09-15, while checking the basemap extract (#86) |
@@ -64,3 +64,5 @@ unknown (§6.1). CLAUDE.md §5 and the `gis-pipeline-sync` skill are updated to 
 **Closes when:** the API is rebuilt, the frontend built, and a call east of -122.70 shows its aerial tile on screen.
 
 Still using a box: `tools/osm_level_crossings.py:29` limits the OSM crossings it takes to a box ending at -122.70.
+
+**Deployed, 2026-09-15 15:25 PDT.** `cfr_api` recreated; the endpoint answers `true` at a Quarry Rd front point and `false` at 49.2626, -122.7811. `frontend/dist` built 15:25:34 and its bundle calls `within-city` (checked on the kiosk).

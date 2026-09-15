@@ -24,7 +24,7 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
 | **88** | 🔴 crew-visible | REPORTED 2026-09-15, not built | [A destination far from any road reaches the crew as an ordinary ETA: the snap distance is never read](punchlist/88-a-destination-far-from-any-road-reaches-the-crew-as-an-ordinary-eta.md) |
-| **87** | 🔴 crew-visible | FIXED `1cdef5f4`; waits on the API rebuild, then the frontend build | [The aerial panel's "outside the City" test is a box that cuts off the City's east side](punchlist/87-the-aerial-panel-calls-part-of-the-city-outside-the-city.md) |
+| **87** | 🔴 crew-visible | LIVE 2026-09-15 (`1cdef5f4`); on-screen check pending | [The aerial panel's "outside the City" test is a box that cuts off the City's east side](punchlist/87-the-aerial-panel-calls-part-of-the-city-outside-the-city.md) |
 | **86** | 🔴 crew-visible | FIXED `86eee32e`, rebuilt and served 2026-09-15; on-screen check pending | [The street basemap was built from the Vancouver extract, so the eastern City has no roads](punchlist/86-street-basemap-built-from-the-vancouver-extract-no-roads-in-the-eastern-city.md) |
 | **85** | 🔴 crew-visible | OPEN — found 2026-09-13, not built; no call has hit it | [A lot with no road of its street's name pins at the lot's centre, with no notice](punchlist/85-a-lot-with-no-road-of-its-streets-name-pins-at-the-lot-centre-with-no-notice.md) |
 | **84** | 🔴 crew-visible | OPEN — ruled 2026-09-13: remove; not built | [`KNOWN_BUILDINGS`: eight hand-coded buildings override console pins, three of them wrong](punchlist/84-known-buildings-hand-coded-coordinates-override-console-pins.md) |

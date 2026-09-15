@@ -150,6 +150,23 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // Stable identity: a fresh object every render re-ran every effect that lists it.
   const destination = useMemo(() => (hasValidCoords ? { lat: destLat, lng: destLng } : null), [hasValidCoords, destLat, destLng]);
 
+  // Where the route lines end. While an arrival point is being set from a replay they follow the
+  // draft pin, then the saved point, as the console's Explore mode does (MapBoard `routeDest`), so
+  // the approach can be judged here rather than on the next call (operator, 2026-09-14). Only a
+  // replay with the arrival panel open passes `arrival`; closing it returns the routes to where the
+  // recorded call went. The call's own pin never moves, and a call with no location gets no route
+  // at all (CLAUDE.md s5).
+  const routeDest = useMemo(() => {
+    if (!hasValidCoords) return null;
+    const draft = arrival?.draft;
+    if (draft && draft.lat != null && draft.lng != null) return { lat: draft.lat, lng: draft.lng };
+    const saved = arrival?.parcel;
+    if (saved && saved.entrance_lat != null && saved.entrance_lng != null) {
+      return { lat: saved.entrance_lat, lng: saved.entrance_lng };
+    }
+    return destination;
+  }, [hasValidCoords, arrival?.draft, arrival?.parcel, destination]);
+
   // All severities, active now. No filter controls on the dispatch map by design.
   const { activeClosures } = useRoadClosures({
     filterNoAccess: true, filterAccessOnly: true, filterCaution: true,
@@ -194,7 +211,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // The hydrants a driver should see, by the operator's rule (utils/routeHydrants.js):
   // along the route within 300 ft of arrival first, then around the address, then within
   // the 1,000 ft supply lay, else a warning. Punch-list #74.
-  const routeHydrants = useRouteHydrants(destLat, destLng, routeCoords);
+  // Measured to the end of the drawn route, so a pick is along the approach that is on the map.
+  const routeHydrants = useRouteHydrants(routeDest?.lat ?? null, routeDest?.lng ?? null, routeCoords);
 
   // The parcel outline for the map, [lat, lng] rings from the call's [lng, lat] rings.
   const parcelRings = useMemo(() => {
@@ -415,6 +433,19 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (unsaved)</Tooltip>
           </CircleMarker>
         )}
+        {/* Once saved the draft clears. Without this nothing drew the saved point, so the map fell
+            back to the recorded call's pin and a save read as "the pin jumps back": the operator
+            saved 1144 Inlet St five times on 2026-09-14, and every save had landed. Emerald is the
+            confirmed colour (kiosk-responsive-ergonomics skill), as the Arrival point notice uses. */}
+        {arrival && !arrival.draft && arrival.parcel?.entrance_lat != null && arrival.parcel?.entrance_lng != null && (
+          <CircleMarker
+            center={[arrival.parcel.entrance_lat, arrival.parcel.entrance_lng]}
+            radius={10}
+            pathOptions={{ color: '#059669', fillColor: '#34d399', fillOpacity: 0.95, weight: 3 }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (saved)</Tooltip>
+          </CircleMarker>
+        )}
         <ZoomWatcher onZoom={setMapZoom} />
 
         {/* The parcel outline, soft blue, as the workstation draws it: rings of [lng, lat]
@@ -462,7 +493,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             route reports its coordinates, for the hydrant picker and the fit. */}
         {hasValidCoords && (
           <HallRoutesOverlay
-            dest={[destLat, destLng]}
+            dest={[routeDest.lat, routeDest.lng]}
             homeHall={origin.id || '1'}
             routingMetrics={persistedUnitMetrics}
             onHomeRouteCalculated={(coords, summary) => { setRouteCoords(coords); setRouteSummary(summary || null); }}

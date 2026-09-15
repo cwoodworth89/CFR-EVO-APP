@@ -147,11 +147,11 @@ live; the four round-2 rows in `evaluation_history` carry the verdict in their n
 | #60, #32 | operator | deferred |
 | — | operator | agent restart; round 2 (ruled *leave it* 2026-09-08); Street View Static API on the key; the same-screen clause |
 
-**Future development the operator named for a fresh agent**: an OSM routing plan — the
-self-hosted street basemap from the extract the kiosk already routes on (replaces the
-watermarked Carto tiles, #47b), and the apparatus routing profile (#1), which starts at the
-standards index and CLAUDE.md §7.2. Every responding hall's route on one map and hydrants
-along the route are on the post-freeze backlog with the operator's design notes.
+**Future development the operator named for a fresh agent**: the apparatus routing profile
+(#1), which starts at the standards index and CLAUDE.md §7.2. The other half of that OSM plan,
+the self-hosted street basemap, has been live since 2026-09-09. Every responding hall's route
+on one map and hydrants along the route are on the post-freeze backlog with the operator's
+design notes.
 
 ---
 

@@ -101,126 +101,42 @@ Hydrants within a 500-meter radius of the incident are retrieved and color-coded
 
 ---
 
-## 6. LiDAR 3D Spatial Intelligence & Topography Engine
+## 6. MBTiles & the Slippy Map Standard (`cfr_tiles`, port 8081)
 
-> [!CAUTION]
-> **None of §6 is implemented, and the data it needs is not held.** Verified 2026-08-30:
-> there is **no elevation, DEM, HGT or point-cloud data anywhere in the system**, `public.roads`
-> has no grade, incline or elevation column, and no point-cloud classification, canopy model or
-> floodplain analysis exists in the codebase. `FLAG_OVERHEAD_OBSTRUCTION` appears nowhere.
->
-> Two statements below are not merely unbuilt but **false as written**: §6.2 says *"the routing
-> engine biases against routes with >15% downhill gradients"* — OSRM runs the **stock `driving`
-> profile** with no elevation input and no custom Lua profile exists in the repository, so no
-> such bias is applied to anything.
->
-> Read §6 as a wish list. Do not cite any figure in it as provenance (CLAUDE.md §6.3), and do
-> not build on it without first obtaining the elevation data it assumes. The same content, with
-> the same problem, appears in `docs/emergency_routing_gis_parcels_standard.md` §3.5, which is
-> annotated there for the same reason.
-
-CFR EVO integrates point-cloud LiDAR data, Digital Surface Models (DSM), and Digital Elevation Models (DEM/DTM) to provide tactical 3D spatial awareness for apparatus dispatch, tactical positioning, and route computation.
-
-```
-backend/data/lidar/
-├── dtm/                          # Bare-earth Digital Terrain Model (1m raster, EPSG:26910)
-├── dsm/                          # Digital Surface Model including canopy & structures (1m raster)
-└── nDSM/                         # Normalized DSM (nDSM = DSM - DTM) representing height above ground
-```
-
-### 6.1 Building Height Extraction & Aerial Apparatus Reach Validation
-* **Formula**: $\text{Structure Height } (H_{\text{bldg}}) = \text{DSM}_{\text{roof}} - \text{DTM}_{\text{ground}}$
-* **Aerial Apparatus Dispatch Validation**:
-  * **Ladder 1 & Ladder 3** (105-foot / 32m aerial reach, maximum operational scrub height: ~28m / 92ft considering setback angle and outrigger deployment).
-  * Structures with $H_{\text{bldg}} \ge 12.0\text{m}$ ($\sim 4$ storeys, e.g., high-density developments in City Centre, Burquitlam, and Lougheed Corridor) automatically trigger mandatory Ladder company dispatch assignments and outrigger placement clearance alerts in the CAD payload.
-* **Setback & Scrub Envelope Calculation**:
-  ```python
-  def validate_aerial_reach(building_height_m: float, setback_distance_m: float, max_reach_m: float = 32.0) -> dict:
-      """Calculates aerial reach vector and operating angle for Ladder 1/3."""
-      diagonal_reach = (building_height_m**2 + setback_distance_m**2) ** 0.5
-      reach_ratio = diagonal_reach / max_reach_m
-      return {
-          "required_reach_m": round(diagonal_reach, 2),
-          "reach_ratio": round(reach_ratio, 2),
-          "ladder_feasible": reach_ratio <= 0.85,  # 85% safety threshold under operational NFPA envelope
-          "setback_m": setback_distance_m,
-          "height_m": building_height_m
-      }
-  ```
-
-### 6.2 Topographic Slope Calculations & Apparatus Route Biasing
-* **Westwood Plateau & Burke Mountain Grade Hazards**:
-  * Topographic slopes across Burke Mountain (Coast Meridian Rd, David Ave, Harper Rd) and Westwood Plateau (Plateau Blvd, Parkway Blvd) feature grades ranging from **15% to 25%** ($\sim 8.5^\circ - 14.0^\circ$).
-  * Heavy apparatus (Tenders, 40,000+ lb Engine 1/2/3/4, Aerial Ladders) face severe brake thermal fade, transmission retarder limits, and uphill acceleration penalties on sustained $\ge 12\%$ grades.
-* **OSRM / Emergency Route Grade Penalties**:
-  * Slope $(\%) = \frac{\Delta \text{Elevation}}{\text{Run}} \times 100$
-  * The routing engine biases against routes with $>15\%$ downhill gradients for heavy units, favoring gentler arterial switchbacks unless primary access is physically impossible.
-
-### 6.3 Overhead Wire & Tree Canopy Clearance in Residential Cul-de-Sacs
-* **Vertical Clearance Envelope**:
-  * Full NFPA vertical clearance requires $\ge 4.15\text{m}$ (13.6 ft) for front-line Engines and Ladders.
-  * Point cloud classification filters return returns between $3.5\text{m}$ and $6.0\text{m}$ within the street right-of-way (ROW) buffer ($8\text{m}$ corridor).
-* **Cul-de-Sac Chokepoint Detection**:
-  * In heavily wooded cul-de-sacs (e.g., Chineside, Harbour Chines, Ranch Park, Westwood Plateau), mature Western Redcedar and Douglas Fir branch overgrowth combined with low-hanging telecommunications/power service drops are flagged as apparatus clearance warnings (`FLAG_OVERHEAD_OBSTRUCTION`).
-
-### 6.4 Wildland-Urban Interface (WUI) Fuel Canopy Density Modeling
-* **Northern Interface Boundary**:
-  * The northern municipal boundary adjoins Pinecone Burke Provincial Park, Eagle Mountain, and Coquitlam Watershed forests.
-* **Canopy Fuel Bulk Density (CBD) & Crown Base Height (CBH)**:
-  * LiDAR returns above $2.0\text{m}$ calculate Canopy Cover Percentage ($\text{CC}\%$) and Crown Volume within $30\text{m}$ and $100\text{m}$ defensible space buffers around residential property parcel lines.
-  * Structures with $\text{CC} > 60\%$ within $30\text{m}$ of natural forest interface are assigned elevated FireSmart wildfire hazard ratings on CAD dispatch.
-
-### 6.5 Floodplain Ground Bare-Earth Elevation Mapping
-* **Hydrological Inundation Zones**:
-  * Lowland areas along the Fraser River (Maillardville / Colony Farm / Fraser Mills), Coquitlam River corridor, and Pitt River floodplain lie at bare-earth elevations below $4.0\text{m}$ Geodetic Datum (CGVD28/CGVD2013).
-* **Freshet & Extreme High Tide Routing**:
-  * DTM bare-earth raster queries determine parcel immersion risk during spring freshet and king tides.
-  * Access roads with bare-earth elevations $\le 2.2\text{m}$ GVD are dynamically flagged when hydrological freshet warnings are broadcast.
-
----
-
-## 7. Centralized MBTiles Architecture & Slippy Map Standard (`cfr_tiles` Port 8081)
-
-CFR EVO eliminates external map CDN dependencies (Mapbox, Carto, Google Maps, ArcGIS Online) by serving all raster and vector basemaps directly from containerized SQLite MBTiles archives on port `8081` (`ghcr.io/consbio/mbtileserver:latest`).
+Every basemap and overlay is served offline from SQLite MBTiles archives by `cfr_tiles`
+(`ghcr.io/consbio/mbtileserver`); no layer depends on an outside map CDN. What each archive
+holds, how it is built and how to probe it: the **`mbtiles-tile-server`** skill.
 
 ```
 backend/data/tiles/
-├── ortho.mbtiles             # City of Coquitlam 2025 7.5cm orthophotos (z12-20, OGL)
-├── street.mbtiles            # Full street & reference basemap with road labels
-└── street_nolabels.mbtiles   # Clean tactical basemap for high-contrast HUD overlays
+├── street_vector.mbtiles     # Street basemap: OpenStreetMap vector tiles, z0-14, drawn at any zoom
+├── ortho.mbtiles             # 2025 7.5 cm aerial imagery, z12-20
+└── cadastral.mbtiles         # City parcel lines, address numbers and road labels, z14-20
 ```
 
-### 7.1 OpenStreetMap Slippy Map Specification Compliance
+### 6.1 OpenStreetMap Slippy Map Specification Compliance
 * **Projection**: Standard Web Mercator (`EPSG:3857` / Spherical Mercator).
 * **Coordinate Origin**: Top-left origin convention ($x=0, y=0$ at Northwest quadrant), matching the OpenStreetMap Slippy Map standard (`{z}/{x}/{y}`).
-* **TMS Inversion Elimination**: MBTiles archives are generated and served directly in standard Slippy format, removing runtime TMS $y$-coordinate flipping ($y_{\text{TMS}} = 2^z - 1 - y_{\text{XYZ}}$).
-* **Base Layer Endpoints**:
-  - `http://${window.location.hostname}:8081/services/ortho/tiles/{z}/{x}/{y}.jpg`
-  - `http://${window.location.hostname}:8081/services/street/tiles/{z}/{x}/{y}.png`
-  - `http://${window.location.hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png`
+* **Row order**: MBTiles stores rows bottom-up ($y_{\text{TMS}} = 2^z - 1 - y_{\text{XYZ}}$). The build scripts write TMS rows and `mbtileserver` serves XYZ, so no client code flips rows.
+* **Endpoints**: `${TILE_BASE_URL}/services/<service>/tiles/{z}/{x}/{y}.pbf|jpg|png`, with `TILE_BASE_URL` from `frontend/src/apiClient.js`; never a hardcoded host (CLAUDE.md §1).
 
-### 7.2 City of Coquitlam 7.5cm Aerial Orthophoto Pyramid (`ortho.mbtiles`)
+### 6.2 Aerial Imagery (`ortho.mbtiles`)
 
 > [!IMPORTANT]
-> **There is one imagery layer now.** `ortho.mbtiles` holds City of Coquitlam 7.5cm
-> orthophotography under the Open Government Licence, crawled from the City's own
-> `Imagery_2025` cache. The Esri `satellite.mbtiles` layer was **retired 2026-08-31** — it
-> was never City data and its terms were never read (#47). A verifier script
-> (`backend/scripts/verify_ortho_provenance.py`) was written and deleted the same day
-> (9017e6a) because it could not do its job; there is no script for this.
+> **The live archive is the Esri World Imagery crawl of the City's 2025 capture** (511,118
+> tiles, z12–20), possibly with City gap tiles. The tree cannot rebuild it: the Esri crawl
+> scripts were deleted in `d4a04fc8`, and `compile_mbtiles.py --layer ortho` crawls the City's own
+> `Imagery_2025` cache instead. **Operator ruling 2026-09-15: City imagery is the goal**, and Esri
+> stays live until a process gives City imagery at a quality he accepts (post-freeze backlog). Do
+> not crawl or swap the archive without the operator. Record: punch-list #47b; serving and
+> probes: `mbtiles-tile-server` skill §1 and §5.2.
 
-<!-- audit-ok: backend/scripts/verify_ortho_provenance.py -- records that the verifier was deleted 2026-08-31 -->
-
-* **Resolution**: 7.5 cm ground sampling distance (measured: `.sdw` pixel size 0.075 m).
-* **Extent**: −122.8995, 49.2165 → −122.6110, 49.3628 (covers `public.city_boundary`).
-  **Blank outside that footprint is correct** — there is no fallback beneath it by design
-  (CLAUDE.md §6.1), so the edge of municipal imagery is visible rather than disguised.
-* **Native zoom**: z20 — where the City's cache ends (z21 returns 404) and the honest limit
-  for a 7.5 cm source, since z20 is 9.74 cm/px here and z21 would be 4.87 cm/px. Every zoom
-  is crawled from the City directly; no level is derived from another.
-* **Endpoint**: `http://${window.location.hostname}:8081/services/ortho/tiles/{z}/{x}/{y}.jpg`
-* **Crawl**: `gis-pipeline-sync` skill §4.1 —
-  `python backend/scripts/compile_mbtiles.py --layer ortho`. No GDAL, no MrSID.
+* **Resolution**: the City's capture is 7.5 cm ground sampling distance (measured: `.sdw` pixel
+  size 0.075 m).
+* **Extent**: the Esri crawl reaches beyond the City at every zoom. z12–16 cover the region, and
+  at least 45,594 z20 tiles lie outside the City's bounding box (Port Moody, Anmore, Belcarra,
+  south of the Fraser); those are not known to be City photographs (#47b).
+* **Native zoom**: z20, the honest limit for a 7.5 cm source: z20 is 9.74 cm/px here and z21
+  would be 4.87 cm/px. The City's own cache also ends at z20 (z21 returns 404).
+* **Endpoint**: `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`
 * **$0 Subscription-Free Guarantee**: Stored 100% locally on NVMe SSD storage with `fallbackUrl: null`, ensuring 100% disaster resilience with zero recurring API or tile-serving costs.
-
-

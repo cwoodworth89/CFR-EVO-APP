@@ -127,12 +127,11 @@ ORIGIN_SHIFT = 20037508.342789244  # Earth circumference / 2 in Web Mercator met
 #   * The previous 0.2s (5 req/s) was measured, not guessed, as the cause of an
 #     8h35m cadastral crawl -- 153,094 tiles at exactly 5.0 tiles/s, pinned to
 #     the ceiling for the entire run. At 0.05s the same crawl is roughly 2h.
-#   * It is NOT raised to match compile_mbtiles.py, which runs 32 workers with no
-#     limiter at all (~110 tiles/s). That is aimed at Carto and Esri -- commercial
-#     CDNs built for request volume. This one hits municipal infrastructure that
-#     is likely modest and may be shared with public-facing services, and the City
-#     is both the department's data partner and the licensor of this data under
-#     the Open Government Licence. Being a bad neighbour here costs more than time.
+#   * It is NOT raised to an unthrottled rate. This hits municipal infrastructure
+#     that is likely modest and may be shared with public-facing services, and the
+#     City is both the department's data partner and the licensor of this data
+#     under the Open Government Licence. Being a bad neighbour here costs more than
+#     time. compile_mbtiles.py's City imagery crawl keeps the same ceiling.
 #
 # Raise or lower with --delay for a one-off run; prefer off-hours for a full
 # re-crawl. See punch-list #40 and docs/briefings/tile_recrawl_runbook.md.

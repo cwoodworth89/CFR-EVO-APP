@@ -25,13 +25,11 @@ This rule file defines domain constraints, runtime environments, and workflow st
   address (#64).
 
 > [!CAUTION]
-> **The Open Government Licence covers City data only.** It does not reach
-> `basemaps.cartocdn.com`, the source of the street layers — the City neither owns nor
-> sublicenses it, and building this for the department does not
-> inherit rights the department never held. Carto began stamping unauthenticated tiles
-> `API KEY REQUIRED` between the original crawl and the 2026-08-27 re-crawl, which is that
-> licence answering for itself. **Do not raise the street layers' `max_zoom` while Carto is
-> the source.** Open: punch-list #47b.
+> **The Open Government Licence covers City data only**, and building this for the
+> department inherits no rights the department never held. The street basemap is
+> OpenStreetMap data under the ODbL and must carry its credit line
+> ([`docs/standards/basemap/README.md`](docs/standards/basemap/README.md)). The aerial
+> layer's licensing is an accepted risk, not resolved: punch-list #47b.
 
 **Every code path that reaches outside the LAN is registered in
 [`docs/external_calls.md`](docs/external_calls.md)** — what it is, why, and what a crew sees

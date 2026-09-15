@@ -2,24 +2,15 @@
 """
 compile_mbtiles.py
 ==================
-Builds and compiles centralized MBTiles archives for CFR EVO:
-1. ortho.mbtiles:
+Builds the ortho.mbtiles archive for CFR EVO:
    - City of Coquitlam 2025 7.5cm Orthophoto, crawled from the City's OWN cached
      tile service (CachedServices/Imagery_2025). Zooms 12-20, city coverage only.
    - Tiles are stored exactly as the City publishes them -- no resampling here.
      Measured 2026-08-31, the City's z20 rendering is sharper than anything this
      project produced from the raw MrSID, and sharper than Esri World Imagery.
    - Standard format: JPEG. Open Government Licence - Coquitlam.
-2. street.mbtiles:
-   - Carto Voyager / OpenStreetMap street basemap with full labels. Zooms 12-18.
-   - The ONLY layer extending past the city: regional context to z16 so an
-     operator panning out still sees named roads.
-   - Standard format: PNG.
-3. street_nolabels.mbtiles:
-   - Tactical light/grey basemap without text labels. Zooms 12-18.
-   - City coverage only -- it exists to underlay the cadastral overlay, which
-     stops at the municipal boundary.
-   - Standard format: PNG.
+
+The street basemap is not built here: backend/scripts/build_vector_basemap.sh.
 
 Tiles are selected by INTERSECTION WITH THE MUNICIPAL POLYGON, not a bounding box
 (see the coverage policy below). If the polygon cannot be loaded the run STOPS --
@@ -65,15 +56,9 @@ logger = logging.getLogger("mbtiles_builder")
 #
 # There are exactly TWO areas: inside Coquitlam, and outside it. The former
 # "URBAN_CORE" third tier was removed -- it was an unconsulted narrowing that
-# excluded 32% of the city's parcels from z19-20 imagery.
-#
-#   REGION  - context only. The LABELLED street map, so an operator panning
-#             outside the city still sees named roads.
-#   CITY    - the real municipal boundary plus a buffer. Everything, to the
-#             highest zoom each source offers: both street styles and the
-#             7.5cm orthophotos. The unlabelled style exists to sit
-#             under the cadastral overlay, so it is pointless outside the
-#             cadastral extent -- i.e. outside the city.
+# excluded 32% of the city's parcels from z19-20 imagery. Only the raster street
+# map was crawled outside the city, and it was removed 2026-09-15; the
+# orthophotos are crawled inside the city, to the highest zoom the source offers.
 #
 # CITY bounds are the extent of public.city_boundary (City of Coquitlam Open
 # Data, queried 2026-08-23: -122.89343, 49.21987 -> -122.62109, 49.35117) plus
@@ -86,12 +71,6 @@ logger = logging.getLogger("mbtiles_builder")
 # them by hand if the municipal boundary ever changes.
 # ---------------------------------------------------------------------------
 
-# Regional context bounds -- labelled street map only.
-REGIONAL_MIN_LAT = 49.15
-REGIONAL_MAX_LAT = 49.48
-REGIONAL_MIN_LON = -123.04
-REGIONAL_MAX_LON = -122.60
-
 # ~1 km at Coquitlam's latitude (49.28 deg N).
 CITY_BUFFER_DEG_LAT = 0.009
 CITY_BUFFER_DEG_LON = 0.0138
@@ -102,52 +81,9 @@ CITY_MAX_LAT = 49.35117 + CITY_BUFFER_DEG_LAT
 CITY_MIN_LON = -122.89343 - CITY_BUFFER_DEG_LON
 CITY_MAX_LON = -122.62109 + CITY_BUFFER_DEG_LON
 
-# Highest zoom fetched for REGIONAL context. Street detail outside the response
-# area has little operational value and the tile count explodes: z12-16 over the
-# region is 10,149 tiles (~0.04 GB), while z12-20 is 2,523,994 (~8.8 GB at the
-# measured 3.5 KB/tile) plus roughly a day and a half of crawling. Raise this
-# deliberately, not by accident.
-REGIONAL_MAX_ZOOM = 16
-
 USER_AGENT = "CFR-EVO/1.0 (Coquitlam Fire Rescue Emergency Offline Cache)"
 
 LAYER_CONFIGS = {
-    "street": {
-        "format": "png",
-        "description": "Carto Voyager / OpenStreetMap Basemap with Full Labels",
-        "url_template": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
-        "subdomains": ["a", "b", "c", "d"],
-        "min_zoom": 12,
-        # z18, not z19. Operator decision 2026-08-30: the street basemaps are
-        # specified as z12-18 and were never wanted deeper. The 2026-08-26 raise
-        # to z19 fetched 81,032 tiles per street layer AFTER Carto began stamping
-        # unauthenticated tiles "API KEY REQUIRED" -- every one of them is
-        # watermarked (punch-list #47). Leaflet upscales past maxNativeZoom, so
-        # the map still zooms to 22; it just stops fetching new detail.
-        # Do NOT raise this again while Carto is the source -- see #47.
-        "max_zoom": 18,
-        # The only layer that extends past the city: an operator panning out
-        # still needs named roads for context. See the coverage policy above.
-        "regional_context": True,
-    },
-    "street_nolabels": {
-        "format": "png",
-        "description": "Tactical Light/Grey Basemap without Labels",
-        "url_template": "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
-        "subdomains": ["a", "b", "c", "d"],
-        "min_zoom": 12,
-        # z18, not z19. Operator decision 2026-08-30: the street basemaps are
-        # specified as z12-18 and were never wanted deeper. The 2026-08-26 raise
-        # to z19 fetched 81,032 tiles per street layer AFTER Carto began stamping
-        # unauthenticated tiles "API KEY REQUIRED" -- every one of them is
-        # watermarked (punch-list #47). Leaflet upscales past maxNativeZoom, so
-        # the map still zooms to 22; it just stops fetching new detail.
-        # Do NOT raise this again while Carto is the source -- see #47.
-        "max_zoom": 18,
-        # City only: this style exists to sit under the cadastral overlay, which
-        # does not extend past the municipal boundary.
-        "regional_context": False,
-    },
     "ortho": {
         "format": "jpg",
         "description": "City of Coquitlam 2025 7.5cm Orthophoto (Open Government Licence)",
@@ -165,11 +101,9 @@ LAYER_CONFIGS = {
         # z21 would be 4.87 cm/px with nothing real to put in it.
         "max_zoom": 20,
         # City only. The service renders nothing beyond the municipal extent.
-        "regional_context": False,
         # Municipal infrastructure belonging to the department's data partner,
         # not a commercial CDN. Same courtesy as crawl_cadastral_tiles.py
-        # (operator decision 2026-08-27): ~20 req/s, not the 110/s this script
-        # uses against Carto.
+        # (operator decision 2026-08-27): ~20 req/s.
         "rate_limit_sec": 0.05,
     }
 }
@@ -314,14 +248,8 @@ def init_mbtiles_db(db_path: str, layer_name: str, config: Dict[str, Any]) -> sq
         # -123.04 -- which is why nothing detected the gap in punch-list #40. A
         # layer that reports coverage it does not have is CLAUDE.md 6.1 applied to
         # a tileset: a confident wrong answer beats a visible unknown.
-        "bounds": (
-            f"{REGIONAL_MIN_LON},{REGIONAL_MIN_LAT},{REGIONAL_MAX_LON},{REGIONAL_MAX_LAT}"
-            if config.get("regional_context", False)
-            else f"{CITY_MIN_LON},{CITY_MIN_LAT},{CITY_MAX_LON},{CITY_MAX_LAT}"
-        ),
-        # Zoom depth is uniform inside the city; regional context stops earlier.
+        "bounds": f"{CITY_MIN_LON},{CITY_MIN_LAT},{CITY_MAX_LON},{CITY_MAX_LAT}",
         "coquitlam_bounds": f"{CITY_MIN_LON},{CITY_MIN_LAT},{CITY_MAX_LON},{CITY_MAX_LAT}",
-        "regional_maxzoom": str(REGIONAL_MAX_ZOOM) if config.get("regional_context", False) else "",
         "minzoom": str(config["min_zoom"]),
         "maxzoom": str(config["max_zoom"]),
         "center": "-122.7907,49.2911,15",
@@ -539,23 +467,14 @@ def compile_layer(
     # 3. Calculate missing tiles to download
     tiles_to_download = []
     min_z, max_z = config["min_zoom"], config["max_zoom"]
-    
-    regional_ok = config.get("regional_context", False)
 
     for z in range(min_z, max_z + 1):
-        # Inside the city, every layer is fetched to its full zoom depth. The
-        # labelled street map additionally covers the wider region, but only up
-        # to REGIONAL_MAX_ZOOM -- see the coverage policy at the top of this file.
+        # Every zoom is fetched to its full depth inside the city -- see the
+        # coverage policy at the top of this file.
         z_tiles = filter_tiles_to_city(
             calculate_tiles(CITY_MIN_LAT, CITY_MIN_LON, CITY_MAX_LAT, CITY_MAX_LON, z)
         )
-        if regional_ok and z <= REGIONAL_MAX_ZOOM:
-            # Regional context stays a plain box: it is deliberately NOT the city,
-            # and at z12-16 the whole region is only 10,149 tiles.
-            z_tiles = calculate_tiles(
-                REGIONAL_MIN_LAT, REGIONAL_MIN_LON, REGIONAL_MAX_LAT, REGIONAL_MAX_LON, z
-            )
-            
+
         for t in z_tiles:
             tz, tx, ty = t
             t_tms = (1 << tz) - 1 - ty
@@ -635,9 +554,9 @@ def main():
     parser = argparse.ArgumentParser(description="Compile centralized MBTiles archives for CFR EVO.")
     parser.add_argument(
         "--layer",
-        choices=["all", "ortho", "street", "street_nolabels"],
-        default="all",
-        help="Layer(s) to compile (default: all)"
+        choices=["ortho"],
+        default="ortho",
+        help="Layer to compile (default: ortho, the only one)"
     )
     parser.add_argument(
         "--tiles-dir",
@@ -664,7 +583,7 @@ def main():
     tiles_base = Path(args.tiles_dir).resolve() if args.tiles_dir else repo_root / "data" / "tiles"
     tiles_base.mkdir(parents=True, exist_ok=True)
     
-    layers = ["street", "street_nolabels", "ortho"] if args.layer == "all" else [args.layer]
+    layers = [args.layer]
     
     for layer in layers:
         output_file = str(tiles_base / f"{layer}.mbtiles")

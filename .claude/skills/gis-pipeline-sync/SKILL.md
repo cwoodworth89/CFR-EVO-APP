@@ -80,6 +80,15 @@ All offline base layers and property overlays are packaged into monolithic SQLit
 
 ### 4.1 Orthophoto Crawl (7.5cm City of Coquitlam imagery)
 
+> [!WARNING]
+> **The served `ortho.mbtiles` is not this crawl.** It is the Esri World Imagery crawl of the
+> City's capture (511,118 tiles, z12–20), possibly with City gap tiles, and it reaches beyond the
+> City at every zoom (punch-list #47b). **Operator ruling 2026-09-15: City imagery is the goal**,
+> and Esri stays live until a process gives City imagery at a quality he accepts. The crawl below
+> was run on 2026-08-31 and read as harsh on the bay display; finding a better process is a
+> post-freeze backlog line. Do not crawl or swap the aerial archive without the operator:
+> `mbtiles-tile-server` skill §1 and §5.2.
+
 **The City serves its own imagery cache. Crawl that — do not build tiles from the raw
 MrSID.** Measured 2026-08-31 on the same ground at z20, edge-energy sharpness:
 
@@ -129,7 +138,7 @@ information than a 6 GB one.
 
 #### Rate limiting is deliberate
 
-`compile_mbtiles.py` runs 32 workers with no pacing against Carto. The `ortho` layer sets
+The `ortho` layer sets
 `rate_limit_sec: 0.05` (~20 req/s) because `geodata.coquitlam.ca` is municipal
 infrastructure belonging to the department's data partner, not a commercial CDN. Matches the
 operator decision of 2026-08-27 for the cadastral crawl.
@@ -144,7 +153,7 @@ serialises behind one lock. The 2026-08-27 cadastral crawl ran 8.5 hours pinned 
 So the ortho layer physically cannot ingest Port Moody, Coquitlam's watershed, Belcarra or
 Anmore. The municipal extent is enforced *by the source*, not by our configuration.
 
-That is a real change in where the guarantee lives. Carto and Esri are global: with those,
+That is a real change in where the guarantee lives. Esri is global: with it,
 `filter_tiles_to_city()` and the coverage polygon were the **only** thing stopping the crawl
 walking into neighbouring municipalities, and a bug in that filter would have silently pulled
 data the department has no claim to. With the City's service, a filter bug just wastes
@@ -155,8 +164,7 @@ mutual-aid buffer, and **13,699 of 430,845 requests 404'd** because that buffer 
 City's imagery. Predicted 14,061 from the service's published `fullExtent`, so the failures
 are the self-limiting behaving exactly as designed, not a fault.
 
-The buffer is still correct for `street` (regional context genuinely helps an operator panning
-out) but is dead weight for `ortho`. Clipping the ortho tile list to the service `fullExtent`
+The buffer is dead weight for `ortho`. Clipping the ortho tile list to the service `fullExtent`
 would remove those wasted requests and about 13 minutes of crawl. Left as-is for now: a
 predictable 404 is cheaper than another bespoke bounds constant, and #40 was caused by exactly
 that kind of hand-tuned box.
@@ -188,8 +196,8 @@ Within a year, the tiles are static and need no attention at all.
 
 Both are **retired**, not merely unused:
 
-* `satellite.mbtiles` (Esri World Imagery) — removed. It was never City data, its terms were
-  never read (#47), and the City's own imagery covers the same ground better.
+* `satellite.mbtiles` (Esri World Imagery) — removed as a separate layer. The Esri crawl is what
+  `ortho.mbtiles` serves today (the box at the top of this section, #47b).
 * `ingest_coquitlam_orthos.py`, `precache_satellite_tiles.py` — deleted.
 * `Coquitlam_2025_7.5cm.zip` and the MrSID/GDAL warp path — no longer part of any pipeline.
   The raw SID remains a valid archival source, but nothing builds tiles from it.
@@ -197,15 +205,17 @@ Both are **retired**, not merely unused:
 If you find yourself reaching for `klokantech/gdal` or a `.sid` file to make basemap tiles,
 stop: crawl the City service instead.
 
-### 4.2 Vector & Street Basemap MBTiles
-* **Street Layer**: `backend/data/tiles/street.mbtiles` (`/services/street/tiles/{z}/{x}/{y}.png`)
-* **Dark / Grey No-Labels**: `backend/data/tiles/street_nolabels.mbtiles` (`/services/street_nolabels/tiles/{z}/{x}/{y}.png`)
+### 4.2 Street Basemap (vector)
+The street basemap is `street_vector.mbtiles`, OpenStreetMap vector tiles built on the kiosk by
+`backend/scripts/build_vector_basemap.sh`: no crawl and no external request. Build, style and
+serving: `mbtiles-tile-server` skill §5.1.
 
 ### 4.3 Cadastral Property Overlay Pre-Cache
 Crawls the authentic municipal ArcGIS DynamicServices Cadastral overlay (`layers=show:0,1,16` — road labels, house address numbers, parcel boundaries) into transparent PNG32 tiles:
 ```powershell
-python backend/scripts/crawl_cadastral_tiles.py --min-zoom 14 --max-zoom 20 --delay 0.2 --workers 8
+python backend/scripts/crawl_cadastral_tiles.py --min-zoom 14 --max-zoom 20 --workers 8
 ```
+* **Pace**: `--delay` defaults to 0.05 s (~20 req/s, operator decision 2026-08-27), one ceiling that the workers do not multiply.
 * **Output Archive**: `backend/data/tiles/cadastral.mbtiles`
 * **Endpoint**: `http://${hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png`
 
@@ -216,22 +226,14 @@ python backend/scripts/crawl_cadastral_tiles.py --min-zoom 14 --max-zoom 20 --de
 > [!WARNING]
 > `mbtileserver` only accepts `GET` and `OPTIONS`. Probing with `HEAD` (`curl -I`) returns `HTTP/1.1 405 Method Not Allowed`. Always probe with `GET`.
 
-Verify that the `cfr_tiles` container serves all 4 services with zero WAN requests:
-```powershell
+Verify that `cfr_tiles` serves its three services with no WAN request:
+```bash
 curl -s http://localhost:8081/services
 ```
-Expected response contains JSON array of available services (`ortho`, `street`, `street_nolabels`, `cadastral`).
+Expect exactly `cadastral`, `ortho` and `street_vector`.
 
-Sample tile verification (using GET):
-```powershell
-# Verify Z18 ortho tile for Town Centre Fire Hall (Hall 1)
-curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/ortho/tiles/18/41984/89445.jpg
-
-# Verify Z16 Cadastral overlay tile
-curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/cadastral/tiles/16/10400/22800.png
-```
-Expected response: `200 image/jpeg (...) bytes` and `200 image/png (...) bytes`.
-
-For deep troubleshooting, coordinate math, and recovery commands, see [`.claude/skills/mbtiles-tile-server/SKILL.md`](../mbtiles-tile-server/SKILL.md).
+**A `200` alone proves nothing:** a raster tile the archive does not hold answers `200 image/png`
+with a 116-byte blank. Probe tiles at Hall 1 with their healthy sizes, the coordinate math and
+the recovery commands are in [`.claude/skills/mbtiles-tile-server/SKILL.md`](../mbtiles-tile-server/SKILL.md) §4.
 
 

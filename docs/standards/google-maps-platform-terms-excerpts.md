@@ -69,7 +69,7 @@ the City's parcel data, not from Google.
 > or a non-Google Map.
 
 **What this means for CFR EVO**: the kiosk and the workstation draw the Street View panel on
-the same screen as the Leaflet map (Carto street tiles, City orthophotos). Clause (ii) names
+the same screen as the Leaflet map (the self-hosted OpenStreetMap street map, the aerial imagery). Clause (ii) names
 that arrangement. **Raised with the operator 2026-09-06; not resolved here.** Options are the
 operator's: a separate screen or a full-screen modal for Street View with the map hidden,
 or dropping Street View.

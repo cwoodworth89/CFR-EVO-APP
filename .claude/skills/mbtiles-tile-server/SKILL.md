@@ -1,173 +1,212 @@
 ---
 name: mbtiles-tile-server
-description: Operational runbook and architectural guide for managing the containerized MBTiles server (cfr_tiles on port 8081), compiling SQLite MBTiles archives, and crawling offline map layers.
+description: Runbook for cfr_tiles, the kiosk's offline tile server (mbtileserver on :8081). The three archives it serves (street_vector, the OpenStreetMap vector basemap; ortho, the aerial imagery; cadastral, the City overlay), how each is built, the read-only volume's journal-mode rule, registering a changed archive, and probes that tell a real tile from a blank. Read before touching an .mbtiles file.
 ---
 
-# MBTiles Tile Server & Offline Raster Cache
+# MBTiles Tile Server (`cfr_tiles`)
 
-This skill covers operating the containerized `mbtileserver`, building and crawling SQLite MBTiles archives, resolving Slippy vs. TMS coordinate systems, and troubleshooting offline map rendering for CFR EVO.
-
----
-
-## 1. Architecture Overview
-
-CFR EVO serves all high-resolution aerial imagery, street basemaps, and municipal cadastral property overlays from a dedicated local container:
-
-* **Container Name**: `cfr_tiles`
-* **Image**: `ghcr.io/consbio/mbtileserver:latest`
-* **Host Port**: `8081` (maps to internal container port `8080`)
-* **Volume Mount**: `backend/data/tiles/` mounted to `/tiles:ro` (read-only)
-* **Specification**: Slippy XYZ Web Mercator (`EPSG:3857`), top-left origin `{z}/{x}/{y}`
-
-### Published Services
-
-| Service Name | Archive File | Format | Zoom Levels | URL Endpoint |
-|---|---|---|---|---|
-| `ortho` | `ortho.mbtiles` | JPEG | Z12–Z20 | `http://${hostname}:8081/services/ortho/tiles/{z}/{x}/{y}.jpg` |
-| `street` | `street.mbtiles` | PNG | Z12–Z18 | `http://${hostname}:8081/services/street/tiles/{z}/{x}/{y}.png` |
-| `street_nolabels` | `street_nolabels.mbtiles` | PNG | Z12–Z18 | `http://${hostname}:8081/services/street_nolabels/tiles/{z}/{x}/{y}.png` |
-| `cadastral` | `cadastral.mbtiles` | PNG32 (Transparent) | Z14–Z20 | `http://${hostname}:8081/services/cadastral/tiles/{z}/{x}/{y}.png` |
-| `street_vector` | `street_vector.mbtiles` | PBF vector tiles (OpenMapTiles schema, gzip) | Z0–Z14, drawn to any zoom | `http://${hostname}:8081/services/street_vector/tiles/{z}/{x}/{y}.pbf`; TileJSON at `/services/street_vector` |
+Every map layer the kiosk draws comes from SQLite MBTiles archives in `backend/data/tiles/`,
+served offline by `cfr_tiles`. Where each layer's data comes from and the date of our copy:
+[`docs/standards/data_sources.md`](../../../docs/standards/data_sources.md).
 
 ---
 
-## 2. Critical SQLite & Docker Volume Constraint
+## 1. What it serves
+
+`cfr_tiles` runs `ghcr.io/consbio/mbtileserver:latest` as `-d /tiles -p 8080`, published on
+host port `8081`, with `backend/data/tiles/` mounted read-only at `/tiles`
+(`docker-compose.yml`). It registers every `.mbtiles` file in that directory **when it
+starts**, under the file's name.
+
+| Service | Archive | Tiles | Zooms | Built by |
+|:--|:--|:--|:--|:--|
+| `street_vector` | `street_vector.mbtiles`, 40 MB | Vector PBF, gzip, OpenMapTiles schema 3.16.0 | z0–14, drawn at any zoom | `backend/scripts/build_vector_basemap.sh` (§5.1) |
+| `ortho` | `ortho.mbtiles`, 8.1 GB | JPEG | z12–20 | Nothing in the repo reproduces the served archive (§5.2) |
+| `cadastral` | `cadastral.mbtiles`, 1.0 GB | Transparent PNG | z14–20 | `backend/scripts/crawl_cadastral_tiles.py` (§5.3) |
+
+Tiles are at `${TILE_BASE_URL}/services/<service>/tiles/{z}/{x}/{y}.pbf|jpg|png`, TileJSON at
+`${TILE_BASE_URL}/services/<service>`, and the list at `/services`.
+
+**Which aerial imagery is served.** The photographs are the City's 2025 7.5 cm capture, but the
+archive is the Esri World Imagery crawl of them (511,118 tiles), possibly with City gap tiles, and
+it reaches beyond the City at every zoom (punch-list #47b). Its metadata and the map's credit line
+(`BASE_LAYERS.SATELLITE` in `frontend/src/components/MapConstants.js`) both say *"served via Esri
+World Imagery"*. On 2026-08-31 the operator kept Esri because a crawl of the City's own tiles read
+as harsh on the bay display. **Operator ruling 2026-09-15: City imagery is the goal**, and Esri
+stays live until a process gives City imagery at a quality he accepts (post-freeze backlog). Do
+not re-crawl or swap this archive without the operator's word.
+
+---
+
+## 2. The read-only volume needs journal mode DELETE
 
 > [!IMPORTANT]
-> **SQLite WAL Mode Read-Only Lock Failure**:
-> Because `cfr_tiles` mounts `/tiles` as **read-only (`:ro`)**, SQLite cannot open or register an archive if it was left in **WAL (Write-Ahead Logging)** mode (`SQLITE_CANTOPEN: unable to open database file`).
->
-> Any script or tool that creates or modifies an `.mbtiles` file **MUST** convert the journal mode to `DELETE` and run a full checkpoint before closing the connection:
-> ```python
-> cur.execute("PRAGMA wal_checkpoint(FULL);")
-> cur.execute("PRAGMA journal_mode = DELETE;")
-> conn.commit()
-> conn.close()
-> ```
+> `cfr_tiles` mounts the tiles read-only, and SQLite cannot open an archive left in **WAL**
+> mode there (`SQLITE_CANTOPEN: unable to open database file`). Every archive must be in
+> `journal_mode = DELETE` before the server sees it.
 
-### Recovery Command (Fixing Unmounted MBTiles on Kiosk)
+* `build_vector_basemap.sh` and `crawl_cadastral_tiles.py` convert their own output.
+* `compile_mbtiles.py` writes in WAL mode and leaves it. Run
+  `python3 backend/scripts/finalize_mbtiles.py` afterwards: it converts every archive in
+  `backend/data/tiles/` and exits 1 if any of them fails.
 
-If `mbtileserver` logs show `SQLITE_CANTOPEN` for any archive:
+To fix one archive by hand on the kiosk:
 ```bash
-python3 -c "import sqlite3; conn = sqlite3.connect('backend/data/tiles/<name>.mbtiles'); conn.execute('PRAGMA wal_checkpoint(FULL)'); conn.execute('PRAGMA journal_mode = DELETE'); conn.close()"
+python3 -c "import sqlite3; c = sqlite3.connect('backend/data/tiles/<name>.mbtiles'); c.execute('PRAGMA wal_checkpoint(FULL)'); c.execute('PRAGMA journal_mode = DELETE'); c.close()"
 chmod 644 backend/data/tiles/<name>.mbtiles
-docker restart cfr_tiles
+```
+Then register it (§3).
+
+---
+
+## 3. Registering a new, replaced or deleted archive
+
+The server reads its directory only at start, so a changed archive needs a `cfr_tiles`
+restart, and **every basemap on every display blanks for a few seconds**. The operator runs
+it once `tools/kiosk_capture_state.sh` says SAFE; `.claude/hooks/kiosk_restart_guard.py`
+blocks it for Claude Code. On the kiosk, from the repo root:
+```bash
+bash tools/kiosk_capture_state.sh && docker restart cfr_tiles
 ```
 
 ---
 
-## 3. HTTP Method & Health Verification Rules
+## 4. Health checks
 
 > [!WARNING]
-> **Never use `curl -I` (HEAD request) against `mbtileserver`**:
-> The `mbtileserver` Go server strictly implements `GET` and `OPTIONS`. Probing with `HEAD` (`curl -I`) returns `HTTP/1.1 405 Method Not Allowed`.
+> **GET only.** mbtileserver answers `HEAD` (`curl -I`) with `405 Method Not Allowed`.
 
-### Health Check Commands
-
-List all published services:
 ```bash
 curl -s http://localhost:8081/services
 ```
-Expected output: JSON array containing metadata for `ortho`, `street`, `street_nolabels`, and `cadastral`.
+Expect exactly `cadastral`, `ortho` and `street_vector`.
 
-Probe individual tile delivery (using `GET`):
-```bash
-# Verify Cadastral Z16 tile
-curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/cadastral/tiles/16/10400/22800.png
-
-# Verify Satellite Z18 tile
-curl -s -w "%{http_code} %{content_type} (%{size_download} bytes)\n" -o /dev/null http://localhost:8081/services/ortho/tiles/18/41984/89445.jpg
-```
-Expected response: `200 image/png (...) bytes` or `200 image/jpeg (...) bytes`.
-
----
-
-## 4. Coordinate Math & Schema Standards
-
-### Slippy XYZ vs TMS Coordinates in SQLite
-
-MBTiles specification standardizes on **TMS** (bottom-left origin), whereas Leaflet and web tile endpoints use **Slippy XYZ** (top-left origin).
-
-* **Conversion formula**:
-  $$\text{tile\_row} = (2^{\text{zoom}} - 1) - y_{\text{xyz}}$$
-* **Web Mercator (EPSG:3857) Bounding Box Calculation**:
-  $$\text{origin\_shift} = 20037508.342789244$$
-  $$\text{tile\_size} = \frac{2 \times \text{origin\_shift}}{2^{\text{zoom}}}$$
-  $$\text{west} = -\text{origin\_shift} + x \times \text{tile\_size}$$
-  $$\text{east} = -\text{origin\_shift} + (x + 1) \times \text{tile\_size}$$
-  $$\text{north} = \text{origin\_shift} - y \times \text{tile\_size}$$
-  $$\text{south} = \text{origin\_shift} - (y + 1) \times \text{tile\_size}$$
-
----
-
-## 5. Tile Generation & Crawler Runbooks
-
-### 5.1 Cadastral MapServer Crawler (`crawl_cadastral_tiles.py`)
-
-Crawls the authentic City of Coquitlam ArcGIS DynamicServices Cadastral MapServer (`layers=show:0,1,16` — road labels, civic address numbers, parcel boundaries) into transparent PNG32 tiles:
+**A `200` does not mean the tile exists.** A raster tile the archive does not hold answers
+`200 image/png` with a 116-byte blank, even from `ortho`, which stores JPEG. A vector tile
+outside the archive answers `204` with no body (both measured 2026-09-15). So check the type
+and the size. These probes are the tiles under Hall 1 (`STATIONS` in `MapConstants.js`):
 
 ```bash
-# Full municipal crawl across Z14–Z20 (resumable)
-python3 backend/scripts/crawl_cadastral_tiles.py \
-  --min-zoom 14 \
-  --max-zoom 20 \
-  --delay 0.2 \
-  --workers 8 \
-  --output backend/data/tiles/cadastral.mbtiles
+for p in cadastral/tiles/16/10414/22425.png ortho/tiles/18/41658/89702.jpg street_vector/tiles/14/2603/5606.pbf; do
+  curl -s -o /dev/null -w "%{http_code} %{content_type} %{size_download}  $p\n" "http://localhost:8081/services/$p"
+done
 ```
 
-* **Delay**: Default `0.2` ($200\text{ ms}$) provides polite rate-limiting (~5 req/s) against municipal infrastructure.
-* **Resumable**: Skips already downloaded `(zoom_level, tile_column, tile_row)` keys present in SQLite.
+| Probe | Healthy answer, 2026-09-15 |
+|:--|:--|
+| cadastral z16 | `200 image/png 21489` |
+| ortho z18 | `200 image/jpeg 16983` |
+| street_vector z14 | `200 application/x-protobuf 81889` |
 
-### 5.0 The street basemap (`build_vector_basemap.sh`)
-
-**Since 2026-09-09 the street basemap is `street_vector.mbtiles`**, vector tiles the project
-builds itself from the OSM extract the kiosk routes on (`backend/data/osrm/vancouver.osm.pbf`),
-with Planetiler in a pinned container, in about a minute:
-
+An `image/png` of 116 bytes from any of them means the archive has no tile there. The sizes change
+when an archive is rebuilt, so re-measure after one. Tile numbers for another point, with the
+arithmetic the build scripts use:
 ```bash
-backend/scripts/build_vector_basemap.sh --restart-tiles
-```
-
-It reads its three auxiliary sources from `backend/data/planetiler_sources/` (1.4 GB, seeded
-once; never downloaded by the script), writes to a temporary name and moves the archive into
-place only after the journal-mode check, so a failed build never replaces the served one. The
-guard refuses to run over a live capture or beside an OSRM graph build. The frontend draws it
-with MapLibre GL under the Leaflet overlays (`frontend/src/components/map/vectorBasemap.js`);
-the style, sprite and glyphs are served from the app's own origin under `/basemap/`, the
-glyphs (102 MB, git-ignored) copied to the kiosk by hand. A missing vector tile answers
-`204 No Content`, not a blank PNG. `street.mbtiles` and `street_nolabels.mbtiles` are no
-longer drawn and stay on disk as the rollback. Licences: `docs/standards/basemap/README.md`.
-
-### 5.2 Multi-Layer Compiler (`compile_mbtiles.py`)
-
-Crawls and compiles `ortho.mbtiles` (City imagery service), `street.mbtiles` and `street_nolabels.mbtiles` (Carto). The `gdal2tiles`/MrSID ingest path was removed 2026-08-31 — see `gis-pipeline-sync` §4.1:
-
-```bash
-python3 backend/scripts/compile_mbtiles.py --layer all --workers 32
+python3 -c "import math; lat, lon, z = 49.2911, -122.7907, 16; n = 2**z; print(int((lon + 180) / 360 * n), int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n))"
 ```
 
 ---
 
-## 6. Frontend Integration Contract
+## 5. Building each archive
 
-1. **Base URL Resolution**: All components must import `TILE_BASE_URL` from `frontend/src/apiClient.js`. Never hardcode `localhost:8081`.
-2. **Layer Definitions** in `frontend/src/components/MapConstants.js`:
-   ```javascript
-   export const BASE_LAYERS = {
-     STREET: { type: 'vector', service: 'street_vector', attribution: '© OpenMapTiles · © OpenStreetMap contributors (ODbL)', maxZoom: 22 },
-     SATELLITE: {
-       url: `${TILE_BASE_URL}/services/ortho/tiles/{z}/{x}/{y}.jpg`,
-       fallbackUrl: null,
-       maxNativeZoom: 20,
-       maxZoom: 22,
-     },
-     CADASTRAL: {
-       url: `${TILE_BASE_URL}/services/cadastral/tiles/{z}/{x}/{y}.png`,
-       fallbackUrl: null,
-       maxNativeZoom: 20,
-       maxZoom: 22,
-     },
-   };
-   ```
-3. **Offline Fallback Guard**: `fallbackUrl: null` is strictly enforced to prevent external CDN/ArcGIS network leaks during live emergency operations.
+### 5.1 `street_vector`: the OpenStreetMap vector basemap
+
+The street basemap since 2026-09-09, last rebuilt 2026-09-15. `backend/scripts/build_vector_basemap.sh`
+builds it on the kiosk in about a minute:
+
+* **Planetiler** runs as a container image pinned by digest (0.10.3-SNAPSHOT, git `9af0823`),
+  because the kiosk has no Java. Its OpenMapTiles profile writes z0–14.
+* **Inputs**: `EXTRACT`, by default `backend/data/osrm/coquitlam_region.osm.pbf`, Geofabrik's
+  British Columbia extract (downloaded 2026-09-09) cut with osmium to the bounds below.
+  `BASEMAP_PBF` overrides it, and it must sit under `backend/data`, which the container sees as
+  `/data`. The tiles' `osmosisreplicationtime` reads 1970-01-01 for this cut, so date the data by
+  the extract, not the tiles. Plus three auxiliary sources in `backend/data/planetiler_sources/`
+  (water polygons, Natural Earth, lake centrelines; 1.4 GB) that the script never downloads.
+* **Bounds**: tiles are cut to `-123.31,48.99,-122.45,49.52`, the workstation's scroll limits
+  with a margin. The app paints land colour only inside the TileJSON bounds, and the "no map
+  data" hatch shows outside them (punch-list #40).
+* **Safety**: it refuses to run during a capture (`tools/kiosk_capture_state.sh`) or beside an
+  OSRM graph build. It writes `street_vector.building.mbtiles`, sets journal mode DELETE and
+  the service name, and only then moves it over the live file, so a failed build never
+  replaces the served archive. Log: `backend/data/tiles/street_vector.build.log`.
+* `--restart-tiles` restarts `cfr_tiles` at the end, which makes it an operator-only command
+  (§3).
+
+```bash
+backend/scripts/build_vector_basemap.sh    # then the operator registers the archive (§3)
+```
+
+**The style, sprite and glyphs are not in the archive.** They are served from the app's own
+origin under `/basemap/`:
+
+* `tools/build_basemap_style.py` generates `frontend/public/basemap/street.style.json` from the
+  vendored `frontend/public/basemap/upstream/osm-bright.style.json`. The operator's 2026-09-09
+  label and POI rulings are written in the generator, so change the generator, not the JSON.
+  `python tools/build_basemap_style.py --check` exits 1 when the committed style is stale.
+* The sprite is committed. The glyphs (`frontend/public/basemap/fonts/`, Noto Sans, 102 MB) are
+  git-ignored and were copied to the kiosk by hand; `npm run build` carries them into
+  `frontend/dist/basemap/`.
+* `frontend/src/components/map/vectorBasemap.js` fetches the style and the TileJSON and fills
+  the style's `{{TILEJSON_URL}}` and `{{ASSETS_URL}}` placeholders.
+* `frontend/src/components/MapLayers.jsx` draws it with `L.maplibreGL`
+  (`@maplibre/maplibre-gl-leaflet` 0.1.4 over `maplibre-gl` 4.7.1) in Leaflet's `tilePane`, under
+  every overlay. Labels are style layers the app shows or hides, not a second tile set. If
+  the style or TileJSON fetch fails, nothing is drawn and the hatch stays (CLAUDE.md §6.1).
+* Every map carries the credit `© OpenMapTiles · © OpenStreetMap contributors (ODbL)`.
+  Licences: [`docs/standards/basemap/README.md`](../../../docs/standards/basemap/README.md).
+
+### 5.2 `ortho`: aerial imagery
+
+The served archive is the Esri crawl (§1). The scripts that fetched it were deleted in `d4a04fc8`,
+so the tree cannot rebuild it. `backend/scripts/compile_mbtiles.py --layer ortho` crawls the City's own
+`CachedServices/Imagery_2025` cache instead: z12–20 inside the municipal coverage polygon, held
+to ~20 requests a second, about 6 hours. Before running it:
+
+* **It resumes.** It skips every tile the archive already holds, so run over today's archive it
+  would only fill gaps, and with the City's render. A rebuild goes to a staging directory
+  (`--tiles-dir`), is checked there, and is swapped in.
+* It calls the City's servers (`docs/external_calls.md` §5), which needs the operator's
+  permission (CLAUDE.md §1).
+
+Crawl detail, the z20 limit and the annual refresh: `gis-pipeline-sync` skill §4.1.
+
+### 5.3 `cadastral`: the City overlay
+
+`backend/scripts/crawl_cadastral_tiles.py` renders the City's
+`DynamicServices/Cadastral/MapServer/export` with `layers=show:0,1,16` (road labels, address
+labels, parcels) into transparent PNGs, z14–20, and resumes like §5.2. `--delay` defaults to
+0.05 s, about 20 requests a second (operator decision 2026-08-27), a single ceiling that
+`--workers` does not multiply. It calls the City's servers, so the same permission applies.
+
+```bash
+python3 backend/scripts/crawl_cadastral_tiles.py    # defaults: z14-20, 0.05 s, 8 workers, backend/data/tiles/cadastral.mbtiles
+```
+
+---
+
+## 6. XYZ and TMS rows
+
+MBTiles stores rows bottom-up (TMS), while tile URLs count them top-down (XYZ). The build
+scripts write TMS rows and mbtileserver serves XYZ, so nothing in the frontend flips rows.
+When you read an archive directly:
+
+$$\text{tile\_row} = (2^{z} - 1) - y$$
+
+```bash
+python3 -c "import sqlite3; c = sqlite3.connect('file:backend/data/tiles/cadastral.mbtiles?mode=ro', uri=True); z, x, y = 16, 10414, 22425; print(c.execute('select length(tile_data) from tiles where zoom_level=? and tile_column=? and tile_row=?', (z, x, 2**z - 1 - y)).fetchone())"
+```
+This returned `(21489,)` on 2026-09-15, the same bytes as the Hall 1 probe in §4.
+
+---
+
+## 7. Frontend contract
+
+1. Every tile and TileJSON URL is built from `TILE_BASE_URL`, imported from
+   `frontend/src/apiClient.js`: never a hardcoded `localhost:8081`, never a relative path
+   (CLAUDE.md §1).
+2. `BASE_LAYERS` in `frontend/src/components/MapConstants.js` is the one definition:
+   * `STREET`: `type: 'vector'`, `service: 'street_vector'`, `maxZoom: 22`.
+   * `SATELLITE`: `/services/ortho/tiles/{z}/{x}/{y}.jpg`, `maxNativeZoom: 20`, `maxZoom: 22`.
+   * `CADASTRAL`: `/services/cadastral/tiles/{z}/{x}/{y}.png`, `maxNativeZoom: 20`,
+     `maxZoom: 22`. `CADASTRAL_MIN_ZOOM` (14) comes from the tileset's own metadata.
+3. The raster layers carry `fallbackUrl: null`. No CDN sits behind any layer.

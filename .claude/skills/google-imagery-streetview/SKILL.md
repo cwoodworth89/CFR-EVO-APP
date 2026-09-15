@@ -48,7 +48,7 @@ flowchart TD
     D --> E
     
     E --> F[Kiosk UI Split-Screen Display]
-    F --> F1[Live Tactical Vector Map (CartoDB Voyager)]
+    F --> F1["Live tactical street map (self-hosted OpenStreetMap vector tiles)"]
     F --> F2[Satellite Aerial with Parcel Polygon]
     F --> F3[Street View 360° Building Entrance]
 ```

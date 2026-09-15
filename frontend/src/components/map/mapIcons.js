@@ -79,8 +79,8 @@ export const createSoftZoneNumberIcon = (zoneId, onImagery = false) => L.divIcon
 // visible, never silently absent). Registered in docs/external_calls.md s3.1.
 //
 // Vendored as local SVG rather than copies of the upstream PNGs: no network at
-// build or run time, no third-party asset licence to carry (s1's Carto caution
-// is the same problem), and vector holds up on a 10-foot apparatus-bay display
+// build or run time, no third-party asset licence to carry (CLAUDE.md s1's licence
+// caution), and vector holds up on a 10-foot apparatus-bay display
 // where a 25x41 raster does not.
 //
 // Imported rather than served from public/ so a missing file breaks `npm run

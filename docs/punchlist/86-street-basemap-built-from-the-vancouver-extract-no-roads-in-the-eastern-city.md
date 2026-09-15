@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | FIXED in `86eee32e`; rebuilt 2026-09-15 and `cfr_tiles` restarted by the operator; on-screen check at the east edge pending |
+| **Status** | CLOSED 2026-09-15: rebuilt from the regional extract and served; operator sees the basemap across the kiosk's view area |
 | **Severity** | 🔴 crew-visible: tiles exist there, so the map looks complete; only the roads are missing |
 | **Area** | 🗺️ Basemap · 🖥️ Kiosk |
 | **Origin** | Scaffolding chat, 2026-09-15; confirmed by a read-only gis-spatial-engineer job against the kiosk the same day |
@@ -55,3 +55,10 @@ extract carries no replication timestamp. The operator restarted `cfr_tiles` the
 **Basemap and routing graph now use different extracts** until the regional graph is swapped in (operator ruling
 2026-09-15: move the graph to the regional extract, with the stay-in-Coquitlam penalty). The map may show eastern
 dykes and trails the live graph cannot route on.
+
+## Closure, 2026-09-15
+
+Operator: street basemap shows across the entire view area of the kiosk. Road lines at the east edge were not checked one
+by one. **Crew impact was lower than rated:** the City cadastral overlay draws the City's road lines, and the vector
+basemap's road labels are turned off at the zooms where cadastral turns on. Whether to flip that (keep basemap roads and
+labels, drop the cadastral layer's labels) is a post-freeze question (backlog, 2026-09-15).

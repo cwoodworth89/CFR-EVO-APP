@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | LIVE 2026-09-15: API rebuilt and frontend built on the kiosk; on-screen check pending |
+| **Status** | CLOSED 2026-09-15: confirmed on screen by the operator |
 | **Severity** | 🔴 crew-visible: a real Coquitlam address would read "NOT AVAILABLE OUTSIDE OF CITY" |
 | **Area** | 🖥️ Kiosk · 🗺️ Geocoding |
 | **Origin** | Lead, 2026-09-15, while checking the basemap extract (#86) |
@@ -66,3 +66,5 @@ unknown (§6.1). CLAUDE.md §5 and the `gis-pipeline-sync` skill are updated to 
 Still using a box: `tools/osm_level_crossings.py:29` limits the OSM crossings it takes to a box ending at -122.70.
 
 **Deployed, 2026-09-15 15:25 PDT.** `cfr_api` recreated; the endpoint answers `true` at a Quarry Rd front point and `false` at 49.2626, -122.7811. `frontend/dist` built 15:25:34 and its bundle calls `within-city` (checked on the kiosk).
+
+**Closed, 2026-09-15.** Operator: 6000 Quarry Rd's aerial tile shows imagery after a hard reload. Its Street View tile is blank with no notice, a separate item being handled on its own.

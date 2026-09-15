@@ -66,6 +66,8 @@
 | **29** | 🟠 operational | CLOSED | [Phase 1 session state lives only in worker memory](29-phase-1-session-state-lives-only-in-worker-memory.md) |
 | **34c** | 🟠 operational | CLOSED | [The phantom "UPDATED" badge](34c-the-phantom-updated-badge.md) |
 | **39** | 🟠 operational | CLOSED | [Review table: restore the verified value in the row, drop the pencil-and-legend](39-review-table-restore-the-verified-value-in-the-row-drop.md) |
+| **87** | 🔴 crew-visible | CLOSED 2026-09-15 | [The aerial panel's "outside the City" test is a box that cuts off the City's east side](87-the-aerial-panel-calls-part-of-the-city-outside-the-city.md) |
+| **86** | 🔴 crew-visible | CLOSED 2026-09-15 | [The street basemap was built from the Vancouver extract, so the eastern City has no roads](86-street-basemap-built-from-the-vancouver-extract-no-roads-in-the-eastern-city.md) |
 | **40** | 🟠 operational | CLOSED | [Street basemap has no tiles above zoom 18 — but the reported symptom did not reproduce](40-street-basemap-has-no-tiles-above-zoom-18-but-the-repor.md) |
 | **43b** | 🟠 operational | CLOSED | [The 8 failed cadastral tiles, and what the "blank" tiles actually are](43b-the-8-failed-cadastral-tiles-and-what-the-blank-tiles-a.md) |
 | **46b** | 🟠 operational | CLOSED | [The API image was 22 GB because it baked in 10.7 GB of bind-mounted data](46b-the-api-image-was-22-gb-because-it-baked-in-10-7-gb-of.md) |

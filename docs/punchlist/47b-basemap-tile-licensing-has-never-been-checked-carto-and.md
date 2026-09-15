@@ -196,3 +196,7 @@ Esri stays live until a new process gives City imagery at the quality he accepts
 work (backlog, 2026-09-15). One lead the history already holds: the City's `export` endpoint renders from the source
 imagery (`qa_handoff_2026-08-31.md:167-170`) and was never explored.
 
+
+**Coverage gaps seen, 2026-09-15.** Operator: at z14–16 large areas of Pitt Meadows have no imagery, and at high zoom there is a
+blank strip just past the City boundary before imagery resumes further out. Not a problem to him: a clean City pull will
+hold only what the City has and drop the rest. Not measured by zoom.

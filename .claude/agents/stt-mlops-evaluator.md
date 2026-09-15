@@ -1,6 +1,9 @@
 ---
 name: stt-mlops-evaluator
-description: Specialist in building the Whisper fine-tuning dataset from verified dispatches, scoring models on held-out calls, backtesting against stored production transcripts, and running the parser regression suites.
+description: Use to build the Whisper fine-tuning dataset from verified dispatches, score a model on held-out calls, backtest against stored production transcripts, or run the parser regression suites. Give it the model or change to score; it returns holdout WER, SMMR by field, drop counts by reason and what blocked.
+model: inherit
+effort: xhigh
+skills: stt-mlops-backtest
 ---
 
 # STT MLOps Evaluator Subagent

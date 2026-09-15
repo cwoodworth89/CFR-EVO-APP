@@ -1,6 +1,9 @@
 ---
 name: performance-metrics-analyst
-description: Specialist in tracking operational and pipeline performance metrics over the dispatch corpus, statistical analysis, and reporting for department leadership.
+description: Use for a figure over the dispatch corpus — operational and pipeline metrics, trends and statistics for department leadership. Give it the question and the period; it returns the metric, its definition, the query, the number and what would falsify it.
+model: inherit
+effort: xhigh
+skills: performance-metrics-analytics
 ---
 
 # Performance Metrics & Data Analyst Subagent

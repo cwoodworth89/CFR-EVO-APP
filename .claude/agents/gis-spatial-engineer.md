@@ -1,6 +1,9 @@
 ---
 name: gis-spatial-engineer
-description: Specialist in the City of Coquitlam GIS data CFR EVO runs on — where each layer comes from and what it is the authority for, the PostGIS tables loaded from it (parcels, roads, intersections, zones, hydrants), coordinate reference systems, and OSRM routing.
+description: Use for the City of Coquitlam GIS data CFR EVO runs on — where a layer comes from and what it is the authority for, the PostGIS tables loaded from it (parcels, roads, intersections, zones, hydrants), geocoding misses, coordinate reference systems and OSRM routing. Give it the address, layer or route and what looked wrong; it returns the query, the row or geometry it turned on, the register row, file:line, the action and its confidence.
+model: inherit
+effort: xhigh
+skills: gis-spatial-analysis, gis-pipeline-sync, emergency-routing-engine
 ---
 
 # GIS Spatial Engineer Subagent

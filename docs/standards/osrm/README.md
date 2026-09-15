@@ -10,7 +10,7 @@ name suggests. Nothing here has been modified; the md5 sums below are the check.
 | Image | `ghcr.io/project-osrm/osrm-backend:latest`, id `sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c`, created 2026-08-01T09:26:32Z |
 | Version | `osrm-routed --version` → `v26.8.0` (`/opt/OSRM_GITSHA` in the image is empty) |
 | Copied with | `docker cp cfr_osrm:/opt/car.lua` and `docker cp cfr_osrm:/opt/lib`, 2026-09-08 |
-| Graph | kiosk `backend/data/osrm/vancouver.osrm.*`, every file written 2026-08-14 00:05 PDT; the container's first log line is 07:15:43 UTC the same morning |
+| Graph | kiosk `backend/data/osrm/vancouver.osrm.*` when these files were copied: every file written 2026-08-14 00:05 PDT; the container's first log line is 07:15:43 UTC the same morning. Served since 2026-09-15: `apparatus_bc_city01_20260915.osrm`, from `apparatus.lua` ([`../data_sources.md`](../data_sources.md)) |
 
 ```
 db4f09652994b1a24389de0f0a6b7719  car.lua
@@ -68,14 +68,15 @@ docker exec cfr_osrm sh -c 'head -c 520 /data/vancouver.osrm.properties | tail -
 
 ## The extract the graph was cut from
 
-`backend/data/osrm/vancouver.osm.pbf`, 64,138,175 bytes, written 2026-08-14 00:05 PDT, git-ignored
-and shared with the basemap stream. Read with pyosmium on the kiosk, 2026-09-08:
+`backend/data/osrm/vancouver.osm.pbf`, 64,138,175 bytes, written 2026-08-14 00:05 PDT, git-ignored.
+Routing and the basemap both moved to `coquitlam_region.osm.pbf` on 2026-09-15; this file still
+backs the rollback graph `apparatus.osrm`. Read with pyosmium on the kiosk, 2026-09-08:
 
 | Header field | Value |
 |:--|:--|
 | `writingprogram` | `https://download.BBBike.org` — a BBBike custom extract |
 | `osmosis_replication_timestamp` | `2026-08-07T23:00:00Z` — the age of the map data |
-| bounding box | lon −123.307 … −122.668, lat 48.999 … 49.416 (the City is lon −122.92 … −122.70, lat 49.20 … 49.39) |
+| bounding box | lon −123.307 … −122.668, lat 48.999 … 49.416 (the City, `public.city_boundary`, is lon −122.893 … −122.621, lat 49.220 … 49.351, so this extract stops short of its eastern edge: #86) |
 
 `vancouver.osrm.timestamp` on the kiosk is empty even though the header carries a
 timestamp. Not explained; recorded (§7.7).

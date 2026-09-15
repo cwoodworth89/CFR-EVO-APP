@@ -48,7 +48,7 @@ from `ortho.mbtiles`, and stays.
 | Current layers | `street`, `street_nolabels` (Carto raster, z12–18), `cadastral` (City, z14–20), `ortho` (City, to z20) |
 | Frontend | `frontend/src/components/MapConstants.js` `BASE_LAYERS` and `CADASTRAL_MIN_ZOOM`; `MapLayers.jsx` `BaseMap` (raster tile layer with a dead WAN fallback class to delete) and `CoquitlamOverlays`; `map/MapSurface.jsx` (the one map both surfaces share) |
 | Crawl and compile | `backend/scripts/crawl_cadastral_tiles.py`, `compile_mbtiles.py`, `finalize_mbtiles.py`, `export_tile_coverage.py`, `calc_tile_counts.py`, `inspect_loose_tiles.py` |
-| The extract | kiosk `backend/data/osrm/vancouver.osm.pbf` (2026-08-14, git-ignored), shared with routing |
+| The extract | kiosk `backend/data/osrm/coquitlam_region.osm.pbf` (Geofabrik British Columbia, downloaded 2026-09-09, cut with osmium; git-ignored), shared with routing since 2026-09-15 |
 | Architecture | [`../architecture/unified_map_surface.md`](../architecture/unified_map_surface.md); the operator's UX brief [`../ux_notes.md`](../ux_notes.md) §3 and §4 |
 
 ## Rules that bind this stream

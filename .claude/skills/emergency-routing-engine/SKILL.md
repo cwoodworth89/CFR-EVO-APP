@@ -72,11 +72,12 @@ flowchart LR
 > per-request API fees**, so an online routing mode is not a fallback this system is allowed to
 > depend on.
 >
-> **All routing goes through §B, the local OSRM container.** Since 2026-09-09 it serves the graph
-> built from `backend/osrm/profiles/apparatus.lua`: the stock `car.lua` vendored at
+> **All routing goes through §B, the local OSRM container.** Since 2026-09-15 it serves
+> `apparatus_bc_city01_20260915.osrm`, built from the regional extract `coquitlam_region.osm.pbf`
+> with `backend/osrm/profiles/apparatus.lua`: the stock `car.lua` vendored at
 > `docs/standards/osrm/` with the operator's rulings (turn restrictions ignored under lights and
-> siren, fire lanes drivable), each hunk cited; the speed table is stock and unsourced
-> (punch-list #1). Leave this subsection only as a record of a path that was considered and
+> siren, fire lanes drivable, routes kept inside the City unless leaving is the only option),
+> each hunk cited; the speed table is stock and unsourced (punch-list #1). Leave this subsection only as a record of a path that was considered and
 > not taken.
 * **Endpoint**: `https://maps.googleapis.com/maps/api/directions/json`
 * **Parameters**:
@@ -96,7 +97,11 @@ flowchart LR
 
 One profile for every apparatus, emergency response assumed (operator ruling 2026-09-09,
 punch-list #1). Applied: posted turn restrictions ignored; fire lanes (`service=emergency_access`)
-drivable. Not applied, by ruling: weight and height limits, one-way (never offered), bollards
+drivable; a way whose last node lies outside the City boundary plus 100 m weighs ten times its
+time (`CFR_CITY_LIMITS_FACTOR=0.1`, operator ruling 2026-09-15, set at build time by
+`backend/scripts/build_osrm_graph.sh`). That raises the route's weight, not its duration, so the
+ETA stays OSRM's time for the route drawn; and it discourages leaving the City without forbidding
+it. Not applied, by ruling: weight and height limits, one-way (never offered), bollards
 (never offered). Not applied, unsourced: any per-class speed, road-class or turn weighting — the
 speed table is OSRM's own. Per-way, per-node and per-turn one-offs go through the override
 mechanisms recorded in punch-list #1, never through code in the routing engine.

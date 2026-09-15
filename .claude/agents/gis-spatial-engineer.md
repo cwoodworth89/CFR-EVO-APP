@@ -70,9 +70,12 @@ City source holds, the operator's rulings in punch-list #82 govern:
 
 ## 5. Routing
 
-Local OSRM, `cfr_osrm`. Compose serves `apparatus.osrm`, built 2026-09-09 from
-`backend/osrm/profiles/apparatus.lua` (the operator's rulings in punch-list #1); `vancouver.osrm`
-is the stock `car.lua` graph and the rollback (`docker-compose.yml`). OSRM's `distance` and
+Local OSRM, `cfr_osrm`. Compose serves `apparatus_bc_city01_20260915.osrm`, built 2026-09-15 from
+the regional extract `coquitlam_region.osm.pbf` (the basemap's extract) with
+`backend/osrm/profiles/apparatus.lua` (the operator's rulings in punch-list #1) and the
+stay-in-Coquitlam penalty at `CFR_CITY_LIMITS_FACTOR=0.1` (operator ruling 2026-09-15, adjustable at
+build time; it raises weight, not duration). The rollback is `apparatus.osrm` (2026-09-09,
+`vancouver.osm.pbf`, no penalty), named in `docker-compose.yml`. OSRM's `distance` and
 `duration` are authoritative; nothing recomputes them. The profile's name is not the apparatus
 tiers: `APPARATUS_TIERS` is staged seed data, not applied (§6.4).
 

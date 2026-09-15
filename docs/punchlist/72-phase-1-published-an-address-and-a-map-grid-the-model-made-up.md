@@ -198,3 +198,17 @@ Rule A, the location gate, was built later the same day on the operator's go (`1
 preliminary payload carries a location only for a parcel or a junction, `location_pending`
 otherwise, and phase 2 places the call from the full recording. Holdout replay: 3 of 44
 locations withheld, the parcel and junction placements untouched.
+
+## Operator rulings on the map grid, 2026-09-15
+
+* **The numbering is the same.** The City's response zones and the map grid E-Comm announces are one numbering (operator).
+* **Trust the verbal grid, and flag the mismatch.** The pre-calculated grid goes out with phase 1; when the announcement
+  differs, the announcement wins and `GRID_MISMATCH` sends it to a reviewer. A second round agreeing with the first
+  strengthens it.
+* **A reviewer's correction carries forward.** Once a grid has been corrected in review, phase 1 shows the corrected grid
+  for that address on later calls, so it matches what E-Comm says.
+* **E-Comm is occasionally wrong**, "exceedingly rare" (operator). So a disagreement is not proof our derived grid is wrong,
+  and the flag is what lets a person catch the rare bad announcement.
+* **Intended direction, not built:** *"If we can fix the map grid system, I would switch it to accepting the database entry
+  over the STT."* Conditional on pre-calculation being made right first; nothing changes until the operator rules again
+  on the back of that work. Measurement of why announced and derived grids disagree: gis-spatial-engineer, 2026-09-15.

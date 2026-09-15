@@ -35,7 +35,7 @@ Usage
 --label names the graph and profile under test. It becomes model_version on the recorded row
 and is required with --record, because the tool cannot read the profile out of a running
 router. What it can observe it records beside the label: OSRM's weight_name from the
-responses, and the modification time of the edge-weight file backend/data/osrm/vancouver.osrm.enw
+responses, and the modification time of the served graph's edge-weight file (backend/data/osrm/<OSRM_GRAPH>.osrm.enw)
 when that file is on this machine (it is on the kiosk; a laptop run records null).
 
 From a laptop, point it at the kiosk: DATABASE_URL to the kiosk's Postgres and
@@ -66,7 +66,10 @@ from gis_service.routing_engine import (  # noqa: E402
 # router the same question, or a difference could be the question and not the graph.
 OSRM_QUERY = "overview=full&geometries=geojson&steps=true"
 HALLS = ("1", "2", "3", "4")
-ENW = os.path.join(str(_repo.ROOT), "backend", "data", "osrm", "vancouver.osrm.enw")
+# The served graph's edge-weight file. It must name the graph cfr_osrm serves (docker-compose.yml);
+# until 2026-09-15 it read vancouver.osrm.enw, so every recorded row reported graph age 2026-08-14.
+ENW = os.path.join(str(_repo.ROOT), "backend", "data", "osrm",
+                   os.environ.get("OSRM_GRAPH", "apparatus_bc_city01_20260915") + ".osrm.enw")
 
 # A route "moved" when its geometry hash differs, or distance or duration differ by more than
 # this. OSRM reports distance to 0.1 m and duration to 0.1 s; anything above rounding noise.

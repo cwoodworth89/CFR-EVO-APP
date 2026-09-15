@@ -35,11 +35,13 @@ DATA="$ROOT/backend/data/osrm"
 # :latest on the kiosk resolves to it today; the digest keeps the profile text and the binary
 # that reads it in step.
 IMAGE=${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend@sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c}
-# The extract. vancouver.osm.pbf is the BBBike cut the kiosk has routed on since 2026-08-14;
-# a replacement is named explicitly (OSRM_PBF=backend/data/osrm/<file>) so that swapping the
+# The extract. coquitlam_region.osm.pbf (osmium cut of Geofabrik British Columbia to the kiosk's
+# scroll box) is what the served graph and the basemap are built from since 2026-09-15; before
+# that, BBBike's vancouver.osm.pbf, which stops at -122.668 and cuts the eastern City (#86).
+# A replacement is named explicitly (OSRM_PBF=backend/data/osrm/<file>) so that swapping the
 # shared extract is a recorded step in <name>.build.txt, never a rename. The basemap stream
 # builds its tiles from the same file; swap both in one window (the routing brief).
-PBF=${OSRM_PBF:-$DATA/vancouver.osm.pbf}
+PBF=${OSRM_PBF:-$DATA/coquitlam_region.osm.pbf}
 [ -f "$PBF" ] || { echo "no extract at $PBF" >&2; exit 1; }
 [ -f "$PROFILE" ] || { echo "no profile at $PROFILE" >&2; exit 1; }
 PROFILE_ABS=$(cd "$(dirname "$PROFILE")" && pwd)/$(basename "$PROFILE")

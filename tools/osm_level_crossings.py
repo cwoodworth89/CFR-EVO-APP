@@ -42,7 +42,8 @@ NOT_A_ROAD = {"footway", "path", "cycleway", "steps", "pedestrian", "bridleway",
 CLUSTER_M = 80
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_PBF = os.path.join(ROOT, "backend", "data", "osrm", "vancouver.osm.pbf")
+# The shared extract the served graph and basemap are built from since 2026-09-15 (#86).
+DEFAULT_PBF = os.path.join(ROOT, "backend", "data", "osrm", "coquitlam_region.osm.pbf")
 KIOSK_LIST = os.path.join(ROOT, "frontend", "src", "components", "map", "railroadCrossings.js")
 
 

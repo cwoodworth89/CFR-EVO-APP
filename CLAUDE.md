@@ -123,13 +123,13 @@ crew-visible (§7.1), which promotes immediately.
   a default station or city coordinate. This is §6.1 applied to geocoding.
 * **Tier 1 — location unresolved** (coords null, NaN or 0): suppress routing lines, show the
   amber standby card (`⚠️ LOCATION UNRESOLVED — Coordinates awaiting operator verification`).
-* **Tier 2 — out of bounds**: outside the authoritative City bounding box
-  `lat < 49.20 || lat > 49.39 || lng < -122.92 || lng > -122.70` via `isWithinCoquitlam(lat, lng)`,
-  show `🌐 NOT AVAILABLE OUTSIDE OF CITY`. **These bounds are depended on by the
-  `gis-pipeline-sync` skill — keep them in sync.** Rendering lives in
-  `frontend/src/components/kiosk/PropertySatellitePanel.jsx` (the cadastral block tile that
-  also carried them was removed from the kiosk on 2026-09-08; SNAP TO CALL on the route
-  map shows the parcel instead).
+* **Tier 2 — out of bounds**: when `public.city_boundary` says the point is outside the City
+  (`GET /api/parcels/within-city`, `ST_Covers`), show `🌐 NOT AVAILABLE OUTSIDE OF CITY`. There is
+  no bounding box and no fallback (#87). If the check cannot answer, show the amber "City boundary
+  check unavailable" card, never inside or outside. Rendering lives in
+  `frontend/src/components/kiosk/PropertySatellitePanel.jsx` (the cadastral block tile that also
+  carried the old box was removed from the kiosk on 2026-09-08; SNAP TO CALL on the route map
+  shows the parcel instead).
 * **Ambiguity**: when `activeCall.is_ambiguous` or `candidates.length > 1`, show the tactical
   candidate selector, plot every candidate (active gold, alternates sky blue), and recalculate
   OSRM routes on one touch.

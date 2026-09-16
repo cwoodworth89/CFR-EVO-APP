@@ -5,11 +5,14 @@
 starting facts, the rules of the road on the shared kiosk, and the boundary with the other
 stream running at the same time ([`osrm_routing_agent.md`](osrm_routing_agent.md)).
 
-> **State, 2026-09-09: the first hour is done.** The trial build, what it looks like, what
-> is left running on the kiosk and the decisions waiting on the operator are in
+> **Delivered.** The vector basemap replaced the raster street layers on 2026-09-09 (`f987ca5`)
+> and was rebuilt from the regional extract on 2026-09-15 (#86). The trial build and what it left
+> running on the kiosk are in
 > [`../briefings/vector_basemap_trial_2026-09-09.md`](../briefings/vector_basemap_trial_2026-09-09.md);
-> the licences are vendored under [`../standards/basemap/`](../standards/basemap/README.md).
-> Nothing in the app is touched yet.
+> the licences are vendored under [`../standards/basemap/`](../standards/basemap/README.md); the
+> serving runbook is the `mbtiles-tile-server` skill. The stream no longer runs as its own
+> worktree session: basemap work goes through the chats in CLAUDE.md §4. This brief is kept for
+> its measurements and the rules on the shared kiosk.
 
 ## What this stream is for
 

@@ -15,7 +15,7 @@ Companion documents:
 * [`docs/standards/README.md`](./standards/README.md) — domain standards index (currently all gaps)
 * [`docs/standards/dependency-behaviour.md`](./standards/dependency-behaviour.md) — **verified library semantics; read this before trusting any API name**
 * [`docs/architecture/unified_map_surface.md`](./architecture/unified_map_surface.md) — frontend architecture, implemented
-* [`docs/briefs/osrm_routing_agent.md`](./briefs/osrm_routing_agent.md) and [`docs/briefs/vector_basemap_agent.md`](./briefs/vector_basemap_agent.md) — **the two post-freeze streams, one brief each**: scope, where things are, the rules on the shared kiosk, the file boundary between them, and the first hour
+* [`docs/briefs/osrm_routing_agent.md`](./briefs/osrm_routing_agent.md) and [`docs/briefs/vector_basemap_agent.md`](./briefs/vector_basemap_agent.md) — **the two post-freeze streams, both delivered** (the vector basemap live 2026-09-09, the regional routing graph 2026-09-15): kept for their measurements and the rules on the shared kiosk
 * [`docs/ux_notes.md`](./ux_notes.md) — **the brief for the next UX pass**: what the operator said on 2026-09-06, what was done, the open design decisions, and the conventions the screens have settled into
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
 
@@ -89,8 +89,8 @@ hydrant on the map. The operator has not yet seen it on the kiosk. All in
 
 ### Two streams, two worktrees
 
-The operator lifted the freeze for two streams and they run in parallel in their own
-worktrees and branches: [`briefs/osrm_routing_agent.md`](briefs/osrm_routing_agent.md)
+The operator lifted the freeze for two streams, which ran in parallel in their own
+worktrees and branches and have both since delivered (the 2026-09-15 update above): [`briefs/osrm_routing_agent.md`](briefs/osrm_routing_agent.md)
 (`../CFR-EVO-APP-routing`, branch `routing`) and
 [`briefs/vector_basemap_agent.md`](briefs/vector_basemap_agent.md)
 (`../CFR-EVO-APP-basemap`, branch `basemap`). This folder stays on `main`, which is what

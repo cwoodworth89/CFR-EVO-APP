@@ -5,6 +5,11 @@
 starting facts, the rules of the road on the shared kiosk, and the boundary with the other
 stream running at the same time ([`vector_basemap_agent.md`](vector_basemap_agent.md)).
 
+> **Delivered.** The apparatus profile went live 2026-09-09, and the regional graph with the
+> stay-in-Coquitlam penalty on 2026-09-15 (`64985d1d`; *Stay in Coquitlam*, below). The stream no
+> longer runs as its own worktree session: routing work goes through the chats in CLAUDE.md §4.
+> This brief is kept for its measurements and the rules on the shared kiosk.
+
 ## What this stream is for
 
 Routing today is **stock OSRM** on the OSM extract, deliberately reset to basics on

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
 import { closureIcon } from './mapIcons';
+import { accessStyle } from '../../utils/closureAccess';
 
 /**
  * Marker + polyline for one road closure, with popup-on-selection behaviour.
@@ -25,9 +26,10 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
     }
   }, [isSelected]);
 
-  let color = "#ef4444"; // NO_ACCESS
-  if (closure.emergencyAccess === "ACCESS_ONLY") color = "#f59e0b"; // ACCESS_ONLY
-  if (closure.emergencyAccess === "CAUTION") color = "#eab308"; // CAUTION
+  // Line colour and popup pill from utils/closureAccess.js. An unknown access level (#91)
+  // was drawn in NO_ACCESS red here; it is now its own neutral N/A state.
+  const access = accessStyle(closure);
+  const color = access.line;
 
   const polylinePos = Array.isArray(closure.polyline) && closure.polyline.length > 0
     ? closure.polyline.map(pt => [parseFloat(pt[0]), parseFloat(pt[1])])
@@ -71,19 +73,16 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
         }}>
           <div className="bg-slate-950 text-white p-2.5 border border-slate-800 rounded-md" style={{ minWidth: '220px', maxWidth: '260px' }}>
             <div className="flex justify-between items-center gap-2">
-              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${
-                closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-              }`}>
-                {closure.emergencyAccess === 'NO_ACCESS' ? 'FULL CLOSURE' :
-                 closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
-                 'LANE CLOSURE'}
+              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${access.popupPill}`}>
+                {access.label}
               </span>
               <span className="text-[9px] text-slate-550 font-mono font-medium">{closure.source}</span>
             </div>
             <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
             <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
+            {closure.idMissing && (
+              <p className="text-[9px] font-mono font-bold text-amber-400 mt-1">⚠️ NO ID IN FEED RECORD</p>
+            )}
             {(closure.affectedZones?.length > 0 || closure.zoneId) && (
               <div className="mt-1.5 pt-1 border-t border-slate-900 flex justify-between items-center text-[9px] font-mono">
                 <span className="text-slate-400 font-medium">📍 Impacted Zones</span>

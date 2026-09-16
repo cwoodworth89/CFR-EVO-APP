@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '../apiClient';
+import { passesAccessFilter } from '../utils/closureAccess';
 
 /** Poll interval for the local road closure feed. The backend syncs from the municipal
  *  source once a day, so this only needs to be frequent enough to pick up a manual
@@ -75,9 +76,8 @@ export function useRoadClosures({
   // Closures the map and the alert count actually render, by access severity and by
   // timeframe window.
   const activeClosures = useMemo(() => roadClosures.filter(closure => {
-    if (closure.emergencyAccess === 'NO_ACCESS' && !filterNoAccess) return false;
-    if (closure.emergencyAccess === 'ACCESS_ONLY' && !filterAccessOnly) return false;
-    if (closure.emergencyAccess === 'CAUTION' && !filterCaution) return false;
+    // An N/A closure (no severity from the feed, #91) passes every access toggle.
+    if (!passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, filterCaution })) return false;
 
     const now = new Date();
     const isCurrentlyActive = closure.isActive;

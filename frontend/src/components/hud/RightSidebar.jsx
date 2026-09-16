@@ -1,4 +1,5 @@
 import React from 'react';
+import { accessStyle, passesAccessFilter, closureKey } from '../../utils/closureAccess';
 
 /** Hall labels and their badge classes. Static, so it lives at module scope: as a literal
  *  inside the component it was rebuilt every render and read by the useMemo below without
@@ -91,9 +92,8 @@ export function RightSidebar({
       })
       .filter(closure => {
         if (closure.isExpired) return false;
-        if (closure.emergencyAccess === "NO_ACCESS" && !filterNoAccess) return false;
-        if (closure.emergencyAccess === "ACCESS_ONLY" && !filterAccessOnly) return false;
-        if (closure.emergencyAccess === "CAUTION" && !filterCaution) return false;
+        // An N/A closure (no severity from the feed, #91) passes every access toggle.
+        if (!passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, filterCaution })) return false;
 
         const isCurrentlyActive = closure.isActive;
         const is24hFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 24 * 3600 * 1000);
@@ -186,15 +186,15 @@ export function RightSidebar({
   const syncFailed = syncStatus?.outcome === "FAILED";
 
   // Only shown when the backend gave a parseable timestamp; never a placeholder that could
-  // be read as the time of an attempt that did not happen.
-  const lastAttemptLabel = React.useMemo(() => {
-    if (!syncStatus?.lastAttemptAt) return null;
-    const at = new Date(syncStatus.lastAttemptAt);
-    if (Number.isNaN(at.getTime())) return null;
-    return at.toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-    });
-  }, [syncStatus]);
+  // be read as the time of an attempt that did not happen. A plain value, not a useMemo:
+  // this runs after the `!isExplore` early return above, and a hook there changes the hook
+  // count when appMode changes with the sidebar mounted (react-hooks/rules-of-hooks).
+  const lastAttemptAt = syncStatus?.lastAttemptAt ? new Date(syncStatus.lastAttemptAt) : null;
+  const lastAttemptLabel = lastAttemptAt && !Number.isNaN(lastAttemptAt.getTime())
+    ? lastAttemptAt.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      })
+    : null;
 
   return (
     <div className={`${compact ? 'absolute inset-y-0 right-0' : 'relative'} h-full flex flex-row-reverse transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${rightSidebarOpen ? `${openWidth} border-l border-slate-800` : 'w-0'}`}>
@@ -257,11 +257,14 @@ export function RightSidebar({
                                     {/* Group Closures */}
                                     {!collapsedGroups[group.unit] && (
                                       <div className="flex flex-col gap-2 pl-1 border-l border-slate-800/40">
-                                        {group.closures.map((closure) => {
+                                        {group.closures.map((closure, idx) => {
                                           const mapPoint = closureMapPoint(closure);
+                                          const access = accessStyle(closure);
                                           return (
                                             <div 
-                                              key={closure.id} 
+                                              // rowId, not the feed's id, which is null when the feed sent none (#91)
+                                              // and would collide.
+                                              key={closureKey(closure) ?? `${group.unit}-${idx}`}
                                               onClick={() => {
                                                 // No location, no fly and no selection: there is
                                                 // no marker to open, and the card says why below.
@@ -279,11 +282,7 @@ export function RightSidebar({
                                             >
                                                  {/* Street Name (Prominent & Color-coded) & Source */}
                                                  <div className="flex justify-between items-center gap-1.5">
-                                                     <span className={`text-xs font-black uppercase tracking-wide truncate ${
-                                                       closure.emergencyAccess === 'NO_ACCESS' ? 'text-red-500' :
-                                                       closure.emergencyAccess === 'ACCESS_ONLY' ? 'text-amber-500' :
-                                                       'text-yellow-500'
-                                                     }`}>
+                                                     <span className={`text-xs font-black uppercase tracking-wide truncate ${access.text}`}>
                                                         {closure.street}
                                                      </span>
                                                      <span className="text-[8px] text-slate-500 font-mono font-medium flex-shrink-0">{closure.source}</span>
@@ -297,18 +296,19 @@ export function RightSidebar({
                                                      ⚠️ NO MAP LOCATION IN FEED RECORD
                                                    </div>
                                                  )}
+                                                 {/* Operator ruling 2026-09-16 (#91): a record with no feed id is kept and the
+                                                     card says so. rowId is never shown in its place. */}
+                                                 {closure.idMissing && (
+                                                   <div className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
+                                                     ⚠️ NO ID IN FEED RECORD
+                                                   </div>
+                                                 )}
                                                  
                                                  {/* Headline & Warning Type Pill */}
                                                  <div className="flex justify-between items-center text-[9px] font-mono font-bold text-slate-400">
                                                     <span className="truncate pr-1">{closure.headline}</span>
-                                                    <span className={`text-[7px] px-1 py-0.2 rounded font-black tracking-wider flex-shrink-0 ${
-                                                      closure.emergencyAccess === 'NO_ACCESS' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                                                      closure.emergencyAccess === 'ACCESS_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                      'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                                                    }`}>
-                                                      {closure.emergencyAccess === 'NO_ACCESS' ? 'FULL CLOSURE' :
-                                                       closure.emergencyAccess === 'ACCESS_ONLY' ? 'EMERGENCY ACCESS ONLY' :
-                                                       'LANE CLOSURE'}
+                                                    <span className={`text-[7px] px-1 py-0.2 rounded font-black tracking-wider flex-shrink-0 ${access.pill}`}>
+                                                      {access.label}
                                                     </span>
                                                  </div>
 

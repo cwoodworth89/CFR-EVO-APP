@@ -1,5 +1,6 @@
 import React from 'react';
 import RoadClosureMarker from './RoadClosureMarker';
+import { closureKey, sameClosure } from '../../utils/closureAccess';
 
 /**
  * Road closure markers for the filtered closure set.
@@ -17,9 +18,11 @@ export default function RoadClosuresLayer({ closures, visible, selectedClosure, 
     <>
       {closures.map((closure, i) => (
         <RoadClosureMarker
-          key={closure.id || i}
+          // rowId, not the feed's id: id is null when the feed sent none (#91), and two
+          // id-less closures would share a key and both highlight as selected.
+          key={closureKey(closure) ?? `idx-${i}`}
           closure={closure}
-          isSelected={selectedClosure !== null && selectedClosure?.id === closure.id}
+          isSelected={sameClosure(selectedClosure, closure)}
           onSelect={onSelect}
         />
       ))}

@@ -90,6 +90,17 @@ class PythonGeometryDecoder:
         return pts
 
 
+DRIVEBC_FEED = "DriveBC Open511"
+MUNICIPAL_FEED = "Municipal 511"
+
+
+def _feed_of(source):
+    """The feed a closure came from. DriveBC rows carry source "DriveBC Open511"; Municipal
+    511 rows carry the issuing organisation instead ("City of Coquitlam", "BC MOTI Gateway"),
+    so anything else is Municipal 511 -- the only other feed road_closure_service ingests."""
+    return DRIVEBC_FEED if source == DRIVEBC_FEED else MUNICIPAL_FEED
+
+
 def _parse_closure_point(raw):
     """A closure's stored [lat, lng] as floats, or None when it is not a usable point.
 
@@ -156,6 +167,8 @@ def get_road_closures(db: Session = Depends(get_db)):
         ).order_by(desc(RoadClosureModel.updated_at)).all()
 
         results = []
+        # Closures served with no stated severity, per feed, for one summary line (below).
+        no_severity = {DRIVEBC_FEED: 0, MUNICIPAL_FEED: 0}
         for r in records:
             geom = r.geometry or {}
             # No default coordinate (CLAUDE.md §5, §6.1; punch list #90). This used to fall
@@ -179,14 +192,11 @@ def get_road_closures(db: Session = Depends(get_db)):
 
             # Unknown severity is served as null in both fields, never defaulted: the
             # old `or "FULL_CLOSURE"` drew an unknown as the most severe tier (punch list
-            # #91). The kiosk shows N/A in the access box.
+            # #91). The kiosk shows N/A in the access box. Counted, not logged per record:
+            # see the summary line after the loop. A stated ALL_LANES_OPEN is not a gap.
             if ((r.closure_type is None or r.emergency_access is None)
                     and r.road_state != "ALL_LANES_OPEN"):
-                logging.error(
-                    "Road closure %s has no known severity (closure_type=%r, "
-                    "emergency_access=%r); served as null, not defaulted.",
-                    r.closure_id, r.closure_type, r.emergency_access,
-                )
+                no_severity[_feed_of(r.source)] += 1
 
             results.append({
                 # rowId is this database's row, for React keys and selection only; never
@@ -212,6 +222,21 @@ def get_road_closures(db: Session = Depends(get_db)):
                 "startDate": r.start_time.isoformat() if r.start_time else None,
                 "endDate": r.end_time.isoformat() if r.end_time else None
             })
+
+        # One line per uncached serve, not one per closure (operator ruling 2026-09-16, #91:
+        # 141 ERROR lines in three minutes buried the per-record lines an admin needs -- the
+        # id-less skip and #90's unusable coordinate, which stay ERROR per record).
+        # WARNING, not ERROR: on this feed an unstated severity is expected and known
+        # (Municipal 511 states a type on almost none of its records), so it is a condition
+        # to watch, not a defect to act on. Logged only when the count is non-zero.
+        missing = sum(no_severity.values())
+        if missing:
+            logging.warning(
+                "%d of %d closures served with no stated severity (%s: %d, %s: %d)",
+                missing, len(results),
+                MUNICIPAL_FEED, no_severity[MUNICIPAL_FEED],
+                DRIVEBC_FEED, no_severity[DRIVEBC_FEED],
+            )
 
         payload = {
             "closures": results,

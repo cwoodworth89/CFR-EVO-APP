@@ -1,6 +1,7 @@
 ---
 name: kiosk-ui-audit
 description: Procedures for auditing, testing, and verifying the station kiosk frontend UI, real-time MQTT WebSockets broadcast, map rendering, parcel boundary polygons, and HITL feedback modals.
+when_to_use: The kiosk UI, the MQTT feed, map rendering or a modal needs auditing or verifying after a change.
 ---
 
 # Station Kiosk UI & Frontend Audit Runbook

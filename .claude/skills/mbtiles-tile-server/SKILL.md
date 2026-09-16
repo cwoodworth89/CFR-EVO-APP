@@ -1,6 +1,7 @@
 ---
 name: mbtiles-tile-server
 description: Runbook for cfr_tiles, the kiosk's offline tile server (mbtileserver on :8081). The three archives it serves (street_vector, the OpenStreetMap vector basemap; ortho, the aerial imagery; cadastral, the City overlay), how each is built, the read-only volume's journal-mode rule, registering a changed archive, and probes that tell a real tile from a blank. Read before touching an .mbtiles file.
+when_to_use: An .mbtiles archive is being built, replaced or served, or a map layer is missing, blank or stale.
 ---
 
 # MBTiles Tile Server (`cfr_tiles`)

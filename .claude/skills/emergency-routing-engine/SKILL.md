@@ -1,6 +1,7 @@
 ---
 name: emergency-routing-engine
 description: Station origin lookups and emergency vehicle routing through the local OSRM container in CFR EVO. Apparatus tiers are staged seed data, not applied (CLAUDE.md §6.4); the Google Directions section records a path considered and not taken.
+when_to_use: A route, ETA or hall origin looks wrong, or the OSRM container, its graph or the apparatus profile is being changed.
 ---
 
 # Emergency Apparatus Routing Engine Runbook

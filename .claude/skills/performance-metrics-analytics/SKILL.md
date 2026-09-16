@@ -1,6 +1,8 @@
 ---
 name: performance-metrics-analytics
 description: Operational runbook and architectural specifications for tracking, analyzing, and visualizing CFR EVO performance metrics, pipeline latency, STT Word Error Rate (WER), and executive management business KPIs.
+when_to_use: A figure over the dispatch corpus is wanted: latency, word error rate, volumes, or a trend for department leadership.
+disallowed-tools: Edit, Write, NotebookEdit
 ---
 
 # Performance Metrics & Operational Analytics Engine

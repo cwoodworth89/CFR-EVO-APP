@@ -1,6 +1,7 @@
 ---
 name: kiosk-remote-ops
 description: Non-interactive operational runbook for executing remote audio diagnostics, service restarts, and frontend asset builds on the station kiosk display (cfr-mapping-tcfh via Tailscale SSH).
+when_to_use: Something needs running on the kiosk over SSH: logs, diagnostics, an audio check or a frontend build.
 ---
 
 # Kiosk Remote Operations & Diagnostics

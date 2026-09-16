@@ -1,6 +1,7 @@
 ---
 name: gis-spatial-analysis
 description: Procedures and tools for managing ESRI shapefiles, performing spatial queries, calculating parcel boundary rings, querying NFPA 291 fire hydrants, and transforming coordinate reference systems (CRS) in CFR EVO.
+when_to_use: A spatial question about parcels, zones, hydrants or coordinates, or a PostGIS query needs writing or checking.
 ---
 
 # GIS Spatial Analysis & Data Engineering Runbook

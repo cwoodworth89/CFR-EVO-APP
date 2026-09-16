@@ -1,6 +1,7 @@
 ---
 name: dispatch-pipeline-ops
 description: Operational runbook and architectural guide for developing, debugging, tuning, and testing the CFR EVO two-phase real-time dispatch audio pipeline.
+when_to_use: Audio capture, the tone gate, STT or the two-phase flow is being changed or debugged, or a call was missed, cut short or parsed wrong.
 ---
 
 # Dispatch Pipeline Operations Runbook

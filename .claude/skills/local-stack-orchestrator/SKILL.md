@@ -1,6 +1,7 @@
 ---
 name: local-stack-orchestrator
 description: Operational runbook for managing the containerized Docker Compose stack (PostgreSQL 16, Mosquitto MQTT, Ntfy, FastAPI Gateway, and MBTiles Tile Server).
+when_to_use: A container in the stack needs checking, its logs read, or a port or the database schema verified.
 ---
 
 # Local Stack Orchestration

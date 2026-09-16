@@ -1,6 +1,7 @@
 ---
 name: google-imagery-streetview
 description: Procedures for fetching, orienting, and rendering Google Street View panoramas in CFR EVO, and for persisting the operator's preferred view as parameters (never imagery, which the Maps Platform terms forbid storing). Not the aerial basemap, which is City orthophotography served offline from ortho.mbtiles (see gis-pipeline-sync).
+when_to_use: The Street View panel, its saved view or the heading it faces is being changed, or it is not showing what it should.
 ---
 
 # Satellite Imagery & Street View Enrichment Runbook

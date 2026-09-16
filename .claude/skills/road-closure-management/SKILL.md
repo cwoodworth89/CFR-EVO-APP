@@ -1,6 +1,7 @@
 ---
 name: road-closure-management
 description: API ingestion procedures for tracking road closures, construction zones, and railway crossing blockages in CFR EVO. The route-corridor collision check (closure_warnings) is a specification, not built.
+when_to_use: A road closure, construction zone or railway crossing needs ingesting, checking or rendering.
 ---
 
 # Road Closure & Traffic Impediment Management Runbook

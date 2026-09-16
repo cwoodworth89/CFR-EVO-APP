@@ -1,6 +1,7 @@
 ---
 name: kiosk-responsive-ergonomics
 description: Layout and typography conventions for the CFR EVO station display and workstation console. Read before changing display sizing, viewport behaviour, or adding a display mode.
+when_to_use: Display sizing, typography, viewport behaviour or a display mode is being changed on the kiosk or the console.
 ---
 
 # Station Display & Workstation Ergonomics

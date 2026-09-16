@@ -1,6 +1,7 @@
 ---
 name: gis-pipeline-sync
 description: Procedures for updating Coquitlam ESRI shapefiles, syncing NFPA 291 fire hydrants into public.hydrants, packaging MBTiles archives, and verifying 1..134 emergency zone spatial boundaries.
+when_to_use: City GIS data is being refreshed or imported, hydrants synced, or a response zone looks wrong.
 ---
 
 # GIS Pipeline & Spatial Sync

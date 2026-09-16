@@ -1,6 +1,7 @@
 ---
 name: stt-mlops-backtest
 description: Procedures for building the Whisper fine-tuning dataset from verified dispatches, training and scoring a model on held-out calls, backtesting it against the stored production transcripts, deploying it, and running the parser regression suites.
+when_to_use: A Whisper model is being trained, scored or deployed, or a parser change needs backtesting against stored transcripts.
 ---
 
 # STT MLOps: Training, Scoring, Backtesting, Deploying

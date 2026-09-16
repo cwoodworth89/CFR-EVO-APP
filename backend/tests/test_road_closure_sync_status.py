@@ -341,11 +341,37 @@ class FeedGapTests(unittest.TestCase):
             with self.subTest(roads=roads):
                 self.db.query(RoadClosureModel).delete()
                 self.db.commit()
-                with self.assertLogs(svc.logger, level="ERROR") as logs:
+                with self.assertLogs(svc.logger, level="WARNING") as logs:
                     self._sync([_event(roads=roads)])
                 (row,) = self._rows()
                 self.assertEqual(self._access(row)[:3], (None, None, None))
-                self.assertTrue(any("DBC-1" in m and "no severity" in m for m in logs.output))
+                self.assertIn(
+                    "WARNING:" + svc.logger.name + ":1 of 1 records stored with no stated "
+                    "severity (Municipal 511: 0, DriveBC Open511: 1)", logs.output)
+
+    def test_severity_is_one_summary_line_per_sync_not_one_per_record(self):
+        # #91: ~70 per-record ERROR lines a sync buried the id-less skip lines.
+        drivebc = [_event(id="gap", road_name="A St"),
+                   _event(id="info", road_name="B St", roads=[_road("ALL_LANES_OPEN", "BOTH")]),
+                   _event(id="closed", road_name="C St", roads=[_road("CLOSED", "BOTH")]),
+                   _event(id=_ABSENT, road_name="Skipped St")]
+        muni = [_muni_issue(issue_id=1, rct=0), _muni_issue(issue_id=2, rct=32),
+                _muni_issue(issue_id=3, rct=262144)]
+        with self.assertLogs(svc.logger, level="DEBUG") as logs:
+            self._sync(drivebc, muni_issues=muni, muni_paths=[_PATH, _PATH2, _PATH3])
+        summaries = [m for m in logs.output if "no stated severity" in m]
+        self.assertEqual(summaries, [
+            "WARNING:" + svc.logger.name + ":3 of 6 records stored with no stated severity "
+            "(Municipal 511: 2, DriveBC Open511: 1)"])
+        errors = [m for m in logs.output if m.startswith("ERROR:")]
+        # The only ERROR left is the id-less skip, per record.
+        self.assertEqual(len(errors), 1)
+        self.assertIn("no id in the feed", errors[0])
+
+    def test_no_summary_line_when_every_severity_is_stated(self):
+        with self.assertLogs(svc.logger, level="DEBUG") as logs:
+            self._sync([_event(roads=[_road("CLOSED", "BOTH")])])
+        self.assertFalse(any("no stated severity" in m for m in logs.output))
 
     def test_state_outside_the_spec_is_null_and_named_in_one_error(self):
         with self.assertLogs(svc.logger, level="ERROR") as logs:
@@ -468,6 +494,7 @@ def _road(state, direction):
 
 _PATH = [(49.28, -122.80), (49.281, -122.801)]
 _PATH2 = [(49.29, -122.81), (49.291, -122.811)]
+_PATH3 = [(49.27, -122.79), (49.271, -122.791)]
 
 
 def _muni_issue(issue_id, rct, location="Como Lake Ave", headline="Paving", base="Lane closed."):

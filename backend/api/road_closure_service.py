@@ -585,19 +585,21 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
         return 0
 
     active_closure_ids = set()
+    # Records stored with no stated severity, per feed, for one summary line per sync.
+    no_severity = {"Municipal 511": 0, "DriveBC Open511": 0}
 
     for item in raw_notices:
         cid = item["closure_id"]
         active_closure_ids.add(cid)
 
-        # A stated ALL_LANES_OPEN is information, not a gap, so it is not logged as one.
+        # Stored as null, never defaulted (#91). Counted, not logged per record: one line
+        # per sync, below. A stated ALL_LANES_OPEN is information, not a gap.
         if ((item["closure_type"] is None or item["emergency_access"] is None)
                 and item.get("road_state") != "ALL_LANES_OPEN"):
-            logger.error(
-                f"Road closure {cid} from {item['source']}: the feed stated no severity "
-                f"({item.get('raw_severity')!r}); stored with closure_type and "
-                f"emergency_access null, not defaulted (punch list #91)."
-            )
+            # DriveBC rows carry source "DriveBC Open511"; Municipal 511 rows carry the
+            # issuing organisation ("City of Coquitlam", "BC MOTI Gateway").
+            feed = "DriveBC Open511" if item["source"] == "DriveBC Open511" else "Municipal 511"
+            no_severity[feed] += 1
 
         # Check for expired
         end_time = item["end_time"]
@@ -649,6 +651,17 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
                 active=is_active
             )
             db.add(new_record)
+
+    # One line per sync, not one per record (operator 2026-09-16, #91). WARNING: on these
+    # feeds an unstated severity is expected, not a defect. The per-record ERROR lines an
+    # admin needs -- a record skipped for having no id -- are logged above and stay per record.
+    stored_without = sum(no_severity.values())
+    if stored_without:
+        logger.warning(
+            f"{stored_without} of {len(raw_notices)} records stored with no stated severity "
+            f"(Municipal 511: {no_severity['Municipal 511']}, "
+            f"DriveBC Open511: {no_severity['DriveBC Open511']})"
+        )
 
     # Early completion deactivation: If a closure is missing from a successful scrape (where raw_notices > 0)
     # and its start_time is in the past, mark active = False (assuming construction completed early).

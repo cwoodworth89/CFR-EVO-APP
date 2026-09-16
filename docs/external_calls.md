@@ -1,31 +1,67 @@
 # External Call Register
 
-**CLAUDE.md §1 requires total offline survival: STT, geocoding, routing, spatial queries,
-tile serving and WebSocket dispatch must all work with no internet.**
-
 This file is the register of every code path that reaches outside the LAN, why it is there,
-and what a crew sees when the link is down.
+and what it costs when the link is down.
+
+**It is in two parts, because two different things were being counted as one.** A Geofabrik
+download that produces a file on disk is not the same kind of risk as a call on the dispatch
+path, and reading them off one undifferentiated list made the second look as ordinary as the
+first.
 
 > [!IMPORTANT]
-> **Operator ruling 2026-08-31: no new external call without explicit permission.**
-> If a change adds a network call to any host that is not `localhost`, the kiosk's own
-> Tailscale address, or a container on the compose network, stop and ask. If one is found,
-> add a row here rather than fixing it silently — the register is the point.
+> **The test — who makes the call?**
+>
+> 1. **A process in the running kiosk** (a container in the compose stack, or the browser on
+>    the display) → **Part A, the production surface.** CLAUDE.md §1 governs it, and the row
+>    must say what a crew sees when the link drops.
+> 2. **A person at a desk**, running a script or a command to produce an artifact → **Part B,
+>    the bench.** §1 does not govern it. The row must say what artifact it produced and
+>    whether it can be fetched again.
+>
+> The test sorts on **who**, not on where: a script run by hand *on the kiosk* is still the
+> bench, because nothing in service waits on it.
+>
+> **Anything that cannot be sorted by that test goes to the operator, not into a column.**
+> Operator ruling 2026-09-16.
 
-**The kiosk has WAN today.** Every call below currently succeeds, which is exactly why they
-went unnoticed. Their cost is paid only during an outage — the one time the system matters
-most. Nothing here fails in normal testing.
+Two rules that apply to **both** parts:
+
+* **Operator ruling 2026-08-31: no new external call without explicit permission.** If a
+  change adds a network call to any host that is not `localhost`, the kiosk's own Tailscale
+  address, or a container on the compose network, stop and ask. If one is found, add a row
+  here rather than fixing it silently — the register is the point.
+* **Licensing is a separate axis and is not folded into this split.** A bench call can create
+  a rights problem exactly as a production one can — punch-list #47b and #82 are both bench
+  rows with live rights questions. **Moving a row into Part B does not downgrade its
+  licensing risk, and never has.** Rights live in
+  [`standards/data_sources.md`](standards/data_sources.md) and the punch list.
+
+**The kiosk has WAN today.** Every Part A call below currently succeeds, which is exactly why
+they went unnoticed. Their cost is paid only during an outage — the one time the system
+matters most. Nothing here fails in normal testing.
 
 Audit command (re-run after any dependency or component change):
 
 ```bash
-grep -rnoE "https?://[A-Za-z0-9._-]+" backend/ services/ frontend/src/ \
-  | grep -vE '\.venv|node_modules|__pycache__|localhost|127\.0\.0\.1|100\.95|w3\.org'
+grep -rnoE "https?://[A-Za-z0-9._-]+" backend/ services/ frontend/src/ tools/ | grep -vE '\.venv|node_modules|__pycache__|localhost|127\.0\.0\.1|100\.95|w3\.org'
 ```
+
+`tools/` was added to that command on 2026-09-16: the bench scripts living there were being
+registered by hand, so the audit could not have found an unregistered one.
 
 ---
 
-## 1. Removed
+## Part A — The production surface
+
+**What the kiosk reaches for while it is in service.** CLAUDE.md §1's offline survival
+requirement governs this part in full: nothing a crew needs to get to an address or read
+critical information may depend on a link. Every row says what a crew sees when it drops.
+
+"Does a crew wait on it?" is **not** the boundary — it is the severity ranking inside this
+part. The road closure sync is the proof: nobody waits on it, and it is still production,
+because the kiosk makes the call and the map draws its result.
+
+### 1. Removed from the production surface
 
 | Host | Where | Resolution |
 |:--|:--|:--|
@@ -38,9 +74,9 @@ the parameter is passed straight to `huggingface_hub.snapshot_download`.
 
 ---
 
-## 2. Live, unattended, on the dispatch path
+### 2. Live, unattended, on the dispatch path
 
-### 2.1 Road closure sync — `open511.gov.bc.ca`, `bc.municipal511.ca`
+#### 2.1 Road closure sync — `open511.gov.bc.ca`, `bc.municipal511.ca`
 
 * `backend/api/road_closure_service.py:89,184,194`
 * Started as a daemon thread at `backend/api/server.py:129` → `run_periodic_road_closure_sync()`
@@ -50,15 +86,31 @@ Nobody triggers it and nothing surfaces its failure. It is wrapped in `try/excep
 and continues, so an outage degrades silently: road closures simply stop updating, and the
 map keeps drawing the last known set with no staleness indicator.
 
-**Open question for the operator:** is a stale-but-present closure list better or worse than a
-visibly empty one? This is §6.1 territory — right now the kiosk cannot tell a crew that what
-it is showing is two weeks old. Not actioned.
+**Operator ruling 2026-09-16: this stays in Part A.** Nobody waits on it, and closures are a
+bonus rather than something a crew needs in order to reach an address — but the kiosk makes
+the call and the map draws its result, so §1 governs it. The candidate boundary "does a crew
+ever wait on it?" sorted this row onto the bench, which is why the register sorts on *who
+makes the call* instead.
+
+**Open, and accepted as needing a fix:** the kiosk cannot tell a crew that what it is showing
+is two weeks old. The operator's direction on 2026-09-16 was a staleness indicator or a
+warning banner in the closure sidebar; the element is not chosen yet.
+
+**Measured 2026-09-16, before anything is built on it (§7.6):** nothing records the last
+*successful contact* with the source. `check_and_sync_if_stale`
+(`backend/api/road_closure_service.py:369`) reads `max(RoadClosureModel.updated_at)`, and
+`updated_at` is stamped on every row a sync touches (`:308`), so it tracks contact only while
+at least one closure comes back. A sync that succeeds and returns **zero** closures leaves
+that timestamp untouched, so "no closures in the City" and "we never got through" look
+identical — the same §6.1 ambiguity the indicator is meant to remove, one level down. A
+truthful indicator needs the sync to record its own last-success time and
+`GET /api/road-closures` to return it; today it returns the list alone.
 
 ---
 
-## 3. Was live, crew-visible, offline-breaking
+### 3. Was live, crew-visible, offline-breaking
 
-### 3.1 Leaflet marker icons — ✅ RESOLVED 2026-08-31
+#### 3.1 Leaflet marker icons — ✅ RESOLVED 2026-08-31
 
 | File | Line | Asset |
 |:--|:--|:--|
@@ -91,9 +143,9 @@ as inline data URIs.
 
 ---
 
-## 4. Live, by design, degrades visibly
+### 4. Live, by design, degrades visibly
 
-### 4.1 Google Street View & Maps — `maps.googleapis.com`, `www.google.com`
+#### 4.1 Google Street View & Maps — `maps.googleapis.com`, `www.google.com`
 
 | File | Line | Use |
 |:--|:--|:--|
@@ -112,10 +164,16 @@ this pattern.
 
 ---
 
-## 5. Operator-run maintenance scripts
+## Part B — The bench
 
-Deliberately online, run by hand on a networked machine, never on the dispatch path. Correct
-as they are.
+**What a person at a desk reaches for to produce an artifact.** None of it is on the
+dispatch path; all of it ships its output to the kiosk's disk, and all of it can be repeated
+by hand. CLAUDE.md §1 does not govern this part — the 2026-08-31 permission ruling and the
+licensing axis above do.
+
+### 5. Maintenance scripts and one-off pulls
+
+Deliberately online, run by hand, never on the dispatch path. Correct as they are.
 
 | Script | Hosts |
 |:--|:--|
@@ -131,9 +189,28 @@ as they are.
 | The OSM extract itself (by hand on the kiosk, 2026-09-09, operator ruling "fill the scroll area with our vector maps") | `download.geofabrik.de` for `british-columbia-latest.osm.pbf` (about 600 MB, MD5 checked against Geofabrik's published sum), clipped on the kiosk with osmium-tool in a container (`stefda/osmium-tool`, pulled from Docker Hub) to `backend/data/osrm/coquitlam_region.osm.pbf`, the box `-123.31,48.99,-122.45,49.52` that covers the workstation's scroll limits (`OPERATIONAL_BOUNDS`) with a margin. The previous file was a BBBike city extract whose service takes a web form and an email, which cannot be scripted. One deliberate event, shared with the routing stream (both briefs). `vancouver.osm.pbf`, the extract this replaced, stays on disk because BBBike's service takes a web form and an email and cannot be re-fetched by script; no prebuilt rollback graph is kept, and `apparatus.osrm.*` and `vancouver.osrm.*` were deleted from the kiosk on 2026-09-15 (operator ruling, `dd70dcc9`). |
 | `backend/scripts/build_vector_basemap.sh` (the Planetiler vector-tile build; run by hand on the kiosk) | `ghcr.io` for the image, then with `--download`: `osmdata.openstreetmap.de` (water polygons, 929 MB), `naturalearthdata.com` (434 MB), `github.com` (lake centrelines, 81 MB, and the Noto Sans glyph release, 62 MB). **Once**: the sources are kept in `backend/data/planetiler_sources/` on the kiosk and every rebuild reads them from disk; the OSM extract itself is the one routing already holds. Never on the dispatch path; the kiosk serves the finished archive offline like every other layer. Licences in `standards/basemap/README.md`. |
 
+#### Can it be fetched again?
+
+The bench's failure mode is not an outage — it is a source that will not hand the artifact
+over a second time. Everything above can be re-run as it stands except where noted:
+
+| | |
+|:--|:--|
+| `vancouver.osm.pbf` | **No, not by script.** BBBike's extract service takes a web form and an email. It is kept on the kiosk for that reason: it is the seed for any pre-penalty OSRM rebuild, and nothing can re-fetch it unattended. |
+| The City's `Imagery_2025` tile cache | Available, but **availability is not the constraint** — the rights question is punch-list #47b, unresolved. Do not treat "we can crawl it again" as permission to. |
+| `geocode.arcgis.com` (Esri World Geocoder) | Reachable, **terms never read** (punch-list #82). Results were kept in scratch files and never entered the system. Not to be re-run without the operator. |
+| Planetiler's sources (water polygons, Natural Earth, lake centrelines, glyphs) | Yes, about 1.5 GB. Kept in `backend/data/planetiler_sources/` on the kiosk so a rebuild needs no link at all. |
+| The City's ArcGIS layers | Yes. The staged copies are dated snapshots; which copy we hold and when it was taken is [`standards/data_sources.md`](standards/data_sources.md), not this file. |
+
+
 ---
 
-## 6. Verified local — not external despite matching a naive grep
+## Neither part — not a call at all
+
+Recorded here because an audit turns them up and someone has to decide the same thing twice
+otherwise.
+
+### 6. Verified local — not external despite matching a naive grep
 
 Checked so the next audit does not re-open them:
 
@@ -145,10 +222,11 @@ Checked so the next audit does not re-open them:
 | `backend/cfr_dispatch/health_watchdog.py:40` | configurable target — **and the module is never invoked in production** |
 | `frontend/src/components/DriverStationSetup.jsx` | `ntfy.sh` appears in a historical comment only; the server is local (punch-list #60) |
 | `backend/dispatch.log.2026-06-*` | `supabase.co` URLs are in **rotated historical logs**, not code. Supabase is gone. |
+| `tools/build_basemap_style.py:191` | `http://tiles/...` and `http://app/...` are **not fetched**. `tiles` is the compose service; both strings only fill the style's placeholders so a copy can be handed to the MapLibre style validator, which is then deleted. Turned up by the `tools/` pass added 2026-09-16. |
 
 ---
 
-## 7. Orphaned credential
+### 7. Orphaned credential
 
 `backend/.env:13` sets `GOOGLE_APPLICATION_CREDENTIALS=backend/cfr-dispatch-mapping-69537f853073.json`
 — a Google Cloud **service-account key including a live `private_key`**, for project

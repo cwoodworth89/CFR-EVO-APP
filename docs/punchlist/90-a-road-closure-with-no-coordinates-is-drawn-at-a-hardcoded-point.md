@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | BUILT — backend `e3009d6a`, frontend `2978da7e` + `73cd4e97`; **not deployed, card not seen rendered.** Latent: falsifier run on the kiosk, 177 rows, 0 null, 0 malformed |
+| **Status** | DEPLOYED — `e3009d6a` and `2978da7e` confirmed on the kiosk 2026-09-16 (HEAD `fdfb103e`, built 15:18Z); the placement follow-up `73cd4e97` is **not yet deployed**. Card not seen rendered. Latent: 177 rows, 0 null, 0 malformed |
 | **Severity** | 🔴 crew-visible — a closure marker where there is no closure looks like every other closure marker |
 | **Area** | ⚙️ API · 🗺️ Map |
 | **Origin** | Found by `gis-spatial-engineer` while building #89, out of its scope; verified by lead against the working tree the same day |
@@ -48,3 +48,4 @@ feed record makes it live.
 | 2026-09-16 | **Frontend built, `2978da7e`**, `RightSidebar.jsx` only. `closureMapPoint` (`:21`) picks the tap target in the marker's order — own coordinates, else the polyline's first point, else `null` — and is stricter than the marker: both numbers must parse finite, so NaN is rejected too. The click handler (`:268`) returns on `null`; the card shows `⚠️ NO MAP LOCATION IN FEED RECORD` (`:329`) and loses its hover and pointer styling so it no longer looks tappable. No tooltip, no placeholder coordinate. Verified: `lint:crash` and `build` clean; the helper run against seven record shapes, three return a point and four return `null`. **Not seen rendered** — no null-coordinate closure exists on the kiosk and none was fabricated (§6.5) |
 | 2026-09-16 | **Operator ruling on the card:** "show an error under location for now, and still display." The warning line moves to sit directly under the card's location/street line, and the card stays a readable closure card, not a disabled-looking one. Sent to `frontend-kiosk-architect` as a follow-up on `2978da7e` |
 | 2026-09-16 | **Follow-up built, `73cd4e97`**, `RightSidebar.jsx` only. The line sits directly under the street-and-source row (`:297`). Card top to bottom: street in its access colour with the source; the amber error line; headline and access pill; date range and ACTIVE/FUTURE pill — same background, border and hall group as any closure, nothing dimmed. Tap guard kept (`:268`). Hover and pointer kept off for these cards (`:277`): neither ever shows on the touch TV, and with a mouse a pointer over a card that does nothing would promise an action; one line to reverse if the operator reads it as disabled. `lint:crash` and `build` clean; not seen rendered (§6.5) |
+| 2026-09-16 | Lead read the kiosk over SSH: HEAD `fdfb103e`, bundle and api image built 15:18Z, so `e3009d6a` and `2978da7e` are live; `73cd4e97` is not. Recorded as confirmed, not reported |

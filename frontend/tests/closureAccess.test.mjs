@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   accessKey, accessStyle, passesAccessFilter, closureKey, sameClosure, ACCESS_UNKNOWN,
-  closureText, NO_TEXT,
+  closureText, NO_TEXT, closureFeedCounts,
 } from '../src/utils/closureAccess.js';
 
 const ALL_OFF = { filterNoAccess: false, filterAccessOnly: false, filterCaution: false };
@@ -56,4 +56,17 @@ test('text the feed did not send renders as --, never a made-up string (#91)', (
   for (const v of [null, undefined, '', '   ', '\n\t']) assert.equal(closureText(v), '--');
   assert.equal(closureText('LOUGHEED HWY'), 'LOUGHEED HWY');
   assert.equal(closureText('  Lane closed  '), 'Lane closed');
+});
+
+test('feed counts match what the kiosk renders, and no list is null not zero', () => {
+  assert.equal(closureFeedCounts(null), null);
+  assert.equal(closureFeedCounts(undefined), null);
+  assert.deepEqual(closureFeedCounts([]), { total: 0, na: 0, noStreet: 0, noHeadline: 0 });
+  const served = [
+    { emergencyAccess: 'NO_ACCESS', street: 'A ST', headline: 'Closed' },
+    { emergencyAccess: null, street: 'B ST', headline: 'B ST' },
+    { emergencyAccess: null, street: null, headline: null },
+    { emergencyAccess: 'CAUTION', street: '  ', headline: 'Works' },
+  ];
+  assert.deepEqual(closureFeedCounts(served), { total: 4, na: 2, noStreet: 2, noHeadline: 1 });
 });

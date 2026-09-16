@@ -102,3 +102,21 @@ export function closureText(value) {
   const text = String(value).trim();
   return text === '' ? NO_TEXT : text;
 }
+
+/**
+ * Counts over the closures the API served, for the admin metrics panel's feed row (operator
+ * 2026-09-16: "monitor for now and possibly we can create rules around patterns"). Every
+ * number is a count of what was served, using the same tests the kiosk renders with, so a
+ * count here always matches what the sidebar shows: `na` is what renders N/A, `noStreet` and
+ * `noHeadline` are what render "--". Null when there is no list, never zeros.
+ */
+export function closureFeedCounts(closures) {
+  if (!Array.isArray(closures)) return null;
+  let na = 0, noStreet = 0, noHeadline = 0;
+  for (const c of closures) {
+    if (accessKey(c) === ACCESS_UNKNOWN) na += 1;
+    if (closureText(c?.street) === NO_TEXT) noStreet += 1;
+    if (closureText(c?.headline) === NO_TEXT) noHeadline += 1;
+  }
+  return { total: closures.length, na, noStreet, noHeadline };
+}

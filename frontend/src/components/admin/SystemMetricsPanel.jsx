@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { API_BASE_URL } from "../../apiClient";
+import { API_BASE_URL, apiClient } from "../../apiClient";
+import { closureFeedCounts } from "../../utils/closureAccess";
+
+/** One read of GET /api/road-closures for the feed row. Module scope, so the panel's effect
+ *  depends on nothing but state setters. On failure both setters record "unknown": the row
+ *  shows "--", not the previous figures as if they were current. */
+async function fetchClosureFeed(setClosureFeed, setClosureFeedOk) {
+  try {
+    const payload = await apiClient.roadClosures.fetchAll();
+    // An api container older than 2026-09-16 sent the bare array and no sync status.
+    const closures = Array.isArray(payload) ? payload : payload?.closures;
+    const sync = Array.isArray(payload) ? null : (payload?.sync ?? null);
+    setClosureFeed({ closures: Array.isArray(closures) ? closures : null, sync });
+    setClosureFeedOk(true);
+  } catch (err) {
+    setClosureFeed(null);
+    setClosureFeedOk(false);
+    console.warn("Could not fetch road closure feed:", err);
+  }
+}
 
 export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }) {
   const [metricsSummary, setMetricsSummary] = useState(null);
@@ -8,6 +27,11 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
   // A value the system did not measure renders as "--", never as a plausible number (CLAUDE.md 6.1).
   const fmt = (v, unit = "") => (v == null ? "--" : `${v}${unit}`);
   const [selectedCall, setSelectedCall] = useState(null);
+  // Road closure feed row. { closures, sync } from GET /api/road-closures, null until the
+  // first answer, and null again when a fetch fails -- a failed read shows "--", not the
+  // previous numbers as if they were current.
+  const [closureFeed, setClosureFeed] = useState(null);
+  const [closureFeedOk, setClosureFeedOk] = useState(null);
 
   useEffect(() => {
     fetchMetrics();
@@ -28,6 +52,11 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
   }, [dispatches]);
 
   const fetchMetrics = async () => {
+    // Fetched on this panel's own 10 s tick, not a second poll loop. useRoadClosures holds the
+    // same data but lives in MapBoard and polls every 5 min; reaching it here would mean
+    // threading props through MapBoard and DispatchReview, and a watch panel five minutes
+    // behind a forced sync is the wrong tool. The API caches the response for 60 s.
+    fetchClosureFeed(setClosureFeed, setClosureFeedOk);
     try {
       const res = await fetch(`${API_BASE_URL}/api/metrics/summary`);
       setApiOk(res.ok);
@@ -42,6 +71,19 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
       setLoading(false);
     }
   };
+
+  const feedSync = closureFeed?.sync ?? null;
+  const feedCounts = closureFeedCounts(closureFeed?.closures);
+  const feedSources = feedSync?.sources && typeof feedSync.sources === "object"
+    ? Object.entries(feedSync.sources) : [];
+  const feedSkipped = feedSync?.skipped ?? null;
+  const feedAttemptAt = (() => {
+    if (!feedSync?.lastAttemptAt) return null;
+    const at = new Date(feedSync.lastAttemptAt);
+    return Number.isNaN(at.getTime()) ? null
+      : at.toLocaleString("en-CA", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+  })();
+  const outcomeColor = { SUCCEEDED: "#4ade80", FAILED: "#f43f5e", NOT_ATTEMPTED: "#94a3b8" }[feedSync?.outcome] || "#94a3b8";
 
   const latestEval = evaluations && evaluations.length > 0
     // The most recent run that measured STT; parser and geocoder runs carry no WER (2026-09-05).
@@ -257,6 +299,89 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Road Closure Feed -- operator ruling 2026-09-16: watch the feed on the console, to
+          spot patterns worth a rule later. Console only; nothing here reaches the hall display
+          or the #89 banner. Every figure is read from GET /api/road-closures as served. */}
+      <div style={{ background: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "16px", padding: "20px", marginTop: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+          <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "700", color: "#f8fafc" }}>
+            🚧 Road Closure Feed
+          </h3>
+          {closureFeedOk === false && (
+            <span style={{ fontSize: "0.85rem", color: "#f43f5e", fontWeight: "600" }}>
+              Could not read GET /api/road-closures. Figures below are unknown.
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px" }}>
+          {/* Last sync attempt */}
+          <div style={{ background: "rgba(2, 6, 23, 0.6)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: "600" }}>LAST SYNC ATTEMPT</div>
+            <div style={{ fontSize: "1.25rem", fontWeight: "800", color: outcomeColor, marginTop: "4px" }}>
+              {fmt(feedSync?.outcome)}
+            </div>
+            <div style={{ fontSize: "0.85rem", color: "#cbd5e1", marginTop: "4px" }}>
+              At {fmt(feedAttemptAt)}
+            </div>
+            {feedSync?.error && (
+              <div style={{ fontSize: "0.85rem", color: "#fda4af", marginTop: "6px", wordBreak: "break-word" }}>
+                {feedSync.error}
+              </div>
+            )}
+          </div>
+
+          {/* Per source: reached, and records skipped for no feed id */}
+          <div style={{ background: "rgba(2, 6, 23, 0.6)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: "600" }}>SOURCES · SKIPPED, NO FEED ID</div>
+            {feedSources.length === 0 ? (
+              <div style={{ fontSize: "0.85rem", color: "#cbd5e1", marginTop: "6px" }}>--</div>
+            ) : feedSources.map(([name, r]) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.85rem" }}>
+                <span style={{ color: "#e2e8f0" }}>{name}</span>
+                <span style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <strong style={{ color: r?.reached === true ? "#4ade80" : r?.reached === false ? "#f43f5e" : "#94a3b8" }}>
+                    {r?.reached === true ? "Reached" : r?.reached === false ? "Not reached" : "--"}
+                  </strong>
+                  <span style={{ color: "#cbd5e1", fontFamily: "monospace" }}>
+                    skipped {feedSkipped ? fmt(feedSkipped.bySource?.[name]) : "--"}
+                  </span>
+                </span>
+              </div>
+            ))}
+            <div style={{ fontSize: "0.85rem", color: "#cbd5e1", marginTop: "6px" }}>
+              Skipped total: <strong style={{ color: feedSkipped?.count > 0 ? "#fbbf24" : "#e2e8f0" }}>{feedSkipped ? fmt(feedSkipped.count) : "--"}</strong>
+            </div>
+            {feedSkipped?.count > 0 && (
+              <div style={{ fontSize: "0.8rem", color: "#fbbf24", marginTop: "4px" }}>
+                Raw records in <code>journalctl -u</code> / <code>docker logs cfr_api</code>, ERROR.
+              </div>
+            )}
+          </div>
+
+          {/* Pattern counts over the served list */}
+          <div style={{ background: "rgba(2, 6, 23, 0.6)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: "600" }}>SERVED LIST</div>
+            <div style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>
+              {[
+                ["Closures served", feedCounts?.total],
+                ["Access N/A (no severity from feed)", feedCounts?.na],
+                ["No street name", feedCounts?.noStreet],
+                ["No headline", feedCounts?.noHeadline],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                  <span>{label}</span>
+                  <strong style={{ color: "#e2e8f0", fontFamily: "monospace" }}>
+                    {fmt(value)}{value != null && feedCounts?.total > 0 && label !== "Closures served"
+                      ? ` (${Math.round((value / feedCounts.total) * 100)}%)` : ""}
+                  </strong>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

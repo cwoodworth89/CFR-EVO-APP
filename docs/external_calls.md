@@ -107,12 +107,13 @@ indicator would have been built on: `check_and_sync_if_stale`
 at least one closure comes back. A sync that succeeds and returns **zero** closures leaves
 that timestamp untouched — so age alone cannot tell the two cases apart.
 
-**Not built yet.** What it needs: the sync's outcome recorded in Postgres with three states
-(not attempted / succeeded / failed) rather than the current two — `check_and_sync_if_stale`
-returns `False` both for "no sync was needed" and for "the sync failed" (`:398`), so today the
-caller cannot tell them apart — then `GET /api/road-closures` returning it, then the flag: **a banner in the closure
-sidebar, shown only while the last attempt failed** (operator, 2026-09-16). Tracked as
-punch-list #89.
+**Backend built 2026-09-16 (`ad339fec`), not yet deployed.** The sync records its outcome in
+`public.road_closure_sync_status` — one row, three states — and `GET /api/road-closures`
+returns it beside the list. The measurement above turned out to be only half of it: neither
+feed's failure raises, each `urlopen` is caught and logged, so an outage looks byte-for-byte
+like a quiet day and reachability had to be recorded per feed rather than inferred. The flag
+is **a banner in the closure sidebar, shown only while the last attempt failed** (operator,
+2026-09-16); the frontend half is in progress and both deploy together. Punch-list #89.
 
 **Measured 2026-09-16, before anything is built on it (§7.6):** nothing records the last
 *successful contact* with the source. `check_and_sync_if_stale`

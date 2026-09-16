@@ -15,15 +15,16 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**16 open** (12 crew-visible) · **83 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**17 open** (13 crew-visible) · **83 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 16
+## Open — 17
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
-| **89** | 🔴 crew-visible | OPEN — design ruled 2026-09-16, not built; no owner yet | [A failed road closure sync leaves the last list on screen, with no warning](punchlist/89-a-failed-road-closure-sync-leaves-the-last-list-on-screen-with-no-warning.md) |
+| **90** | 🔴 crew-visible | OPEN — found 2026-09-16, not built; no owner yet | [A road closure with no coordinates is drawn at a hardcoded point near Coquitlam Centre](punchlist/90-a-road-closure-with-no-coordinates-is-drawn-at-a-hardcoded-point.md) |
+| **89** | 🔴 crew-visible | BACKEND BUILT `ad339fec` (gis-spatial-engineer), frontend half with frontend-kiosk-architect; **api not rebuilt — both halves deploy together** | [A failed road closure sync leaves the last list on screen, with no warning](punchlist/89-a-failed-road-closure-sync-leaves-the-last-list-on-screen-with-no-warning.md) |
 | **88** | 🔴 crew-visible | BUILT `bdcea8bc`, live 2026-09-15 (`cfr-agent` 16:52, `cfr_api` restarted); no live call has raised it yet | [A destination far from any road reaches the crew as an ordinary ETA: the snap distance is never read](punchlist/88-a-destination-far-from-any-road-reaches-the-crew-as-an-ordinary-eta.md) |
 | **85** | 🔴 crew-visible | OPEN — found 2026-09-13, not built; no call has hit it | [A lot with no road of its street's name pins at the lot's centre, with no notice](punchlist/85-a-lot-with-no-road-of-its-streets-name-pins-at-the-lot-centre-with-no-notice.md) |
 | **84** | 🔴 crew-visible | OPEN — ruled 2026-09-13: remove; not built | [`KNOWN_BUILDINGS`: eight hand-coded buildings override console pins, three of them wrong](punchlist/84-known-buildings-hand-coded-coordinates-override-console-pins.md) |

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | BUILT 2026-09-15, deployed to the kiosk, awaiting the API container rebuild. Confirmed on the live graph; not yet seen on a live call. |
+| **Status** | LIVE 2026-09-15 (`bdcea8bc`; `cfr-agent` restarted 16:52, `cfr_api` restarted). Confirmed on the live graph; no live call has raised it yet. |
 | **Severity** | 🔴 crew-visible: the route and ETA look normal while ending up to kilometres from the address |
 | **Area** | 🚒 Routing · 🖥️ Kiosk |
 | **Origin** | gis-spatial-engineer, while checking the regional graph against the routing rules, 2026-09-15 |

@@ -96,6 +96,14 @@ class RoadClosureModel(Base):
     # not a tier, and the old default "FULL_CLOSURE" served an unknown as NO_ACCESS.
     closure_type = Column(String, nullable=True)
     emergency_access = Column(String, nullable=True)
+    # DriveBC only (Open511 v1.0, HELD in docs/standards/README.md); NULL for Municipal 511.
+    # road_state: CLOSED / SOME_LANES_CLOSED / SINGLE_LANE_ALTERNATING / ALL_LANES_OPEN, the
+    # passability field emergency_access is derived from. road_direction: N..NE / NONE /
+    # BOTH, so a one-direction closure can be stated. feed_severity: MINOR / MODERATE /
+    # MAJOR / UNKNOWN as the feed sent it -- traffic impact, information only, never a tier.
+    road_state = Column(String(32), nullable=True)
+    road_direction = Column(String(8), nullable=True)
+    feed_severity = Column(String(16), nullable=True)
     headline = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     geometry = Column(SafeJSON, nullable=False)

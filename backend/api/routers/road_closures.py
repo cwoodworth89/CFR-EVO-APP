@@ -115,6 +115,8 @@ def get_road_closures(db: Session = Depends(get_db)):
     ingestion and counted in `sync.skipped`); `rowId` is the database row, for keys and
     selection only; `severity` and `emergencyAccess` are null when the feed stated none;
     `street`, `headline` and `description` are null when the feed sent nothing.
+    DriveBC closures also carry `roadState`, `roadDirection` and `feedSeverity` (Open511 v1.0
+    values or null); emergencyAccess is derived from roadState/roadDirection, never severity.
 
     Shape (changed 2026-09-16, punch list #89 -- this used to be the bare array):
 
@@ -178,7 +180,8 @@ def get_road_closures(db: Session = Depends(get_db)):
             # Unknown severity is served as null in both fields, never defaulted: the
             # old `or "FULL_CLOSURE"` drew an unknown as the most severe tier (punch list
             # #91). The kiosk shows N/A in the access box.
-            if r.closure_type is None or r.emergency_access is None:
+            if ((r.closure_type is None or r.emergency_access is None)
+                    and r.road_state != "ALL_LANES_OPEN"):
                 logging.error(
                     "Road closure %s has no known severity (closure_type=%r, "
                     "emergency_access=%r); served as null, not defaulted.",
@@ -194,6 +197,11 @@ def get_road_closures(db: Session = Depends(get_db)):
                 "street": r.street_name,
                 "severity": r.closure_type,
                 "emergencyAccess": r.emergency_access,
+                # DriveBC only; null for Municipal 511. roadState ALL_LANES_OPEN with a null
+                # emergencyAccess is informational; a null roadState means unknown.
+                "roadState": r.road_state,
+                "roadDirection": r.road_direction,
+                "feedSeverity": r.feed_severity,
                 # No placeholder text: null when the feed sent none (#91); kiosk shows "--".
                 "description": r.description,
                 "coordinates": parsed_coords,

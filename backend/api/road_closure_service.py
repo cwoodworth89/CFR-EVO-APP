@@ -188,21 +188,88 @@ def _feed_id(value):
     return text_value or None
 
 
-def _drivebc_severity(evt):
-    """(closure_type, emergency_access) for a DriveBC event, or (None, None) when unknown.
+# Open511 v1.0 Events specification, documentation/1.0/event.html (github.com/open511/open511API),
+# read 2026-09-16 and HELD in docs/standards/README.md, "Road closure vocabulary".
+OPEN511_ROAD_STATES = ("CLOSED", "SOME_LANES_CLOSED", "SINGLE_LANE_ALTERNATING", "ALL_LANES_OPEN")
+OPEN511_DIRECTIONS = ("N", "NW", "W", "SW", "S", "SE", "E", "NE", "NONE", "BOTH")
+# Open511 v1.0 `severity`. Carried through as the feed's word only; never a tier (#91 ruling 5).
+OPEN511_SEVERITIES = ("MINOR", "MODERATE", "MAJOR", "UNKNOWN")
 
-    Unknown means the feed sent no severity, a blank one, or the literal "UNKNOWN". It used
-    to default to MINOR and so to CAUTION. Present values keep the mapping they already had
-    (MAJOR -> FULL_CLOSURE / NO_ACCESS, anything else -> LANE_RESTRICTION / CAUTION); that
-    mapping predates #91 and is not ruled on here.
+
+def _open511_road_access(state, direction):
+    """(emergency_access, closure_type) for one Open511 road, per the operator 2026-09-16.
+
+    * CLOSED, direction BOTH / NONE / absent -> NO_ACCESS ("Closed -> No access").
+    * CLOSED in one direction -> CAUTION ("Closed per direction -> Caution - Restrictions,
+      and state the road closure direction. We often can go counterflow with the help of
+      flaggers.") The direction is carried separately so the kiosk can state it.
+    * SOME_LANES_CLOSED, SINGLE_LANE_ALTERNATING -> CAUTION ("Some_lanes/alternating").
+    * ALL_LANES_OPEN -> None: informational ("All_lanes_open -> Info"). roadState says
+      so, which is what separates it from a record whose state is unknown.
+    * absent -> None.
     """
-    raw = evt.get('severity')
-    sev = raw.strip().upper() if isinstance(raw, str) else None
-    if not sev or sev == 'UNKNOWN':
-        return None, None
-    if sev == 'MAJOR':
-        return 'FULL_CLOSURE', 'NO_ACCESS'
-    return 'LANE_RESTRICTION', 'CAUTION'
+    if state == "CLOSED":
+        if direction in (None, "BOTH", "NONE"):
+            return "NO_ACCESS", "FULL_CLOSURE"
+        return "CAUTION", "LANE_RESTRICTION"
+    if state in ("SOME_LANES_CLOSED", "SINGLE_LANE_ALTERNATING"):
+        return "CAUTION", "LANE_RESTRICTION"
+    return None, None
+
+
+# Which road wins when an event lists several. Most restrictive first, so a closure on any
+# listed road is never hidden behind an open one; a stated ALL_LANES_OPEN outranks a road
+# whose state is unknown.
+_ACCESS_RANK = {"NO_ACCESS": 3, "CAUTION": 2}
+
+
+def _drivebc_access(evt, closure_id=None):
+    """Access fields for a DriveBC event, read from roads[].state and roads[].direction.
+
+    Returns a dict: emergency_access, closure_type, road_state, road_direction,
+    feed_severity. `severity` is never read as a tier: Open511 defines it as traffic
+    impact, and on 2026-09-16 18 MAJOR events had every lane open and 5 MINOR were CLOSED.
+    """
+    raw_sev = _feed_text(evt.get('severity'))
+    feed_severity = raw_sev.upper() if raw_sev else None
+    if feed_severity and feed_severity not in OPEN511_SEVERITIES:
+        logger.error(f"DriveBC event {closure_id}: severity {raw_sev!r} is not an Open511 "
+                     f"v1.0 value; carried as sent.")
+
+    candidates = []
+    roads = evt.get('roads') if isinstance(evt.get('roads'), list) else []
+    for road in roads:
+        if not isinstance(road, dict):
+            continue
+        raw_state = _feed_text(road.get('state'))
+        state = raw_state.upper() if raw_state else None
+        if state and state not in OPEN511_ROAD_STATES:
+            logger.error(f"DriveBC event {closure_id}: roads[].state {raw_state!r} is not an "
+                         f"Open511 v1.0 value; treated as unknown.")
+            state = None
+        raw_dir = _feed_text(road.get('direction'))
+        direction = raw_dir.upper() if raw_dir else None
+        if direction and direction not in OPEN511_DIRECTIONS:
+            logger.error(f"DriveBC event {closure_id}: roads[].direction {raw_dir!r} is not an "
+                         f"Open511 v1.0 value; treated as absent.")
+            direction = None
+        access, closure_type = _open511_road_access(state, direction)
+        rank = _ACCESS_RANK.get(access, 1 if state == "ALL_LANES_OPEN" else 0)
+        candidates.append((rank, state, direction, access, closure_type))
+
+    if not candidates:
+        return {"emergency_access": None, "closure_type": None, "road_state": None,
+                "road_direction": None, "feed_severity": feed_severity}
+
+    if len({(c[1], c[2]) for c in candidates}) > 1:
+        logger.warning(
+            f"DriveBC event {closure_id}: its roads disagree "
+            f"{[(c[1], c[2]) for c in candidates]}; serving the most restrictive."
+        )
+    # max() keeps the first of equal rank, i.e. the feed's own order.
+    rank, state, direction, access, closure_type = max(candidates, key=lambda c: c[0])
+    return {"emergency_access": access, "closure_type": closure_type, "road_state": state,
+            "road_direction": direction, "feed_severity": feed_severity}
 
 
 def _feed_text(value):
@@ -321,7 +388,6 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
             mid = len(all_pts) // 2
             lat, lng = all_pts[mid][0], all_pts[mid][1]
 
-            closure_type, emergency_access = _drivebc_severity(evt)
 
             start_dt = None
             end_dt = None
@@ -359,14 +425,20 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
             if closure_id is None:
                 _skip_id_less_record("DriveBC Open511", evt, skipped)
                 continue
+            access = _drivebc_access(evt, closure_id)
 
             raw_notices.append({
                 "closure_id": closure_id,
-                "raw_severity": evt.get('severity'),
+                # Parsed values, not the raw roads[]: an out-of-spec state already has its
+                # own ERROR line naming it, and one line per problem is the rule (#91).
+                "raw_severity": f"roads[].state={access['road_state']!r}",
                 "street_name": _feed_text(evt.get('road_name')),
                 "source": "DriveBC Open511",
-                "closure_type": closure_type,
-                "emergency_access": emergency_access,
+                "closure_type": access["closure_type"],
+                "emergency_access": access["emergency_access"],
+                "road_state": access["road_state"],
+                "road_direction": access["road_direction"],
+                "feed_severity": access["feed_severity"],
                 "headline": _feed_text(evt.get('headline')),
                 "description": _feed_text(evt.get('description')),
                 "geometry": geo,
@@ -518,7 +590,9 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
         cid = item["closure_id"]
         active_closure_ids.add(cid)
 
-        if item["closure_type"] is None or item["emergency_access"] is None:
+        # A stated ALL_LANES_OPEN is information, not a gap, so it is not logged as one.
+        if ((item["closure_type"] is None or item["emergency_access"] is None)
+                and item.get("road_state") != "ALL_LANES_OPEN"):
             logger.error(
                 f"Road closure {cid} from {item['source']}: the feed stated no severity "
                 f"({item.get('raw_severity')!r}); stored with closure_type and "
@@ -546,6 +620,9 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
             existing.zone_id = item["zone_id"]
             existing.affected_zones = item["affected_zones"]
             existing.hall_id = item.get("hall_id")
+            existing.road_state = item.get("road_state")
+            existing.road_direction = item.get("road_direction")
+            existing.feed_severity = item.get("feed_severity")
             existing.start_time = item["start_time"]
             existing.end_time = end_time
             existing.active = is_active
@@ -564,6 +641,9 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
                 zone_id=item["zone_id"],
                 affected_zones=item["affected_zones"],
                 hall_id=item.get("hall_id"),
+                road_state=item.get("road_state"),
+                road_direction=item.get("road_direction"),
+                feed_severity=item.get("feed_severity"),
                 start_time=item["start_time"],
                 end_time=end_time,
                 active=is_active

@@ -294,27 +294,96 @@ class FeedGapTests(unittest.TestCase):
     def _rows(self):
         return self.db.query(RoadClosureModel).order_by(RoadClosureModel.id).all()
 
-    # --- ruling 1: unknown severity ------------------------------------------
+    # --- ruling 5: DriveBC access from roads[].state, never severity ----------
 
-    def test_missing_severity_is_stored_null_and_logged_not_minor(self):
-        for sev in (_ABSENT, None, "", "  ", "UNKNOWN", "unknown"):
-            with self.subTest(severity=sev):
+    def _one(self, **event):
+        self.db.query(RoadClosureModel).delete()
+        self.db.commit()
+        self._sync([_event(**event)])
+        (row,) = self._rows()
+        return row
+
+    def _access(self, row):
+        return (row.emergency_access, row.closure_type, row.road_state, row.road_direction)
+
+    def test_measured_major_with_all_lanes_open_is_informational_not_no_access(self):
+        # 2026-09-16: 18 MAJOR events had every lane open.
+        row = self._one(severity="MAJOR", roads=[_road("ALL_LANES_OPEN", "BOTH")])
+        self.assertEqual(self._access(row), (None, None, "ALL_LANES_OPEN", "BOTH"))
+        self.assertEqual(row.feed_severity, "MAJOR")
+
+    def test_measured_minor_closed_both_ways_is_no_access(self):
+        # 2026-09-16: 5 MINOR events were CLOSED.
+        for direction in ("BOTH", "NONE", _ABSENT):
+            with self.subTest(direction=direction):
+                row = self._one(severity="MINOR", roads=[_road("CLOSED", direction)])
+                self.assertEqual(row.emergency_access, "NO_ACCESS")
+                self.assertEqual(row.closure_type, "FULL_CLOSURE")
+                self.assertEqual(row.feed_severity, "MINOR")
+
+    def test_closed_in_one_direction_is_caution_and_carries_the_direction(self):
+        for direction in ("N", "NW", "W", "SW", "S", "SE", "E", "NE", "ne"):
+            with self.subTest(direction=direction):
+                row = self._one(roads=[_road("CLOSED", direction)])
+                self.assertEqual(self._access(row),
+                                 ("CAUTION", "LANE_RESTRICTION", "CLOSED", direction.upper()))
+
+    def test_unused_spec_states_are_caution_not_unknown(self):
+        for state in ("SOME_LANES_CLOSED", "SINGLE_LANE_ALTERNATING"):
+            with self.subTest(state=state):
+                row = self._one(roads=[_road(state, "BOTH")])
+                self.assertEqual(row.emergency_access, "CAUTION")
+                self.assertEqual(row.road_state, state)
+
+    def test_absent_state_is_null_and_logged(self):
+        # Measured: 52 of 306 events carried no state.
+        for roads in (_ABSENT, [], [_road(_ABSENT, "BOTH")]):
+            with self.subTest(roads=roads):
                 self.db.query(RoadClosureModel).delete()
                 self.db.commit()
                 with self.assertLogs(svc.logger, level="ERROR") as logs:
-                    self._sync([_event(severity=sev)])
+                    self._sync([_event(roads=roads)])
                 (row,) = self._rows()
-                self.assertIsNone(row.closure_type)
-                self.assertIsNone(row.emergency_access)
-                self.assertTrue(any("DBC-1" in m and "severity" in m for m in logs.output))
+                self.assertEqual(self._access(row)[:3], (None, None, None))
+                self.assertTrue(any("DBC-1" in m and "no severity" in m for m in logs.output))
 
-    def test_present_severity_keeps_its_existing_mapping(self):
-        self._sync([_event(id="a", severity="MAJOR"), _event(id="b", severity="minor")])
-        rows = {r.closure_id: r for r in self._rows()}
-        self.assertEqual((rows["a"].closure_type, rows["a"].emergency_access),
-                         ("FULL_CLOSURE", "NO_ACCESS"))
-        self.assertEqual((rows["b"].closure_type, rows["b"].emergency_access),
-                         ("LANE_RESTRICTION", "CAUTION"))
+    def test_state_outside_the_spec_is_null_and_named_in_one_error(self):
+        with self.assertLogs(svc.logger, level="ERROR") as logs:
+            row = self._one(roads=[_road("PARTLY_OPEN", "BOTH")])
+        self.assertIsNone(row.emergency_access)
+        self.assertIsNone(row.road_state)
+        self.assertEqual(sum("PARTLY_OPEN" in m for m in logs.output), 1)
+
+    def test_all_lanes_open_is_not_logged_as_a_gap(self):
+        with self.assertLogs(svc.logger, level="INFO") as logs:
+            self._one(roads=[_road("ALL_LANES_OPEN", "BOTH")])
+        self.assertFalse(any("ERROR" in m for m in logs.output))
+
+    def test_severity_is_carried_as_the_feeds_word_and_never_sets_the_tier(self):
+        for sev in ("MINOR", "MODERATE", "MAJOR", "UNKNOWN"):
+            with self.subTest(severity=sev):
+                row = self._one(severity=sev, roads=[_road("SOME_LANES_CLOSED", "BOTH")])
+                self.assertEqual(row.feed_severity, sev)
+                self.assertEqual(row.emergency_access, "CAUTION")
+        row = self._one(severity=_ABSENT, roads=[_road("CLOSED", "BOTH")])
+        self.assertIsNone(row.feed_severity)
+        self.assertEqual(row.emergency_access, "NO_ACCESS")
+
+    def test_several_roads_serve_the_most_restrictive_and_log_the_disagreement(self):
+        with self.assertLogs(svc.logger, level="WARNING") as logs:
+            row = self._one(roads=[_road("ALL_LANES_OPEN", "BOTH"), _road("CLOSED", "E"),
+                                   _road("CLOSED", "BOTH")])
+        self.assertEqual(self._access(row), ("NO_ACCESS", "FULL_CLOSURE", "CLOSED", "BOTH"))
+        self.assertTrue(any("disagree" in m for m in logs.output))
+
+        row = self._one(roads=[_road(_ABSENT, "BOTH"), _road("ALL_LANES_OPEN", "BOTH")])
+        self.assertEqual(row.road_state, "ALL_LANES_OPEN")
+
+    def test_municipal_rows_carry_no_open511_fields(self):
+        self._sync([], muni_issues=[_muni_issue(issue_id=9, rct=262144)], muni_paths=[_PATH])
+        (row,) = self._rows()
+        self.assertEqual((row.road_state, row.road_direction, row.feed_severity),
+                         (None, None, None))
 
     def test_municipal_record_with_no_stated_type_is_null_not_caution(self):
         issue = _muni_issue(issue_id=7, rct=0, headline="Community event", base="Street fair.")
@@ -388,6 +457,13 @@ class FeedGapTests(unittest.TestCase):
         svc.record_sync_outcome(self.db, svc.SYNC_SUCCEEDED,
                                 sources={"DriveBC Open511": {"reached": True}})
         self.assertIsNone(svc.read_sync_status(self.db)["skipped"])
+
+
+def _road(state, direction):
+    """One Open511 roads[] entry with the fields DriveBC supports."""
+    road = {"name": "Lougheed Hwy", "from": "A", "to": "B", "state": state,
+            "direction": direction}
+    return {k: v for k, v in road.items() if v is not _ABSENT}
 
 
 _PATH = [(49.28, -122.80), (49.281, -122.801)]

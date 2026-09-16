@@ -134,6 +134,9 @@ def test_unknown_severity_and_missing_text_are_served_as_null(caplog):
     rec.affected_zones = ["1"]
     rec.start_time = None
     rec.end_time = None
+    rec.road_state = None
+    rec.road_direction = None
+    rec.feed_severity = None
 
     mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rec]
@@ -154,4 +157,45 @@ def test_unknown_severity_and_missing_text_are_served_as_null(caplog):
     assert payload["sync"]["skipped"] is None  # no attempt recorded yet
     assert any("muni_7_0" in r.getMessage() and "severity" in r.getMessage()
                for r in caplog.records if r.levelno == logging.ERROR)
+    invalidate_road_closures_cache()
+
+
+def test_drivebc_open511_fields_are_served(caplog):
+    """#91 ruling 5: roadState, roadDirection and feedSeverity reach the kiosk as stored."""
+    import logging
+
+    invalidate_road_closures_cache()
+    rows = []
+    for i, (state, direction, access, sev) in enumerate([
+        ("CLOSED", "E", "CAUTION", "MINOR"),
+        ("ALL_LANES_OPEN", "BOTH", None, "MAJOR"),
+    ]):
+        rec = MagicMock(spec=RoadClosureModel)
+        rec.id = i
+        rec.closure_id = f"drivebc.ca/DBC-{i}"
+        rec.headline = rec.street_name = rec.description = "x"
+        rec.closure_type = "LANE_RESTRICTION" if access else None
+        rec.emergency_access = access
+        rec.road_state, rec.road_direction, rec.feed_severity = state, direction, sev
+        rec.coordinates = [49.28, -122.80]
+        rec.geometry = {}
+        rec.source = "DriveBC Open511"
+        rec.zone_id = "1"
+        rec.affected_zones = ["1"]
+        rec.start_time = rec.end_time = None
+        rows.append(rec)
+
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = rows
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    with caplog.at_level(logging.ERROR):
+        closed, info = get_road_closures(db=mock_db)["closures"]
+
+    assert (closed["emergencyAccess"], closed["roadState"], closed["roadDirection"],
+            closed["feedSeverity"]) == ("CAUTION", "CLOSED", "E", "MINOR")
+    assert (info["emergencyAccess"], info["roadState"], info["feedSeverity"]) == (
+        None, "ALL_LANES_OPEN", "MAJOR")
+    # Informational, not a gap: no "no known severity" line for it.
+    assert not any("DBC-1" in r.getMessage() for r in caplog.records)
     invalidate_road_closures_cache()

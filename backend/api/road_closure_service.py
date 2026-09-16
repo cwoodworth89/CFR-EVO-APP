@@ -381,9 +381,9 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
             if not is_within_city(db, geo):
                 continue
 
+            # Kept even with no zone within reach (#92): it is inside the buffered city, so
+            # it is Coquitlam's; zone_id null and the kiosk groups it as OTHER.
             affected_zones, primary_zone, hall_id = resolve_zones_and_hall(db, geo)
-            if not affected_zones:
-                continue  # Outside every Coquitlam emergency response zone.
 
             mid = len(all_pts) // 2
             lat, lng = all_pts[mid][0], all_pts[mid][1]
@@ -492,9 +492,8 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
                         if not is_within_city(db, geo):
                             continue
 
+                        # Kept even with no zone within reach (#92); grouped as OTHER.
                         affected_zones, primary_zone, hall_id = resolve_zones_and_hall(db, geo)
-                        if not affected_zones:
-                            continue  # Outside every Coquitlam emergency response zone.
 
                         mid = len(path_pts) // 2
                         lat, lng = path_pts[mid][0], path_pts[mid][1]

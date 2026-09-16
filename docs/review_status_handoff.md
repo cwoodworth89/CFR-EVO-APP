@@ -6,7 +6,7 @@ Supersedes the 2026-08-21 handoff. The earlier one is preserved in git history.
 
 Companion documents:
 * [`docs/debug_and_qa_punchlist.md`](./debug_and_qa_punchlist.md) — index over [`docs/punchlist/`](./punchlist/);
-  **87 items, 6 open (3 crew-visible), 81 closed** as of 2026-09-09. The live work queue
+  **98 items, 15 open (11 crew-visible), 83 closed** as of 2026-09-15. The live work queue
 * [`docs/arrival_point_handoff.md`](./arrival_point_handoff.md) — **GIS/geocoder workstream: parcel
   arrival points, the roads import fix, and the ~1,400-site review queue. Start there for that work.**
 * [`docs/parser_audit_handoff.md`](./parser_audit_handoff.md) — **scoped handoff for the parser audit**; measured
@@ -20,6 +20,40 @@ Companion documents:
 * [`CLAUDE.md`](../CLAUDE.md) — architectural rules. **§6 and §7 are the ones that matter.**
 
 ---
+
+## Update, 2026-09-15 — the map layers, the City boundary, and the routing graph
+
+Worked by the `lead` chat with sub-agents, alongside a second chat that rebuilt the team scaffolding
+and the standards docs. **Everything below is live on the kiosk**; `cfr-agent` was restarted at 16:52
+PDT and `cfr_api` after it, both by the operator.
+
+| Change | Where |
+|:--|:--|
+| **The street basemap was built from the wrong extract.** `build_vector_basemap.sh` named `coquitlam_region.osm.pbf` but hard-coded BBBike's `vancouver.osm.pbf`, which stops at -122.668 and cut 5.7 km² of the eastern City: tiles everywhere, no roads there. Rebuilt from the regional extract, served after the operator's `cfr_tiles` restart | #86 closed, `86eee32e` |
+| **Tier 2 is the City polygon now, with no box and no fallback.** `GET /api/parcels/within-city` answers from `public.city_boundary` with `ST_Covers`; an unknown renders as an amber "City boundary check unavailable" card. The old box excluded 158 parcels that are really in the City. CLAUDE.md §5 rewritten to match | #87 closed, `1cdef5f4` |
+| **The routing graph moved to the regional extract** with the stay-in-Coquitlam penalty on (`CFR_CITY_LIMITS_FACTOR=0.1`, operator ruling, adjustable at build time). Measured on 2,464 routes: median unchanged, metres driven outside the City 87,244 → 2,727, worst slowdown +166 s (2500 Block Barnet Hwy from Hall 3). Rollback is `apparatus.osrm` in `docker-compose.yml` | #1, `64985d1d`, `evaluation_history` `fbafb199` |
+| **Verified grid history in phase 1.** Work left uncommitted by an earlier chat, checked and landed: phase 1 prefers the grid E-Comm was verified to have dispatched an address as, over the lot's zone, keyed by address **and** unit. It would have applied to 233 past calls and differs from the zone on 8, at 4 addresses | #72, `071ebcb3` |
+| **A destination far from any road now raises a flag.** OSRM reports how far it moved a destination to reach a road; nothing read it, so a route ending kilometres away looked ordinary. `ROUTE_SNAP_FAR` above 50 m (operator ruling). Corpus: median 5.7 m, p90 34.6 m, 24 calls (4.2%) over the threshold | #88, `bdcea8bc` |
+| **Street View says "No Street View available"** instead of drawing an empty panorama | `9a788d94` |
+| **Carto is retired** — no crawl, no docs, and the operator deleted both archives from the kiosk | #47b Carto half closed |
+
+### What a new session should know
+
+* **The ortho layer is the Esri crawl, not the City's tiles**, and the records said otherwise until
+  today. Operator ruling: City imagery is the goal, but the 2026-08-31 City crawl read as harsh on
+  the bay display and was rejected on looks. Esri stays until a process gives City imagery at the
+  quality he accepts; that search is a backlog line, and the licence question is his. **#47b's Esri
+  half stays open.**
+* **Why announced and derived map grids disagree is unknown** (operator, 2026-09-15; he is looking
+  into it on duty). 18 of 487 matched calls, 10 addresses. The frontage-on-a-zone-line finding in #72
+  is an association, not a cause: 58 *agreeing* addresses sit on a line too. Do not build on it.
+* **The City's response zones and E-Comm's map grid are one numbering** (operator, 2026-09-15), now
+  recorded in `standards/data_sources.md` and `standards/operator_data.md`.
+* **Two changes are live but unexercised:** #88's flag and the grid history. Neither has been seen on
+  a real call. #88 closes when one raises it.
+* **`parcels.zone_id` is one interior point, never the polygon** (`import_parcels.py:497-508`). A
+  point on a zone line is tie-broken to the lowest-numbered zone — a numeric decision standing in for
+  a geographic one — and a multi-zone lot keeps one number with nothing recording the others.
 
 ## Update, 2026-09-08 — hardening, the operator's UX pass, and two streams spun out
 

@@ -76,16 +76,56 @@ right-of-way exclusion in the City's layer cannot be told from the geometry** �
 `docs/standards/data_sources.md` and the operator. Victoria Dr touches zone 111 and was dropped by
 the boundary test alone.
 
-## The DriveBC half, measured — lead's hypothesis was mostly wrong
+## The DriveBC half, measured — two causes, one of them systemic after all
 
-One request to the live feed (operator's permission in the GIS chat, registered): 286 active
-events, **only two anywhere near Coquitlam.** `RIDE-100086`, Highway 7B — the Mary Hill Bypass —
-at 49.22697, −122.80629, the same spot as the MOTI record, `ALL_LANES_OPEN` BOTH: the old tests
-dropped it (inside, no zone); the fix keeps it in zone 52 as informational. `RIDE-101452`,
-Highway 7, is 3.45 km outside the city and stays out. Nothing on the Lougheed or Barnet in this
-pull. So the table's "no DriveBC row ever" is mostly because DriveBC rarely has an event inside
-Coquitlam — **not** the systemic drop lead suggested — but the one event that was inside was
-dropped, by the same cause as the seven.
+GIS, two requests with the operator's permission, registered (`cbeb7a8c`): the feed at 23:11Z
+(`status=ACTIVE&limit=500`, 286 active events) and, at 23:31Z, **the sync's own exact URL**
+(`events?format=json&limit=100`).
+
+**Cause 1 — the sync only ever sees 100 of the feed's events, chosen province-wide.**
+`road_closure_service.py`'s DriveBC request carries `limit=100` and no area filter. Its 100 at
+23:31Z were all active and all among the 286, spread across the province — Cariboo 20,
+Vancouver Island 16, Okanagan 15, Lower Mainland 13 — so about 65% of active events never reach
+the spatial tests, and which 100 arrive is the API's choice. **The one event inside Coquitlam
+that day, `RIDE-100086`, was not in the sync's 100.** This is systemic: on any day the API's
+first 100 do not include an in-city event, it is invisible regardless of the spatial tests.
+Lead's first reading — "not the systemic drop I suspected" — was wrong about *this* cause and
+right that the spatial tests alone were not it.
+
+**Cause 2 — the zone strip.** The same cause as the three municipal "inside, no zone" records;
+`eb90bcc7`'s buffer fixes it (once the regression is fixed).
+
+**Nothing earlier in the DriveBC branch drops anything:** all 286 have an id and a Point or
+LineString with coordinates; the branch has no road-name filter.
+
+**Per event within 2 km of the city** (one read-only query of all 286 geometries; the per-event
+run through the daemon's own functions timed out at 600 s over Tailscale and was not retried):
+
+| Event | Where | State | From city | Old tests | Buffered | In sync's 100 |
+|:--|:--|:--|--:|:--|:--|:--|
+| RIDE-100086 | Hwy 7B, Mary Hill Bypass (49.22697, −122.80629), bridge construction | ALL_LANES_OPEN BOTH, MAJOR | inside | zone test | kept, zone 52 | **no** |
+| RIDE-102450 | Hwy 17, Surrey, 545 m E of the Port Mann | ALL_LANES_OPEN W | 786 m out | boundary | boundary | yes |
+| RIDE-102296 | Hwy 1A, Riverview Bridge | ALL_LANES_OPEN BOTH | 1,768 m out | boundary | boundary | yes |
+
+The other 283 are more than 2 km out. Nothing on the Lougheed or Barnet through Coquitlam was in
+the feed at 23:11Z. **Correction by lead:** the "192 / 193 / 195 on the Lougheed at Kennedy Rd"
+lead cited to GIS are DriveBC *webcam* ids from the HighwayCams CSV, not events — lead conflated
+the two; GIS was right that no such events exist. History before today cannot be measured
+backwards; what is measured is that both causes applied on 2026-09-16.
+
+**Fix for cause 1 — sourced, not built; it changes a production request, so it is the
+operator's.** BC's own OpenAPI spec for the feed (read by lead 2026-09-16) defines a **`bbox`**
+query parameter on `GET /events`: "Limits the response to events that fall within the specified
+geographical bounding box. The bbox format must be '[min longitude],[min latitude],[max
+longitude],[max latitude]' with WGS84 coordinates." Also `area_id`, `road_name`, `jurisdiction`,
+`status`, `severity`, `event_type`, `created`, `updated`. (`limit` and `offset` are *not* in the
+spec, though the live API accepts `limit`.) So the sync can ask for exactly the envelope of
+`public.city_boundary` buffered 100 m — the same figure — and receive only in-area events: a
+small payload, no cap, no timeout risk, and no province-wide records paying the spatial tests.
+GIS's alternatives, `limit=500` with the 5 s `urlopen` timeout raised (733 KB measured vs 233 KB
+now), or `offset` pagination, both keep pulling the whole province. Same host and path, so not
+a new external call; §2.1's row changes. **Falsifier:** after the change, `drivebc.ca/RIDE-100086`
+(while active) appears in `public.road_closures` in zone 52.
 
 ## What it should do
 
@@ -116,6 +156,7 @@ public.road_closures WHERE closure_id IN (...)` is 0.
 | Date | Event |
 |:--|:--|
 | 2026-09-16 | Found by the operator in the #91 review list. Opened as crew-visible. Sent to `gis-spatial-engineer`: measure each record's position against the boundary and the nearest zone and name the cause, then fix behind the existing 100 m figure only if every record falls inside it; report the neighbour-municipality count and any DriveBC events the same tests drop |
+| 2026-09-16 | **DriveBC half measured by GIS** (register `cbeb7a8c`): cause 1 is the sync's `limit=100` with no area filter, province-wide — the in-city event was not among the 100; cause 2 is the zone strip. Nothing earlier in the branch drops anything. Lead read BC's OpenAPI spec again: `bbox` is a documented `/events` parameter, so the sourced fix is to request the buffered city envelope. Production request change — the operator's to rule. Lead corrected its own citation of webcam ids as events |
 | 2026-09-16 | **Deployed 23:31Z; regression found on the first forced sync.** The `POST /api/road-closures/sync` that took ~1 s all day ran past three minutes. `pg_stat_activity` showed one active query — `SELECT EXISTS (SELECT 1 FROM public.city_boundary cb WHERE ST_DWithin(cb.geom::geography, ST_SetSRID(ST_GeomFromGeoJSON('{"type": "LineString"…` — at 3.75 s of execution: one record's `is_within_city`. The sync runs it per record over the full Transnomis pull (~6,500) before the city filter, so a sync is now hours; the hourly tick queues behind it and #89 cannot show FAILED because the attempt never finishes. As far as the query text and timing show, `::geography` on the boundary polygon defeats the GiST index the old geometry `ST_Intersects` used. Fix and the before/after timings are GIS's; lead did not terminate the running query. The seven are **not** confirmed served |
 | 2026-09-16 | **Measured and built, `eb90bcc7`** (GIS; register row `f524a07f` for the DriveBC pull). All seven within 100 m of the boundary (max 7.8) and of a zone (max 27.3), so built behind the operator's routing figure: `backend/api/closure_spatial.py` `CLOSURE_BOUNDARY_BUFFER_M = 100`, provenance comment says *reused, not newly ruled* (verified in `backend/scripts/export_routing_polygon.py`, "use the city boundary + 100m", 2026-09-09); `is_within_city` `ST_Intersects` → `ST_DWithin(geography, 100)`; `resolve_zones_and_hall` takes the nearest zone within 100 m when none intersects, else `([], None, None)`; `road_closure_service.py` both feed branches drop the `if not affected_zones: continue`, so a record inside the buffered city with no zone in reach is kept with `zoneId` null and the sidebar already groups that as OTHER — no frontend change. The §5 Tier 2 card is untouched (a different function, `ST_Covers`, unbuffered). **Found in passing:** `public.zones.hall_id` is NULL in all 134 zones, so the resolver's hall is always None and the kiosk groups by `unit_id` from `zones.json` instead — backlog line. Tests `backend/tests/test_closure_spatial_boundary.py`, read-only against the kiosk's live layers: the unbuffered tests drop each of the seven (pins the cause, so a boundary refresh that moves the line fails loudly), the buffered tests keep each in its measured zone, a point 150 m west of the boundary is still rejected, Metrotown is rejected; with the closure suites 54 passed + 25 subtests. Not live. **Falsifier after the rebuild and first sync:** `SELECT closure_id, zone_id FROM public.road_closures WHERE closure_id LIKE 'muni_4|78131841%' OR closure_id = 'drivebc.ca/RIDE-100086';` returns rows. GIS also corrected its briefing's method — the shrink box stopped at −122.65 where the boundary reaches −122.621; re-cut from the true extent, no records added, the 71 stands |
 | 2026-09-16 | Lead's SELECT after the second-round deploy: **zero DriveBC rows in the table, ever.** Amendment sent to GIS: part (b) is not "any" but, as far as the table shows, "all" — measure each DriveBC event within ~2 km of the boundary and name why it fails, including anything earlier in the DriveBC branch than the two spatial tests |

@@ -42,6 +42,49 @@ The application will be accessible at `http://localhost:5173`.
 
 ---
 
+## 2a. Static checks, before any browser check
+
+Run all three on every frontend change, from `frontend/`. A browser check cannot stand in for
+them: it only sees the paths you happened to click.
+
+```bash
+npm run lint:crash
+```
+
+```bash
+npx eslint $( { git diff --name-only --relative HEAD -- src; git ls-files --others --exclude-standard -- src; } | grep -E '\.(js|jsx)$' )
+```
+
+```bash
+npm run build
+```
+
+The middle command runs the **full** `eslint.config.js` on the files you changed, including
+new untracked ones. For work already committed, swap the braces for
+`git diff --name-only --relative <base> HEAD -- src`. If the file list comes back empty, don't
+run it: ESLint with no arguments lints the whole directory.
+
+**Why `lint:crash` alone is not enough.** `eslint.crash.config.js` is deliberately narrow:
+`no-undef` and `react-hooks/immutability` (the TDZ case), the two mistakes the pre-commit hook
+blocks. It has no `react-hooks/rules-of-hooks`, and `npm run build` doesn't check hook order
+either. A hook called after an early return passes both, then throws in React's production
+build the first time the component re-renders down the other branch. React 19.2 throws #300
+for fewer hooks and #310 for more; see `react-dom-client.production.js`.
+
+This shipped. `727c297b` (#89) put a `React.useMemo` after `RightSidebar`'s
+`if (!isExplore) return null;`. `lint:crash` and `build` were clean, and it was deployed.
+Full eslint on the same file reports `react-hooks/rules-of-hooks` at the line; it was found
+only when full eslint ran for #91, and fixed in `776b52e5`. The only error boundary is the
+root one (`main.jsx`), so on the console it fires as the whole-screen "Application
+Diagnostic Error" card, not a blank sidebar.
+
+**Reading the result.** Full eslint has pre-existing errors in files nobody touched (three in
+`MapBoard.jsx` as of 2026-09-16), and they are not yours to fix mid-freeze. An error is yours
+if it is on a line you changed, or if it is absent when you stash your change and re-run.
+**Any `react-hooks/rules-of-hooks` error is a blocker regardless.**
+
+---
+
 ## 3. UI Verification Checklist
 
 When performing a visual or automated audit using `/browser`:

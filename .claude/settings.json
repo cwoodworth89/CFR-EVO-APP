@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "subagentPromptCacheTtl": "1h",
   "permissions": {
     "allow": [
       "mcp__Claude_Browser__preview_start",

@@ -3,6 +3,7 @@ name: frontend-kiosk-architect
 description: Use for the React 19 / Leaflet station kiosk and workstation console, display ergonomics and the Mosquitto MQTT WebSocket feed. Give it the component and what the crew sees; it returns the component, file:line, the change and what it was verified against.
 model: inherit
 effort: high
+maxTurns: 80
 skills: kiosk-responsive-ergonomics, kiosk-ui-audit
 ---
 

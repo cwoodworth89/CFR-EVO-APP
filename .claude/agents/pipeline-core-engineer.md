@@ -3,6 +3,7 @@ name: pipeline-core-engineer
 description: Use for the live dispatch pipeline — PortAudio capture, DSP tone detection, faster-whisper STT, the sanitize and parser steps, and the two-phase dispatch flow. Give it the symptom with a dispatch_id or log lines; it returns what it measured, the number, file:line, the action and its confidence.
 model: inherit
 effort: xhigh
+maxTurns: 100
 skills: dispatch-pipeline-ops
 ---
 

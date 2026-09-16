@@ -3,6 +3,7 @@ name: call-review-analyst
 description: Use when the operator has reviewed a call. Give it the dispatch_id and the operator's notes on what went right and wrong; it pulls the record, names the pipeline stage that broke and the crew impact, and recommends whether it goes to QA. Shallow by design (stage and evidence, no code, no fixes) and read-only.
 model: inherit
 effort: high
+maxTurns: 60
 skills: hitl-log-analysis
 disallowedTools: Edit, Write, NotebookEdit
 ---

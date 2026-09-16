@@ -26,8 +26,8 @@ send them.
 - When the operator is waiting on the answer, run the agent in the foreground and report when it
   returns.
 - When jobs are independent, start them together in the background and report each as it lands.
-- For a follow-up within five minutes, send the same agent a message (SendMessage with the agent id
-  the first run returned) so it keeps its context. Later than that, see *Choosing a lane*.
+- For a follow-up, send the same agent a message (SendMessage with the agent id the first run
+  returned) so it keeps its context. See *Choosing a lane* for when that stops being cheap.
 
 ## Routing
 
@@ -57,15 +57,17 @@ Send each job down the cheapest lane that can do it well.
 | Lane | Use it for | What it costs |
 |:--|:--|:--|
 | **1. Do it yourself**, loading the owning agent's runbook (its `skills:` list) with the Skill tool | A quick check: one query, a log tail, a `file:line` | 0.5k–4k tokens per runbook, in a chat that is already cached |
-| **2. A sub-agent** | A heavy one-off with a clear answer: many files, a batch of calls, a backtest | About 60k tokens before it does any work (measured 2026-09-15). Its cache lasts five minutes, so a follow-up after a pause costs about as much as a new start |
+| **2. A sub-agent** | A heavy one-off with a clear answer: many files, a batch of calls, a backtest | About 60k tokens before it does any work (measured 2026-09-15). Its cache holds for an hour (`subagentPromptCacheTtl` in `.claude/settings.json`; hour-long cache writes bill higher), so a follow-up within the hour is cheap |
 | **3. A specialist chat** | Back-and-forth over a sitting: calls one at a time with screenshots, an afternoon on one GIS problem | One start, then each turn reads from an hour-long cache. The operator talks to it directly, and it reports to you |
 
 - Lane 1 is for looking, not changing: a fix to code or data goes to its owner. Keep it small,
   because everything you read stays in this chat for the rest of the session. A job that means
   wading through many files or long logs goes to lane 2 even when the answer is one line.
 - Put a batch into one sub-agent job, never one job per item.
-- Follow up with a sub-agent only within its five minutes. After that, do a small follow-up
-  yourself or start a fresh job.
+- Follow up with a sub-agent within its hour, by message, so it keeps its context. After that, do
+  a small follow-up yourself or start a fresh job.
+- Every specialist carries a `maxTurns` ceiling. A job that reaches it comes back marked partial:
+  message the agent to continue if the work was real, or re-scope the job if it was wandering.
 - If a chat titled for the work is open, message it rather than starting a sub-agent
   (*Specialist chats*).
 - If a sub-agent job turns into a conversation, stop and ask the operator to open that

@@ -3,6 +3,7 @@ name: kiosk-remote-operator
 description: Use for non-interactive diagnostics, log reads and frontend builds on the station kiosk over Tailscale SSH. Give it what the command is for; it returns the command run, its exit status and the output lines that matter. Restarts, container rebuilds and reboots are the operator's, and the restart guard blocks them.
 model: claude-sonnet-5
 effort: medium
+maxTurns: 30
 skills: kiosk-remote-ops, local-stack-orchestrator
 ---
 

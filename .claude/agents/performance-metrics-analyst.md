@@ -3,6 +3,7 @@ name: performance-metrics-analyst
 description: Use for a figure over the dispatch corpus — operational and pipeline metrics, trends and statistics for department leadership. Give it the question and the period; it returns the metric, its definition, the query, the number and what would falsify it.
 model: inherit
 effort: xhigh
+maxTurns: 80
 skills: performance-metrics-analytics
 ---
 

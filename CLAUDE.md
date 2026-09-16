@@ -36,8 +36,9 @@ This rule file defines domain constraints, runtime environments, and workflow st
 > layer's licensing is an accepted risk, not resolved: punch-list #47b.
 
 **Every code path that reaches outside the LAN is registered in
-[`docs/external_calls.md`](docs/external_calls.md)** — what it is, why, and what a crew sees
-when the link drops. **Operator ruling 2026-08-31: no new external call without permission.**
+[`docs/external_calls.md`](docs/external_calls.md)** — what it is, why, and for a production
+call, what a crew sees when the link drops. **Operator ruling 2026-08-31: no new external call
+without permission.**
 Found one? Add a row; do not fix it silently.
 
 **Services**: FastAPI `:8000` · OSRM `:5000` · mbtileserver `:8081` · Mosquitto MQTT over

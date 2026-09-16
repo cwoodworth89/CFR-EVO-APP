@@ -72,14 +72,22 @@ record (source + stable fields), never from the position in the list.
    **None of them says anything about whether a road is passable**, so MAJOR → NO_ACCESS was an
    invention, not a translation. The field that *is* about passability is `roads[].state` — DriveBC
    supports it (`name`, `from`, `to`, `state`, `direction`, plus a custom `delay` in minutes) and
-   shows `"state": "CLOSED"` as its only example; **its enumeration is not on DriveBC's page**, and
-   the Open511 spec site was unreachable (self-signed certificate; a GitHub mirror guess 404'd —
-   two failed attempts, stopped, §7.7). Recorded in the standards index. **The pass-through
-   question is now the operator's with the real vocabulary in front of him:** show DriveBC's
-   own word (MINOR/MODERATE/MAJOR) as information and leave the access box N/A unless
-   `roads[].state` says CLOSED — or keep mapping severity to access, which the definitions do not
-   support. `event_type` is also available: CONSTRUCTION / SPECIAL_EVENT / INCIDENT /
-   WEATHER_CONDITION / ROAD_CONDITION. Untouched until he rules.
+   shows `"state": "CLOSED"` as its only example. **No reachable document enumerates it:** the
+   Open511 spec site refuses with a self-signed certificate (lead and the operator both hit it),
+   and BC's own OpenAPI specs — found through the Government of Canada open data record the
+   operator supplied — define query parameters and no response schema. So it was **measured on
+   the live feed instead, 2026-09-16, 306 active events in one request:** `roads[].state` is
+   `ALL_LANES_OPEN` (238), absent (52) or `CLOSED` (16); `severity` is MINOR (274) or MAJOR (32),
+   with MODERATE and UNKNOWN not in use; `event_type` is CONSTRUCTION (273), INCIDENT (18) or
+   ROAD_CONDITION (15). **The two fields are independent: 18 MAJOR events had every lane open,
+   and 5 MINOR events were CLOSED.** Under the deployed code those 18 drew as NO_ACCESS and those 5
+   as CAUTION — wrong in both directions, measured. The feed is Open Government Licence – BC
+   (from the spec's `license`). Recorded in the standards index and the register.
+   **Proposal for the operator, not built:** the access box reads `roads[].state` — `CLOSED` →
+   NO_ACCESS; `ALL_LANES_OPEN` → no access restriction, informational; absent or any value outside
+   the measured set → N/A and one ERROR line naming the value, so a new state (Open511 has others,
+   unverified) is seen and ruled on rather than guessed. `severity` is shown as the feed's own
+   word beside it, as information, never as an access tier. Untouched until he rules.
 6. **No hover-only information**, anywhere on the kiosk or the console: "it won't benefit a
    touchscreen setup or mobile." Standing convention, going into `kiosk-responsive-ergonomics`;
    an audit of existing hover-only content is a backlog line, not freeze work.

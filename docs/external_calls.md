@@ -78,9 +78,22 @@ the parameter is passed straight to `huggingface_hub.snapshot_download`.
 
 #### 2.1 Road closure sync — `open511.gov.bc.ca`, `bc.municipal511.ca`
 
-* `backend/api/road_closure_service.py:89,184,194`
+* `backend/api/road_closure_service.py` (`DRIVEBC_EVENTS_URL`, `MUNICIPAL511_PUBLISHERS`, `_ingest_road_closures`)
 * Started as a daemon thread at `backend/api/server.py:129` → `run_periodic_road_closure_sync()`
 * **Wakes every hour**, syncs when local data is older than 24 h (`max_age_seconds=86400`).
+* **How each feed is asked, since 2026-09-16 (punch-list #92, operator: "why not ask DriveBC what do you have in Coquitlam?"):**
+  * **DriveBC:** `api.open511.gov.bc.ca/events?format=json&status=ACTIVE&bbox=<min lon>,<min lat>,<max lon>,<max lat>`,
+    the box being `public.city_boundary` grown 100 m, computed from the table at every sync
+    (`closure_spatial.closure_city_bbox`), following the response's `pagination.next_url`. No
+    `limit`. It replaced `?format=json&limit=100`, which returned 100 province-wide events and
+    missed the in-city one. Measured with the new form: 3 events, 5 KB, 0.22 s. If the box
+    cannot be computed, DriveBC is not asked and the attempt is FAILED (#89).
+  * **Municipal 511:** unchanged requests (the Coquitlam page, then every data file it lists:
+    14 on 2026-09-16, holding every Transnomis client). The feed offers no area filter, so the
+    sync keeps only issues whose `Source` is `City of Coquitlam` before any spatial query.
+    `BC MOTI Gateway` is excluded: its issues copy DriveBC (272 of 303 descriptions identical
+    to active DriveBC events), and DriveBC is now asked for the area directly. Operator ruling
+    2026-09-16.
 
 Nobody triggers it and nothing surfaces its failure. It is wrapped in `try/except` that logs
 and continues, so an outage degrades silently: road closures simply stop updating, and the

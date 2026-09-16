@@ -27,6 +27,26 @@ logger = logging.getLogger(__name__)
 # other record in that pull.
 CLOSURE_BOUNDARY_BUFFER_M = 100
 
+# How the buffer is measured, and why not with ::geography (punch list #92, 2026-09-16).
+# The first build used ST_DWithin(city_boundary::geography, ...), which has no index and runs a
+# geodesic distance against the whole 39,896-vertex boundary for every record the sync tests
+# -- ~9,600 geometries a sync, most of them other Transnomis clients' (Florida included). On
+# the kiosk it stalled the sync (lead, pg_stat_activity: one record at 3.75 s). Measured the
+# same day on the kiosk's layers over one full sync's geometries, one statement: old
+# ST_Intersects 0.01 s, ::geography 78 s, this form 0.7 s, admitting the same 85 geometries
+# as ::geography.
+#
+# 1. `&&` against the geometry expanded by CLOSURE_PREFILTER_DEG: an index-usable bounding-box
+#    test that rejects every far record before any distance is computed. It must cover the
+#    buffer in every direction, or it would reject a record within 100 m: 0.01 degrees of
+#    longitude is ~726 m at 49.35 N (the boundary's northern extent, public.city_boundary),
+#    and of latitude ~1.1 km, both far more than 100 m.
+# 2. For the few that pass, ST_DWithin in metres in NAD83 / UTM zone 10N (EPSG:26910; the
+#    city lies inside zone 10, 126 W to 120 W), where planar distance is metres to well
+#    under 0.1 % here -- sub-decimetre at 100 m.
+CLOSURE_PREFILTER_DEG = 0.01
+CLOSURE_METRIC_SRID = 26910
+
 
 def build_geojson_geometry(points: List[List[float]]) -> Optional[dict]:
     """Builds a GeoJSON geometry from [lat, lng] points.
@@ -50,6 +70,33 @@ def build_geojson_geometry(points: List[List[float]]) -> Optional[dict]:
     return {"type": "LineString", "coordinates": [[p[1], p[0]] for p in usable]}
 
 
+def closure_city_bbox(db: Session) -> Optional[Tuple[float, float, float, float]]:
+    """(min lon, min lat, max lon, max lat) of public.city_boundary grown by
+    CLOSURE_BOUNDARY_BUFFER_M, for asking a feed only for what lies near the city (#92).
+
+    Computed from the table at every call, never hardcoded, so a boundary refresh moves it
+    (CLAUDE.md 6.3). Expanded by the buffer in metres (UTM 10N) and taken back to WGS84 as an
+    envelope, then rounded outward to 5 decimals so rounding can only grow it. It is a
+    rectangle and the city is not: whatever comes back still goes through is_within_city.
+    None when the query fails -- the caller must then treat the feed as not reached, never
+    fall back to an unfiltered or remembered box.
+    """
+    try:
+        row = db.execute(text("""
+            SELECT floor(ST_XMin(b) * 1e5) / 1e5 AS xmin, floor(ST_YMin(b) * 1e5) / 1e5 AS ymin,
+                   ceil(ST_XMax(b) * 1e5) / 1e5 AS xmax, ceil(ST_YMax(b) * 1e5) / 1e5 AS ymax
+            FROM (SELECT ST_Envelope(ST_Transform(
+                             ST_Expand(ST_Transform(ST_Union(geom), :srid), :m), 4326)) AS b
+                  FROM public.city_boundary) x
+        """), {"srid": CLOSURE_METRIC_SRID, "m": CLOSURE_BOUNDARY_BUFFER_M}).mappings().fetchone()
+        if not row or row["xmin"] is None:
+            return None
+        return (float(row["xmin"]), float(row["ymin"]), float(row["xmax"]), float(row["ymax"]))
+    except Exception as e:
+        logger.warning(f"City bounding box query failed: {e}")
+        return None
+
+
 def is_within_city(db: Session, geojson: dict) -> bool:
     """True when the geometry comes within CLOSURE_BOUNDARY_BUFFER_M of the municipal boundary.
 
@@ -68,10 +115,12 @@ def is_within_city(db: Session, geojson: dict) -> bool:
         row = db.execute(text("""
             SELECT EXISTS (
                 SELECT 1 FROM public.city_boundary cb
-                WHERE ST_DWithin(cb.geom::geography,
-                                 ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326)::geography, :m)
+                CROSS JOIN (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326) AS g) q
+                WHERE cb.geom && ST_Expand(q.g, :deg)
+                  AND ST_DWithin(ST_Transform(cb.geom, :srid), ST_Transform(q.g, :srid), :m)
             ) AS inside
-        """), {"gj": _dumps(geojson), "m": CLOSURE_BOUNDARY_BUFFER_M}).mappings().fetchone()
+        """), {"gj": _dumps(geojson), "m": CLOSURE_BOUNDARY_BUFFER_M,
+               "deg": CLOSURE_PREFILTER_DEG, "srid": CLOSURE_METRIC_SRID}).mappings().fetchone()
         return bool(row and row["inside"])
     except Exception as e:
         logger.warning(f"City boundary check failed: {e}")
@@ -106,15 +155,17 @@ def resolve_zones_and_hall(db: Session, geojson: dict) -> Tuple[List[str], Optio
             key=lambda x: int(x) if x.isdigit() else 10**9,
         )
         if not affected:
+            # Same prefilter-then-metres form as is_within_city, for the same reason.
             nearest = db.execute(text("""
                 SELECT z.map_name AS zone_id, z.hall_id
                 FROM public.zones z
-                WHERE ST_DWithin(z.geom::geography,
-                                 ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326)::geography, :m)
-                ORDER BY ST_Distance(z.geom::geography,
-                                     ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326)::geography)
+                CROSS JOIN (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:gj), 4326) AS g) q
+                WHERE z.geom && ST_Expand(q.g, :deg)
+                  AND ST_DWithin(ST_Transform(z.geom, :srid), ST_Transform(q.g, :srid), :m)
+                ORDER BY ST_Distance(ST_Transform(z.geom, :srid), ST_Transform(q.g, :srid))
                 LIMIT 1
-            """), {"gj": gj, "m": CLOSURE_BOUNDARY_BUFFER_M}).mappings().fetchone()
+            """), {"gj": gj, "m": CLOSURE_BOUNDARY_BUFFER_M,
+                   "deg": CLOSURE_PREFILTER_DEG, "srid": CLOSURE_METRIC_SRID}).mappings().fetchone()
             if not nearest or nearest["zone_id"] is None:
                 return [], None, None
             return [str(nearest["zone_id"])], str(nearest["zone_id"]), nearest["hall_id"]

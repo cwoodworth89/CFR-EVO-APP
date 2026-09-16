@@ -21,12 +21,36 @@ logger = logging.getLogger(__name__)
 # transportation-layer import. See backend/api/closure_spatial.py.
 try:
     from backend.api.closure_spatial import (
-        build_geojson_geometry, is_within_city, resolve_zones_and_hall,
+        build_geojson_geometry, closure_city_bbox, is_within_city, resolve_zones_and_hall,
     )
 except ModuleNotFoundError:
     from api.closure_spatial import (
-        build_geojson_geometry, is_within_city, resolve_zones_and_hall,
+        build_geojson_geometry, closure_city_bbox, is_within_city, resolve_zones_and_hall,
     )
+
+import urllib.parse
+
+# DriveBC Open511 events endpoint. `bbox` and `status` are GET /events query parameters in BC's
+# OpenAPI spec for the feed (bcgov/api-specs open511_OAS3.json, read 2026-09-16; standards
+# index, "Road closure vocabulary"). Measured 2026-09-16 23:41 UTC with the buffered city box:
+# 3 events, 5 KB, 0.22 s, including the in-city RIDE-100086 -- where the previous
+# `limit=100` request brought 100 province-wide events (233 KB) and missed it (#92).
+DRIVEBC_EVENTS_URL = "https://api.open511.gov.bc.ca/events"
+
+# Municipal 511 publishers whose records the sync keeps, by the issue's `Source` field -- the
+# value stored in road_closures.source. The data files hold every Transnomis client (about
+# 6,500 issues, Florida included); filtering by publisher before any spatial query leaves the
+# City's own ~83. Measured on the 2026-09-16 pull: City of Coquitlam and BC MOTI Gateway were
+# the only publishers with any geometry within 100 m of the city boundary.
+#
+# BC MOTI Gateway is deliberately excluded. Its issues sit in the feed's division named
+# "DriveBC" and copy the DriveBC stream: 272 of its 303 issues had a description identical
+# to an active DriveBC event (pulls 2 h 30 min apart, 2026-09-16), including the Mary Hill
+# Bypass record, verbatim RIDE-100086. DriveBC is now asked for the city's area directly and
+# carries road state and direction, so keeping the copy would draw each highway event twice.
+# Operator ruling 2026-09-16, gis-spatial-engineer's chat ("Drop MOTI copies"), accepting that
+# a MOTI record absent from DriveBC would be lost (31 of 303 unmatched across the two pulls).
+MUNICIPAL511_PUBLISHERS = ("City of Coquitlam",)
 
 
 class PythonGeometryDecoder:
@@ -347,11 +371,25 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
     # 1. Fetch DriveBC Open511
     source_results["DriveBC Open511"] = {"reached": False, "error": "not attempted"}
     try:
-        req = urllib.request.Request("https://api.open511.gov.bc.ca/events?format=json&limit=100", headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            db_data = json.loads(resp.read().decode('utf-8'))
+        # Ask for the city's area, not the province (operator 2026-09-16, #92: "why not ask
+        # DriveBC what do you have in Coquitlam?"). No box, no request: an unfiltered pull
+        # would bring back the silent cap this replaces.
+        bbox = closure_city_bbox(db)
+        if bbox is None:
+            raise RuntimeError("could not compute the city bounding box; DriveBC not asked")
+        next_url = DRIVEBC_EVENTS_URL + "?" + urllib.parse.urlencode({
+            "format": "json", "status": "ACTIVE", "bbox": ",".join(f"{v:.5f}" for v in bbox),
+        })
+        events, seen_urls = [], set()
+        # Follow the feed's own pagination.next_url until it stops offering one.
+        while next_url and next_url not in seen_urls:
+            seen_urls.add(next_url)
+            req = urllib.request.Request(next_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                db_data = json.loads(resp.read().decode('utf-8'))
+            events.extend(db_data.get('events', []))
+            next_url = (db_data.get('pagination') or {}).get('next_url')
 
-        events = db_data.get('events', [])
         for evt in events:
             geog = evt.get('geography', {})
             coords = geog.get('coordinates', [])
@@ -479,9 +517,15 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
 
                 for issue in issues:
                     geoms = issue.get('Geometry', [])
+                    # Another client's issue: skipped before any spatial query (#92). Its
+                    # points are still read, because the decoder is one stream per file and
+                    # every later issue's geometry depends on this one's being consumed.
+                    other_publisher = issue.get('Source') not in MUNICIPAL511_PUBLISHERS
                     for geom_idx, geom in enumerate(geoms):
                         num_points = geom.get('NumPoints', 0)
                         path_pts = decoder.get_n_points(num_points)
+                        if other_publisher:
+                            continue
 
                         # No default coordinate: an unparseable geometry is dropped
                         # rather than pinned to a placeholder (CLAUDE.md §6.1).

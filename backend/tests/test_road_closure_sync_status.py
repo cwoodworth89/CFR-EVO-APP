@@ -111,8 +111,12 @@ class RoadClosureSyncStatusTests(unittest.TestCase):
             tables=[RoadClosureModel.__table__, RoadClosureSyncStatusModel.__table__],
         )
         self.db = sessionmaker(bind=self.engine)()
+        # closure_city_bbox is PostGIS; a box measured from the kiosk's table stands in.
+        self._bbox = patch.object(svc, "closure_city_bbox", lambda db: (-122.89492, 49.2184, -122.6197, 49.35263))
+        self._bbox.start()
 
     def tearDown(self):
+        self._bbox.stop()
         self.db.close()
 
     # --- the status row itself ------------------------------------------------
@@ -278,6 +282,7 @@ class FeedGapTests(unittest.TestCase):
             patch.object(svc, "is_within_city", lambda db, geo: True),
             patch.object(svc, "resolve_zones_and_hall", lambda db, geo: (["1"], "1", "1")),
             patch.object(svc, "text", lambda sql: sa_text("SELECT 1")),
+            patch.object(svc, "closure_city_bbox", lambda db: (-122.89492, 49.2184, -122.6197, 49.35263)),
         ]
         for p in self.patches:
             p.start()
@@ -348,6 +353,83 @@ class FeedGapTests(unittest.TestCase):
                 self.assertIn(
                     "WARNING:" + svc.logger.name + ":1 of 1 records stored with no stated "
                     "severity (Municipal 511: 0, DriveBC Open511: 1)", logs.output)
+
+    # --- #92: ask the feeds for Coquitlam, not the province ----------------------
+
+    def test_drivebc_is_asked_for_the_city_box_active_only_with_no_cap(self):
+        seen = []
+        inner = _feeds([_event()])
+
+        def spy(req, timeout=None):
+            seen.append(req.full_url)
+            return inner(req, timeout)
+
+        with patch("urllib.request.urlopen", spy):
+            svc.sync_road_closures_to_db(self.db)
+        (drivebc,) = [u for u in seen if "open511" in u]
+        self.assertTrue(drivebc.startswith("https://api.open511.gov.bc.ca/events?"))
+        self.assertIn("status=ACTIVE", drivebc)
+        self.assertIn("bbox=-122.89492%2C49.21840%2C-122.61970%2C49.35263", drivebc)
+        self.assertNotIn("limit=", drivebc)
+
+    def test_drivebc_follows_the_feeds_pagination(self):
+        pages = {
+            "first": {"events": [_event(id="p1", road_name="A St")],
+                      "pagination": {"offset": "0", "next_url": "https://api.open511.gov.bc.ca/events?page=2"}},
+            "second": {"events": [_event(id="p2", road_name="B St")], "pagination": {"offset": "1"}},
+        }
+        inner = _feeds([])
+
+        def urlopen(req, timeout=None):
+            url = req.full_url
+            if url.endswith("page=2"):
+                return _Resp(json.dumps(pages["second"]).encode())
+            if "open511" in url:
+                return _Resp(json.dumps(pages["first"]).encode())
+            return inner(req, timeout)
+
+        with patch("urllib.request.urlopen", urlopen):
+            svc.sync_road_closures_to_db(self.db)
+        self.assertEqual(sorted(r.closure_id for r in self._rows()), ["p1", "p2"])
+
+    def test_no_city_box_means_drivebc_is_not_asked_and_the_sync_fails(self):
+        seen = []
+        inner = _feeds([_event()])
+
+        def spy(req, timeout=None):
+            seen.append(req.full_url)
+            return inner(req, timeout)
+
+        with patch.object(svc, "closure_city_bbox", lambda db: None), \
+                patch("urllib.request.urlopen", spy):
+            svc.sync_road_closures_to_db(self.db)
+        self.assertFalse(any("open511" in u for u in seen))
+        status = svc.read_sync_status(self.db)
+        self.assertEqual(status["outcome"], svc.SYNC_FAILED)
+        self.assertFalse(status["sources"]["DriveBC Open511"]["reached"])
+
+    def test_municipal_keeps_only_the_citys_own_issues_and_stays_aligned(self):
+        # Another client's issue and a MOTI copy come first in the file: they are skipped,
+        # but their points are consumed, so the City's issue still gets its own geometry.
+        florida = dict(_muni_issue(issue_id=11, rct=262144, location="Pine Terrace"),
+                       Source="Transnomis Solutions")
+        moti = dict(_muni_issue(issue_id=12, rct=262144, location="Mary Hill Bypass"),
+                    Source="BC MOTI Gateway")
+        city = _muni_issue(issue_id=13, rct=262144, location="Como Lake Ave")
+        calls = []
+        real = svc.is_within_city
+
+        def within(db, geo):
+            calls.append(geo)
+            return True
+
+        with patch.object(svc, "is_within_city", within):
+            self._sync([], muni_issues=[florida, moti, city], muni_paths=[_PATH, _PATH2, _PATH3])
+        (row,) = self._rows()
+        self.assertEqual((row.closure_id, row.source), ("muni_13_0", "City of Coquitlam"))
+        # Only the City's geometry reached a spatial test, and it is the third path, not the first.
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["coordinates"][0], [_PATH3[0][1], _PATH3[0][0]])
 
     def test_severity_is_one_summary_line_per_sync_not_one_per_record(self):
         # #91: ~70 per-record ERROR lines a sync buried the id-less skip lines.

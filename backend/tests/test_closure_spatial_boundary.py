@@ -93,3 +93,17 @@ def test_a_point_150_m_outside_the_boundary_is_still_out(db):
 def test_a_closure_well_outside_the_city_is_out(db):
     # Metrotown, Burnaby -- kilometres from the boundary.
     assert closure_spatial.is_within_city(db, _point(49.2276, -123.0076)) is False
+
+
+def test_the_city_box_is_computed_from_the_table_and_holds_every_admitted_closure(db):
+    box = closure_spatial.closure_city_bbox(db)
+    assert box is not None
+    xmin, ymin, xmax, ymax = box
+    extent = db.execute(text(
+        "SELECT ST_XMin(e) x0, ST_YMin(e) y0, ST_XMax(e) x1, ST_YMax(e) y1 "
+        "FROM (SELECT ST_Extent(geom)::geometry e FROM public.city_boundary) q"
+    )).mappings().one()
+    # Strictly larger than the boundary itself on every side: the buffer is in it.
+    assert xmin < extent["x0"] and ymin < extent["y0"] and xmax > extent["x1"] and ymax > extent["y1"]
+    for _id, _before, lat, lng, _zone in SEVEN:
+        assert xmin <= lng <= xmax and ymin <= lat <= ymax

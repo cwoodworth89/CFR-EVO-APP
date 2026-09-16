@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, Date, JSON, ARRAY, Numeric, CheckConstraint, func
+from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, Date, JSON, ARRAY, Numeric, CheckConstraint, Index, func
+from sqlalchemy import text
 from sqlalchemy.orm import synonym
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY as PG_ARRAY
 import uuid
@@ -83,14 +84,35 @@ class EvaluationHistoryModel(Base):
 
 class RoadClosureModel(Base):
     __tablename__ = "road_closures"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        # Every row must be matchable by the next sync: by the feed's id, or, when the feed
+        # sent none, by the content key (punch list #91).
+        CheckConstraint(
+            "closure_id IS NOT NULL OR feed_record_key IS NOT NULL",
+            name="ck_road_closures_id_or_record_key",
+        ),
+        Index(
+            "ux_road_closures_feed_record_key", "feed_record_key", unique=True,
+            postgresql_where=text("closure_id IS NULL"),
+            sqlite_where=text("closure_id IS NULL"),
+        ),
+        {'extend_existing': True},
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    closure_id = Column(String, unique=True, index=True, nullable=False)
+    # The feed's own id, or NULL when the feed record carried none -- never invented from
+    # the record's position in the list (punch list #91, operator ruling 2026-09-16).
+    # Postgres UNIQUE allows any number of NULLs.
+    closure_id = Column(String, unique=True, index=True, nullable=True)
+    # Match key for an id-less record only: sha256 over raw feed fields. Not an id and
+    # never served as one. NULL whenever closure_id is set.
+    feed_record_key = Column(Text, nullable=True)
     street_name = Column(String, nullable=False)
     source = Column(String, nullable=False)
-    closure_type = Column(String, default="FULL_CLOSURE")
-    emergency_access = Column(String, nullable=False)
+    # NULL when the feed sent no usable severity (#91). No default: an unknown severity is
+    # not a tier, and the old default "FULL_CLOSURE" served an unknown as NO_ACCESS.
+    closure_type = Column(String, nullable=True)
+    emergency_access = Column(String, nullable=True)
     headline = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     geometry = Column(SafeJSON, nullable=False)

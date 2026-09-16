@@ -1,11 +1,12 @@
 import os
 import json
+import hashlib
 import re
 import math
 import logging
 import urllib.request
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 from sqlalchemy.orm import Session
 
 try:
@@ -150,6 +151,56 @@ def read_sync_status(db: Session) -> dict:
     }
 
 
+# --- FIELDS THE FEED DID NOT SEND (punch list #91) ----------------------------
+#
+# Operator rulings 2026-09-16. An unknown severity is not a tier: it is stored and served as
+# null, and the kiosk shows N/A in the access box. A feed record with no id keeps a null id
+# and says so; it is never given one from its position in the list.
+
+def _feed_id(value):
+    """The feed's own id as a string, or None when the feed sent none.
+
+    Missing, None and blank all count as none. str(None) would otherwise become the id
+    "None", which every id-less record would share.
+    """
+    if value is None:
+        return None
+    text_value = str(value).strip()
+    return text_value or None
+
+
+def _drivebc_severity(evt):
+    """(closure_type, emergency_access) for a DriveBC event, or (None, None) when unknown.
+
+    Unknown means the feed sent no severity, a blank one, or the literal "UNKNOWN". It used
+    to default to MINOR and so to CAUTION. Present values keep the mapping they already had
+    (MAJOR -> FULL_CLOSURE / NO_ACCESS, anything else -> LANE_RESTRICTION / CAUTION); that
+    mapping predates #91 and is not ruled on here.
+    """
+    raw = evt.get('severity')
+    sev = raw.strip().upper() if isinstance(raw, str) else None
+    if not sev or sev == 'UNKNOWN':
+        return None, None
+    if sev == 'MAJOR':
+        return 'FULL_CLOSURE', 'NO_ACCESS'
+    return 'LANE_RESTRICTION', 'CAUTION'
+
+
+def _content_record_key(source, fields):
+    """A match key for a feed record that has no id, derived only from what the feed sent.
+
+    It is not an id and is never served as one: GET /api/road-closures returns id = null and
+    idMissing = true for these rows. It exists so the upsert can find the same record on the
+    next sync instead of inserting it again. Built from raw feed fields only (never the text
+    placeholders), and it deliberately leaves out the fields a feed edits in place --
+    headline, description, severity, end time -- so an edit to those updates the row rather
+    than forking it.
+    """
+    blob = json.dumps({"source": source, **fields}, sort_keys=True,
+                      separators=(",", ":"), default=str)
+    return "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
 # --- LIVE INGESTION & POSTGRESQL SYNC PIPELINE ---
 
 def sync_road_closures_to_db(db: Session):
@@ -240,8 +291,7 @@ def _ingest_road_closures(db: Session, source_results: dict):
             mid = len(all_pts) // 2
             lat, lng = all_pts[mid][0], all_pts[mid][1]
 
-            sev = (evt.get('severity') or 'MINOR').upper()
-            emergency_access = 'NO_ACCESS' if sev == 'MAJOR' else 'CAUTION'
+            closure_type, emergency_access = _drivebc_severity(evt)
 
             start_dt = None
             end_dt = None
@@ -273,11 +323,22 @@ def _ingest_road_closures(db: Session, source_results: dict):
                 except Exception:
                     pass
 
+            closure_id = _feed_id(evt.get('id'))
             raw_notices.append({
-                "closure_id": str(evt.get('id', f"db_{len(raw_notices)}")),
+                "closure_id": closure_id,
+                "feed_record_key": None if closure_id else _content_record_key(
+                    "DriveBC Open511",
+                    {
+                        "road_name": evt.get('road_name'),
+                        "geography": geog,
+                        "schedule": evt.get('schedule'),
+                        "created": evt.get('created'),
+                    },
+                ),
+                "raw_severity": evt.get('severity'),
                 "street_name": (evt.get('road_name') or "Regional Corridor").strip(),
                 "source": "DriveBC Open511",
-                "closure_type": "FULL_CLOSURE" if sev == "MAJOR" else "LANE_RESTRICTION",
+                "closure_type": closure_type,
                 "emergency_access": emergency_access,
                 "headline": (evt.get('headline') or "TRAFFIC ALERT").strip(),
                 "description": (evt.get('description') or "Active traffic event.").strip(),
@@ -368,8 +429,20 @@ def _ingest_road_closures(db: Session, source_results: dict):
                         headline_text = desc.get('Headline') or loc_name
                         desc_text = (desc.get('BaseDescription') or "").strip() or "Local road construction or restriction."
 
+                        # geom_idx separates the geometries of one issue; it is not a
+                        # substitute for the issue's own id. No IssueId -> no closure_id.
+                        issue_id = _feed_id(issue.get('IssueId'))
                         raw_notices.append({
-                            "closure_id": f"muni_{issue.get('IssueId')}_{geom_idx}",
+                            "closure_id": f"muni_{issue_id}_{geom_idx}" if issue_id else None,
+                            "feed_record_key": None if issue_id else _content_record_key(
+                                issue.get('Source') or "City of Coquitlam",
+                                {
+                                    "location": geom.get('MarkerInfo', {}).get('LocationName'),
+                                    "path": path_pts,
+                                    "start_ms": desc.get('ProposedStartTimeUtcEpochMillis'),
+                                },
+                            ),
+                            "raw_severity": rct,
                             "street_name": loc_name.strip(),
                             "source": issue.get('Source') or "City of Coquitlam",
                             "closure_type": "FULL_CLOSURE" if emergency_access == "NO_ACCESS" else "LANE_RESTRICTION",
@@ -410,10 +483,37 @@ def _ingest_road_closures(db: Session, source_results: dict):
         return 0
 
     active_closure_ids = set()
+    # Content match keys for records the feed sent without an id (punch list #91).
+    active_record_keys = set()
 
     for item in raw_notices:
         cid = item["closure_id"]
-        active_closure_ids.add(cid)
+        record_key = item.get("feed_record_key")
+        label = cid or record_key
+
+        if item["closure_type"] is None or item["emergency_access"] is None:
+            logger.error(
+                f"Road closure {label} from {item['source']}: the feed sent no usable "
+                f"severity ({item.get('raw_severity')!r}); stored with closure_type and "
+                f"emergency_access null, not defaulted (punch list #91)."
+            )
+
+        if cid is None:
+            logger.error(
+                f"Road closure from {item['source']} has no id in the feed record; kept with "
+                f"closure_id null and matched on content key {record_key} (punch list #91)."
+            )
+            if record_key in active_record_keys:
+                # Two id-less records identical in every key field in one batch. They cannot
+                # be told apart without inventing something, so the first is kept.
+                logger.error(
+                    f"Two id-less road closure records from {item['source']} share content "
+                    f"key {record_key} in one sync; kept the first, dropped the second."
+                )
+                continue
+            active_record_keys.add(record_key)
+        else:
+            active_closure_ids.add(cid)
 
         # Check for expired
         end_time = item["end_time"]
@@ -423,7 +523,13 @@ def _ingest_road_closures(db: Session, source_results: dict):
         is_expired = end_time and now_utc > end_time
         is_active = not is_expired
 
-        existing = db.query(RoadClosureModel).filter(RoadClosureModel.closure_id == cid).first()
+        if cid is not None:
+            existing = db.query(RoadClosureModel).filter(RoadClosureModel.closure_id == cid).first()
+        else:
+            existing = db.query(RoadClosureModel).filter(
+                RoadClosureModel.closure_id == None,
+                RoadClosureModel.feed_record_key == record_key,
+            ).first()
         if existing:
             existing.street_name = item["street_name"]
             existing.source = item["source"]
@@ -439,10 +545,12 @@ def _ingest_road_closures(db: Session, source_results: dict):
             existing.start_time = item["start_time"]
             existing.end_time = end_time
             existing.active = is_active
+            existing.feed_record_key = record_key
             existing.updated_at = now_utc
         else:
             new_record = RoadClosureModel(
                 closure_id=cid,
+                feed_record_key=record_key,
                 street_name=item["street_name"],
                 source=item["source"],
                 closure_type=item["closure_type"],
@@ -462,12 +570,19 @@ def _ingest_road_closures(db: Session, source_results: dict):
 
     # Early completion deactivation: If a closure is missing from a successful scrape (where raw_notices > 0)
     # and its start_time is in the past, mark active = False (assuming construction completed early).
-    if active_closure_ids:
+    # An id-less row has closure_id NULL, and NOT IN over a NULL is never true -- without the
+    # second branch those rows would never be deactivated once they leave the feed.
+    if active_closure_ids or active_record_keys:
         db.query(RoadClosureModel).filter(
             RoadClosureModel.active == True,
             RoadClosureModel.start_time != None,
             RoadClosureModel.start_time <= now_utc,
-            ~RoadClosureModel.closure_id.in_(active_closure_ids)
+            or_(
+                and_(RoadClosureModel.closure_id != None,
+                     ~RoadClosureModel.closure_id.in_(list(active_closure_ids))),
+                and_(RoadClosureModel.closure_id == None,
+                     ~RoadClosureModel.feed_record_key.in_(list(active_record_keys))),
+            )
         ).update({RoadClosureModel.active: False}, synchronize_session=False)
 
     # Scheduled expiration deactivation: Deactivate records whose scheduled end_time has passed
@@ -496,8 +611,9 @@ def _ingest_road_closures(db: Session, source_results: dict):
     """), {"since": now_utc - timedelta(minutes=5)})
 
     db.commit()
-    logger.info(f"Successfully differentials-synced {len(active_closure_ids)} road closures. Purged {deleted_count} stale records older than 30 days.")
-    return len(active_closure_ids)
+    synced_count = len(active_closure_ids) + len(active_record_keys)
+    logger.info(f"Successfully differentials-synced {synced_count} road closures. Purged {deleted_count} stale records older than 30 days.")
+    return synced_count
 
 
 def check_and_sync_if_stale(db: Session, max_age_seconds: int = 86400) -> str:

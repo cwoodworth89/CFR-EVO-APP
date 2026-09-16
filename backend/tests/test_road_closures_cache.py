@@ -112,3 +112,42 @@ def test_closure_without_usable_coordinates_is_null_and_logged_not_defaulted(cap
     for i in range(len(bad_values)):
         assert any(f"bad-{i}" in m for m in logged)
     invalidate_road_closures_cache()
+
+
+def test_unknown_severity_and_missing_id_are_served_as_null_and_stated(caplog):
+    """Punch list #91: the contract the kiosk builds N/A and "no id in feed record" on."""
+    import logging
+
+    invalidate_road_closures_cache()
+    rec = MagicMock(spec=RoadClosureModel)
+    rec.id = 42
+    rec.closure_id = None
+    rec.feed_record_key = "sha256:abc"
+    rec.headline = "x"
+    rec.street_name = "x"
+    rec.closure_type = None
+    rec.emergency_access = None
+    rec.description = "x"
+    rec.coordinates = [49.28, -122.80]
+    rec.geometry = {}
+    rec.source = "test"
+    rec.zone_id = "1"
+    rec.affected_zones = ["1"]
+    rec.start_time = None
+    rec.end_time = None
+
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rec]
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    with caplog.at_level(logging.ERROR):
+        (served,) = get_road_closures(db=mock_db)["closures"]
+
+    assert served["severity"] is None
+    assert served["emergencyAccess"] is None
+    assert served["id"] is None
+    assert served["idMissing"] is True
+    assert served["rowId"] == 42
+    assert any("sha256:abc" in r.getMessage() and "severity" in r.getMessage()
+               for r in caplog.records if r.levelno == logging.ERROR)
+    invalidate_road_closures_cache()

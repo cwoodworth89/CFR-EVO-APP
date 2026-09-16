@@ -111,6 +111,10 @@ def _parse_closure_point(raw):
 def get_road_closures(db: Session = Depends(get_db)):
     """Active road closures, and the outcome of the last attempt to sync them.
 
+    Per closure, since #91: `id` is the feed's id or null, `idMissing` is true when the
+    feed record carried no id, `rowId` is the database row (keys and selection only),
+    `severity` and `emergencyAccess` are null when the feed sent no usable severity.
+
     Shape (changed 2026-09-16, punch list #89 -- this used to be the bare array):
 
         {
@@ -160,7 +164,7 @@ def get_road_closures(db: Session = Depends(get_db)):
                 logging.error(
                     "Road closure %s has no usable coordinates (stored value %r); "
                     "returned with coordinates=null, not drawn at a default point.",
-                    r.closure_id, r.coordinates,
+                    r.closure_id or r.feed_record_key, r.coordinates,
                 )
 
             polyline = []
@@ -168,11 +172,26 @@ def get_road_closures(db: Session = Depends(get_db)):
                 raw_poly = geom.get("coordinates", [])
                 polyline = [[float(pt[0]), float(pt[1])] for pt in raw_poly if isinstance(pt, (list, tuple)) and len(pt) >= 2]
 
+            # Unknown severity is served as null in both fields, never defaulted: the
+            # old `or "FULL_CLOSURE"` drew an unknown as the most severe tier (punch list
+            # #91). The kiosk shows N/A in the access box.
+            if r.closure_type is None or r.emergency_access is None:
+                logging.error(
+                    "Road closure %s has no known severity (closure_type=%r, "
+                    "emergency_access=%r); served as null, not defaulted.",
+                    r.closure_id or r.feed_record_key, r.closure_type, r.emergency_access,
+                )
+
             results.append({
+                # The feed's id, or null when the feed record had none (#91). Never display
+                # rowId in its place: rowId is this database's row, for React keys and
+                # selection only.
                 "id": r.closure_id,
+                "idMissing": r.closure_id is None,
+                "rowId": r.id,
                 "headline": r.headline or r.street_name,
                 "street": r.street_name,
-                "severity": r.closure_type or "FULL_CLOSURE",
+                "severity": r.closure_type,
                 "emergencyAccess": r.emergency_access,
                 "description": r.description or "Active traffic event.",
                 "coordinates": parsed_coords,

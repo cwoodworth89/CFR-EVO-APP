@@ -208,5 +208,180 @@ class RoadClosureSyncStatusTests(unittest.TestCase):
         self.assertEqual(len(set(results)), 3)
 
 
+# --- punch list #91: fields the feed did not send --------------------------------------
+#
+# The ingestion runs for real against SQLite. The three things that need PostGIS are
+# replaced: the city/zone lookups (answer "inside zone 1") and the geom mirror UPDATE
+# (ST_GeomFromGeoJSON), which becomes a no-op statement.
+
+def _encode_polyline(points):
+    """Google polyline encoding at 1e5, the inverse of PythonGeometryDecoder."""
+    out, prev_lat, prev_lng = [], 0, 0
+    for lat, lng in points:
+        for value, prev in ((round(lat * 1e5), prev_lat), (round(lng * 1e5), prev_lng)):
+            delta = value - prev
+            delta = ~(delta << 1) if delta < 0 else (delta << 1)
+            while delta >= 0x20:
+                out.append(chr((0x20 | (delta & 0x1f)) + 63))
+                delta >>= 5
+            out.append(chr(delta + 63))
+        prev_lat, prev_lng = round(lat * 1e5), round(lng * 1e5)
+    return "".join(out)
+
+
+def _feeds(drivebc_events, muni_issues=(), muni_paths=()):
+    """An urlopen stand-in serving the given DriveBC events and Municipal 511 issues."""
+    muni = {
+        "Issues": list(muni_issues),
+        "CoordsEncoded": "".join(_encode_polyline(p) for p in muni_paths),
+    }
+
+    def _urlopen(req, timeout=None):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        if "open511" in url:
+            return _Resp(json.dumps({"events": list(drivebc_events)}).encode())
+        if url.endswith("municipality=coquitlam"):
+            return _Resp(b'{"jsonData0.txt":"jsonData0.txt"}')
+        return _Resp(json.dumps(muni).encode())
+
+    return _urlopen
+
+
+def _event(**overrides):
+    evt = {
+        "id": "drivebc.ca/DBC-1",
+        "severity": "MAJOR",
+        "road_name": "Lougheed Hwy",
+        "headline": "CONSTRUCTION",
+        "description": "Lane closed.",
+        "geography": {"type": "Point", "coordinates": [-122.80, 49.28]},
+        "schedule": {"intervals": ["2026-09-01T00:00Z/2099-01-01T00:00Z"]},
+    }
+    evt.update(overrides)
+    return {k: v for k, v in evt.items() if v is not _ABSENT}
+
+
+_ABSENT = object()
+
+
+class FeedGapTests(unittest.TestCase):
+    def setUp(self):
+        from sqlalchemy import text as sa_text
+        self.engine = create_engine("sqlite://")
+        _Base.metadata.create_all(
+            bind=self.engine,
+            tables=[RoadClosureModel.__table__, RoadClosureSyncStatusModel.__table__],
+        )
+        self.db = sessionmaker(bind=self.engine)()
+        self.patches = [
+            patch.object(svc, "is_within_city", lambda db, geo: True),
+            patch.object(svc, "resolve_zones_and_hall", lambda db, geo: (["1"], "1", "1")),
+            patch.object(svc, "text", lambda sql: sa_text("SELECT 1")),
+        ]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.db.close()
+
+    def _sync(self, *args, **kwargs):
+        with patch("urllib.request.urlopen", _feeds(*args, **kwargs)):
+            return svc.sync_road_closures_to_db(self.db)
+
+    def _rows(self):
+        return self.db.query(RoadClosureModel).order_by(RoadClosureModel.id).all()
+
+    # --- ruling 1: unknown severity ------------------------------------------
+
+    def test_missing_severity_is_stored_null_and_logged_not_minor(self):
+        for sev in (_ABSENT, None, "", "  ", "UNKNOWN", "unknown"):
+            with self.subTest(severity=sev):
+                self.db.query(RoadClosureModel).delete()
+                self.db.commit()
+                with self.assertLogs(svc.logger, level="ERROR") as logs:
+                    self._sync([_event(severity=sev)])
+                (row,) = self._rows()
+                self.assertIsNone(row.closure_type)
+                self.assertIsNone(row.emergency_access)
+                self.assertTrue(any("DBC-1" in m and "severity" in m for m in logs.output))
+
+    def test_present_severity_keeps_its_existing_mapping(self):
+        self._sync([_event(id="a", severity="MAJOR"), _event(id="b", severity="minor")])
+        rows = {r.closure_id: r for r in self._rows()}
+        self.assertEqual((rows["a"].closure_type, rows["a"].emergency_access),
+                         ("FULL_CLOSURE", "NO_ACCESS"))
+        self.assertEqual((rows["b"].closure_type, rows["b"].emergency_access),
+                         ("LANE_RESTRICTION", "CAUTION"))
+
+    # --- ruling 2: missing feed id -------------------------------------------
+
+    def test_missing_id_is_kept_null_and_never_positional(self):
+        for missing in (_ABSENT, None, ""):
+            with self.subTest(id=missing):
+                self.db.query(RoadClosureModel).delete()
+                self.db.commit()
+                with self.assertLogs(svc.logger, level="ERROR") as logs:
+                    self._sync([_event(id="has-id", road_name="A St"),
+                                _event(id=missing, road_name="B St")])
+                ids = sorted((r.closure_id or "<null>") for r in self._rows())
+                self.assertEqual(ids, ["<null>", "has-id"])
+                for r in self._rows():
+                    self.assertFalse((r.closure_id or "").startswith("db_"))
+                    self.assertNotEqual(r.closure_id, "None")
+                self.assertTrue(any("no id in the feed record" in m for m in logs.output))
+
+    def test_id_less_record_is_matched_across_syncs_not_duplicated(self):
+        evt = _event(id=_ABSENT)
+        self._sync([evt])
+        (first,) = self._rows()
+        self.assertIsNone(first.closure_id)
+        self.assertTrue(first.feed_record_key.startswith("sha256:"))
+        row_id = first.id
+
+        # Hourly sync, then one where the feed edited the headline and severity in place.
+        self._sync([evt])
+        self._sync([dict(evt, headline="EDITED", severity="MINOR")])
+        (row,) = self._rows()
+        self.assertEqual(row.id, row_id)
+        self.assertEqual(row.headline, "EDITED")
+        self.assertEqual(row.emergency_access, "CAUTION")
+
+    def test_two_different_id_less_records_stay_two_rows(self):
+        self._sync([_event(id=_ABSENT, road_name="A St"), _event(id=_ABSENT, road_name="B St")])
+        self.assertEqual(len(self._rows()), 2)
+
+    def test_identical_id_less_records_in_one_batch_collapse_loudly(self):
+        evt = _event(id=_ABSENT)
+        with self.assertLogs(svc.logger, level="ERROR") as logs:
+            self._sync([evt, dict(evt)])
+        self.assertEqual(len(self._rows()), 1)
+        self.assertTrue(any("share content key" in m for m in logs.output))
+
+    def test_id_less_record_is_deactivated_when_it_leaves_the_feed(self):
+        gone = _event(id=_ABSENT, road_name="Gone St")
+        self._sync([gone, _event(id="stays")])
+        self._sync([_event(id="stays")])
+        rows = {r.street_name: r for r in self._rows()}
+        self.assertFalse(rows["Gone St"].active)
+        self.assertTrue(rows["Lougheed Hwy"].active)
+
+    def test_municipal_issue_without_issue_id_is_null_not_muni_none(self):
+        issue = {
+            "IssueId": None,
+            "Source": "City of Coquitlam",
+            "Geometry": [{"NumPoints": 2, "MarkerInfo": {"RoadClosureType": 0,
+                                                         "LocationName": "Como Lake Ave"}}],
+            "Description": {"Headline": "Paving", "BaseDescription": "Lane closed."},
+        }
+        path = [(49.28, -122.80), (49.281, -122.801)]
+        self._sync([], muni_issues=[issue], muni_paths=[path])
+        self._sync([], muni_issues=[issue], muni_paths=[path])
+        (row,) = self._rows()
+        self.assertIsNone(row.closure_id)
+        self.assertIsNotNone(row.feed_record_key)
+
+
 if __name__ == "__main__":
     unittest.main()

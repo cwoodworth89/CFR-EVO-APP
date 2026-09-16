@@ -37,9 +37,9 @@ services:
 
   osrm:
     # Pinned by digest: a graph only loads in the OSRM version that built it (the fingerprint
-    # in <graph>.osrm.properties), and this digest is the image that built apparatus.osrm
-    # (backend/data/osrm/apparatus.build.txt, backend/scripts/build_osrm_graph.sh). Moving the
-    # image means rebuilding the graph in the same step.
+    # in <graph>.osrm.properties), and this digest is the image that built the served graph
+    # (its build record beside it, backend/scripts/build_osrm_graph.sh). Moving the image means
+    # rebuilding the graph in the same step.
     image: ghcr.io/project-osrm/osrm-backend@sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c
     container_name: cfr_osrm
     restart: always
@@ -48,8 +48,11 @@ services:
     # (turn restrictions off, fire lanes drivable; punch-list #1) and the stay-in-Coquitlam
     # penalty at CFR_CITY_LIMITS_FACTOR=0.1 (operator ruling 2026-09-15, adjustable at build time;
     # build record apparatus_bc_city01_20260915.build.txt; corpus measurement evaluation_history
-    # fbafb199). Rollback: apparatus.osrm (2026-09-09, vancouver.osm.pbf, no penalty) -- change
-    # the three names back and `docker compose up -d --no-deps osrm`.
+    # fbafb199). No prebuilt rollback graph is kept: the operator ruled on 2026-09-15 that the
+    # kiosk is not in production and problems are dealt with as they come. To go back, rebuild
+    # from vancouver.osm.pbf with the pre-penalty profile (afa05f27, md5 84bf86d7 in
+    # apparatus.build.txt) -- about ten seconds, per the build records -- then change the three
+    # names below and `docker compose up -d --no-deps osrm`.
     command: >
       sh -c 'if [ -f /data/apparatus_bc_city01_20260915.osrm.timestamp ]; then
         exec osrm-routed --algorithm mld /data/apparatus_bc_city01_20260915.osrm;

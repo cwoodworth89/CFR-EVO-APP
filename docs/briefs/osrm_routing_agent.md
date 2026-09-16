@@ -40,8 +40,8 @@ is to make routing **right for fire apparatus and right for this city**, on evid
 
 | | |
 |:--|:--|
-| Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend` pinned by digest, `osrm-routed --algorithm mld /data/apparatus_bc_city01_20260915.osrm` since 2026-09-15; the rollback is `apparatus.osrm`, served 2026-09-09 to 2026-09-15), port 5000 |
-| Data | kiosk `backend/data/osrm/`: `coquitlam_region.osm.pbf` (Geofabrik's British Columbia extract, downloaded 2026-09-09 and cut with osmium to `-123.31,48.99,-122.45,49.52`; git-ignored, shared with the basemap), hard-linked as `apparatus_bc_city01_20260915.osm.pbf` for the served graph. `vancouver.osm.pbf` (a BBBike extract, map data of 2026-08-07, file of 2026-08-14) built the stock `car.lua` graph (answered 2026-09-08, below) and the rollback `apparatus.osrm` |
+| Container | `osrm` in `docker-compose.yml` (`ghcr.io/project-osrm/osrm-backend` pinned by digest, `osrm-routed --algorithm mld /data/apparatus_bc_city01_20260915.osrm` since 2026-09-15; no prebuilt rollback graph is kept, see the compose comment), port 5000 |
+| Data | kiosk `backend/data/osrm/`: `coquitlam_region.osm.pbf` (Geofabrik's British Columbia extract, downloaded 2026-09-09 and cut with osmium to `-123.31,48.99,-122.45,49.52`; git-ignored, shared with the basemap), hard-linked as `apparatus_bc_city01_20260915.osm.pbf` for the served graph. `vancouver.osm.pbf` (a BBBike extract, map data of 2026-08-07, file of 2026-08-14) is kept because BBBike's service takes a web form and an email and cannot be re-fetched by script; every graph built from it was deleted 2026-09-15 |
 | Profile | `backend/osrm/profiles/apparatus.lua`, the vendored `car.lua` (`docs/standards/osrm/`) with the operator's rulings, each hunk cited; `backend/scripts/build_osrm_graph.sh` builds a graph beside the served one and records what built it |
 | Service code | `services/gis/src/gis_service/routing_engine.py` (OSRM client, hall apron departure, staged `APPARATUS_TIERS` — staged, not applied, §6.4) |
 | API | `backend/api/routers/routing.py`; the frontend's `RoutingOverlay.jsx` calls `/api/route` |
@@ -137,8 +137,8 @@ is to make routing **right for fire apparatus and right for this city**, on evid
    2,248 routes moved, 562 of them the Hall 2 apron (a fire lane in OSM), all 24 loops gone,
    nothing slower by more than 11 s** — the second `routing` row, and the table in punch-list
    #1. **Deployed 2026-09-09 12:30 PDT** on the operator's word: `cfr_osrm` served
-   `apparatus.osrm` until 2026-09-15, image pinned by digest, the stock graph on disk as the
-   rollback; since then the regional graph below. The speed
+   `apparatus.osrm` until 2026-09-15, image pinned by digest; since then the regional graph
+   below. Neither old graph is on disk any more. The speed
    table is the one thing still unsourced. The item closes on the operator's word, or stays
    open on any dispatch id they name with a route they would not drive.
 

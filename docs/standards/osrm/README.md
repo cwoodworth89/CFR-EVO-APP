@@ -10,7 +10,7 @@ name suggests. Nothing here has been modified; the md5 sums below are the check.
 | Image | `ghcr.io/project-osrm/osrm-backend:latest`, id `sha256:3ac496ff8fd7e1af53846179d73d06a97f719c8ad2217d008ed868942398665c`, created 2026-08-01T09:26:32Z |
 | Version | `osrm-routed --version` → `v26.8.0` (`/opt/OSRM_GITSHA` in the image is empty) |
 | Copied with | `docker cp cfr_osrm:/opt/car.lua` and `docker cp cfr_osrm:/opt/lib`, 2026-09-08 |
-| Graph | kiosk `backend/data/osrm/vancouver.osrm.*` when these files were copied: every file written 2026-08-14 00:05 PDT; the container's first log line is 07:15:43 UTC the same morning. Served since 2026-09-15: `apparatus_bc_city01_20260915.osrm`, from `apparatus.lua` ([`../data_sources.md`](../data_sources.md)) |
+| Graph | kiosk `backend/data/osrm/vancouver.osrm.*` when these files were copied: every file written 2026-08-14 00:05 PDT; the container's first log line is 07:15:43 UTC the same morning. **Those files were deleted 2026-09-15** (operator: the kiosk is not in production, so no graph is kept for rollback), so the readings below cannot be repeated. Served since then: `apparatus_bc_city01_20260915.osrm`, from `apparatus.lua` ([`../data_sources.md`](../data_sources.md)) |
 
 ```
 db4f09652994b1a24389de0f0a6b7719  car.lua
@@ -53,24 +53,26 @@ evidence is therefore circumstantial, and it is listed so the next person can we
    are ten minutes older than the container's first start.
 
 **What this does not prove**: an edited copy of `car.lua` with a different speed table would
-leave the properties block unchanged. The one check that settles it is a rebuild from this
-vendored text with the same image, comparing `vancouver.osrm.enw` and `vancouver.osrm.geometry`
-byte for byte against the kiosk's. Do that at the first deliberate rebuild and record the
-result here (§7.6).
+leave the properties block unchanged. The check that would have settled it — rebuilding from this
+vendored text and comparing `vancouver.osrm.enw` and `vancouver.osrm.geometry` byte for byte
+against the kiosk's — is no longer available: those files were deleted on 2026-09-15 and the
+question is now closed unanswered (§7.5). It stopped mattering on 2026-09-09, when the kiosk
+moved to `apparatus.lua`, whose graphs each carry a build record naming the profile by md5.
 
 Re-verify at any time, on the kiosk:
 
 ```bash
 docker exec cfr_osrm osrm-routed --version
 docker exec cfr_osrm md5sum /opt/car.lua
-docker exec cfr_osrm sh -c 'head -c 520 /data/vancouver.osrm.properties | tail -c 8 | od -A n -t x1'
+docker exec cfr_osrm sh -c 'head -c 520 /data/apparatus_bc_city01_20260915.osrm.properties | tail -c 8 | od -A n -t x1'
 ```
 
 ## The extract the graph was cut from
 
 `backend/data/osrm/vancouver.osm.pbf`, 64,138,175 bytes, written 2026-08-14 00:05 PDT, git-ignored.
-Routing and the basemap both moved to `coquitlam_region.osm.pbf` on 2026-09-15; this file still
-backs the rollback graph `apparatus.osrm`. Read with pyosmium on the kiosk, 2026-09-08:
+Routing and the basemap both moved to `coquitlam_region.osm.pbf` on 2026-09-15. The file is kept
+even though nothing is built from it today, because BBBike's service takes a web form and an email
+and cannot be re-fetched by script. Read with pyosmium on the kiosk, 2026-09-08:
 
 | Header field | Value |
 |:--|:--|
@@ -78,8 +80,9 @@ backs the rollback graph `apparatus.osrm`. Read with pyosmium on the kiosk, 2026
 | `osmosis_replication_timestamp` | `2026-08-07T23:00:00Z` — the age of the map data |
 | bounding box | lon −123.307 … −122.668, lat 48.999 … 49.416 (the City, `public.city_boundary`, is lon −122.893 … −122.621, lat 49.220 … 49.351, so this extract stops short of its eastern edge: #86) |
 
-`vancouver.osrm.timestamp` on the kiosk is empty even though the header carries a
-timestamp. Not explained; recorded (§7.7).
+`vancouver.osrm.timestamp` on the kiosk was empty even though the header carries a
+timestamp. Not explained; recorded (§7.7). The file went with the rest of that graph on
+2026-09-15.
 
 ## What the text decides, for the work ahead
 

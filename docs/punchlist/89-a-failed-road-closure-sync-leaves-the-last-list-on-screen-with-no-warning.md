@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | DEPLOYED 2026-09-16 — the operator reports the frontend build and `--build api` ran; **not confirmed by lead against the kiosk, and the falsifier is not yet run.** The any-feed/all-feeds judgement is still open |
+| **Status** | DEPLOYED 2026-09-16 — the operator reports the frontend build and `--build api` ran; **not confirmed by lead against the kiosk, and the falsifier is not yet run.** Any-feed-failed ruled "any for now" (operator, 2026-09-16) — as built, no change |
 | **Severity** | 🔴 crew-visible — a two-week-old closure list looks exactly like today's |
 | **Area** | 🖥️ Kiosk · ⚙️ API |
 | **Origin** | External call audit, 2026-08-31 (`post_freeze_backlog.md`, the §2.1 row); promoted when the operator ruled the design on 2026-09-16 |
@@ -75,3 +75,4 @@ the next successful tick, including when the source returns zero closures.
 | 2026-09-16 | Frontend half sent to `frontend-kiosk-architect` with the response contract: fix `useRoadClosures.js:27` (`Array.isArray` guard blanks the list on the new shape) and the banner in `RightSidebar.jsx` on exactly `sync.outcome === "FAILED"`; `NOT_ATTEMPTED` never raises it. #90 opened for the default coordinate GIS found at `routers/road_closures.py:134` |
 | 2026-09-16 | **Frontend built, `727c297b`.** `useRoadClosures.js:35` unwraps `payload?.closures ?? payload` — the list draws on the old bare array and the new object, so the bundle and the api container can land in either order without an empty sidebar; `:36` lifts `sync`, returned as `syncStatus` (`:81`). Banner in `RightSidebar.jsx:167` on exactly `syncStatus?.outcome === "FAILED"`, rendered at `:194` between the header and the scroll area so it cannot scroll away; amber, not red, because red already means NO_ACCESS on the closure cards beside it; `error` and `lastAttemptAt` omitted entirely when null (§6.1). Wire through `MapBoard.jsx:108`, `:585`. On a *fetch* failure the hook keeps both the last list and the last flag — the kiosk failing to reach the API says nothing about the feeds. Verified: `lint:crash` and `build` clean; the unwrap and the condition exercised across nine payload shapes at expression level (no React test harness exists). **Not seen rendered**; visual fit at 320 px is reasoned, not looked at |
 | 2026-09-16 | Operator reports deployed ("Done"). Recorded as reported, not confirmed (§6.6). Falsifier unrun. Note: #90's `e3009d6a` touches the same api container and will need another `--build api` |
+| 2026-09-16 | **Operator ruled the open judgement: "any for now."** Any one feed not ingested in full marks the attempt FAILED, as GIS built it (`road_closure_service.py:176`). Revisable if DriveBC proves flaky; the per-feed detail in `sync.sources` is what would show that |

@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN — found 2026-09-16; not built; needs the operator's ruling on each default |
+| **Status** | OPEN — severity and id ruled 2026-09-16 (below), backend with `gis-spatial-engineer`; **text placeholders not yet ruled**, untouched |
 | **Severity** | 🔴 crew-visible — crews read the access level off a severity the feed never sent |
 | **Area** | ⚙️ API · 🖥️ Kiosk |
 | **Origin** | Found by `gis-spatial-engineer` while fixing #90 ("hardcoded failsafes concern me, it needs to fail loudly" — operator, 2026-09-16); every line verified by lead against the working tree at `e3009d6a` |
@@ -45,12 +45,17 @@ ONLY and NO ACCESS — rather than pick one. Text fields render as absent (`--`)
 that reads as a description. A record with no id from the feed gets an id derived from the
 record (source + stable fields), never from the position in the list.
 
-## Operator rulings needed
+## Operator rulings
 
-1. Unknown severity: a fourth visible state, or drop the record from the map and keep it in
-   the sidebar list only?
-2. Text placeholders: blank, or omit the card field?
-3. The `db_{n}` id: derive from content, or refuse the record and log it?
+1. **Unknown severity — ruled 2026-09-16: "keep the box but add N/A."** A fourth visible
+   state. Severity and the derived access level propagate as `null`; the kiosk keeps the access
+   box and shows **N/A** in it. Never CAUTION, never NO_ACCESS.
+2. **Text placeholders — not yet ruled.** Blank (`--`), or omit the card field? Untouched until
+   the operator says.
+3. **The `db_{n}` id — ruled 2026-09-16: "keep positional ID as null, but state it."** No id is
+   invented from the record's position. The record is kept and the card says the feed sent no
+   id. How a record with no id survives the upsert without being invented or duplicated is
+   engineering, GIS's to solve and state.
 
 ## Falsifier
 
@@ -63,3 +68,4 @@ defect is latent like #90 was; it still goes, for the same reason.
 | Date | Event |
 |:--|:--|
 | 2026-09-16 | Found by `gis-spatial-engineer` during #90, out of its scope, not built. Verified by lead line by line. Promoted under §7.1: the severity pair is crew-visible. Rulings above are the operator's |
+| 2026-09-16 | Operator ruled severity (N/A, a fourth state) and the id (null, stated on the card). Backend sent to `gis-spatial-engineer`: stop both severity defaults and the positional id, define the response contract for unknown severity and missing id, solve the upsert, leave the text placeholders alone. Frontend half (the N/A box, the "no id" line) waits on that contract. Text placeholders still need a ruling |

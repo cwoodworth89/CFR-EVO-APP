@@ -92,9 +92,9 @@ the call and the map draws its result, so §1 governs it. The candidate boundary
 ever wait on it?" sorted this row onto the bench, which is why the register sorts on *who
 makes the call* instead.
 
-**Open, and accepted as needing a fix:** the kiosk cannot tell a crew that what it is showing
-is two weeks old. The operator's direction on 2026-09-16 was a staleness indicator or a
-warning banner in the closure sidebar; the element is not chosen yet.
+**Still open.** The kiosk cannot tell a crew that what it is showing is two weeks old. The
+operator raised a staleness indicator or a warning banner in the closure sidebar on
+2026-09-16 as likely needed; he has not picked the element and nothing is built.
 
 **Measured 2026-09-16, before anything is built on it (§7.6):** nothing records the last
 *successful contact* with the source. `check_and_sync_if_stale`

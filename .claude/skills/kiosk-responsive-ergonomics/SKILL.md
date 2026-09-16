@@ -145,8 +145,17 @@ replaced gave Leaflet a NaN zoom on a phone (`docs/standards/dependency-behaviou
 * **`touch:`** (`@media (pointer: coarse)`, added in `tailwind.config.js`) for target sizes
   and 16 px inputs. It applies to the hall's touch TV as much as to a phone, and never to a
   mouse. `hoverOnlyWhenSupported` is on, so `hover:` never sticks after a tap.
-* **Nothing crew-facing lives only in a `title` tooltip.** A touch screen never shows one;
-  the flag reasons and the changed-field list open on a tap for that reason.
+* **No information lives only on hover.** Standing rule, operator 2026-09-16: *"I want to
+  move away from hover information as it won't benefit a touchscreen setup or mobile."*
+  Nothing may be carried only by a `title` attribute, a tooltip, a `hover:` state or a
+  mouse-enter handler. Anything a crew needs is either on the surface or opens on a tap. The
+  hall display is a touch TV and a phone has no pointer, so neither ever shows hover content.
+  Worked examples: the flag reasons and the changed-field list open on a tap; the #90
+  no-location and #89 sync-failure warnings are printed on the card, not in a tooltip.
+  `hover:` styling that only highlights something the surface already shows is fine: it adds
+  nothing, and nothing is lost without it. When a `title` is kept for a mouse user, its text
+  must duplicate something already visible. Existing hover-only content is on the backlog,
+  not audited during the freeze; new work follows the rule.
 * **Dark slate palette** (`bg-slate-950`, `border-slate-800`) throughout. This is for
   low-light station conditions and contrast, not viewing distance, and stays regardless of
   the constraint above.

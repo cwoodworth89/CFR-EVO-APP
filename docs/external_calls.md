@@ -92,9 +92,26 @@ the call and the map draws its result, so §1 governs it. The candidate boundary
 ever wait on it?" sorted this row onto the bench, which is why the register sorts on *who
 makes the call* instead.
 
-**Still open.** The kiosk cannot tell a crew that what it is showing is two weeks old. The
-operator raised a staleness indicator or a warning banner in the closure sidebar on
-2026-09-16 as likely needed; he has not picked the element and nothing is built.
+**Operator ruling 2026-09-16 — the flag is the failed sync, not the age of the data.** Raise
+a warning when the previous attempt to sync failed; clear it the next time one succeeds.
+
+This is deliberately not a staleness indicator, and it is the better answer for a reason worth
+keeping: **it makes an empty closure list readable.** No flag and no closures means the source
+was reached and the City has none; a flag and no closures means we could not reach it. That is
+the §6.1 ambiguity closed, with no derived value and no threshold to tune.
+
+The measurement that ruled out the other approach, kept because it is what a staleness
+indicator would have been built on: `check_and_sync_if_stale`
+(`backend/api/road_closure_service.py:369`) reads `max(RoadClosureModel.updated_at)`, and
+`updated_at` is stamped on every row a sync touches (`:308`), so it tracks contact only while
+at least one closure comes back. A sync that succeeds and returns **zero** closures leaves
+that timestamp untouched — so age alone cannot tell the two cases apart.
+
+**Not built yet.** What it needs: the sync's outcome recorded in Postgres with three states
+(not attempted / succeeded / failed) rather than the current two — `check_and_sync_if_stale`
+returns `False` both for "no sync was needed" and for "the sync failed" (`:398`), so today the
+caller cannot tell them apart — then `GET /api/road-closures` returning it, then the flag in
+the sidebar.
 
 **Measured 2026-09-16, before anything is built on it (§7.6):** nothing records the last
 *successful contact* with the source. `check_and_sync_if_stale`

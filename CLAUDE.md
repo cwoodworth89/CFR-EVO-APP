@@ -7,7 +7,11 @@ This rule file defines domain constraints, runtime environments, and workflow st
 ## 1. Local-Only Stack, $0 Cost, Municipal Open Data
 
 * **Total offline survival**: STT, geocoding, routing, spatial queries, tile serving and
-  WebSocket dispatch MUST all work with no internet. No WAN dependency anywhere.
+  WebSocket dispatch MUST all work with no internet. **The kiosk in service has no WAN
+  dependency** — nothing a crew needs to reach an address or read critical information may
+  depend on a link. Build-time and research fetches are allowed, run by hand, and registered
+  in [`docs/external_calls.md`](docs/external_calls.md) Part B; they must produce an artifact
+  that ships to the kiosk's disk. Operator ruling 2026-09-16.
 * **$0 recurring cost**: do NOT reintroduce Supabase, Firebase, AWS RDS, cloud STT, or paid
   geocoding. Everything persists to containerized PostgreSQL 16 + PostGIS 3.4
   (`postgis/postgis:16-3.4-alpine`, `localhost:5432`).

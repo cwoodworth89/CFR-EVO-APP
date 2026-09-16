@@ -288,6 +288,15 @@ export function RightSidebar({
                                                      </span>
                                                      <span className="text-[8px] text-slate-500 font-mono font-medium flex-shrink-0">{closure.source}</span>
                                                  </div>
+
+                                                 {/* Operator ruling 2026-09-16 (#90): no coordinates shows an
+                                                     error under the location, and the card still displays.
+                                                     Said on the card, not in a tooltip: the hall display is touch. */}
+                                                 {!mapPoint && (
+                                                   <div className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
+                                                     ⚠️ NO MAP LOCATION IN FEED RECORD
+                                                   </div>
+                                                 )}
                                                  
                                                  {/* Headline & Warning Type Pill */}
                                                  <div className="flex justify-between items-center text-[9px] font-mono font-bold text-slate-400">
@@ -321,14 +330,6 @@ export function RightSidebar({
                                                     )}
                                                  </div>
 
-                                                 {/* The feed record carries no usable location, so the
-                                                     map cannot show it and tapping does nothing. Said on
-                                                     the card, not in a tooltip: the hall display is touch. */}
-                                                 {!mapPoint && (
-                                                   <div className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
-                                                     ⚠️ NO MAP LOCATION IN FEED RECORD
-                                                   </div>
-                                                 )}
                                             </div>
                                           );
                                         })}

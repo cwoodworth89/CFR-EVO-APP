@@ -12,6 +12,23 @@ const GROUP_DEFS = {
   "OTHER": { label: "Regional Corridors / Other", color: "border-slate-600 text-slate-400 bg-slate-800/30" }
 };
 
+/** Where tapping a closure card flies the map, or null when the record carries no usable
+ *  location. Same order as RoadClosureMarker.jsx: the closure's own point, then the first
+ *  vertex of its own polyline -- both real data from the same record -- and otherwise
+ *  nothing. No default coordinate (CLAUDE.md 5, 6.1): since e3009d6a the API sends
+ *  `coordinates: null` rather than a fake point, and Leaflet's flyTo throws on null, which
+ *  left the tap silently dead. Stricter than the marker only in rejecting NaN. Punch list #90. */
+function closureMapPoint(closure) {
+  const toPoint = pt => {
+    if (!Array.isArray(pt) || pt.length < 2) return null;
+    const lat = parseFloat(pt[0]);
+    const lng = parseFloat(pt[1]);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
+  };
+  return toPoint(closure.coordinates)
+    ?? (Array.isArray(closure.polyline) && closure.polyline.length > 0 ? toPoint(closure.polyline[0]) : null);
+}
+
 export function RightSidebar({ 
   // A phone: a drawer over the right of the map rather than a column beside it.
   compact = false,
@@ -240,18 +257,25 @@ export function RightSidebar({
                                     {/* Group Closures */}
                                     {!collapsedGroups[group.unit] && (
                                       <div className="flex flex-col gap-2 pl-1 border-l border-slate-800/40">
-                                        {group.closures.map((closure) => (
+                                        {group.closures.map((closure) => {
+                                          const mapPoint = closureMapPoint(closure);
+                                          return (
                                             <div 
                                               key={closure.id} 
                                               onClick={() => {
+                                                // No location, no fly and no selection: there is
+                                                // no marker to open, and the card says why below.
+                                                if (!mapPoint) return;
                                                 if (map) {
-                                                  map.flyTo(closure.coordinates, 16, { animate: true });
+                                                  map.flyTo(mapPoint, 16, { animate: true });
                                                 }
                                                 if (onSelectClosure) {
                                                   onSelectClosure(closure);
                                                 }
                                               }}
-                                              className="bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-left p-2.5 rounded-xl shadow-sm cursor-pointer transition-all flex flex-col gap-1.5 group relative overflow-hidden flex-shrink-0"
+                                              className={`bg-slate-950 border border-slate-850 text-left p-2.5 rounded-xl shadow-sm transition-all flex flex-col gap-1.5 group relative overflow-hidden flex-shrink-0 ${
+                                                mapPoint ? 'hover:bg-slate-900 hover:border-slate-750 cursor-pointer' : 'cursor-default'
+                                              }`}
                                             >
                                                  {/* Street Name (Prominent & Color-coded) & Source */}
                                                  <div className="flex justify-between items-center gap-1.5">
@@ -296,8 +320,18 @@ export function RightSidebar({
                                                       </span>
                                                     )}
                                                  </div>
+
+                                                 {/* The feed record carries no usable location, so the
+                                                     map cannot show it and tapping does nothing. Said on
+                                                     the card, not in a tooltip: the hall display is touch. */}
+                                                 {!mapPoint && (
+                                                   <div className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
+                                                     ⚠️ NO MAP LOCATION IN FEED RECORD
+                                                   </div>
+                                                 )}
                                             </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     )}
                                 </div>

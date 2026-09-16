@@ -64,24 +64,25 @@ new untracked ones. For work already committed, swap the braces for
 `git diff --name-only --relative <base> HEAD -- src`. If the file list comes back empty, don't
 run it: ESLint with no arguments lints the whole directory.
 
-**Why `lint:crash` alone is not enough.** `eslint.crash.config.js` is deliberately narrow:
-`no-undef` and `react-hooks/immutability` (the TDZ case), the two mistakes the pre-commit hook
-blocks. It has no `react-hooks/rules-of-hooks`, and `npm run build` doesn't check hook order
-either. A hook called after an early return passes both, then throws in React's production
-build the first time the component re-renders down the other branch. React 19.2 throws #300
-for fewer hooks and #310 for more; see `react-dom-client.production.js`.
+**Why full eslint as well.** `eslint.crash.config.js` is deliberately narrow: `no-undef`,
+`react-hooks/immutability` (the TDZ case) and, since 2026-09-16, `react-hooks/rules-of-hooks`.
+Those three are what the pre-commit hook blocks, because each compiles clean through Vite and
+throws only in the browser. Everything else full eslint reports is advisory, so it doesn't
+block a commit and isn't in `lint:crash`. It is still worth reading on the lines you changed.
 
-This shipped. `727c297b` (#89) put a `React.useMemo` after `RightSidebar`'s
-`if (!isExplore) return null;`. `lint:crash` and `build` were clean, and it was deployed.
-Full eslint on the same file reports `react-hooks/rules-of-hooks` at the line; it was found
-only when full eslint ran for #91, and fixed in `776b52e5`. The only error boundary is the
-root one (`main.jsx`), so on the console it fires as the whole-screen "Application
-Diagnostic Error" card, not a blank sidebar.
+**How `rules-of-hooks` got into the guard.** `727c297b` (#89) put a `React.useMemo` after
+`RightSidebar`'s `if (!isExplore) return null;`. The crash config didn't include that rule
+then, and `npm run build` doesn't check hook order, so it passed both and was deployed. React
+19.2's production build throws on a hook-count change between renders: #300 for fewer hooks,
+#310 for more (`react-dom-client.production.js`). The only error boundary is the root one
+(`main.jsx`), so it fires as the whole-screen "Application Diagnostic Error" card. Full eslint
+caught it during #91, and it was fixed in `776b52e5`. The operator then ruled the rule into
+`lint:crash`, so the guard and this runbook now agree.
 
 **Reading the result.** Full eslint has pre-existing errors in files nobody touched (three in
 `MapBoard.jsx` as of 2026-09-16), and they are not yours to fix mid-freeze. An error is yours
 if it is on a line you changed, or if it is absent when you stash your change and re-run.
-**Any `react-hooks/rules-of-hooks` error is a blocker regardless.**
+Anything `lint:crash` reports is a blocker regardless.
 
 ---
 

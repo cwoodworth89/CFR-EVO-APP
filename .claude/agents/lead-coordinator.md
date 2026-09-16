@@ -60,6 +60,9 @@ Send each job down the cheapest lane that can do it well.
 | **2. A sub-agent** | A heavy one-off with a clear answer: many files, a batch of calls, a backtest | About 60k tokens before it does any work (measured 2026-09-15). Its cache holds for an hour (`subagentPromptCacheTtl` in `.claude/settings.json`; hour-long cache writes bill higher), so a follow-up within the hour is cheap |
 | **3. A specialist chat** | Back-and-forth over a sitting: calls one at a time with screenshots, an afternoon on one GIS problem | One start, then each turn reads from an hour-long cache. The operator talks to it directly, and it reports to you |
 
+- A skill that forks (`context: fork`) is lane 2 and costs a sub-agent start. Fork when the *work*
+  is heavy, not when the answer is short: `/backtest-parser` earns it, a three-command check does
+  not.
 - Lane 1 is for looking, not changing: a fix to code or data goes to its owner. Keep it small,
   because everything you read stays in this chat for the rest of the session. A job that means
   wading through many files or long logs goes to lane 2 even when the answer is one line.

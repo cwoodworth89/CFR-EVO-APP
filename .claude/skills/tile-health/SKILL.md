@@ -1,10 +1,7 @@
 ---
 name: tile-health
-description: Check the kiosk's tile server end to end — which services cfr_tiles publishes, whether each answers with a real tile rather than a blank, and whether an archive was left in WAL mode. Read-only, and it runs in its own sub-agent so the probe output stays out of the calling chat.
+description: Check the kiosk's tile server end to end — which services cfr_tiles publishes, whether each answers with a real tile rather than a blank, and whether an archive was left in WAL mode. Read-only, and it runs in the calling chat: three probes and a listing are not worth a sub-agent.
 when_to_use: Someone asks whether the map tiles are healthy, or a tile archive was just rebuilt, swapped, deleted, or cfr_tiles was restarted.
-context: fork
-agent: kiosk-remote-operator
-background: false
 disallowed-tools: Edit, Write, NotebookEdit
 ---
 

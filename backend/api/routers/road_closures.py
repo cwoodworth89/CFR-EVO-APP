@@ -111,9 +111,10 @@ def _parse_closure_point(raw):
 def get_road_closures(db: Session = Depends(get_db)):
     """Active road closures, and the outcome of the last attempt to sync them.
 
-    Per closure, since #91: `id` is the feed's id or null, `idMissing` is true when the
-    feed record carried no id, `rowId` is the database row (keys and selection only),
-    `severity` and `emergencyAccess` are null when the feed sent no usable severity.
+    Per closure, since #91: `id` is always the feed's id (records without one are skipped at
+    ingestion and counted in `sync.skipped`); `rowId` is the database row, for keys and
+    selection only; `severity` and `emergencyAccess` are null when the feed stated none;
+    `street`, `headline` and `description` are null when the feed sent nothing.
 
     Shape (changed 2026-09-16, punch list #89 -- this used to be the bare array):
 
@@ -123,7 +124,9 @@ def get_road_closures(db: Session = Depends(get_db)):
             "outcome": "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED",
             "lastAttemptAt": ISO-8601 string | null,
             "error": string | null,
-            "sources": {"<feed name>": {"reached": bool, "error": string}} | null
+            "sources": {"<feed name>": {"reached": bool, "error": string,
+                                        "skippedNoId": int}} | null,
+            "skipped": {"count": int, "bySource": {"<feed name>": int}} | null
           }
         }
 
@@ -164,7 +167,7 @@ def get_road_closures(db: Session = Depends(get_db)):
                 logging.error(
                     "Road closure %s has no usable coordinates (stored value %r); "
                     "returned with coordinates=null, not drawn at a default point.",
-                    r.closure_id or r.feed_record_key, r.coordinates,
+                    r.closure_id, r.coordinates,
                 )
 
             polyline = []
@@ -179,21 +182,20 @@ def get_road_closures(db: Session = Depends(get_db)):
                 logging.error(
                     "Road closure %s has no known severity (closure_type=%r, "
                     "emergency_access=%r); served as null, not defaulted.",
-                    r.closure_id or r.feed_record_key, r.closure_type, r.emergency_access,
+                    r.closure_id, r.closure_type, r.emergency_access,
                 )
 
             results.append({
-                # The feed's id, or null when the feed record had none (#91). Never display
-                # rowId in its place: rowId is this database's row, for React keys and
-                # selection only.
+                # rowId is this database's row, for React keys and selection only; never
+                # display it as the feed's id.
                 "id": r.closure_id,
-                "idMissing": r.closure_id is None,
                 "rowId": r.id,
                 "headline": r.headline or r.street_name,
                 "street": r.street_name,
                 "severity": r.closure_type,
                 "emergencyAccess": r.emergency_access,
-                "description": r.description or "Active traffic event.",
+                # No placeholder text: null when the feed sent none (#91); kiosk shows "--".
+                "description": r.description,
                 "coordinates": parsed_coords,
                 "polyline": polyline,
                 "source": r.source,

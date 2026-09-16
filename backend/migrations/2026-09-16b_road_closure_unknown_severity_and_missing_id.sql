@@ -1,37 +1,38 @@
--- Let a road closure carry an unknown severity and a missing feed id as NULL, instead of the
--- invented values the ingestion used to fill them with.
+-- Let a road closure carry an unknown severity and a missing road name as NULL, instead of
+-- the invented values the ingestion used to fill them with.
 --
 -- WHY
 -- ---
 -- Punch list #91, operator rulings 2026-09-16.
 --
--- 1. Unknown severity -> "keep the box but add N/A". A DriveBC event with no severity was
---    stored as MINOR/CAUTION, and a row with no closure_type was served as FULL_CLOSURE,
---    so the same unknown reached crews as the mildest or the most severe tier depending on
---    which field was empty. Both are now NULL, so emergency_access must allow NULL.
+-- 1. Unknown severity -> N/A. A DriveBC event with no severity was stored as MINOR/CAUTION,
+--    a Municipal 511 record with no stated closure type started at CAUTION ("for all I know
+--    it's purely informational alerts"), and a row with no closure_type was served as
+--    FULL_CLOSURE. All are now NULL, so emergency_access must allow NULL. closure_type
+--    already does.
 --
--- 2. Missing feed id -> "keep as null, but state it". A record without an id was given
---    db_<position in the list> (DriveBC) or muni_None_<n> (Municipal 511), which a later
---    sync can hand to a different closure and overwrite it. closure_id is now NULL for those
---    records, so it must allow NULL. Postgres UNIQUE permits any number of NULLs.
+-- 2. Text the feed did not send -> NULL, shown as "--" ("If we don't get a title don't make
+--    one up"). street_name was filled with "Regional Corridor" / "Local Road"; it is now
+--    NULL when the feed sends none, so street_name must allow NULL. headline and description
+--    already do.
 --
---    closure_id is what the upsert matches on, so an id-less record needs another way to be
---    found on the next sync without inventing an id or inserting a duplicate every hour:
---    feed_record_key, a sha256 over the raw fields the feed sent (see
---    road_closure_service._content_record_key). It is set only when closure_id is NULL, is
---    unique among those rows, and is never served as an id. The CHECK guarantees every row
---    is matchable one way or the other.
+-- Not in this file, by ruling: a record with no feed id is skipped at ingestion, not stored,
+-- so closure_id stays NOT NULL. (The first draft of this file, never run, dropped that NOT
+-- NULL and added a content-key column; the operator reversed that ruling before deploy.)
 --
--- ORDER MATTERS. Apply this BEFORE rebuilding the api container. The new code maps
--- feed_record_key, so without the column every query on road_closures fails and
--- GET /api/road-closures returns 500 (the kiosk list goes empty; #89's banner would show,
--- since the sync status lives in its own table). Base.metadata.create_all does not alter an
--- existing table, so the rebuild will not do this for you. The old code runs unchanged
--- against the migrated table: it always writes both columns and never reads the new one.
+-- ORDER: apply this BEFORE rebuilding the api container.
+--   * Rebuild first, migration late: the old table is fine for reads, so the kiosk list keeps
+--     drawing, but the first sync that meets an unstated severity or a missing road name
+--     fails its INSERT on the NOT NULL. The whole sync rolls back, #89 records FAILED and
+--     the banner shows, and every hourly tick fails the same way until this runs.
+--   * Migration first, old code still running: harmless. The old code always writes both
+--     columns.
+-- Base.metadata.create_all does not alter an existing table, so the rebuild will not do this.
 --
--- Falsifier from #91, run on the kiosk 2026-09-16 before this was written: 0 rows with a
--- NULL closure_type, description, street_name or headline, 0 with a db_% id, 0 with a
--- muni_None% id. 177 rows. The defect was latent.
+-- Falsifier from #91, run on the kiosk 2026-09-16: 0 of 177 rows had a NULL closure_type,
+-- description, street_name or headline, or a db_% / muni_None% id. After this migration and
+-- before the next sync, `SELECT count(*) FROM public.road_closures WHERE emergency_access IS
+-- NULL OR street_name IS NULL;` is 0 -- the migration changes no data.
 --
 -- Apply on the kiosk:
 --   docker exec -i cfr_postgres psql -U cfr_user -d cfr_dispatch \
@@ -40,25 +41,12 @@
 BEGIN;
 
 ALTER TABLE public.road_closures
-    ALTER COLUMN closure_id DROP NOT NULL,
     ALTER COLUMN emergency_access DROP NOT NULL,
-    ADD COLUMN IF NOT EXISTS feed_record_key TEXT;
+    ALTER COLUMN street_name DROP NOT NULL;
 
-ALTER TABLE public.road_closures
-    DROP CONSTRAINT IF EXISTS ck_road_closures_id_or_record_key;
-ALTER TABLE public.road_closures
-    ADD CONSTRAINT ck_road_closures_id_or_record_key
-    CHECK (closure_id IS NOT NULL OR feed_record_key IS NOT NULL);
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_road_closures_feed_record_key
-    ON public.road_closures (feed_record_key)
-    WHERE closure_id IS NULL;
-
-COMMENT ON COLUMN public.road_closures.closure_id IS
-    'The feed''s own id; NULL when the feed record carried none. Never derived from position. Punch list #91.';
-COMMENT ON COLUMN public.road_closures.feed_record_key IS
-    'Only when closure_id IS NULL: sha256 over raw feed fields, so the next sync can match the record. Not an id; never served as one.';
 COMMENT ON COLUMN public.road_closures.emergency_access IS
-    'NO_ACCESS / ACCESS_ONLY / CAUTION, or NULL when the feed sent no usable severity (#91). The kiosk shows N/A.';
+    'NO_ACCESS / ACCESS_ONLY / CAUTION, or NULL when the feed stated no severity (#91). The kiosk shows N/A.';
+COMMENT ON COLUMN public.road_closures.street_name IS
+    'Road name as the feed sent it, or NULL when it sent none (#91). The kiosk shows --.';
 
 COMMIT;

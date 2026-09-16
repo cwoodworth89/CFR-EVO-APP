@@ -233,7 +233,8 @@ def _feeds(drivebc_events, muni_issues=(), muni_paths=()):
     """An urlopen stand-in serving the given DriveBC events and Municipal 511 issues."""
     muni = {
         "Issues": list(muni_issues),
-        "CoordsEncoded": "".join(_encode_polyline(p) for p in muni_paths),
+        # One continuous encoding: the decoder carries its running deltas across issues.
+        "CoordsEncoded": _encode_polyline([pt for path in muni_paths for pt in path]),
     }
 
     def _urlopen(req, timeout=None):
@@ -315,73 +316,92 @@ class FeedGapTests(unittest.TestCase):
         self.assertEqual((rows["b"].closure_type, rows["b"].emergency_access),
                          ("LANE_RESTRICTION", "CAUTION"))
 
-    # --- ruling 2: missing feed id -------------------------------------------
+    def test_municipal_record_with_no_stated_type_is_null_not_caution(self):
+        issue = _muni_issue(issue_id=7, rct=0, headline="Community event", base="Street fair.")
+        self._sync([], muni_issues=[issue], muni_paths=[_PATH])
+        (row,) = self._rows()
+        self.assertIsNone(row.closure_type)
+        self.assertIsNone(row.emergency_access)
 
-    def test_missing_id_is_kept_null_and_never_positional(self):
-        for missing in (_ABSENT, None, ""):
+    def test_municipal_stated_type_still_raises_it(self):
+        self._sync([], muni_issues=[
+            _muni_issue(issue_id=1, rct=262144),
+            _muni_issue(issue_id=2, rct=0, base="Road closed for paving."),
+        ], muni_paths=[_PATH, _PATH2])
+        rows = {r.closure_id: r for r in self._rows()}
+        self.assertEqual(rows["muni_1_0"].emergency_access, "NO_ACCESS")
+        self.assertEqual(rows["muni_2_0"].emergency_access, "ACCESS_ONLY")
+
+    # --- ruling: text the feed did not send ----------------------------------
+
+    def test_missing_text_is_null_not_a_placeholder(self):
+        self._sync([_event(road_name=_ABSENT, headline=None, description="   ")])
+        (row,) = self._rows()
+        self.assertIsNone(row.street_name)
+        self.assertIsNone(row.headline)
+        self.assertIsNone(row.description)
+
+    def test_municipal_missing_text_is_null_not_a_placeholder(self):
+        issue = _muni_issue(issue_id=3, rct=262144, location=None, headline=None, base=None)
+        self._sync([], muni_issues=[issue], muni_paths=[_PATH])
+        (row,) = self._rows()
+        self.assertIsNone(row.street_name)
+        self.assertIsNone(row.headline)
+        self.assertIsNone(row.description)
+
+    # --- ruling (reversed): a record with no feed id is skipped ---------------
+
+    def test_id_less_drivebc_record_is_skipped_logged_and_counted(self):
+        for missing in (_ABSENT, None, "", "  "):
             with self.subTest(id=missing):
                 self.db.query(RoadClosureModel).delete()
                 self.db.commit()
                 with self.assertLogs(svc.logger, level="ERROR") as logs:
                     self._sync([_event(id="has-id", road_name="A St"),
-                                _event(id=missing, road_name="B St")])
-                ids = sorted((r.closure_id or "<null>") for r in self._rows())
-                self.assertEqual(ids, ["<null>", "has-id"])
-                for r in self._rows():
-                    self.assertFalse((r.closure_id or "").startswith("db_"))
-                    self.assertNotEqual(r.closure_id, "None")
-                self.assertTrue(any("no id in the feed record" in m for m in logs.output))
+                                _event(id=missing, road_name="Skipped St")])
+                ids = [r.closure_id for r in self._rows()]
+                self.assertEqual(ids, ["has-id"])
+                self.assertTrue(any("no id in the feed" in m and "Skipped St" in m
+                                    for m in logs.output))
+                status = svc.read_sync_status(self.db)
+                self.assertEqual(status["skipped"],
+                                 {"count": 1, "bySource": {"DriveBC Open511": 1,
+                                                           "Municipal 511": 0}})
+                self.assertEqual(status["outcome"], svc.SYNC_SUCCEEDED)
 
-    def test_id_less_record_is_matched_across_syncs_not_duplicated(self):
-        evt = _event(id=_ABSENT)
-        self._sync([evt])
-        (first,) = self._rows()
-        self.assertIsNone(first.closure_id)
-        self.assertTrue(first.feed_record_key.startswith("sha256:"))
-        row_id = first.id
-
-        # Hourly sync, then one where the feed edited the headline and severity in place.
-        self._sync([evt])
-        self._sync([dict(evt, headline="EDITED", severity="MINOR")])
-        (row,) = self._rows()
-        self.assertEqual(row.id, row_id)
-        self.assertEqual(row.headline, "EDITED")
-        self.assertEqual(row.emergency_access, "CAUTION")
-
-    def test_two_different_id_less_records_stay_two_rows(self):
-        self._sync([_event(id=_ABSENT, road_name="A St"), _event(id=_ABSENT, road_name="B St")])
-        self.assertEqual(len(self._rows()), 2)
-
-    def test_identical_id_less_records_in_one_batch_collapse_loudly(self):
-        evt = _event(id=_ABSENT)
+    def test_id_less_municipal_record_is_skipped_not_muni_none(self):
         with self.assertLogs(svc.logger, level="ERROR") as logs:
-            self._sync([evt, dict(evt)])
-        self.assertEqual(len(self._rows()), 1)
-        self.assertTrue(any("share content key" in m for m in logs.output))
+            self._sync([], muni_issues=[_muni_issue(issue_id=None, rct=262144,
+                                                    location="Como Lake Ave")],
+                       muni_paths=[_PATH])
+        self.assertEqual(self._rows(), [])
+        self.assertTrue(any("Municipal 511" in m and "Como Lake Ave" in m for m in logs.output))
+        self.assertEqual(svc.read_sync_status(self.db)["skipped"]["bySource"]["Municipal 511"], 1)
 
-    def test_id_less_record_is_deactivated_when_it_leaves_the_feed(self):
-        gone = _event(id=_ABSENT, road_name="Gone St")
-        self._sync([gone, _event(id="stays")])
-        self._sync([_event(id="stays")])
-        rows = {r.street_name: r for r in self._rows()}
-        self.assertFalse(rows["Gone St"].active)
-        self.assertTrue(rows["Lougheed Hwy"].active)
+    def test_skipped_count_resets_on_the_next_attempt(self):
+        self._sync([_event(id=_ABSENT)])
+        self.assertEqual(svc.read_sync_status(self.db)["skipped"]["count"], 1)
+        self._sync([_event(id="ok")])
+        self.assertEqual(svc.read_sync_status(self.db)["skipped"]["count"], 0)
 
-    def test_municipal_issue_without_issue_id_is_null_not_muni_none(self):
-        issue = {
-            "IssueId": None,
-            "Source": "City of Coquitlam",
-            "Geometry": [{"NumPoints": 2, "MarkerInfo": {"RoadClosureType": 0,
-                                                         "LocationName": "Como Lake Ave"}}],
-            "Description": {"Headline": "Paving", "BaseDescription": "Lane closed."},
-        }
-        path = [(49.28, -122.80), (49.281, -122.801)]
-        self._sync([], muni_issues=[issue], muni_paths=[path])
-        self._sync([], muni_issues=[issue], muni_paths=[path])
-        (row,) = self._rows()
-        self.assertIsNone(row.closure_id)
-        self.assertIsNotNone(row.feed_record_key)
+    def test_a_status_row_without_counts_reads_skipped_null_not_zero(self):
+        svc.record_sync_outcome(self.db, svc.SYNC_SUCCEEDED,
+                                sources={"DriveBC Open511": {"reached": True}})
+        self.assertIsNone(svc.read_sync_status(self.db)["skipped"])
 
+
+_PATH = [(49.28, -122.80), (49.281, -122.801)]
+_PATH2 = [(49.29, -122.81), (49.291, -122.811)]
+
+
+def _muni_issue(issue_id, rct, location="Como Lake Ave", headline="Paving", base="Lane closed."):
+    return {
+        "IssueId": issue_id,
+        "Source": "City of Coquitlam",
+        "Geometry": [{"NumPoints": 2, "MarkerInfo": {"RoadClosureType": rct,
+                                                     "LocationName": location}}],
+        "Description": {"Headline": headline, "BaseDescription": base},
+    }
 
 if __name__ == "__main__":
     unittest.main()

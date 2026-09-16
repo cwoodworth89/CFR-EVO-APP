@@ -2,18 +2,22 @@
  * How a road closure's emergency access level is shown, in one place: the sidebar card,
  * the map marker's popup, the polyline colour and the access filters all read it here.
  *
- * Four states. The three the feed can state (`emergencyAccess` from GET /api/road-closures)
- * and a fourth, N/A, for a closure whose feed gave no usable severity. Punch list #91,
- * operator ruling 2026-09-16: "keep the box but add N/A". The API sends `null` for that
- * (backend `ea6151b9`); before it, an unknown was drawn as CAUTION in one place and
- * NO_ACCESS in another. Any value outside the three is treated the same as null -- an
- * unrecognised level is not a level (CLAUDE.md 6.1).
+ * Five states. The three access tiers (`emergencyAccess` from GET /api/road-closures), and
+ * two for a null `emergencyAccess`, told apart by DriveBC's `roadState` (backend a002ce82):
+ *   - INFO: `roadState` ALL_LANES_OPEN. The feed says the road is open; it is information,
+ *     not a restriction. Operator ruling 2026-09-16 (#91 ruling 5): "All_lanes_open -> Info."
+ *   - N/A: anything else with no tier -- the feed stated nothing usable. Operator ruling
+ *     2026-09-16: "keep the box but add N/A". Before ea6151b9 an unknown was drawn as
+ *     CAUTION in one place and NO_ACCESS in another.
+ * Any `emergencyAccess` outside the three tiers is treated as null -- an unrecognised level
+ * is not a level (CLAUDE.md 6.1).
  *
  * Colours are Tailwind's default palette, named per entry, matching what each file used
  * before this module existed.
  */
 
 export const ACCESS_UNKNOWN = 'UNKNOWN';
+export const ACCESS_INFO = 'INFO';
 
 const ACCESS = {
   NO_ACCESS: {
@@ -31,11 +35,24 @@ const ACCESS = {
     popupPill: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
   },
   CAUTION: {
-    label: 'LANE CLOSURE',
+    // Operator ruling 2026-09-16 (#91 ruling 5): the CAUTION tier is "Caution - Restrictions".
+    // Was LANE CLOSURE, which is false for a road closed in one direction (now CAUTION too).
+    // One label for the tier, whichever feed it came from; the specific restriction, where
+    // the feed states one, is printed beside it by roadRestriction().
+    label: 'CAUTION – RESTRICTIONS',
     line: '#eab308',                // Tailwind yellow-500
     text: 'text-yellow-500',
     pill: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
     popupPill: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+  },
+  [ACCESS_INFO]: {
+    // Neutral and not a warning colour: an open road is not a tier. Distinct from N/A's slate
+    // so "the feed says all lanes are open" never reads as "the feed said nothing".
+    label: 'INFO',
+    line: '#22d3ee',                // Tailwind cyan-400
+    text: 'text-cyan-300',
+    pill: 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/40',
+    popupPill: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40',
   },
   [ACCESS_UNKNOWN]: {
     // Neutral on purpose: none of red / amber / yellow, so it cannot be read as a tier.
@@ -47,10 +64,11 @@ const ACCESS = {
   },
 };
 
-/** The access key for a closure: one of the three feed states, or ACCESS_UNKNOWN. */
+/** The access key for a closure: one of the three tiers, ACCESS_INFO, or ACCESS_UNKNOWN. */
 export function accessKey(closure) {
   const v = closure?.emergencyAccess;
-  return v === 'NO_ACCESS' || v === 'ACCESS_ONLY' || v === 'CAUTION' ? v : ACCESS_UNKNOWN;
+  if (v === 'NO_ACCESS' || v === 'ACCESS_ONLY' || v === 'CAUTION') return v;
+  return closure?.roadState === 'ALL_LANES_OPEN' ? ACCESS_INFO : ACCESS_UNKNOWN;
 }
 
 /** Label and styling for a closure's access level. */
@@ -59,9 +77,9 @@ export function accessStyle(closure) {
 }
 
 /**
- * Whether the three access toggles let a closure through. An N/A closure always passes:
- * the operator ruled it is kept and shown, and no toggle names it, so hiding it behind
- * one would make an unknown disappear because a known tier was switched off.
+ * Whether the three access toggles let a closure through. An N/A or INFO closure always
+ * passes: the operator ruled both are kept and shown, and no toggle names either, so hiding
+ * one behind a toggle would make it disappear because a known tier was switched off.
  */
 export function passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, filterCaution }) {
   switch (accessKey(closure)) {
@@ -108,15 +126,66 @@ export function closureText(value) {
  * 2026-09-16: "monitor for now and possibly we can create rules around patterns"). Every
  * number is a count of what was served, using the same tests the kiosk renders with, so a
  * count here always matches what the sidebar shows: `na` is what renders N/A, `noStreet` and
- * `noHeadline` are what render "--". Null when there is no list, never zeros.
+ * `noHeadline` are what render "--", `info` is what renders INFO. Null when there is no list,
+ * never zeros.
  */
 export function closureFeedCounts(closures) {
   if (!Array.isArray(closures)) return null;
-  let na = 0, noStreet = 0, noHeadline = 0;
+  let na = 0, info = 0, noStreet = 0, noHeadline = 0;
   for (const c of closures) {
-    if (accessKey(c) === ACCESS_UNKNOWN) na += 1;
+    const key = accessKey(c);
+    if (key === ACCESS_UNKNOWN) na += 1;
+    if (key === ACCESS_INFO) info += 1;
     if (closureText(c?.street) === NO_TEXT) noStreet += 1;
     if (closureText(c?.headline) === NO_TEXT) noHeadline += 1;
   }
-  return { total: closures.length, na, noStreet, noHeadline };
+  return { total: closures.length, na, info, noStreet, noHeadline };
+}
+
+/** `source` of a DriveBC record, as the backend stores it (backend/api/road_closure_service.py,
+ *  the DriveBC ingest: "source": "DriveBC Open511"). */
+export const DRIVEBC_SOURCE = 'DriveBC Open511';
+
+// Open511 v1.0 roads[].direction (N..NE, NONE, BOTH), as bound directions for a crew.
+const BOUND = {
+  N: 'northbound', NE: 'northeast-bound', E: 'eastbound', SE: 'southeast-bound',
+  S: 'southbound', SW: 'southwest-bound', W: 'westbound', NW: 'northwest-bound',
+};
+
+/**
+ * The restriction DriveBC states for this closure, in words, or null when it states none.
+ * Operator ruling 2026-09-16 (#91 ruling 5): "Closed per direction -> Caution - Restrictions,
+ * and state the road closure direction. We often can go counterflow with the help of
+ * flaggers." So a one-direction closure names its direction; the tier alone would not.
+ * roadState values are Open511 v1.0 roads[].state. Null when the field is absent (an older
+ * api, or Municipal 511, which never sends it) -- nothing is inferred from the tier.
+ */
+export function roadRestriction(closure) {
+  switch (closure?.roadState) {
+    case 'CLOSED': {
+      const d = closure.roadDirection;
+      if (BOUND[d]) return `Closed ${BOUND[d]}`;
+      if (d === 'BOTH') return 'Closed both directions';
+      return 'Closed';
+    }
+    case 'SOME_LANES_CLOSED': return 'Some lanes closed';
+    case 'SINGLE_LANE_ALTERNATING': return 'Single lane alternating';
+    case 'ALL_LANES_OPEN': return 'All lanes open';
+    default: return null;
+  }
+}
+
+/**
+ * DriveBC's own severity word, as a line of information -- never a tier, never a colour.
+ * Open511 v1.0 defines severity as traffic impact (MINOR "very limited impact on traffic" ..
+ * MAJOR "a significant impact on traffic"), and the live feed on 2026-09-16 had 18 MAJOR events
+ * with every lane open (#91 ruling 5), so the line says "traffic impact" to keep it from
+ * being read as passability.
+ * DriveBC record with the field sent: the word, or "--" when null. Anything else -- a
+ * Municipal 511 record (not applicable there), or a response from an api that predates the
+ * field -- returns null and no line is drawn.
+ */
+export function feedSeverityLine(closure) {
+  if (closure?.source !== DRIVEBC_SOURCE || !('feedSeverity' in closure)) return null;
+  return `DriveBC traffic impact: ${closureText(closure.feedSeverity)}`;
 }

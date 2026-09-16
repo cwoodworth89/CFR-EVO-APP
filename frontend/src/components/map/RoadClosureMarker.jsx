@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
 import { closureIcon } from './mapIcons';
-import { accessStyle, closureText } from '../../utils/closureAccess';
+import { accessStyle, closureText, roadRestriction, feedSeverityLine } from '../../utils/closureAccess';
 
 /**
  * Marker + polyline for one road closure, with popup-on-selection behaviour.
@@ -29,6 +29,8 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
   // Line colour and popup pill from utils/closureAccess.js. An unknown access level (#91)
   // was drawn in NO_ACCESS red here; it is now its own neutral N/A state.
   const access = accessStyle(closure);
+  const restriction = roadRestriction(closure);
+  const severityLine = feedSeverityLine(closure);
   const color = access.line;
 
   const polylinePos = Array.isArray(closure.polyline) && closure.polyline.length > 0
@@ -80,6 +82,13 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
             </div>
             <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closureText(closure.headline)}</h3>
             <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closureText(closure.street)}</p>
+            {/* #91 ruling 5: stated restriction beside the tier, and DriveBC's severity as information. */}
+            {restriction && (
+              <p className={`text-[10px] font-mono font-bold mt-1 ${access.text}`}>{restriction}</p>
+            )}
+            {severityLine && (
+              <p className="text-[9px] font-mono text-slate-500 mt-0.5">{severityLine}</p>
+            )}
             {(closure.affectedZones?.length > 0 || closure.zoneId) && (
               <div className="mt-1.5 pt-1 border-t border-slate-900 flex justify-between items-center text-[9px] font-mono">
                 <span className="text-slate-400 font-medium">📍 Impacted Zones</span>

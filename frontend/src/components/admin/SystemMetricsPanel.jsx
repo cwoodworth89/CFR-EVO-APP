@@ -370,6 +370,7 @@ export default function SystemMetricsPanel({ dispatches = [], evaluations = [] }
               {[
                 ["Closures served", feedCounts?.total],
                 ["Access N/A (no severity from feed)", feedCounts?.na],
+                ["Info (all lanes open)", feedCounts?.info],
                 ["No street name", feedCounts?.noStreet],
                 ["No headline", feedCounts?.noHeadline],
               ].map(([label, value]) => (

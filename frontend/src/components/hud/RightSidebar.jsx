@@ -1,5 +1,5 @@
 import React from 'react';
-import { accessStyle, passesAccessFilter, closureKey, closureText } from '../../utils/closureAccess';
+import { accessStyle, passesAccessFilter, closureKey, closureText, roadRestriction, feedSeverityLine } from '../../utils/closureAccess';
 
 /** Hall labels and their badge classes. Static, so it lives at module scope: as a literal
  *  inside the component it was rebuilt every render and read by the useMemo below without
@@ -260,6 +260,8 @@ export function RightSidebar({
                                         {group.closures.map((closure, idx) => {
                                           const mapPoint = closureMapPoint(closure);
                                           const access = accessStyle(closure);
+                                          const restriction = roadRestriction(closure);
+                                          const severityLine = feedSeverityLine(closure);
                                           return (
                                             <div 
                                               // rowId, the database row: stable across syncs and always sent (#91).
@@ -303,6 +305,19 @@ export function RightSidebar({
                                                       {access.label}
                                                     </span>
                                                  </div>
+
+                                                 {/* #91 ruling 5: the restriction DriveBC states, beside the tier (a
+                                                     one-direction closure names its direction: crews may go counterflow
+                                                     with flaggers), and DriveBC's own severity as information, never as
+                                                     the tier. Both absent for Municipal 511 and for an older api. */}
+                                                 {(restriction || severityLine) && (
+                                                   <div className="flex justify-between items-center gap-2 text-[9px] font-mono">
+                                                     <span className={`font-bold truncate ${access.text}`}>{restriction || ''}</span>
+                                                     {severityLine && (
+                                                       <span className="text-slate-500 flex-shrink-0">{severityLine}</span>
+                                                     )}
+                                                   </div>
+                                                 )}
 
                                                  {/* Date Range & Status Pill */}
                                                  <div className="flex justify-between items-center text-[9px] font-mono border-t border-slate-900/50 pt-1.5 mt-0.5">

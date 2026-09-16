@@ -48,7 +48,7 @@ PROFILE_ABS=$(cd "$(dirname "$PROFILE")" && pwd)/$(basename "$PROFILE")
 PROFILE_NAME=$(basename "$PROFILE")
 
 # osrm-extract names its output after its input, so the extract is hard-linked under the
-# graph's name: same bytes, no copy, and vancouver.osrm.* is never written to.
+# graph's name: same bytes, no copy, and the source extract keeps its own name.
 ln -f "$PBF" "$DATA/$NAME.osm.pbf"
 
 # The City polygon, regenerated from the database at every build so it cannot drift from

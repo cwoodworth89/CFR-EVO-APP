@@ -15,14 +15,15 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**18 open** (14 crew-visible) · **83 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**19 open** (15 crew-visible) · **83 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 18
+## Open — 19
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
+| **92** | 🔴 crew-visible | OPEN — found 2026-09-16 by the operator in the #91 review list; with gis-spatial-engineer to measure, then fix | [Closures the City files on its own boundary roads are dropped by the spatial tests](punchlist/92-closures-on-boundary-roads-are-dropped-by-the-spatial-tests.md) |
 | **91** | 🔴 crew-visible | Second round BUILT, **not deployed**: DriveBC access from `roads[].state` `a002ce82` (+ migration c, **before `--build api`**), log collapse `2f767903`, admin panel row `e0514fe4`; Municipal 511 value table measured and the operator's review list written `bf8b7e2a`; frontend render `b1dd4c8f`. **Ready to deploy as one set** (migration c, frontend build, `--build api`). Municipal tiers, filters and three domain choices are the operator's | [Road closure fields the feed did not send are filled with invented values, including the access level](punchlist/91-road-closure-fields-the-feed-did-not-send-are-filled-with-invented-values.md) |
 | **90** | 🔴 crew-visible | DEPLOYED in full 2026-09-16 20:07Z (confirmed on the kiosk, HEAD `0d17989a`); latent — 0 null coordinates after the 20:08Z sync; card never seen rendered | [A road closure with no coordinates is drawn at a hardcoded point near Coquitlam Centre](punchlist/90-a-road-closure-with-no-coordinates-is-drawn-at-a-hardcoded-point.md) |
 | **89** | 🔴 crew-visible | **CONFIRMED 2026-09-16 20:48Z** — falsifier run by lead on the operator's word: feeds unreachable → `FAILED`, list kept; feeds restored → `SUCCEEDED`, cleared; persisted row matches. Banner render itself not seen by lead (condition tested, not looked at). "Any for now" as built | [A failed road closure sync leaves the last list on screen, with no warning](punchlist/89-a-failed-road-closure-sync-leaves-the-last-list-on-screen-with-no-warning.md) |

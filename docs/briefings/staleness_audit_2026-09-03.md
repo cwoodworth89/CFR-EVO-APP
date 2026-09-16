@@ -6,7 +6,8 @@
 **Method:** deterministic cross-reference scans (`tools/audit_staleness.py`), every
 candidate then checked against the source line, git history, or the kiosk database
 (`cfr-postgres`, read-only) before it appears here. No item below came from judgement about
-prose. The raw scan output is [`staleness_audit_2026-09-03_raw_scan.md`](staleness_audit_2026-09-03_raw_scan.md).
+prose. The raw scan output was kept beside this file until 2026-09-15; it is in git history, and
+`tools/audit_staleness.py` reproduces it.
 **Operator rulings the same day:** the `.env.example` files go; anything about setting up a
 machine is deferred until the code is stable; Antigravity is no longer used on this project.
 

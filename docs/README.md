@@ -88,8 +88,10 @@ unless they say so at the top.
 
 A document that described a system no longer run is deleted rather than kept with a warning
 banner (operator ruling 2026-09-04). Git history has them. `gis_endpoints.md` and the
-local-stack/DSP walkthrough went on 2026-09-04; eight others on 2026-08-30. Unadopted
-proposals are the exception and stay, with their review attached, because a rejected design
-that is visible cannot be proposed a second time by accident.
+local-stack/DSP walkthrough went on 2026-09-04; eight others on 2026-08-30; the 2026-09-03
+staleness audit's raw scan output on 2026-09-15, since its summary carries the findings and
+`tools/audit_staleness.py` reproduces the scan. Unadopted proposals are the exception and stay,
+with their review attached, because a rejected design that is visible cannot be proposed a second
+time by accident.
 
 <!-- audit-ok: docs/gis_endpoints.md -- deleted 2026-09-04; this section records it -->

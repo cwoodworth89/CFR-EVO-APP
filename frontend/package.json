@@ -17,8 +17,6 @@
     "@mapbox/polylabel": "^1.0.2",
     "@maplibre/maplibre-gl-leaflet": "0.1.4",
     "@turf/turf": "^7.3.1",
-    "esri-leaflet": "^3.0.19",
-    "esri-leaflet-vector": "^4.3.2",
     "leaflet": "^1.9.4",
     "leaflet-routing-machine": "^3.2.12",
     "maplibre-gl": "4.7.1",

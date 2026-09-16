@@ -7,13 +7,6 @@
         "@modelcontextprotocol/server-postgres",
         "${DATABASE_URL}"
       ]
-    },
-    "cfr-docker": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-server-docker"
-      ]
     }
   }
 }

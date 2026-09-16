@@ -15,11 +15,17 @@ from sqlalchemy import desc
 try:
     from backend.api.database import get_db, SessionLocal
     from backend.api.models import RoadClosureModel
-    from backend.api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
+    from backend.api.road_closure_service import (
+        sync_road_closures_to_db, check_and_sync_if_stale, read_sync_status,
+        SYNC_RESULT_NOT_NEEDED, SYNC_SUCCEEDED,
+    )
 except ModuleNotFoundError:
     from api.database import get_db, SessionLocal
     from api.models import RoadClosureModel
-    from api.road_closure_service import sync_road_closures_to_db, check_and_sync_if_stale
+    from api.road_closure_service import (
+        sync_road_closures_to_db, check_and_sync_if_stale, read_sync_status,
+        SYNC_RESULT_NOT_NEEDED, SYNC_SUCCEEDED,
+    )
 
 router = APIRouter(prefix="/api/road-closures", tags=["road-closures"])
 
@@ -85,7 +91,27 @@ class PythonGeometryDecoder:
 
 @router.get("")
 def get_road_closures(db: Session = Depends(get_db)):
-    """Returns active road closures with a high-performance 60-second in-memory TTL cache (<5ms response time)."""
+    """Active road closures, and the outcome of the last attempt to sync them.
+
+    Shape (changed 2026-09-16, punch list #89 -- this used to be the bare array):
+
+        {
+          "closures": [ ...unchanged closure objects... ],
+          "sync": {
+            "outcome": "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED",
+            "lastAttemptAt": ISO-8601 string | null,
+            "error": string | null,
+            "sources": {"<feed name>": {"reached": bool, "error": string}} | null
+          }
+        }
+
+    `sync.outcome == "FAILED"` is what raises the kiosk's warning flag, and it is what
+    makes an empty list readable: no flag and no closures means the source was reached and
+    the City has none; a flag and no closures means we could not reach it.
+
+    Both parts are cached together for 60s so the flag can never be served from a
+    different attempt than the list beside it.
+    """
     now = time.time()
     # Fast lock-free read path
     cached_data = _ROAD_CLOSURES_CACHE["data"]
@@ -132,9 +158,14 @@ def get_road_closures(db: Session = Depends(get_db)):
                 "endDate": r.end_time.isoformat() if r.end_time else None
             })
 
-        _ROAD_CLOSURES_CACHE["data"] = results
+        payload = {
+            "closures": results,
+            "sync": read_sync_status(db),
+        }
+
+        _ROAD_CLOSURES_CACHE["data"] = payload
         _ROAD_CLOSURES_CACHE["expires_at"] = time.time() + 60.0
-        return results
+        return payload
 
 
 @router.post("/sync")
@@ -143,9 +174,16 @@ def trigger_road_closure_sync(db: Session = Depends(get_db)):
     try:
         count = sync_road_closures_to_db(db)
         invalidate_road_closures_cache()
+        # The call returning normally is not the same as the feeds being reachable: an
+        # unreachable feed is caught and swallowed inside the ingestion and yields a count
+        # of 0 with no exception. Report what the attempt recorded, not the fact that
+        # nothing raised -- "success" with the link down is exactly the plausible wrong
+        # answer CLAUDE.md 6.1 is about.
+        status = read_sync_status(db)
         return {
-            "status": "success",
+            "status": "success" if status["outcome"] == SYNC_SUCCEEDED else "failed",
             "syncedCount": count,
+            "sync": status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
@@ -159,8 +197,12 @@ def run_periodic_road_closure_sync():
         try:
             db = SessionLocal()
             try:
-                synced = check_and_sync_if_stale(db, max_age_seconds=86400)
-                if synced:
+                result = check_and_sync_if_stale(db, max_age_seconds=86400)
+                # Three values now, and all three are truthy strings -- test the value,
+                # never the truthiness (punch list #89). A failed attempt invalidates the
+                # cache too: the flag it just raised has to reach the kiosk on the next
+                # poll, not up to 60s after someone else happens to clear the cache.
+                if result != SYNC_RESULT_NOT_NEEDED:
                     invalidate_road_closures_cache()
             finally:
                 db.close()

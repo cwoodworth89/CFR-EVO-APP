@@ -9,9 +9,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 try:
-    from backend.api.models import RoadClosureModel
+    from backend.api.models import RoadClosureModel, RoadClosureSyncStatusModel
 except ModuleNotFoundError:
-    from api.models import RoadClosureModel
+    from api.models import RoadClosureModel, RoadClosureSyncStatusModel
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,84 @@ class PythonGeometryDecoder:
         return pts
 
 
+# --- SYNC OUTCOME (punch list #89) -------------------------------------------
+#
+# Three states, persisted in public.road_closure_sync_status. The operator's ruling of
+# 2026-09-16 is that the kiosk flags *the previous attempt having failed*, and clears the
+# flag on the next success -- not the age of the data. Age was measured and ruled out:
+# updated_at is stamped only on rows a sync touches, so a healthy sync that returns zero
+# closures leaves it untouched and an age-based indicator would warn on a quiet day.
+
+SYNC_NOT_ATTEMPTED = "NOT_ATTEMPTED"
+SYNC_SUCCEEDED = "SUCCEEDED"
+SYNC_FAILED = "FAILED"
+
+# Returned by check_and_sync_if_stale. It used to return a bool, which collapsed
+# "no sync was needed" and "the sync failed" into the same False.
+SYNC_RESULT_NOT_NEEDED = "NOT_NEEDED"
+SYNC_RESULT_SYNCED = "SYNCED"
+SYNC_RESULT_FAILED = "FAILED"
+
+
+def record_sync_outcome(db: Session, outcome: str, sources=None, error: str = None):
+    """Writes the outcome of the attempt that just finished to the single status row.
+
+    Called on every exit path of sync_road_closures_to_db, including the one where both
+    feeds were unreachable and nothing raised.
+
+    Rolls back first: the caller may arrive here from a failed commit, and the status row
+    must be written even when the closure transaction could not be.
+    """
+    try:
+        db.rollback()
+        row = db.query(RoadClosureSyncStatusModel).filter(
+            RoadClosureSyncStatusModel.id == 1
+        ).first()
+        if row is None:
+            row = RoadClosureSyncStatusModel(id=1)
+            db.add(row)
+        row.last_outcome = outcome
+        row.last_attempt_at = datetime.now(timezone.utc)
+        row.last_error = error
+        row.sources = sources or None
+        db.commit()
+    except Exception as e:
+        # Never let bookkeeping take down the sync itself, but do not hide it either.
+        logger.error(f"Could not record road closure sync outcome ({outcome}): {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+def read_sync_status(db: Session) -> dict:
+    """The last attempt's outcome, for GET /api/road-closures.
+
+    An absent row means this database has never been synced by a build that records the
+    outcome -- reported as NOT_ATTEMPTED, which is not a failure and must not render as
+    one (CLAUDE.md 6.1: an unknown reported as unknown is a correct answer).
+    """
+    row = db.query(RoadClosureSyncStatusModel).filter(
+        RoadClosureSyncStatusModel.id == 1
+    ).first()
+    if row is None:
+        return {
+            "outcome": SYNC_NOT_ATTEMPTED,
+            "lastAttemptAt": None,
+            "error": None,
+            "sources": None,
+        }
+    attempted = row.last_attempt_at
+    if attempted is not None and attempted.tzinfo is None:
+        attempted = attempted.replace(tzinfo=timezone.utc)
+    return {
+        "outcome": row.last_outcome or SYNC_NOT_ATTEMPTED,
+        "lastAttemptAt": attempted.isoformat() if attempted else None,
+        "error": row.last_error,
+        "sources": row.sources,
+    }
+
+
 # --- LIVE INGESTION & POSTGRESQL SYNC PIPELINE ---
 
 def sync_road_closures_to_db(db: Session):
@@ -79,12 +157,47 @@ def sync_road_closures_to_db(db: Session):
     Fetches DriveBC and Municipal 511 feeds server-side,
     applies spatial Ray-Casting PIP to verify Emergency Zone containment,
     enriches with zone_id and affected_zones array, and upserts into PostgreSQL road_closures table.
+
+    Records the attempt's outcome in public.road_closure_sync_status on every exit path,
+    so the daemon and the manual POST /api/road-closures/sync both leave a trace.
+
+    A source that could not be ingested in full makes the whole attempt FAILED. That is
+    conservative on purpose: a partial list looks exactly like a complete one on the
+    kiosk, so "we reached one of the two feeds" is not an all-clear. Per-source detail
+    goes in the `sources` column so the operator can see which one.
+    """
+    source_results = {}
+    try:
+        count = _ingest_road_closures(db, source_results)
+    except Exception as e:
+        record_sync_outcome(db, SYNC_FAILED, sources=source_results, error=str(e))
+        raise
+
+    unreachable = [name for name, r in source_results.items() if not r.get("reached")]
+    record_sync_outcome(
+        db,
+        SYNC_FAILED if unreachable else SYNC_SUCCEEDED,
+        sources=source_results,
+        error=(f"Source(s) not ingested: {', '.join(unreachable)}" if unreachable else None),
+    )
+    return count
+
+
+def _ingest_road_closures(db: Session, source_results: dict):
+    """The ingestion itself. `source_results` is filled in per feed by reference.
+
+    Note for anyone changing the error handling here: neither feed's failure propagates
+    out of this function. Each is caught, logged and swallowed, and an unreachable network
+    simply yields an empty `raw_notices` -- the same shape as a genuinely quiet day. That
+    is why reachability is recorded per source at the point the block completes, and not
+    inferred from whether this function raised.
     """
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     now_utc = datetime.now(timezone.utc)
     raw_notices = []
 
     # 1. Fetch DriveBC Open511
+    source_results["DriveBC Open511"] = {"reached": False, "error": "not attempted"}
     try:
         req = urllib.request.Request("https://api.open511.gov.bc.ca/events?format=json&limit=100", headers=headers)
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -176,10 +289,16 @@ def sync_road_closures_to_db(db: Session):
                 "start_time": start_dt,
                 "end_time": end_dt
             })
+        # Reached only once the whole block has run: a mid-list parse failure leaves a
+        # partial contribution from this feed, which is not a successful ingestion.
+        source_results["DriveBC Open511"] = {"reached": True}
     except Exception as e:
         logger.warning(f"DriveBC ingestion warning: {e}")
+        source_results["DriveBC Open511"] = {"reached": False, "error": str(e)}
 
     # 2. Fetch Municipal 511
+    source_results["Municipal 511"] = {"reached": False, "error": "not attempted"}
+    muni_chunk_errors = []
     try:
         req_page = urllib.request.Request("https://bc.municipal511.ca/?municipality=coquitlam", headers=headers)
         with urllib.request.urlopen(req_page, timeout=5) as resp:
@@ -267,11 +386,26 @@ def sync_road_closures_to_db(db: Session):
                         })
             except Exception as chunk_err:
                 logger.warning(f"Municipal 511 chunk parse warning: {chunk_err}")
+                muni_chunk_errors.append(f"{filename}: {chunk_err}")
+
+        if muni_chunk_errors:
+            # Some chunks came back and some did not, so this feed's contribution is
+            # incomplete. Not an all-clear.
+            source_results["Municipal 511"] = {
+                "reached": False,
+                "error": "; ".join(muni_chunk_errors),
+            }
+        else:
+            source_results["Municipal 511"] = {"reached": True}
     except Exception as e:
         logger.warning(f"Municipal 511 ingestion warning: {e}")
+        source_results["Municipal 511"] = {"reached": False, "error": str(e)}
 
     # Upsert notices into PostgreSQL differentials
     if not raw_notices:
+        # Zero notices is ambiguous on its own -- an unreachable feed and a genuinely
+        # quiet day produce the identical empty list. The caller tells them apart from
+        # source_results, not from this count (punch list #89).
         logger.warning("No road closure notices were scraped from remote feeds. Retaining local database cache for offline survival.")
         return 0
 
@@ -366,11 +500,18 @@ def sync_road_closures_to_db(db: Session):
     return len(active_closure_ids)
 
 
-def check_and_sync_if_stale(db: Session, max_age_seconds: int = 86400) -> bool:
+def check_and_sync_if_stale(db: Session, max_age_seconds: int = 86400) -> str:
     """
     Checks the last update timestamp of local road closures in PostgreSQL.
     If the database is empty OR the last update is older than max_age_seconds (default 24h),
     triggers a differential sync.
+
+    Returns one of SYNC_RESULT_NOT_NEEDED / SYNC_RESULT_SYNCED / SYNC_RESULT_FAILED.
+
+    It used to return a bool, and returned False both for "no sync was needed" and for
+    "the sync failed" -- so the caller could not tell an idle hour from an outage
+    (punch list #89). Do not collapse these back to a truthiness test: all three values
+    are non-empty strings and all three are truthy.
     """
     from sqlalchemy import func
     latest_update = db.query(func.max(RoadClosureModel.updated_at)).scalar()
@@ -393,9 +534,17 @@ def check_and_sync_if_stale(db: Session, max_age_seconds: int = 86400) -> bool:
     if should_sync:
         try:
             sync_road_closures_to_db(db)
-            return True
         except Exception as e:
+            # sync_road_closures_to_db has already recorded SYNC_FAILED before re-raising.
             logger.error(f"Failed to run scheduled road closure sync: {e}")
-            return False
-    return False
+            return SYNC_RESULT_FAILED
+
+        # The sync returning normally does not make it a success: an unreachable feed is
+        # caught and swallowed inside the ingestion, so the outcome it recorded is the
+        # only honest answer here.
+        if read_sync_status(db).get("outcome") == SYNC_FAILED:
+            return SYNC_RESULT_FAILED
+        return SYNC_RESULT_SYNCED
+
+    return SYNC_RESULT_NOT_NEEDED
 

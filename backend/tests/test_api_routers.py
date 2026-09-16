@@ -309,8 +309,14 @@ class TestAPIRouters(unittest.TestCase):
 
     def test_road_closures_router(self):
         invalidate_road_closures_cache()
-        closures = get_road_closures(db=self.db)
-        self.assertTrue(isinstance(closures, list))
+        payload = get_road_closures(db=self.db)
+        # Shape changed 2026-09-16 (punch list #89): the outcome of the last sync now
+        # travels beside the list, so an empty list can be read.
+        self.assertTrue(isinstance(payload, dict))
+        self.assertTrue(isinstance(payload["closures"], list))
+        self.assertIn(
+            payload["sync"]["outcome"], ("NOT_ATTEMPTED", "SUCCEEDED", "FAILED")
+        )
 
     def test_audio_and_tiles_routers(self):
         status = get_listener_status()

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, Date, JSON, ARRAY, Numeric, func
+from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, Text, DateTime, Date, JSON, ARRAY, Numeric, CheckConstraint, func
 from sqlalchemy.orm import synonym
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY as PG_ARRAY
 import uuid
@@ -104,6 +104,45 @@ class RoadClosureModel(Base):
     end_time = Column(DateTime(timezone=True), nullable=True)
     active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class RoadClosureSyncStatusModel(Base):
+    """The outcome of the most recent attempt to sync road closures from the remote feeds.
+
+    One row, id = 1. It is deliberately NOT a column on road_closures: the outcome of an
+    attempt is not a property of any closure, and a successful sync that returns zero
+    closures touches no row at all -- which is precisely the case the flag has to be able
+    to report (punch list #89, operator ruling 2026-09-16).
+
+    Persisted rather than held in process memory because the API container restarts, and
+    run_periodic_road_closure_sync only re-attempts once the local data is already past
+    check_and_sync_if_stale's 24 h gate -- so an in-memory flag would clear on every
+    restart and then read "all clear" for up to an hour with the link still down.
+    """
+    __tablename__ = "road_closure_sync_status"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_road_closure_sync_status_singleton"),
+        CheckConstraint(
+            "last_outcome IN ('NOT_ATTEMPTED', 'SUCCEEDED', 'FAILED')",
+            name="ck_road_closure_sync_status_outcome",
+        ),
+        {'extend_existing': True},
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=False, default=1)
+    # NOT_ATTEMPTED / SUCCEEDED / FAILED. NOT_ATTEMPTED is the state before this API
+    # container has ever run a sync; it is not the same as a failure and must not render
+    # as one.
+    last_outcome = Column(String(16), nullable=False, default="NOT_ATTEMPTED")
+    last_attempt_at = Column(DateTime(timezone=True), nullable=True)
+    # Free text from the exception, when there was one. Diagnostic, not crew-facing.
+    last_error = Column(Text, nullable=True)
+    # Per-source reachability for the attempt, e.g.
+    # {"DriveBC Open511": {"reached": true}, "Municipal 511": {"reached": false, "error": "..."}}
+    # It is what makes "any source unreachable counts as FAILED" auditable rather than a
+    # bare boolean the operator has to take on trust.
+    sources = Column(SafeJSON, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 

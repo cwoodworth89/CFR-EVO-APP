@@ -72,3 +72,43 @@ def test_road_closures_caching_and_invalidation():
     res3 = get_road_closures(db=mock_db)
     assert len(res3["closures"]) == 1
     assert mock_db.query.call_count == 2 * QUERIES_PER_UNCACHED_CALL
+
+
+def test_closure_without_usable_coordinates_is_null_and_logged_not_defaulted(caplog):
+    """Punch list #90: no hardcoded fallback point. A bad record goes out as null, loudly."""
+    import logging
+
+    invalidate_road_closures_cache()
+    bad_values = [None, [], ["49.28"], ["abc", "-122.8"], ["nan", "-122.8"], [0, 0]]
+    records = []
+    for i, coords in enumerate(bad_values):
+        rec = MagicMock(spec=RoadClosureModel)
+        rec.closure_id = f"bad-{i}"
+        rec.headline = "x"
+        rec.street_name = "x"
+        rec.closure_type = "FULL_CLOSURE"
+        rec.emergency_access = "CAUTION"
+        rec.description = "x"
+        rec.coordinates = coords
+        rec.geometry = {}
+        rec.source = "test"
+        rec.zone_id = "1"
+        rec.affected_zones = ["1"]
+        rec.start_time = None
+        rec.end_time = None
+        records.append(rec)
+
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = records
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    with caplog.at_level(logging.ERROR):
+        payload = get_road_closures(db=mock_db)
+
+    assert [c["coordinates"] for c in payload["closures"]] == [None] * len(bad_values)
+    for c in payload["closures"]:
+        assert c["coordinates"] != [49.28, -122.80]
+    logged = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    for i in range(len(bad_values)):
+        assert any(f"bad-{i}" in m for m in logged)
+    invalidate_road_closures_cache()

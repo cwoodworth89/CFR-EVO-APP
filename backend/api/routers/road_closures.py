@@ -2,6 +2,7 @@
 Live Road Closures API Pipeline & In-Memory TTL Cache for CFR EVO API Gateway.
 Provides active road closure data, manual differential sync triggers, and background staleness daemon.
 """
+import math
 import time
 import threading
 import logging
@@ -89,6 +90,23 @@ class PythonGeometryDecoder:
         return pts
 
 
+def _parse_closure_point(raw):
+    """A closure's stored [lat, lng] as floats, or None when it is not a usable point.
+
+    Unusable means missing, not exactly two values, not numeric, NaN/infinite, or 0 --
+    CLAUDE.md §5 treats null, NaN and 0 alike as an unresolved location.
+    """
+    if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+        return None
+    try:
+        lat, lng = float(raw[0]), float(raw[1])
+    except (ValueError, TypeError):
+        return None
+    if not (math.isfinite(lat) and math.isfinite(lng)) or lat == 0 or lng == 0:
+        return None
+    return [lat, lng]
+
+
 @router.get("")
 def get_road_closures(db: Session = Depends(get_db)):
     """Active road closures, and the outcome of the last attempt to sync them.
@@ -131,11 +149,19 @@ def get_road_closures(db: Session = Depends(get_db)):
         results = []
         for r in records:
             geom = r.geometry or {}
-            raw_coords = r.coordinates or [49.28, -122.80]
-            try:
-                parsed_coords = [float(c) for c in raw_coords]
-            except (ValueError, TypeError):
-                parsed_coords = [49.28, -122.80]
+            # No default coordinate (CLAUDE.md §5, §6.1; punch list #90). This used to fall
+            # back to a hardcoded [49.28, -122.80] with no source, so a record with missing
+            # or malformed coordinates was drawn as an ordinary closure near Coquitlam
+            # Centre. It now goes out as null, and the failure is logged at ERROR with the
+            # closure id so it cannot pass unnoticed. The kiosk still lists the closure;
+            # RoadClosureMarker draws it from its own polyline or not at all.
+            parsed_coords = _parse_closure_point(r.coordinates)
+            if parsed_coords is None:
+                logging.error(
+                    "Road closure %s has no usable coordinates (stored value %r); "
+                    "returned with coordinates=null, not drawn at a default point.",
+                    r.closure_id, r.coordinates,
+                )
 
             polyline = []
             if geom.get("type") == "LineString":

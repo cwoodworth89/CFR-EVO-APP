@@ -83,9 +83,10 @@ ssh tcfire@100.95.146.94 "cd /home/tcfire/CFR-EVO-APP && git pull && cd frontend
 
 * **Pre-commit guard**: `git config core.hooksPath .githooks` (once per clone).
   [`.githooks/pre-commit`](.githooks/pre-commit) runs `npm run lint:crash` on staged
-  `frontend/src/**`. It blocks only the **crash class** — `no-undef` and TDZ — because those
-  compile cleanly through Vite and throw at runtime on the kiosk; `npm run build` does not
-  catch them. Bypass with `--no-verify`.
+  `frontend/src/**`. It blocks only the **crash class** — `no-undef`, TDZ and, since 2026-09-16,
+  `react-hooks/rules-of-hooks` — because those compile cleanly through Vite and throw at
+  runtime on the kiosk; `npm run build` does not catch them (the third rule was added after
+  `727c297b` reached the display; operator ruling). Bypass with `--no-verify`.
 * **Git-ignored files** (`backend/.env`, `frontend/.env.local`, `backend/models/`,
   `backend/data/`) are not synced by git — `scp` them manually.
 * The `cfr-postgres` MCP server connects to the kiosk's Postgres over Tailscale. It is the

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   accessKey, accessStyle, passesAccessFilter, closureKey, sameClosure, ACCESS_UNKNOWN,
+  closureText, NO_TEXT,
 } from '../src/utils/closureAccess.js';
 
 const ALL_OFF = { filterNoAccess: false, filterAccessOnly: false, filterCaution: false };
@@ -48,4 +49,11 @@ test('keys prefer rowId, fall back to id, and two unidentified closures never ma
   assert.equal(sameClosure({ rowId: 7, id: null }, { rowId: 8, id: null }), false);
   assert.equal(sameClosure({ id: null }, { id: null }), false);
   assert.equal(sameClosure(null, { rowId: 1 }), false);
+});
+
+test('text the feed did not send renders as --, never a made-up string (#91)', () => {
+  assert.equal(NO_TEXT, '--');
+  for (const v of [null, undefined, '', '   ', '\n\t']) assert.equal(closureText(v), '--');
+  assert.equal(closureText('LOUGHEED HWY'), 'LOUGHEED HWY');
+  assert.equal(closureText('  Lane closed  '), 'Lane closed');
 });

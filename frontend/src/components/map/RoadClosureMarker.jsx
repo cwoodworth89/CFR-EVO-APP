@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
 import { closureIcon } from './mapIcons';
-import { accessStyle } from '../../utils/closureAccess';
+import { accessStyle, closureText } from '../../utils/closureAccess';
 
 /**
  * Marker + polyline for one road closure, with popup-on-selection behaviour.
@@ -78,11 +78,8 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
               </span>
               <span className="text-[9px] text-slate-550 font-mono font-medium">{closure.source}</span>
             </div>
-            <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closure.headline}</h3>
-            <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closure.street}</p>
-            {closure.idMissing && (
-              <p className="text-[9px] font-mono font-bold text-amber-400 mt-1">⚠️ NO ID IN FEED RECORD</p>
-            )}
+            <h3 className="font-bold text-sm text-slate-200 mt-2 leading-tight">{closureText(closure.headline)}</h3>
+            <p className="text-[9px] text-slate-400 font-mono mt-0.5 font-semibold">{closureText(closure.street)}</p>
             {(closure.affectedZones?.length > 0 || closure.zoneId) && (
               <div className="mt-1.5 pt-1 border-t border-slate-900 flex justify-between items-center text-[9px] font-mono">
                 <span className="text-slate-400 font-medium">📍 Impacted Zones</span>
@@ -103,7 +100,7 @@ function RoadClosureMarker({ closure, isSelected, onSelect }) {
                 )}
               </p>
             )}
-            <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent" style={{ whiteSpace: 'pre-line', maxHeight: '200px' }}>{closure.description}</p>
+            <p className="text-xs text-slate-350 mt-2 font-sans leading-relaxed border-t border-slate-900 pt-1.5 whitespace-pre-line overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent" style={{ whiteSpace: 'pre-line', maxHeight: '200px' }}>{closureText(closure.description)}</p>
           </div>
         </Popup>
 

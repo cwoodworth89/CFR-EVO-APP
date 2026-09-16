@@ -1,5 +1,5 @@
 import React from 'react';
-import { accessStyle, passesAccessFilter, closureKey } from '../../utils/closureAccess';
+import { accessStyle, passesAccessFilter, closureKey, closureText } from '../../utils/closureAccess';
 
 /** Hall labels and their badge classes. Static, so it lives at module scope: as a literal
  *  inside the component it was rebuilt every render and read by the useMemo below without
@@ -262,8 +262,7 @@ export function RightSidebar({
                                           const access = accessStyle(closure);
                                           return (
                                             <div 
-                                              // rowId, not the feed's id, which is null when the feed sent none (#91)
-                                              // and would collide.
+                                              // rowId, the database row: stable across syncs and always sent (#91).
                                               key={closureKey(closure) ?? `${group.unit}-${idx}`}
                                               onClick={() => {
                                                 // No location, no fly and no selection: there is
@@ -283,7 +282,7 @@ export function RightSidebar({
                                                  {/* Street Name (Prominent & Color-coded) & Source */}
                                                  <div className="flex justify-between items-center gap-1.5">
                                                      <span className={`text-xs font-black uppercase tracking-wide truncate ${access.text}`}>
-                                                        {closure.street}
+                                                        {closureText(closure.street)}
                                                      </span>
                                                      <span className="text-[8px] text-slate-500 font-mono font-medium flex-shrink-0">{closure.source}</span>
                                                  </div>
@@ -296,17 +295,10 @@ export function RightSidebar({
                                                      ⚠️ NO MAP LOCATION IN FEED RECORD
                                                    </div>
                                                  )}
-                                                 {/* Operator ruling 2026-09-16 (#91): a record with no feed id is kept and the
-                                                     card says so. rowId is never shown in its place. */}
-                                                 {closure.idMissing && (
-                                                   <div className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
-                                                     ⚠️ NO ID IN FEED RECORD
-                                                   </div>
-                                                 )}
                                                  
                                                  {/* Headline & Warning Type Pill */}
                                                  <div className="flex justify-between items-center text-[9px] font-mono font-bold text-slate-400">
-                                                    <span className="truncate pr-1">{closure.headline}</span>
+                                                    <span className="truncate pr-1">{closureText(closure.headline)}</span>
                                                     <span className={`text-[7px] px-1 py-0.2 rounded font-black tracking-wider flex-shrink-0 ${access.pill}`}>
                                                       {access.label}
                                                     </span>

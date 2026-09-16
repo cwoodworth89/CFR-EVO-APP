@@ -18,8 +18,7 @@ export default function RoadClosuresLayer({ closures, visible, selectedClosure, 
     <>
       {closures.map((closure, i) => (
         <RoadClosureMarker
-          // rowId, not the feed's id: id is null when the feed sent none (#91), and two
-          // id-less closures would share a key and both highlight as selected.
+          // rowId, the database row: stable across syncs and always sent (#91).
           key={closureKey(closure) ?? `idx-${i}`}
           closure={closure}
           isSelected={sameClosure(selectedClosure, closure)}

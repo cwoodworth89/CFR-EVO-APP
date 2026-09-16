@@ -74,7 +74,7 @@ export function passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, 
 
 /**
  * The key a closure is identified by in React lists and in map selection. `rowId` is the
- * database row (#91: stable across syncs, always sent) -- never shown as the feed's id.
+ * database row (#91: stable across syncs, always sent) -- never shown in place of the feed's id.
  * Falls back to `id` for a response from an api container older than ea6151b9, and to
  * null when neither exists, so callers can refuse to match two unidentified closures.
  */
@@ -86,4 +86,19 @@ export function closureKey(closure) {
 export function sameClosure(a, b) {
   const ka = closureKey(a);
   return ka !== null && ka === closureKey(b);
+}
+
+/** Placeholder for a text field the feed did not send. */
+export const NO_TEXT = '--';
+
+/**
+ * A closure text field (street, headline, description) as shown on the kiosk. Punch list
+ * #91, operator ruling 2026-09-16: a field the feed sent nothing for arrives as null
+ * (backend c8dc474d) and renders as "--", never a made-up string and never an empty slot.
+ * Blank or whitespace-only strings are the same absence and render the same way.
+ */
+export function closureText(value) {
+  if (value === null || value === undefined) return NO_TEXT;
+  const text = String(value).trim();
+  return text === '' ? NO_TEXT : text;
 }

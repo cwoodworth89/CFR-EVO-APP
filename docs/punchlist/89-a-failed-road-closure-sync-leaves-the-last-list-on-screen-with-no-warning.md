@@ -54,8 +54,11 @@ City has none; a flag and no closures means we could not reach it.
    down). States: not attempted / succeeded / failed, with the time of the last attempt.
    `check_and_sync_if_stale` stops returning `False` for two different things.
 2. **API — expose it.** `GET /api/road-closures` returns the outcome beside the list.
-3. **Kiosk — the flag.** In the closure sidebar. Element to be chosen with the operator
-   (memory: he picks the element; no redesign).
+3. **Kiosk — the flag.** Operator ruling 2026-09-16: **a banner in the closure sidebar,
+   shown only while the last sync attempt failed, absent otherwise.** Not a persistent status
+   line. Rendered by `RightSidebar.jsx` from the field the API returns in piece 2; the sidebar
+   keeps drawing the last list beneath it, since a stale list with a warning beats an empty
+   one.
 
 Falsifier, before building on it (§7.6): pull the kiosk's network for one hourly tick with the
 data older than 24 h, and confirm the flag raises; restore it and confirm the flag clears on
@@ -66,4 +69,5 @@ the next successful tick, including when the source returns zero closures.
 | Date | Event |
 |:--|:--|
 | 2026-08-31 | Found by the external call audit; parked in the backlog as "§6.1 question, not a coding fix" |
-| 2026-09-16 | Age-based indicator measured and ruled out (see above). Operator ruled the failed-attempt flag. Promoted here; no owner assigned yet |
+| 2026-09-16 | Age-based indicator measured and ruled out (see above). Operator ruled the failed-attempt flag. Promoted here |
+| 2026-09-16 | Operator: backend half to `gis-spatial-engineer` (sent by lead, three bounded pieces); element ruled — a banner in the closure sidebar, only while the last attempt failed. Frontend half goes to `frontend-kiosk-architect` once the API field's shape is returned |

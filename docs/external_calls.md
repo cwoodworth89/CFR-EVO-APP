@@ -110,8 +110,9 @@ that timestamp untouched — so age alone cannot tell the two cases apart.
 **Not built yet.** What it needs: the sync's outcome recorded in Postgres with three states
 (not attempted / succeeded / failed) rather than the current two — `check_and_sync_if_stale`
 returns `False` both for "no sync was needed" and for "the sync failed" (`:398`), so today the
-caller cannot tell them apart — then `GET /api/road-closures` returning it, then the flag in
-the sidebar.
+caller cannot tell them apart — then `GET /api/road-closures` returning it, then the flag: **a banner in the closure
+sidebar, shown only while the last attempt failed** (operator, 2026-09-16). Tracked as
+punch-list #89.
 
 **Measured 2026-09-16, before anything is built on it (§7.6):** nothing records the last
 *successful contact* with the source. `check_and_sync_if_stale`

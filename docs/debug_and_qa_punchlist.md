@@ -15,16 +15,17 @@ Index only. **Each item's full history lives in its own file** under [`docs/punc
 | 🟠 operational | Degrades or interrupts operation, but the failure is visible. |
 | ⚪ hygiene | Internal quality, tooling, test debt. Safe to defer past the freeze. |
 
-**17 open** (13 crew-visible) · **83 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
+**18 open** (14 crew-visible) · **83 closed** → [`punchlist/_closed.md`](punchlist/_closed.md)
 
 ---
 
-## Open — 17
+## Open — 18
 
 | ID | Severity | Status | Item |
 |:--|:--|:--|:--|
-| **90** | 🔴 crew-visible | OPEN — found 2026-09-16, not built; no owner yet | [A road closure with no coordinates is drawn at a hardcoded point near Coquitlam Centre](punchlist/90-a-road-closure-with-no-coordinates-is-drawn-at-a-hardcoded-point.md) |
-| **89** | 🔴 crew-visible | BUILT `ad339fec` + `727c297b`, **not deployed** — needs `--build api` and a frontend build on the kiosk, then the falsifier; the any-feed/all-feeds judgement is still the operator's | [A failed road closure sync leaves the last list on screen, with no warning](punchlist/89-a-failed-road-closure-sync-leaves-the-last-list-on-screen-with-no-warning.md) |
+| **91** | 🔴 crew-visible | OPEN — found 2026-09-16, not built; three rulings needed from the operator | [Road closure fields the feed did not send are filled with invented values, including the access level](punchlist/91-road-closure-fields-the-feed-did-not-send-are-filled-with-invented-values.md) |
+| **90** | 🔴 crew-visible | BACKEND BUILT `e3009d6a` (gis-spatial-engineer, operator's word), **not deployed**; sidebar tap guard with frontend-kiosk-architect; latent — 177 rows, 0 null on the kiosk | [A road closure with no coordinates is drawn at a hardcoded point near Coquitlam Centre](punchlist/90-a-road-closure-with-no-coordinates-is-drawn-at-a-hardcoded-point.md) |
+| **89** | 🔴 crew-visible | DEPLOYED 2026-09-16 (operator reports; not confirmed by lead against the kiosk); **falsifier not yet run**; the any-feed/all-feeds judgement is still the operator's | [A failed road closure sync leaves the last list on screen, with no warning](punchlist/89-a-failed-road-closure-sync-leaves-the-last-list-on-screen-with-no-warning.md) |
 | **88** | 🔴 crew-visible | BUILT `bdcea8bc`, live 2026-09-15 (`cfr-agent` 16:52, `cfr_api` restarted); no live call has raised it yet | [A destination far from any road reaches the crew as an ordinary ETA: the snap distance is never read](punchlist/88-a-destination-far-from-any-road-reaches-the-crew-as-an-ordinary-eta.md) |
 | **85** | 🔴 crew-visible | OPEN — found 2026-09-13, not built; no call has hit it | [A lot with no road of its street's name pins at the lot's centre, with no notice](punchlist/85-a-lot-with-no-road-of-its-streets-name-pins-at-the-lot-centre-with-no-notice.md) |
 | **84** | 🔴 crew-visible | OPEN — ruled 2026-09-13: remove; not built | [`KNOWN_BUILDINGS`: eight hand-coded buildings override console pins, three of them wrong](punchlist/84-known-buildings-hand-coded-coordinates-override-console-pins.md) |

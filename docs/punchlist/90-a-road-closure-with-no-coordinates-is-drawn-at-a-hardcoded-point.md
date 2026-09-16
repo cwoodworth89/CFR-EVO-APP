@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN — found 2026-09-16; not built |
+| **Status** | BACKEND BUILT `e3009d6a`, **not deployed**; the sidebar tap (`RightSidebar.jsx:248`) is with `frontend-kiosk-architect`. Latent: falsifier run on the kiosk, 177 rows, 0 null, 0 malformed |
 | **Severity** | 🔴 crew-visible — a closure marker where there is no closure looks like every other closure marker |
 | **Area** | ⚙️ API · 🗺️ Map |
 | **Origin** | Found by `gis-spatial-engineer` while building #89, out of its scope; verified by lead against the working tree the same day |
@@ -44,3 +44,4 @@ feed record makes it live.
 | Date | Event |
 |:--|:--|
 | 2026-09-16 | Found by `gis-spatial-engineer` during #89, verified by lead, promoted straight to the list under §7.1. Not built; no owner yet |
+| 2026-09-16 | **Backend fixed, `e3009d6a`**, on the operator's direct word in the GIS chat ("hardcoded failsafes concern me, it needs to fail loudly"). The pair is gone from both places; `_parse_closure_point` (`routers/road_closures.py:~93`) returns `None` for missing, wrong arity, non-numeric, NaN, infinite or 0 (§5 treats null, NaN and 0 alike). The closure still goes out, with `"coordinates": null`, and each one is logged at ERROR with its id and the stored value. Test in `backend/tests/test_road_closures_cache.py`: six bad values → all null, none equal the old pair, every id logged; road closure tests 10/10. **Falsifier run on the kiosk:** 177 rows, 0 null, 0 malformed — latent, nothing on screen changes today. Not deployed. **Consumer side found by GIS:** `RightSidebar.jsx:248` calls `map.flyTo(closure.coordinates, …)` unguarded, so a null now throws in the click handler and the tap does nothing; `RoadClosureMarker.jsx:41` already handles null. Sent to `frontend-kiosk-architect`. GIS also listed the other invented defaults in the same two files — the severity pair is crew-visible — opened as #91, not built |

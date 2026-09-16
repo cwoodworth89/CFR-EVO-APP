@@ -41,6 +41,18 @@ zone layer that stops at a road edge or excludes a highway right-of-way leaves t
 uncovered. **Which of those it is, per record, is not yet measured** — that is the first half of
 the job.
 
+## The larger half: DriveBC
+
+One SELECT on the kiosk after the 21:00Z sync of 2026-09-16: `public.road_closures` holds
+181 rows — 71 active and 107 inactive filed by the City of Coquitlam, 3 inactive by BC MOTI
+Gateway — and **not one row from DriveBC Open511, active or inactive, since the oldest row
+(2026-08-18)**. The feed is reached on every sync (`sync.sources` says so), and the live feed
+held 306 active events that day, including the Lougheed at Kennedy Rd and the Port Mann
+approaches. As far as the table can show, the same two tests — or something earlier in the
+DriveBC branch — drop **every** provincial-highway event, and the `roads[].state` mapping
+deployed at 20:59Z has never had a record to act on. That is the highway-call half of this
+item and probably the larger one. Cause per event to be measured, not guessed.
+
 ## What it should do
 
 A closure the City files on a road inside or along Coquitlam is shown, grouped under the
@@ -68,3 +80,4 @@ public.road_closures WHERE closure_id IN (...)` is 0.
 | Date | Event |
 |:--|:--|
 | 2026-09-16 | Found by the operator in the #91 review list. Opened as crew-visible. Sent to `gis-spatial-engineer`: measure each record's position against the boundary and the nearest zone and name the cause, then fix behind the existing 100 m figure only if every record falls inside it; report the neighbour-municipality count and any DriveBC events the same tests drop |
+| 2026-09-16 | Lead's SELECT after the second-round deploy: **zero DriveBC rows in the table, ever.** Amendment sent to GIS: part (b) is not "any" but, as far as the table shows, "all" — measure each DriveBC event within ~2 km of the boundary and name why it fails, including anything earlier in the DriveBC branch than the two spatial tests |

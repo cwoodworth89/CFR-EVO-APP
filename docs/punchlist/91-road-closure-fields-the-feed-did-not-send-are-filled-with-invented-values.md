@@ -83,11 +83,30 @@ record (source + stable fields), never from the position in the list.
    and 5 MINOR events were CLOSED.** Under the deployed code those 18 drew as NO_ACCESS and those 5
    as CAUTION — wrong in both directions, measured. The feed is Open Government Licence – BC
    (from the spec's `license`). Recorded in the standards index and the register.
-   **Proposal for the operator, not built:** the access box reads `roads[].state` — `CLOSED` →
-   NO_ACCESS; `ALL_LANES_OPEN` → no access restriction, informational; absent or any value outside
-   the measured set → N/A and one ERROR line naming the value, so a new state (Open511 has others,
-   unverified) is seen and ruled on rather than guessed. `severity` is shown as the feed's own
-   word beside it, as information, never as an access tier. Untouched until he rules.
+   **The specification itself was then read** — Open511 v1.0 `event.html` from the maintainer's
+   repository, found through the operator's `datastandards.directory` link — so `roads[].state` is
+   now HELD, verbatim: `CLOSED` "road closed in the given direction", `SOME_LANES_CLOSED` "but the
+   road remains open", `SINGLE_LANE_ALTERNATING`, `ALL_LANES_OPEN`; with `roads[].direction`
+   (N…NE, NONE, BOTH). Municipal 511's own legend was read too: it distinguishes "Road Closed -
+   No Emergency Access / Emergency Access Unspecified", "Road Closed - Emergency Access Only",
+   "Road Closed - Local Traffic Only", "Lane(s) Closed", "Alternating Traffic", "Intermittently
+   Blocked", "Bike Lane Closure", "Sidewalk Closure". Both in the standards index.
+   **Proposal for the operator, sourced, not built:**
+   - **DriveBC:** the access box reads `roads[].state`, not `severity`. `CLOSED` → NO ACCESS —
+     but the spec says *in the given direction*, so a closure with `direction` N and the crew
+     approaching S is his to rule on. `SOME_LANES_CLOSED` and `SINGLE_LANE_ALTERNATING` → the
+     road is passable with a restriction: which of our tiers, if any, is a domain call.
+     `ALL_LANES_OPEN` → no restriction, informational. Absent → N/A. A value outside the four →
+     N/A and one ERROR line naming it. `severity` shown as the feed's word (MINOR / MODERATE /
+     MAJOR / UNKNOWN), never as a tier.
+   - **Municipal 511:** the tiers already mirror its legend, but the `RoadClosureType` bit values
+     in `road_closure_service.py` have no document behind them. Before any tier is trusted, GIS
+     should verify each bit against the legend by measurement — pull one municipal record of
+     each legend type and read its bits — and record the table. "Emergency Access Unspecified"
+     shares an icon with "No Emergency Access" on the vendor's map; whether it shares a tier on
+     ours is the operator's.
+   - **Licence:** Municipal 511 states none. Recorded in the register; the operator decides.
+   Untouched until he rules.
 6. **No hover-only information**, anywhere on the kiosk or the console: "it won't benefit a
    touchscreen setup or mobile." Standing convention, going into `kiosk-responsive-ergonomics`;
    an audit of existing hover-only content is a backlog line, not freeze work.

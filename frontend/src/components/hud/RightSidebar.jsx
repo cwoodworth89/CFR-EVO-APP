@@ -29,7 +29,10 @@ export function RightSidebar({
   map,
   onSelectClosure,
   zones = [],
-  homeHall = "1"
+  homeHall = "1",
+  // { outcome, lastAttemptAt, error, sources } from useRoadClosures, or null when the API
+  // did not send one (an api container older than 2026-09-16). Punch list #89.
+  syncStatus = null
 }) {
   const [collapsedGroups, setCollapsedGroups] = React.useState({});
 
@@ -158,6 +161,24 @@ export function RightSidebar({
     return `${startStr} - ${endStr}`;
   };
 
+  // Punch list #89, operator ruling 2026-09-16: warn only while the last attempt to sync
+  // the closure feeds FAILED, and say nothing otherwise. NOT_ATTEMPTED is not a failure --
+  // it is what a database never synced by a build that records the outcome reports, and it
+  // is the live value on the kiosk today -- and a null status is an older api container,
+  // which is equally not a failure. Both render no banner (CLAUDE.md 6.1).
+  const syncFailed = syncStatus?.outcome === "FAILED";
+
+  // Only shown when the backend gave a parseable timestamp; never a placeholder that could
+  // be read as the time of an attempt that did not happen.
+  const lastAttemptLabel = React.useMemo(() => {
+    if (!syncStatus?.lastAttemptAt) return null;
+    const at = new Date(syncStatus.lastAttemptAt);
+    if (Number.isNaN(at.getTime())) return null;
+    return at.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+  }, [syncStatus]);
+
   return (
     <div className={`${compact ? 'absolute inset-y-0 right-0' : 'relative'} h-full flex flex-row-reverse transition-all duration-300 ease-in-out z-[1000] min-w-0 flex-shrink-0 ${rightSidebarOpen ? `${openWidth} border-l border-slate-800` : 'w-0'}`}>
        {/* Sidebar Body Wrapper (animates width and uses overflow-hidden to prevent contents sticking out when collapsed) */}
@@ -168,6 +189,34 @@ export function RightSidebar({
                 <div className="text-slate-500 text-[10px] uppercase font-mono tracking-widest mb-1">CFR DISPATCH</div>
                 <div className="text-lg text-rose-500 font-extrabold uppercase font-sans tracking-wide">ROAD CLOSURES</div>
              </div>
+
+             {/* Sync failure banner -- outside the scroll area on purpose: a warning that
+                 can be scrolled out of sight is a warning the crew does not get. The list
+                 keeps drawing beneath it, since a stale list with a warning beats an empty
+                 one (punch list #89). */}
+             {syncFailed && (
+               <div
+                 role="status"
+                 className="flex-shrink-0 mx-4 mt-4 p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/60 flex flex-col gap-1"
+               >
+                  <div className="text-[11px] font-black uppercase font-mono tracking-wide text-amber-400">
+                     ⚠️ CLOSURE FEED SYNC FAILED
+                  </div>
+                  <div className="text-[10px] font-mono text-amber-200/90 leading-snug">
+                     Showing the last list received. It may be out of date.
+                  </div>
+                  {syncStatus.error && (
+                    <div className="text-[10px] font-mono text-amber-300/80 leading-snug break-words">
+                       {syncStatus.error}
+                    </div>
+                  )}
+                  {lastAttemptLabel && (
+                    <div className="text-[9px] font-mono text-amber-500/70">
+                       Last attempt {lastAttemptLabel}
+                    </div>
+                  )}
+               </div>
+             )}
 
              {/* Alerts Card List */}
              <div className="p-4 flex-grow overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">

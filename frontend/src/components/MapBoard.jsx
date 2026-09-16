@@ -105,7 +105,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
   } = layers;
 
   // Road closures and the filtered subset the map and alert count render.
-  const { roadClosures, activeClosures } = useRoadClosures(layers);
+  const { roadClosures, activeClosures, syncStatus: closureSyncStatus } = useRoadClosures(layers);
   const [cadastralError, setCadastralError] = useState(false); 
   
   // COLLAPSIBLE SIDEBAR STATES
@@ -582,6 +582,7 @@ export default function MapBoard({ onReviewCall, initialMode = "EXPLORE" }) {
             setRightSidebarOpen={setRightSidebarOpen}
             appMode={appMode}
             roadClosures={roadClosures}
+            syncStatus={closureSyncStatus}
             map={map}
             onSelectClosure={setSelectedClosure}
             zones={zones}

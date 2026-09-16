@@ -12,18 +12,29 @@ const REFRESH_MS = 300000; // 5 minutes
  *
  * Extracted from MapBoard.jsx. Nothing here touches the map instance or the dispatch
  * target, so it lifts out cleanly; the caller passes the current filter state (owned by
- * useMapLayerPreferences) and gets back both the raw list and the filtered one.
+ * useMapLayerPreferences) and gets back the raw list, the filtered one, and the outcome
+ * of the backend's last attempt to sync the feeds (`syncStatus`, punch list #89).
  */
 export function useRoadClosures({
   filterNoAccess, filterAccessOnly, filterCaution,
   showActiveNow, showNext24h, showNext7d,
 }) {
   const [roadClosures, setRoadClosures] = useState([]);
+  // The backend's last sync attempt: { outcome, lastAttemptAt, error, sources }, or null
+  // when the API did not send one. Null is not a failure -- see the unwrap below.
+  const [syncStatus, setSyncStatus] = useState(null);
 
   useEffect(() => {
     const loadClosures = () => {
       apiClient.roadClosures.fetchAll()
-        .then(rawEvents => {
+        .then(payload => {
+          // GET /api/road-closures returned a bare array until 2026-09-16 and now returns
+          // { closures, sync } (punch list #89). Reading both shapes keeps the list drawing
+          // through the deploy window, when the kiosk's built bundle and the api container
+          // are updated by separate steps and either can land first.
+          const rawEvents = payload?.closures ?? payload;
+          const sync = (payload && !Array.isArray(payload) && payload.sync) || null;
+          setSyncStatus(sync);
           if (!Array.isArray(rawEvents)) return;
           const now = new Date();
           const processed = rawEvents.map(evt => {
@@ -48,6 +59,10 @@ export function useRoadClosures({
           setRoadClosures(processed);
         })
         .catch(err => {
+          // The last list and the last sync outcome are both left standing: a poll that
+          // could not reach the API says nothing about whether the backend's own last
+          // attempt to reach the feeds succeeded, and clearing the flag here would report
+          // an unknown as "all clear" (CLAUDE.md 6.1).
           console.warn('Failed to load local road closures:', err);
         });
     };
@@ -78,5 +93,5 @@ export function useRoadClosures({
     showActiveNow, showNext24h, showNext7d,
   ]);
 
-  return { roadClosures, activeClosures };
+  return { roadClosures, activeClosures, syncStatus };
 }

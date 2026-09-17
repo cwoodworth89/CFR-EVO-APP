@@ -91,15 +91,13 @@ function HydrantBody({ model }) {
 
 /**
  * @param {object}   props.model         the hydrant card model, or null before the map has reported one
- * @param {function} props.onTap         TAP TO ZOOM: asks the route map to snap to the call
  * @param {string}   props.prePlanUrl    the dispatch's pre-incident plan, if the record carries one
  * @param {function} props.onOpenPrePlan opens it
  */
-export default function HydrantCard({ model = null, onTap = null, prePlanUrl = null, onOpenPrePlan = null, className = '' }) {
+export default function HydrantCard({ model = null, prePlanUrl = null, onOpenPrePlan = null, className = '' }) {
   // Null only in the frame before the route map reports: the project's own mark for a value
   // that is not there yet, never a state invented to fill the gap (CLAUDE.md s6.1).
   const m = model || { state: CARD_STATE.AWAITING, note: '--', rows: [] };
-  const tappable = Boolean(onTap) && m.state === CARD_STATE.PICKS;
 
   return (
     <section className={`bg-slate-900 border rounded-xl min-w-0 px-3 py-2.5 lg:px-4 lg:py-3 flex flex-col text-left ${
@@ -110,15 +108,8 @@ export default function HydrantCard({ model = null, onTap = null, prePlanUrl = n
       {/* The hydrant, read from the top. */}
       <div className="flex flex-col gap-1.5 lg:gap-2 min-w-0">
         <HydrantBody model={m} />
-        {tappable && (
-          <button
-            type="button"
-            onClick={onTap}
-            className="self-start font-mono font-bold text-[10px] tracking-[0.1em] uppercase text-sky-300 hover:text-sky-200 cursor-pointer transition"
-          >
-            Tap to zoom
-          </button>
-        )}
+        {/* TAP TO ZOOM removed (operator, 2026-09-17). SNAP TO CALL on the route map does the
+            same snap. */}
       </div>
 
       {/* Documents, along the foot. Operator, 2026-09-10: a place "for bringing up a stored

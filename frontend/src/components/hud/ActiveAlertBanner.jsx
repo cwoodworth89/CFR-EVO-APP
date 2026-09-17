@@ -123,7 +123,6 @@ export default function ActiveAlertBanner({
   // The hydrant by the operator's rule, from the route map (utils/hydrantCard.js). Null until
   // the map has measured one; the card then says which state it is in, never a guess.
   hydrantModel = null,
-  onHydrantTap = null,
   // The call's documents, along the foot of the hydrant card (operator, 2026-09-10).
   prePlanUrl = null,
   onOpenPrePlan = null,
@@ -376,7 +375,7 @@ export default function ActiveAlertBanner({
       </section>
 
       {/* The water */}
-      <HydrantCard model={hydrantModel} onTap={onHydrantTap} prePlanUrl={prePlanUrl} onOpenPrePlan={onOpenPrePlan} />
+      <HydrantCard model={hydrantModel} prePlanUrl={prePlanUrl} onOpenPrePlan={onOpenPrePlan} />
     </header>
   );
 }

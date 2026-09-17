@@ -61,10 +61,9 @@ export default function KioskView({ kioskState }) {
 
   const [showPrePlanModal, setShowPrePlanModal] = useState(false);
   // The hydrant is picked along the route the map drew, so the map measures it and hands the
-  // card's model up here; the header renders it and hands TAP TO ZOOM back down to the map's
-  // own SNAP TO CALL (operator, 2026-09-10: the card moved off the map into the header).
+  // card's model up here; the header renders it (operator, 2026-09-10: the card moved off the
+  // map into the header).
   const [hydrantModel, setHydrantModel] = useState(null);
-  const [snapRequest, setSnapRequest] = useState(0);
   // Below `lg`, a phone or an upright tablet: the layout stacks, the detail tiles become tabs.
   const compact = useCompactViewport();
 
@@ -339,7 +338,6 @@ export default function KioskView({ kioskState }) {
         elapsedFormatted={elapsedFormatted}
         timeoutFormatted={timeoutFormatted}
         hydrantModel={hydrantModel}
-        onHydrantTap={hasCoords ? () => setSnapRequest((n) => n + 1) : null}
         prePlanUrl={prePlanUrl}
         onOpenPrePlan={() => setShowPrePlanModal(true)}
         onDismiss={() => dismissActiveCall('manual')}
@@ -356,7 +354,6 @@ export default function KioskView({ kioskState }) {
             stationHall={KIOSK_HALL}
             compact={compact}
             onHydrantModel={setHydrantModel}
-            snapRequest={snapRequest}
             arrival={showArrival ? arrival : null}
             onHallRoute={onHallRoute}
             arrivalNotice={arrivalNotice}

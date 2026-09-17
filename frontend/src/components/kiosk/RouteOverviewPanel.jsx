@@ -89,7 +89,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null, onHallRoute = null, arrivalNotice = null }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, arrival = null, onHallRoute = null, arrivalNotice = null }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -276,27 +276,15 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // Off the route: a snap, or a drag or wheel by hand. The one button then offers the way
   // back. The console shows a separate RE-CENTER ON ROUTE pill after a drag; nothing floats
   // over this map's lower half (2026-09-10), so the button carries that case too, and the
-  // way back is still one tap. SNAP TO CALL returns once the view is back on the route; the
-  // header's hydrant TAP TO ZOOM snaps from anywhere.
+  // way back is still one tap. SNAP TO CALL returns once the view is back on the route.
   const offRoute = userPanned || viewMode === 'call';
 
   // The hydrant card lives in the header now (operator, 2026-09-10), but the picks are
-  // measured here, along the route this map drew, so the model goes up. TAP TO ZOOM comes
-  // back down as a handle on this panel's own SNAP TO CALL: the header needs no map of its
-  // own, and the pin can no longer be covered by a card that is not over the map.
+  // measured here, along the route this map drew, so the model goes up.
   useEffect(() => {
     if (onHydrantModel) onHydrantModel(hydrantModel);
   }, [hydrantModel, onHydrantModel]);
 
-  // TAP TO ZOOM on the header's hydrant card asks this map to snap. A counter rather than a
-  // handle passed upward: writing a function into a prop ref is the crash-lint's
-  // react-hooks/immutability rule, and a counter says "asked again" without one.
-  const lastSnapRequest = useRef(snapRequest);
-  useEffect(() => {
-    if (snapRequest === lastSnapRequest.current) return;
-    lastSnapRequest.current = snapRequest;
-    if (hasValidCoords) snapToCall();
-  });
 
 
   return (

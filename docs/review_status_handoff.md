@@ -36,6 +36,7 @@ PDT and `cfr_api` after it, both by the operator.
 | **A destination far from any road now raises a flag.** OSRM reports how far it moved a destination to reach a road; nothing read it, so a route ending kilometres away looked ordinary. `ROUTE_SNAP_FAR` above 50 m (operator ruling). Corpus: median 5.7 m, p90 34.6 m, 24 calls (4.2%) over the threshold | #88, `bdcea8bc` |
 | **Street View says "No Street View available"** instead of drawing an empty panorama | `9a788d94` |
 | **Carto is retired** — no crawl, no docs, and the operator deleted both archives from the kiosk | #47b Carto half closed |
+| **The dispatch map's SNAP TO CALL and RE-CENTRE are one button**, matching explore mode (operator, 2026-09-16). `RouteOverviewPanel.jsx:383–389`: *Snap to call* on the route, *Show route* once the view has left it by snap, drag or wheel. One deliberate difference: nothing may float over the dispatch map's lower half (2026-09-10), so there is no drag-pill; after a drag, snapping is two taps (the header's hydrant TAP TO ZOOM still snaps in one). Tooltips removed under the hover rule. Needs a frontend build; not seen rendered | `0e04af21` |
 
 ### What a new session should know
 

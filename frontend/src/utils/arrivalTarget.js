@@ -56,6 +56,14 @@ export function applyArrivalToCall(call, target) {
   if (!call || !target || !isCoord(target.lat, target.lng)) return call;
   const candidates = call.candidates ?? call.target?.candidates;
   if (Array.isArray(candidates) && candidates.length > 1) return call;
+  // Already there (a call recorded at the point the resolver still gives): the same call, so
+  // nothing downstream reads it as moved -- the header keeps the recorded ETAs.
+  const recLat = call.lat ?? call.target?.lat;
+  const recLng = call.lng ?? call.target?.lng;
+  if (isCoord(recLat, recLng) && Number(recLat) === target.lat && Number(recLng) === target.lng
+      && (call.target?.arrival_point ?? null) === target.arrival_point) {
+    return call;
+  }
   return {
     ...call,
     lat: target.lat,
@@ -101,4 +109,36 @@ export function unitEtasForMovedCall(persistedMetrics, hallStats) {
       distKm: usable && live.distanceKm != null ? live.distanceKm : null,
     };
   });
+}
+
+const normalAddress = (s) => String(s || '').replace(/\s+/g, ' ').trim().toUpperCase();
+
+/**
+ * The target the call on screen takes, derived every time the call is shown -- nothing held
+ * in session (#94). Operator, 2026-09-17: the pin goes wherever the route goes, and "we lost
+ * our marker placement again" after replaying another call and coming back. The stored point
+ * lived in KioskView state, which unmounts when a replay ends (App.jsx mode switch), while
+ * the route read the parcel's entrance fresh each time; the two parted on return.
+ *
+ * The rule: the resolver's answer for this address NOW, from the parcel row the arrival panel
+ * already looks up (resolverTargetFromParcel), applied at load, after a save, after a clear.
+ * Three guards, each so a pin is never moved onto something that is not this call's property:
+ *   * the parcel row's address must be the call's own lookup address -- the read lookup falls
+ *     back to a partial ILIKE match (api/routers/parcels.py _address_row), and 40 rows match
+ *     "%1145 Heffley%";
+ *   * the call must have been placed on a parcel (a recorded arrival_point, or parcel rings) --
+ *     a junction, block or street section keeps its own point;
+ *   * the row must give a point (resolverTargetFromParcel non-null).
+ * Null when any guard fails: the call shows as recorded.
+ */
+export function onScreenArrivalTarget(call, parcel, lookupAddress) {
+  if (!call || !parcel) return null;
+  const key = normalAddress(lookupAddress);
+  if (!key || normalAddress(parcel.address) !== key) return null;
+  const t = call.target || {};
+  const rings = t.rings ?? call.rings;
+  const placedOnParcel = ['entrance', 'front', 'centroid'].includes(t.arrival_point)
+    || (Array.isArray(rings) && rings.length > 0);
+  if (!placedOnParcel) return null;
+  return resolverTargetFromParcel(parcel);
 }

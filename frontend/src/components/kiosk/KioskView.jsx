@@ -8,7 +8,7 @@ import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { STATIONS } from '../MapConstants';
 import { useCompactViewport } from '../../hooks/useCompactViewport';
 import { useArrivalPoint } from '../../hooks/useArrivalPoint';
-import { resolverTargetFromParcel, applyArrivalToCall, unitEtasForMovedCall, destinationKey } from '../../utils/arrivalTarget';
+import { applyArrivalToCall, unitEtasForMovedCall, destinationKey, onScreenArrivalTarget } from '../../utils/arrivalTarget';
 import ArrivalPointSection from '../hud/ArrivalPointSection';
 import { sanitizeAddress } from '../../utils/addressUtils';
 
@@ -75,24 +75,20 @@ export default function KioskView({ kioskState }) {
   // the crew is watching that one and nobody unlocked anything to put it there.
   const isReview = isReviewMode || Boolean(activeCall?.isReview);
 
-  // A saved (or cleared) arrival point applies to the call on screen, not only the next one
-  // (punch list #94, operator 2026-09-17: closing the editor "the route jumps back", the pin
-  // never having moved). The save returns the parcel row; the call on screen takes the
-  // destination the resolver would give the next call from it (utils/arrivalTarget.js). Held
-  // here, per call, so closing the editor keeps it; a different call starts clean. Nothing
-  // changes until the operator saves or clears on this screen: the replay shows the call as
-  // recorded until then.
-  const callKey = activeCall?.dispatch_id || activeCall?.id || activeCall?.address || '';
-  const [appliedArrival, setAppliedArrival] = useState(null);   // { callKey, target }
-  const onArrivalSaved = useCallback((saved) => {
-    setAppliedArrival({ callKey, target: resolverTargetFromParcel(saved) });
-  }, [callKey]);
-  const arrival = useArrivalPoint({ address: isReview ? sanitizeAddress(activeCall?.address || '') : '', onSaved: onArrivalSaved });
-  // The call every panel below reads: the recorded call, or the recorded call with the applied
-  // arrival point as its destination. The dispatch record itself is never rewritten.
+  // The arrival point applies to the call on screen, derived every time the call is shown --
+  // at load, after a save, after a clear -- from the parcel row the arrival panel looks up
+  // (punch list #94, utils/arrivalTarget.js onScreenArrivalTarget). Pin, route, Street View,
+  // header ETAs and the note box all read `displayCall`, so they follow one point. It used to
+  // be held in this component's state after a save, which unmounts when a replay ends, so
+  // replaying another call and coming back lost the pin while the route still read the parcel
+  // (operator, 2026-09-17). Review replays only: a live call looks nothing up here, and the
+  // resolver already gave it the entrance.
+  const lookupAddress = isReview ? sanitizeAddress(activeCall?.address || '') : '';
+  const arrival = useArrivalPoint({ address: lookupAddress });
+  // The dispatch record itself is never rewritten.
   const displayCall = useMemo(
-    () => (appliedArrival && appliedArrival.callKey === callKey ? applyArrivalToCall(activeCall, appliedArrival.target) : activeCall),
-    [activeCall, appliedArrival, callKey],
+    () => applyArrivalToCall(activeCall, onScreenArrivalTarget(activeCall, arrival.parcel, lookupAddress)),
+    [activeCall, arrival.parcel, lookupAddress],
   );
   const destinationMoved = displayCall !== activeCall;
 

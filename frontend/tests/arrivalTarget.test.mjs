@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolverTargetFromParcel, applyArrivalToCall, unitEtasForMovedCall, destinationKey } from '../src/utils/arrivalTarget.js';
+import { resolverTargetFromParcel, applyArrivalToCall, unitEtasForMovedCall, destinationKey, onScreenArrivalTarget } from '../src/utils/arrivalTarget.js';
 
 const parcel = (over = {}) => ({
   lat: 49.2790, lng: -122.8010,               // centroid
@@ -76,4 +76,54 @@ test('route results are tagged with the destination they were computed to', () =
   assert.equal(destinationKey(49.2795, -122.8008), '49.2795,-122.8008');
   assert.equal(destinationKey('49.2795', '-122.8008'), '49.2795,-122.8008');
   assert.equal(destinationKey(null, 1), '');
+});
+
+// The Heffley shape: recorded at the frontage, the parcel since given an operator entrance.
+const heffleyCall = () => ({
+  dispatch_id: 'DISP-2026-1432E6', address: '1145 Heffley Cres', lat: 49.2785, lng: -122.8010,
+  target: { lat: 49.2785, lng: -122.8010, arrival_point: 'front', rings: [[[-122.801, 49.278], [-122.800, 49.278], [-122.800, 49.279]]] },
+});
+const heffleyParcel = (over = {}) => parcel({
+  address: '1145 Heffley Cres', entrance_lat: 49.2795, entrance_lng: -122.8008, entrance_note: 'Main Lobby entrance', ...over,
+});
+const shown = (call, parcelRow) => applyArrivalToCall(call, onScreenArrivalTarget(call, parcelRow, call.address));
+
+test('at load, a replay takes the parcel\'s saved entrance -- no save needed this session', () => {
+  const on = shown(heffleyCall(), heffleyParcel());
+  assert.equal(on.lat, 49.2795);
+  assert.equal(on.target.arrival_point, 'entrance');
+  assert.equal(on.target.entrance_note, 'Main Lobby entrance');
+});
+
+test('switching to another call and back shows the same screen both times', () => {
+  // Nothing is held between the two: each showing derives the target from the call and the row.
+  const first = shown(heffleyCall(), heffleyParcel());
+  const other = shown({ address: '3001 Gordon Ave', lat: 49.26, lng: -122.77, target: { lat: 49.26, lng: -122.77, arrival_point: 'front', rings: [[[0, 0]]] } },
+    parcel({ address: '3001 Gordon Ave', front_lat: 49.26, front_lng: -122.77 }));
+  assert.equal(other.lat, 49.26);
+  const again = shown(heffleyCall(), heffleyParcel());   // a fresh mount: new call object, new lookup
+  assert.deepEqual([again.lat, again.lng, again.target.arrival_point], [first.lat, first.lng, first.target.arrival_point]);
+});
+
+test('no entrance and the recorded frontage still current: the call is unchanged, not "moved"', () => {
+  const call = heffleyCall();
+  assert.equal(shown(call, heffleyParcel({ entrance_lat: null, entrance_lng: null, entrance_note: null })), call);
+});
+
+test('a cleared entrance on a call recorded at the old entrance goes to the frontage', () => {
+  const call = { ...heffleyCall(), lat: 49.2795, lng: -122.8008, target: { ...heffleyCall().target, lat: 49.2795, lng: -122.8008, arrival_point: 'entrance' } };
+  const on = shown(call, heffleyParcel({ entrance_lat: null, entrance_lng: null, entrance_note: null }));
+  assert.equal(on.lat, 49.2785);
+  assert.equal(on.target.arrival_point, 'front');
+});
+
+test('guards: a partial-match row, a junction, no row -- the call shows as recorded', () => {
+  const call = heffleyCall();
+  assert.equal(onScreenArrivalTarget(call, heffleyParcel({ address: '1145 Heffley Cres 101' }), call.address), null);
+  assert.equal(onScreenArrivalTarget(call, heffleyParcel(), ''), null);
+  const junction = { address: 'Lougheed Hwy & Pinetree Way', lat: 49.28, lng: -122.79, target: { lat: 49.28, lng: -122.79 } };
+  assert.equal(onScreenArrivalTarget(junction, parcel({ address: 'Lougheed Hwy & Pinetree Way', entrance_lat: 49.1, entrance_lng: -122.1 }), junction.address), null);
+  assert.equal(onScreenArrivalTarget(call, null, call.address), null);
+  // Case and spacing do not make a different address.
+  assert.ok(onScreenArrivalTarget(call, heffleyParcel({ address: '1145  HEFFLEY cres' }), call.address));
 });

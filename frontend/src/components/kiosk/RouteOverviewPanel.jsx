@@ -141,23 +141,18 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // Stable identity: a fresh object every render re-ran every effect that lists it.
   const destination = useMemo(() => (hasValidCoords ? { lat: destLat, lng: destLng } : null), [hasValidCoords, destLat, destLng]);
 
-  // Where the route lines end. While an arrival point is being set from a replay they follow the
-  // draft pin, then the saved point, as the console's Explore mode does (MapBoard `routeDest`), so
-  // the approach can be judged here rather than on the next call (operator, 2026-09-14). Only a
-  // replay with the arrival panel open passes `arrival`. Once saved, the arrival point is the
-  // call's own destination (KioskView applies it, punch list #94), so the pin moves to it and the
-  // route stays there after the panel closes; before #94 closing it sent the route back to the
-  // recorded point. A call with no location gets no route at all (CLAUDE.md s5).
+  // Where the route lines end: the draft pin while one is being placed, so the approach can be
+  // judged before saving (operator, 2026-09-14), else the call's destination. Since #94 the
+  // destination IS the arrival point wherever one applies (KioskView derives it from the parcel
+  // for every showing), so the route and the pin are one point; the route no longer reads the
+  // parcel on its own, which is what let them part (operator, 2026-09-17). A call with no
+  // location gets no route at all (CLAUDE.md s5).
   const routeDest = useMemo(() => {
     if (!hasValidCoords) return null;
     const draft = arrival?.draft;
     if (draft && draft.lat != null && draft.lng != null) return { lat: draft.lat, lng: draft.lng };
-    const saved = arrival?.parcel;
-    if (saved && saved.entrance_lat != null && saved.entrance_lng != null) {
-      return { lat: saved.entrance_lat, lng: saved.entrance_lng };
-    }
     return destination;
-  }, [hasValidCoords, arrival?.draft, arrival?.parcel, destination]);
+  }, [hasValidCoords, arrival?.draft, destination]);
 
   // All severities, active now. No filter controls on the dispatch map by design.
   const { activeClosures } = useRoadClosures({
@@ -426,23 +421,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (unsaved)</Tooltip>
           </CircleMarker>
         )}
-        {/* Once saved the draft clears. Without this nothing drew the saved point, so the map fell
-            back to the recorded call's pin and a save read as "the pin jumps back": the operator
-            saved 1144 Inlet St five times on 2026-09-14, and every save had landed. Emerald is the
-            confirmed colour (kiosk-responsive-ergonomics skill), as the Arrival point notice uses. */}
-        {/* Since #94 a saved point becomes the call's destination and the pin moves onto it, so the
-            dot is drawn only where the two differ: an arrival point saved before this replay,
-            which this call on screen has not taken. */}
-        {arrival && !arrival.draft && arrival.parcel?.entrance_lat != null && arrival.parcel?.entrance_lng != null
-          && !(destination && Number(arrival.parcel.entrance_lat) === destination.lat && Number(arrival.parcel.entrance_lng) === destination.lng) && (
-          <CircleMarker
-            center={[arrival.parcel.entrance_lat, arrival.parcel.entrance_lng]}
-            radius={10}
-            pathOptions={{ color: '#059669', fillColor: '#34d399', fillOpacity: 0.95, weight: 3 }}
-          >
-            <Tooltip permanent direction="top" offset={[0, -10]}>Arrival point (saved)</Tooltip>
-          </CircleMarker>
-        )}
+        {/* The emerald "Arrival point (saved)" dot is gone (#94): the pin is on the saved point
+            from the moment the call is shown, so the dot had no case left. */}
         <ZoomWatcher onZoom={setMapZoom} />
 
         {/* The parcel outline, soft blue, as the workstation draws it: rings of [lng, lat]

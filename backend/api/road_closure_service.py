@@ -29,6 +29,7 @@ except ModuleNotFoundError:
     )
 
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 
 # DriveBC Open511 events endpoint. `bbox` and `status` are GET /events query parameters in BC's
 # OpenAPI spec for the feed (bcgov/api-specs open511_OAS3.json, read 2026-09-16; standards
@@ -51,6 +52,12 @@ DRIVEBC_EVENTS_URL = "https://api.open511.gov.bc.ca/events"
 # Operator ruling 2026-09-16, gis-spatial-engineer's chat ("Drop MOTI copies"), accepting that
 # a MOTI record absent from DriveBC would be lost (31 of 303 unmatched across the two pulls).
 MUNICIPAL511_PUBLISHERS = ("City of Coquitlam",)
+
+# Most Municipal 511 data files fetched at once. Measured 2026-09-16 on the kiosk: the Coquitlam
+# page listed 13 files, fetched one after another in ~6.7 s of an 8.8 s sync, 181-byte files
+# included at ~0.25 s each. Operator 2026-09-16 (#92): "We can parallel if it's easy"; all 13 at
+# once, lead's bound. The requests, URLs and 5 s timeout are unchanged -- only their overlap is.
+MUNICIPAL511_FETCH_WORKERS = 13
 
 
 class PythonGeometryDecoder:
@@ -511,11 +518,28 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
         if not matches:
             matches = [("jsonData0.txt", "jsonData0.txt")]
 
-        for _, filename in matches:
+        def _fetch_file(filename):
+            # The body, or the exception, so one failed file is reported below exactly as the
+            # sequential loop reported it: a chunk error, and Municipal 511 not reached.
             try:
                 req_data = urllib.request.Request(f"https://bc.municipal511.ca/Dynamic/{filename}", headers=headers)
                 with urllib.request.urlopen(req_data, timeout=5) as resp:
-                    muni_data = json.loads(resp.read().decode('utf-8'))
+                    return resp.read()
+            except Exception as fetch_err:
+                return fetch_err
+
+        # Fetched concurrently, processed in the page's order. Each file carries its own
+        # CoordsEncoded stream and gets its own decoder, so the order files are *processed* in
+        # is what keeps geometry aligned, and that order is unchanged (map preserves it).
+        filenames = [filename for _, filename in matches]
+        with ThreadPoolExecutor(max_workers=max(1, min(MUNICIPAL511_FETCH_WORKERS, len(filenames)))) as pool:
+            bodies = list(pool.map(_fetch_file, filenames))
+
+        for filename, body in zip(filenames, bodies):
+            try:
+                if isinstance(body, Exception):
+                    raise body
+                muni_data = json.loads(body.decode('utf-8'))
 
                 issues = muni_data.get('Issues', [])
                 decoder = PythonGeometryDecoder(muni_data.get('CoordsEncoded', ''))

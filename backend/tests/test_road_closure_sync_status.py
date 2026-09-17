@@ -431,6 +431,61 @@ class FeedGapTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["coordinates"][0], [_PATH3[0][1], _PATH3[0][0]])
 
+    # --- #92: Municipal 511 data files fetched concurrently ---------------------
+
+    def _muni_files(self, files, fail=(), barrier=None):
+        """urlopen for a page listing `files` (name -> (issues, paths)); names in `fail` raise."""
+        page = json.dumps({f"{n}.txt": n for n in files}).encode()
+
+        def urlopen(req, timeout=None):
+            url = req.full_url
+            if "open511" in url:
+                return _Resp(json.dumps({"events": []}).encode())
+            if url.endswith("municipality=coquitlam"):
+                return _Resp(page)
+            name = url.rsplit("/", 1)[-1]
+            if barrier is not None:
+                barrier.wait()  # every file request must be in flight at once to pass
+            if name in fail:
+                raise OSError(f"timed out: {name}")
+            issues, paths = files[name]
+            return _Resp(json.dumps({"Issues": issues, "CoordsEncoded":
+                                     _encode_polyline([pt for path in paths for pt in path])}).encode())
+        return urlopen
+
+    def test_municipal_files_are_fetched_at_the_same_time(self):
+        import threading
+        files = {f"jsonData{i}": ([], []) for i in range(3)}
+        barrier = threading.Barrier(3, timeout=5)
+        with patch("urllib.request.urlopen", self._muni_files(files, barrier=barrier)):
+            svc.sync_road_closures_to_db(self.db)
+        # A sequential fetch would break the barrier and mark the feed not reached.
+        self.assertTrue(svc.read_sync_status(self.db)["sources"]["Municipal 511"]["reached"])
+
+    def test_each_file_keeps_its_own_geometry_when_fetched_concurrently(self):
+        files = {
+            "jsonData0": ([_muni_issue(issue_id=1, rct=262144, location="A St"),
+                           _muni_issue(issue_id=2, rct=262144, location="B St")], [_PATH, _PATH2]),
+            "jsonData1": ([_muni_issue(issue_id=3, rct=262144, location="C St")], [_PATH3]),
+        }
+        with patch("urllib.request.urlopen", self._muni_files(files)):
+            svc.sync_road_closures_to_db(self.db)
+        got = {r.closure_id: r.coordinates for r in self._rows()}
+        mid = lambda path: [path[len(path) // 2][0], path[len(path) // 2][1]]
+        self.assertEqual(got, {"muni_1_0": mid(_PATH), "muni_2_0": mid(_PATH2), "muni_3_0": mid(_PATH3)})
+
+    def test_one_failed_file_still_marks_municipal_511_not_reached(self):
+        files = {"jsonData0": ([_muni_issue(issue_id=1, rct=262144)], [_PATH]),
+                 "jsonData1": ([], [])}
+        with patch("urllib.request.urlopen", self._muni_files(files, fail={"jsonData1"})):
+            svc.sync_road_closures_to_db(self.db)
+        status = svc.read_sync_status(self.db)
+        self.assertFalse(status["sources"]["Municipal 511"]["reached"])
+        self.assertIn("jsonData1: timed out", status["sources"]["Municipal 511"]["error"])
+        self.assertEqual(status["outcome"], svc.SYNC_FAILED)
+        # The file that did arrive is still ingested, as it was when fetched in sequence.
+        self.assertEqual([r.closure_id for r in self._rows()], ["muni_1_0"])
+
     def test_severity_is_one_summary_line_per_sync_not_one_per_record(self):
         # #91: ~70 per-record ERROR lines a sync buried the id-less skip lines.
         drivebc = [_event(id="gap", road_name="A St"),

@@ -42,7 +42,7 @@ call or a review replay.
 review strip       only on a review replay: REVIEW REPLAY / EXIT REVIEW, full width
 ActiveAlertBanner  (header: three cards -- the call, the units with ETAs, the hydrant)
 ├── notices row          only when the record carries one: pre-incident plan, operator-set arrival point
-├── RouteOverviewPanel   flex-1       route map: route pill, control stack (ZOOM, SNAP TO CALL, RE-CENTRE, + -)
+├── RouteOverviewPanel   flex-1       route map: arrival-point box top left only when operator-set, control stack (ZOOM, SNAP TO CALL / SHOW ROUTE, + -); no route pill since 2026-09-17, the header's unit line carries the figures
 └── DetailStack          38.5 %, 360-740 px   PropertySatellitePanel ("AERIAL") and StreetViewPanel, each in a TileFrame header bar
 ```
 

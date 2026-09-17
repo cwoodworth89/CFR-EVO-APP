@@ -191,11 +191,9 @@ for (const vp of VIEWPORTS) {
     }
     check(await page.locator('h1').count() > 0, 'the address heading is on screen');
     check(await page.locator('text=/REVIEW REPLAY/i').count() > 0, 'the review-replay strip is above the header');
-    const pill = await page.locator('text=/^(ROUTE|STRAIGHT-LINE) ·/').first().textContent().catch(() => '');
-    if (located) {
-      check(/(ROUTE|STRAIGHT-LINE) · [\d.]+ KM · \d+ MIN/.test(pill || ''), `the route pill carries OSRM's figures (${(pill || '').trim()})`);
-    } else {
-      check(/AWAITING LOCATION/.test(pill || ''), `the route pill says the location is awaited (${(pill || '').trim()})`);
+    // The route pill was removed 2026-09-17 (operator: duplicate of the header's unit line).
+    check(await page.locator('text=/^(ROUTE|STRAIGHT-LINE) ·/').count() === 0, 'no route pill on the map (the header carries the figures)');
+    if (!located) {
       check(await page.locator('text=/LOCATION UNRESOLVED/i').count() > 0, 'the unresolved-location banner is above the header');
       check(await page.locator('button', { hasText: /snap to call/i }).count() === 0, 'no SNAP TO CALL without a location');
     }

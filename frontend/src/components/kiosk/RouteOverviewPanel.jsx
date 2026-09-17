@@ -22,16 +22,6 @@ const OVERLAY_INSET_PX = 12;
 const CONTROL = 'bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg px-4 py-3 lg:px-5 lg:py-3.5 touch:py-4 font-mono font-extrabold text-xs lg:text-sm tracking-[0.1em] uppercase shadow-lg transition whitespace-nowrap';
 const ZOOM_BTN = 'w-12 h-12 xl:w-14 xl:h-14 bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg text-slate-50 font-sans text-2xl leading-none shadow-lg cursor-pointer';
 
-/** The route pill's text: OSRM's figures for the drawn home route, or the unknown marks. */
-function routePillText(summary) {
-  if (!summary) return 'ROUTE · -- KM · -- MIN';
-  const km = summary.distanceKm != null ? `${Number(summary.distanceKm).toFixed(1)} KM` : '-- KM';
-  const min = summary.etaMinutes != null ? `${Math.round(Number(summary.etaMinutes))} MIN` : '-- MIN';
-  // A degraded answer is a straight-line distance with no router behind it: say so
-  // (docs/ux_notes.md section 4, "straight-line on a distance that is one").
-  return `${summary.degraded ? 'STRAIGHT-LINE' : 'ROUTE'} · ${km} · ${min}`;
-}
-
 // Dynamic Screen-Aware Route Auto-Fitter (Fills 85-90% of Map Container Area)
 // A programmatic fit fires the same zoomstart the user's scroll wheel does, so the
 // RE-CENTER button used to appear on every call before anyone touched the map (operator,
@@ -99,7 +89,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null, onHallRoute = null }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null, onHallRoute = null, arrivalNotice = null }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -190,8 +180,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   }), []);
   // The route as drawn, reported by RoutingOverlay; the hydrant picker measures along it.
   const [routeCoords, setRouteCoords] = useState([]);
-  // OSRM's distance and duration for that drawn route, for the pill (CLAUDE.md s6.2).
-  const [routeSummary, setRouteSummary] = useState(null);
   const [mapZoom, setMapZoom] = useState(13);
 
   // Reset view state when the active call changes.
@@ -206,7 +194,6 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
     setUserPanned(false);
     setSelectedCandidateIdx(0);
     setRouteCoords([]);
-    setRouteSummary(null);
     setViewMode('route');
   }
 
@@ -357,14 +344,22 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
           three sat over the route: "there is also a floating/pulsing amber banner that's
           been popping up in the main map board ... we can remove that since we're using the
           above header banners" (operator, 2026-09-10). Nothing floats over this map now
-          except the route pill and the control stack, both in its top corners. */}
+          except the arrival-point box, when there is one, and the control stack, in its top
+          corners. */}
 
-      {/* The route pill: OSRM's distance and duration for the drawn home route, the router's
-          own figures and never a recomputation (CLAUDE.md s6.2). Until the route arrives, or
-          when the record has no location, the marks say so. */}
-      <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none bg-slate-950 border border-slate-800 rounded-md px-3 py-2 font-mono font-bold text-[11px] lg:text-xs tracking-[0.1em] uppercase text-slate-50 shadow-lg">
-        {hasValidCoords ? routePillText(routeSummary) : 'ROUTE · AWAITING LOCATION'}
-      </div>
+      {/* The route pill (ROUTE · km · min) is gone: the header's unit line shows the home hall's
+          distance and ETA (operator, 2026-09-17: "duplicate information that needs to go").
+          Its slot holds the operator-set arrival point, and only when there is one: information,
+          not a warning, so the pill's own quiet dark box, smaller, no colour (operator,
+          2026-09-17: "a tiny info box here instead IF set"). It replaces the emerald notices row.
+          KioskView decides when: never while the review's arrival panel is open. */}
+      {hasValidCoords && arrivalNotice && (
+        <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none max-w-[55%] bg-slate-950 border border-slate-800 rounded-md px-2.5 py-1.5 font-mono text-[10px] lg:text-[11px] leading-snug text-slate-100 shadow-lg">
+          <span className="font-bold tracking-[0.1em] uppercase text-slate-400">Arrival point</span>
+          <span className="text-slate-500"> · </span>
+          <span className={arrivalNotice.note ? '' : 'font-bold tracking-[0.1em] uppercase'}>{arrivalNotice.note || 'Set'}</span>
+        </div>
+      )}
 
       {/* The control stack, top right, the console's mirrored (artboard 3A): the zoom readout,
           one SNAP TO CALL / SHOW ROUTE button, and the zoom buttons, in one fixed order so each
@@ -498,7 +493,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             dest={[routeDest.lat, routeDest.lng]}
             homeHall={origin.id || '1'}
             routingMetrics={persistedUnitMetrics}
-            onHomeRouteCalculated={(coords, summary) => { setRouteCoords(coords); setRouteSummary(summary || null); }}
+            onHomeRouteCalculated={(coords) => { setRouteCoords(coords); }}
             // Every hall's router answer, tagged with the destination it was computed to, for the
             // header when the call's destination has moved on screen (#94). A route to a draft pin
             // carries the draft's key and is ignored there.

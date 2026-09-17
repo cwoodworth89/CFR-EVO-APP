@@ -240,7 +240,9 @@ export default function KioskView({ kioskState }) {
   // own frontage and needs no notice.
   const arrivalSet = displayCall?.target?.arrival_point === 'entrance';
   const entranceNote = displayCall?.target?.entrance_note || null;
-  const hasNotices = arrivalSet;
+  // Shown as a small box in the route map's top-left (operator, 2026-09-17), not the emerald
+  // notices row it replaces. Hidden while the review's arrival panel is open: the panel says it.
+  const arrivalNotice = arrivalSet && !showArrival ? { note: entranceNote } : null;
 
   return (
     // Below `lg` the column scrolls: three header cards, a map at half the height and the
@@ -347,20 +349,6 @@ export default function KioskView({ kioskState }) {
         onDismiss={() => dismissActiveCall('manual')}
       />
 
-      {/* Notices: one row, rendered only when the record carries something to say. */}
-      {hasNotices && (
-        <div className="flex-shrink-0 px-2 lg:px-3 pt-2 lg:pt-3 flex flex-wrap gap-2 lg:gap-3">
-          {arrivalSet && (
-            <div className="flex-1 min-w-[16rem] flex items-center gap-3 px-3.5 py-2.5 lg:px-4 lg:py-3 rounded-xl bg-emerald-950/60 border border-emerald-700/70">
-              <span className="font-mono font-extrabold text-[10px] lg:text-[11px] tracking-[0.12em] uppercase bg-emerald-400 text-slate-950 rounded px-2 py-1 whitespace-nowrap">Arrival point</span>
-              <span className="font-sans font-medium text-emerald-100 text-sm lg:text-base leading-snug">
-                Set by the operator{entranceNote ? ` — ${entranceNote}` : ''}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* The body: the route map and the two view tiles. From `lg` up a row, the map taking
           what the column leaves; below it a column, the map at just over half the height and
           the tiles as tabs. The column is the canvas's 740 px of 1,920, held between a floor
@@ -375,6 +363,7 @@ export default function KioskView({ kioskState }) {
             snapRequest={snapRequest}
             arrival={showArrival ? arrival : null}
             onHallRoute={onHallRoute}
+            arrivalNotice={arrivalNotice}
           />
         </section>
 

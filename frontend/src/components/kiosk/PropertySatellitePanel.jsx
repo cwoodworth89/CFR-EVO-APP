@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { targetPinIcon } from '../map/mapIcons';
 import { BASE_LAYERS } from '../MapConstants';
 import { API_BASE_URL } from '../../apiClient';
 import TileFrame from './TileFrame';
@@ -163,9 +162,8 @@ export default function PropertySatellitePanel({ activeCall }) {
         <Polygon positions={polygonPositions} pathOptions={{ color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3 }} />
       )}
 
-      <Marker position={[destLat, destLng]} icon={targetPinIcon}>
-        <Popup>Destination: {activeCall?.address || 'Target Location'}</Popup>
-      </Marker>
+      {/* No pin on the aerial tile (operator, 2026-09-17: "It clutters the image"). The parcel
+          outline says where the property is; the route map carries the pin. */}
 
       <StableAutoCenterAndResize lat={destLat} lng={destLng} polygonPositions={polygonPositions} callKey={callKey} />
     </MapContainer>

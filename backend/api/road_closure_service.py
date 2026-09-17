@@ -67,10 +67,14 @@ MUNICIPAL511_FETCH_WORKERS = 13
 # outside these twenty stay null (N/A).
 MUNICIPAL511_TIERS = {
     262144: ("NO_ACCESS", "FULL_CLOSURE"),        # Road Closed - No Emergency Access
+    # Local Traffic Only and Detour are served as full closures -- a ruling the operator expects
+    # to revisit ("for now"), 2026-09-17: "Yes, Local Traffic and Detour -> Full Closure for now."
+    # His reason: "I often find local access only the road is no access at a certain point and
+    # it can be misleading. Same with detours."
+    16384: ("NO_ACCESS", "FULL_CLOSURE"),         # Road Closed - Local Traffic Only
+    1: ("NO_ACCESS", "FULL_CLOSURE"),             # Detour
     65536: ("ACCESS_ONLY", "LANE_RESTRICTION"),   # Road Closed - Emergency Access Only
     32768: ("ACCESS_ONLY", "LANE_RESTRICTION"),   # Road Closed - Emergency Access Unspecified
-    16384: ("ACCESS_ONLY", "LANE_RESTRICTION"),   # Road Closed - Local Traffic Only
-    1: ("ACCESS_ONLY", "LANE_RESTRICTION"),       # Detour ("Detour is Warning")
     32: ("CAUTION", "LANE_RESTRICTION"),          # Lane(s) Closed
     2048: ("CAUTION", "LANE_RESTRICTION"),        # Alternating Traffic
     8192: ("CAUTION", "LANE_RESTRICTION"),        # Road Closed - One Direction

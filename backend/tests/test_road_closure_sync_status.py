@@ -563,8 +563,9 @@ class FeedGapTests(unittest.TestCase):
 
     def test_every_vendor_type_gets_the_ruled_tier(self):
         ruled = {
-            262144: "NO_ACCESS",
-            65536: "ACCESS_ONLY", 32768: "ACCESS_ONLY", 16384: "ACCESS_ONLY", 1: "ACCESS_ONLY",
+            # 16384 Local Traffic Only and 1 Detour: full closure "for now", operator 2026-09-17.
+            262144: "NO_ACCESS", 16384: "NO_ACCESS", 1: "NO_ACCESS",
+            65536: "ACCESS_ONLY", 32768: "ACCESS_ONLY",
             32: "CAUTION", 2048: "CAUTION", 8192: "CAUTION", 131072: "CAUTION", 4096: "CAUTION",
             2: "INFO", 4: "INFO", 8: "INFO", 16: "INFO", 64: "INFO", 128: "INFO", 256: "INFO",
             512: "INFO", 1024: "INFO",

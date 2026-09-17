@@ -2,7 +2,7 @@
 
 | | |
 |:--|:--|
-| **Status** | OPEN — measured 2026-09-16 by `frontend-kiosk-architect`; **nothing built**; the fix needs two operator rulings and, for the metadata route, a yes to one more request per call |
+| **Status** | RULED 2026-09-16 — **option A**, the operator's word: "Let's get A going because it's a crew facing issue." With `frontend-kiosk-architect` to build; the metadata endpoint's billing is verified first, and the §4.1 register row changes in the same commit |
 | **Severity** | 🟠 operational — the tile shows the right street the wrong way; the crew can see it is wrong, but it costs them the look at the property the panel exists for |
 | **Area** | 🖥️ Kiosk · 🌐 Street View |
 | **Origin** | Operator, 2026-09-16: *"I find the default view is often facing away from the property. Almost always, can we check? I feel like when we ask for that static image, it should be doing a better job."* |
@@ -87,3 +87,4 @@ is falsified if the yes rate is not clearly above the ~54% of cases within 90° 
 | Date | Event |
 |:--|:--|
 | 2026-09-16 | Raised by the operator. Measured by `frontend-kiosk-architect` from the code and six real records: heading is 0 on every unsaved call because camera and aim point are the same coordinate; 46% of recent parcel calls face away by the proxy. Two fixes and two domain questions put to the operator; nothing built |
+| 2026-09-16 | **Ruled: option A** — "Let's get A going because it's a crew facing issue." Lead's reading, flagged for the operator to overturn: the yes is to A *as proposed*, so the aim point is the **lot centre** from `target.rings`, falling back to the **target point** for non-parcel calls. Sent to `frontend-kiosk-architect`: verify the metadata endpoint's billing against Google's usage page before building (stop and report if billed); one metadata request per unsaved call; image by `pano_id`; the fallback chain as proposed with **no heading of 0 anywhere** — an aim point that cannot be computed is said on the tile, not faced north; fix the `toActiveCall` root cause; saved views still win; the §4.1 register row rewritten in the same commit. The operator's replay of the 41 dispatches is the falsifier |

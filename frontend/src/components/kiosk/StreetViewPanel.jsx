@@ -151,9 +151,10 @@ export default function StreetViewPanel({ activeCall }) {
       'The tile says it is not aimed rather than face an arbitrary direction.');
   }, [resolution.kind, resolution.reason, activeCall?.address]);
 
-  // The tile's view is the resolution's; the expanded view also works while resolving or not
-  // aimed, from the default view, and aims itself from the SDK's own panorama search.
-  const view = resolution.view || defaultView;
+  // The panorama hook's view: the resolution's expandView, which exists whenever the call has
+  // coordinates -- not aimed and no imagery included -- so Expand always opens at the nearest
+  // panorama and the view can be set for next time (operator, 2026-09-16).
+  const view = resolution.expandView;
 
   const staticUrl = tileHasPicture ? staticStreetViewUrl(resolution.view, apiKey) : '';
   const useStaticTile = Boolean(staticUrl) && !staticFailed;
@@ -228,8 +229,8 @@ export default function StreetViewPanel({ activeCall }) {
         )}
         {tileWaiting && resolution.kind === 'no-heading' && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
-            <p className="text-amber-300 text-sm font-mono font-bold">Street View not aimed</p>
-            <span className="text-[10px] text-slate-400 font-mono leading-snug">No parcel outline and no panorama position to face it from. Expand to look around.</span>
+            <p className="text-amber-300 text-sm font-mono font-bold">No aimed view available</p>
+            <span className="text-[10px] text-slate-400 font-mono leading-snug">No parcel outline and no panorama position to face it from. Expand to look around from the nearest panorama and save the view for next time.</span>
           </div>
         )}
         {showStatic && (

@@ -116,7 +116,7 @@ test('fallback chain (#93)', () => {
   const saved = { lat: 1, lng: 2, heading: 214, pitch: 13, fov: 90, panoId: 'p1' };
 
   // A saved view wins, whatever Google says.
-  assert.deepEqual(resolveStreetView({ savedView: saved, defaultView: def, meta: { status: 'OK' } }), { kind: 'saved', view: saved });
+  assert.deepEqual(resolveStreetView({ savedView: saved, defaultView: def, meta: { status: 'OK' } }), { kind: 'saved', view: saved, expandView: saved });
   assert.equal(resolveStreetView({ savedView: null, defaultView: null, meta: null }).kind, 'standby');
   assert.equal(resolveStreetView({ savedView: null, defaultView: def, meta: null }).kind, 'resolving');
 
@@ -153,6 +153,19 @@ test('fallback chain (#93)', () => {
   const jDenied = resolveStreetView({ savedView: null, defaultView: junction, meta: { status: 'REQUEST_DENIED' } });
   assert.equal(jDenied.kind, 'no-heading');
   assert.equal(jDenied.view, null);
+});
+
+test('Expand always has somewhere to open while the call has coordinates (operator 2026-09-16)', () => {
+  const junction = defaultViewForCall(recordCall({ ...FRONT }));
+  for (const meta of [null, { status: 'ZERO_RESULTS' }, { status: 'REQUEST_DENIED' }, { status: 'FETCH_FAILED' }]) {
+    const r = resolveStreetView({ savedView: null, defaultView: junction, meta });
+    assert.equal(r.view, null, `tile shows a status for ${meta?.status}`);
+    assert.equal(r.expandView, junction, `Expand opens at the call point for ${meta?.status}`);
+    assert.equal(r.expandView.heading, null);   // no invented direction handed to the SDK
+  }
+  const saved = { lat: 1, lng: 2, heading: 214, pitch: 13, fov: 90, panoId: 'p1' };
+  assert.equal(resolveStreetView({ savedView: saved, defaultView: junction, meta: null }).expandView, saved);
+  assert.equal(resolveStreetView({ savedView: null, defaultView: null, meta: null }).expandView, null);
 });
 
 test('a view with no heading does not pin the live heading', () => {

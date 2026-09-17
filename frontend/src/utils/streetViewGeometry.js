@@ -229,18 +229,28 @@ export const viewFromMetadata = (defaultView, meta) => {
  *      UNKNOWN_ERROR, a failed fetch, no key)
  *   a picture with no direction        -> 'no-heading'  the tile says it is not aimed
  *
+ * `view` is the compact tile's picture (null when the tile shows a status instead).
+ * `expandView` is what the interactive view opens on, and it is set whenever the call has
+ * coordinates -- including resolving, no imagery and not aimed. Operator, 2026-09-16: "if no
+ * heading comes back we still need to allow the user to expand the window into interactive
+ * mode, at the nearest point to look and set a future point." The interactive view searches
+ * for the nearest panorama itself (useStreetViewPanorama), and a save from there makes the
+ * next call for the address take the 'saved' branch.
+ *
  * Offline is decided before this: the panel shows "Street View needs the internet".
  */
 export const resolveStreetView = ({ savedView, defaultView, meta }) => {
-  if (savedView) return { kind: 'saved', view: savedView };
-  if (!defaultView) return { kind: 'standby', view: null };
-  if (!meta) return { kind: 'resolving', view: null };
-  if (meta.status === 'ZERO_RESULTS') return { kind: 'no-imagery', view: null, reason: meta.status };
+  if (savedView) return { kind: 'saved', view: savedView, expandView: savedView };
+  if (!defaultView) return { kind: 'standby', view: null, expandView: null };
+  if (!meta) return { kind: 'resolving', view: null, expandView: defaultView };
+  if (meta.status === 'ZERO_RESULTS') return { kind: 'no-imagery', view: null, expandView: defaultView, reason: meta.status };
   const fromPano = viewFromMetadata(defaultView, meta);
   const view = fromPano || defaultView;
   const kind = fromPano ? 'metadata' : 'fallback';
-  if (!Number.isFinite(view.heading)) return { kind: 'no-heading', view: null, reason: meta.status, from: kind };
-  return { kind, view, reason: meta.status };
+  if (!Number.isFinite(view.heading)) {
+    return { kind: 'no-heading', view: null, expandView: defaultView, reason: meta.status, from: kind };
+  }
+  return { kind, view, expandView: view, reason: meta.status };
 };
 
 /**

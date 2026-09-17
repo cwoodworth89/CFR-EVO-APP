@@ -92,7 +92,13 @@ Three modules, one view object `{ lat, lng, heading, pitch, fov, panoId }`:
 | `frontend/src/components/kiosk/StreetViewPanel.jsx` | layout only: static tile, expanded interactive view, save bar |
 
 The saved view comes from `public.parcels` and nowhere else; the localStorage copy that
-used to shadow it is gone. A failed save reports as failed. The pattern below is what the
+used to shadow it is gone. A failed save reports as failed.
+
+**Intended, operator-confirmed 2026-09-17:** saving an arrival point from a review replay
+moves the call on screen (#94), which re-aims an *unsaved* Street View once -- one metadata
+request, the nearest panorama to the new point, facing the lot centre (#93) -- while a *saved*
+view is never re-aimed. Operator: *"automatically snaps the unset streetview to the new area,
+and rotates it to face the property. Super handy."* The pattern below is what the
 hook does inside; do not reintroduce it in a component.
 
 ### 3a. The listener pattern the hook implements (reference)

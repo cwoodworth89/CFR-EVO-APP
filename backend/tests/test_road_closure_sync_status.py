@@ -314,7 +314,8 @@ class FeedGapTests(unittest.TestCase):
     def test_measured_major_with_all_lanes_open_is_informational_not_no_access(self):
         # 2026-09-16: 18 MAJOR events had every lane open.
         row = self._one(severity="MAJOR", roads=[_road("ALL_LANES_OPEN", "BOTH")])
-        self.assertEqual(self._access(row), (None, None, "ALL_LANES_OPEN", "BOTH"))
+        # INFO since 2026-09-17 (#91): one field carries the tier for both feeds.
+        self.assertEqual(self._access(row), ("INFO", None, "ALL_LANES_OPEN", "BOTH"))
         self.assertEqual(row.feed_severity, "MAJOR")
 
     def test_measured_minor_closed_both_ways_is_no_access(self):
@@ -498,8 +499,8 @@ class FeedGapTests(unittest.TestCase):
             self._sync(drivebc, muni_issues=muni, muni_paths=[_PATH, _PATH2, _PATH3])
         summaries = [m for m in logs.output if "no stated severity" in m]
         self.assertEqual(summaries, [
-            "WARNING:" + svc.logger.name + ":3 of 6 records stored with no stated severity "
-            "(Municipal 511: 2, DriveBC Open511: 1)"])
+            "WARNING:" + svc.logger.name + ":2 of 6 records stored with no stated severity "
+            "(Municipal 511: 1, DriveBC Open511: 1)"])
         errors = [m for m in logs.output if m.startswith("ERROR:")]
         # The only ERROR left is the id-less skip, per record.
         self.assertEqual(len(errors), 1)
@@ -557,6 +558,59 @@ class FeedGapTests(unittest.TestCase):
         (row,) = self._rows()
         self.assertEqual((row.road_state, row.road_direction, row.feed_severity),
                          (None, None, None))
+
+    # --- #91 ruled 2026-09-17: Municipal 511 type -> tier ------------------------
+
+    def test_every_vendor_type_gets_the_ruled_tier(self):
+        ruled = {
+            262144: "NO_ACCESS",
+            65536: "ACCESS_ONLY", 32768: "ACCESS_ONLY", 16384: "ACCESS_ONLY", 1: "ACCESS_ONLY",
+            32: "CAUTION", 2048: "CAUTION", 8192: "CAUTION", 131072: "CAUTION", 4096: "CAUTION",
+            2: "INFO", 4: "INFO", 8: "INFO", 16: "INFO", 64: "INFO", 128: "INFO", 256: "INFO",
+            512: "INFO", 1024: "INFO",
+            0: None,
+        }
+        self.assertEqual(len(ruled), 20)  # the vendor's twenty values, 0 Unknown included
+        for rct, tier in ruled.items():
+            with self.subTest(rct=rct):
+                self.db.query(RoadClosureModel).delete()
+                self.db.commit()
+                self._sync([], muni_issues=[_muni_issue(issue_id=rct, rct=rct, base="Lane closed.")],
+                           muni_paths=[_PATH])
+                (row,) = self._rows()
+                self.assertEqual(row.emergency_access, tier)
+
+    def test_a_value_outside_the_twenty_is_null_with_one_error_and_unknown_has_none(self):
+        with self.assertLogs(svc.logger, level="ERROR") as logs:
+            self._sync([], muni_issues=[_muni_issue(issue_id=5, rct=524288, base="Lane closed.")],
+                       muni_paths=[_PATH])
+        (row,) = self._rows()
+        self.assertIsNone(row.emergency_access)
+        self.assertEqual(sum("524288" in m for m in logs.output), 1)
+
+        self.db.query(RoadClosureModel).delete()
+        self.db.commit()
+        with self.assertLogs(svc.logger, level="DEBUG") as logs:
+            self._sync([], muni_issues=[_muni_issue(issue_id=6, rct=0, base="Lane closed.")],
+                       muni_paths=[_PATH])
+        self.assertFalse(any(m.startswith("ERROR:") for m in logs.output))
+
+    def test_a_stated_type_wins_over_the_road_closed_text(self):
+        # The measured disagreement: Alternating Traffic whose note reads "full closure dec 5".
+        self._sync([], muni_issues=[
+            _muni_issue(issue_id=1, rct=2048, base="5515441 - full closure dec 5"),
+            _muni_issue(issue_id=2, rct=8, base="Road closed to pedestrians"),
+            _muni_issue(issue_id=3, rct=0, base="Road closed for paving."),
+        ], muni_paths=[_PATH, _PATH2, _PATH3])
+        tiers = {r.closure_id: r.emergency_access for r in self._rows()}
+        self.assertEqual(tiers, {"muni_1_0": "CAUTION", "muni_2_0": "INFO",
+                                 "muni_3_0": "ACCESS_ONLY"})
+
+    def test_info_ranks_below_caution_and_above_unknown_across_roads(self):
+        row = self._one(roads=[_road("ALL_LANES_OPEN", "BOTH"), _road("SOME_LANES_CLOSED", "BOTH")])
+        self.assertEqual((row.emergency_access, row.road_state), ("CAUTION", "SOME_LANES_CLOSED"))
+        row = self._one(roads=[_road(_ABSENT, "BOTH"), _road("ALL_LANES_OPEN", "BOTH")])
+        self.assertEqual((row.emergency_access, row.road_state), ("INFO", "ALL_LANES_OPEN"))
 
     def test_municipal_record_with_no_stated_type_is_null_not_caution(self):
         issue = _muni_issue(issue_id=7, rct=0, headline="Community event", base="Street fair.")

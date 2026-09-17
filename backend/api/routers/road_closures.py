@@ -194,8 +194,7 @@ def get_road_closures(db: Session = Depends(get_db)):
             # old `or "FULL_CLOSURE"` drew an unknown as the most severe tier (punch list
             # #91). The kiosk shows N/A in the access box. Counted, not logged per record:
             # see the summary line after the loop. A stated ALL_LANES_OPEN is not a gap.
-            if ((r.closure_type is None or r.emergency_access is None)
-                    and r.road_state != "ALL_LANES_OPEN"):
+            if r.emergency_access is None:
                 no_severity[_feed_of(r.source)] += 1
 
             results.append({
@@ -207,8 +206,10 @@ def get_road_closures(db: Session = Depends(get_db)):
                 "street": r.street_name,
                 "severity": r.closure_type,
                 "emergencyAccess": r.emergency_access,
-                # DriveBC only; null for Municipal 511. roadState ALL_LANES_OPEN with a null
-                # emergencyAccess is informational; a null roadState means unknown.
+                # emergencyAccess: "NO_ACCESS" | "ACCESS_ONLY" | "CAUTION" | "INFO" | null
+                # (null = N/A, the feed stated nothing usable). INFO since 2026-09-17 (#91).
+                # DriveBC only; null for Municipal 511. roadState is the stated restriction
+                # (ALL_LANES_OPEN is served with emergencyAccess "INFO"); null means unknown.
                 "roadState": r.road_state,
                 "roadDirection": r.road_direction,
                 "feedSeverity": r.feed_severity,

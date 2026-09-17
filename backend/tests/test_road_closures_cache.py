@@ -173,13 +173,13 @@ def test_drivebc_open511_fields_are_served(caplog):
     rows = []
     for i, (state, direction, access, sev) in enumerate([
         ("CLOSED", "E", "CAUTION", "MINOR"),
-        ("ALL_LANES_OPEN", "BOTH", None, "MAJOR"),
+        ("ALL_LANES_OPEN", "BOTH", "INFO", "MAJOR"),
     ]):
         rec = MagicMock(spec=RoadClosureModel)
         rec.id = i
         rec.closure_id = f"drivebc.ca/DBC-{i}"
         rec.headline = rec.street_name = rec.description = "x"
-        rec.closure_type = "LANE_RESTRICTION" if access else None
+        rec.closure_type = "LANE_RESTRICTION" if access not in (None, "INFO") else None
         rec.emergency_access = access
         rec.road_state, rec.road_direction, rec.feed_severity = state, direction, sev
         rec.coordinates = [49.28, -122.80]
@@ -200,7 +200,7 @@ def test_drivebc_open511_fields_are_served(caplog):
     assert (closed["emergencyAccess"], closed["roadState"], closed["roadDirection"],
             closed["feedSeverity"]) == ("CAUTION", "CLOSED", "E", "MINOR")
     assert (info["emergencyAccess"], info["roadState"], info["feedSeverity"]) == (
-        None, "ALL_LANES_OPEN", "MAJOR")
+        "INFO", "ALL_LANES_OPEN", "MAJOR")
     # Informational, not a gap: nothing unstated here, so no summary line at all.
     assert not any("no stated severity" in r.getMessage() for r in caplog.records)
     invalidate_road_closures_cache()
@@ -234,7 +234,7 @@ def test_severity_summary_is_one_line_per_uncached_serve_counted_by_feed(caplog)
         rec(3, "BC MOTI Gateway", None),          # a Municipal 511 row, by its organisation
         rec(4, "City of Coquitlam", "NO_ACCESS"),
         rec(5, "DriveBC Open511", None),           # absent state: a gap
-        rec(6, "DriveBC Open511", None, state="ALL_LANES_OPEN"),  # informational: not a gap
+        rec(6, "DriveBC Open511", "INFO", state="ALL_LANES_OPEN"),  # INFO is stated: not a gap
     ]
     mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = rows

@@ -59,6 +59,36 @@ MUNICIPAL511_PUBLISHERS = ("City of Coquitlam",)
 # once, lead's bound. The requests, URLs and 5 s timeout are unchanged -- only their overlap is.
 MUNICIPAL511_FETCH_WORKERS = 13
 
+# Municipal 511 RoadClosureType (highest bit) -> (emergency_access, closure_type).
+# Values and labels: the vendor's own switch in bc.municipal511.ca Framework.min.js, read
+# 2026-09-16 (standards index, "Road closure vocabulary"). Tiers: operator ruling 2026-09-17,
+# punch list #91 -- "Mapping is right, Detour is Warning, hide Unspecified by default".
+# INFO is a stated tier ("this record is information"), not an unknown; 0 Unknown and any value
+# outside these twenty stay null (N/A).
+MUNICIPAL511_TIERS = {
+    262144: ("NO_ACCESS", "FULL_CLOSURE"),        # Road Closed - No Emergency Access
+    65536: ("ACCESS_ONLY", "LANE_RESTRICTION"),   # Road Closed - Emergency Access Only
+    32768: ("ACCESS_ONLY", "LANE_RESTRICTION"),   # Road Closed - Emergency Access Unspecified
+    16384: ("ACCESS_ONLY", "LANE_RESTRICTION"),   # Road Closed - Local Traffic Only
+    1: ("ACCESS_ONLY", "LANE_RESTRICTION"),       # Detour ("Detour is Warning")
+    32: ("CAUTION", "LANE_RESTRICTION"),          # Lane(s) Closed
+    2048: ("CAUTION", "LANE_RESTRICTION"),        # Alternating Traffic
+    8192: ("CAUTION", "LANE_RESTRICTION"),        # Road Closed - One Direction
+    131072: ("CAUTION", "LANE_RESTRICTION"),      # Intermittently Blocked
+    4096: ("CAUTION", "LANE_RESTRICTION"),        # Opposite Side Lane Open
+    2: ("INFO", None),                            # No / Minimal Traffic Impact
+    4: ("INFO", None),                            # Shoulder Closure
+    8: ("INFO", None),                            # Sidewalk Closure
+    16: ("INFO", None),                           # Bike Lane Closure
+    64: ("INFO", None),                           # Bus Lane Closure
+    128: ("INFO", None),                          # HOV Lane Closure
+    256: ("INFO", None),                          # Left Turn Closure
+    512: ("INFO", None),                          # Right Turn Closure
+    1024: ("INFO", None),                         # Buffer Lane Closure
+}
+# 0 is the vendor's "Unknown": stated as unknown, so null without an ERROR line.
+MUNICIPAL511_UNKNOWN_TYPE = 0
+
 
 class PythonGeometryDecoder:
     def __init__(self, encoded: str):
@@ -235,9 +265,10 @@ def _open511_road_access(state, direction):
       and state the road closure direction. We often can go counterflow with the help of
       flaggers.") The direction is carried separately so the kiosk can state it.
     * SOME_LANES_CLOSED, SINGLE_LANE_ALTERNATING -> CAUTION ("Some_lanes/alternating").
-    * ALL_LANES_OPEN -> None: informational ("All_lanes_open -> Info"). roadState says
-      so, which is what separates it from a record whose state is unknown.
-    * absent -> None.
+    * ALL_LANES_OPEN -> INFO ("All_lanes_open -> Info"). Served as emergencyAccess "INFO"
+      since 2026-09-17 (#91), the same tier Municipal 511's information-only types get, so one
+      field carries the tier for both feeds. roadState still says ALL_LANES_OPEN.
+    * absent -> None (N/A).
     """
     if state == "CLOSED":
         if direction in (None, "BOTH", "NONE"):
@@ -245,13 +276,15 @@ def _open511_road_access(state, direction):
         return "CAUTION", "LANE_RESTRICTION"
     if state in ("SOME_LANES_CLOSED", "SINGLE_LANE_ALTERNATING"):
         return "CAUTION", "LANE_RESTRICTION"
+    if state == "ALL_LANES_OPEN":
+        return "INFO", None
     return None, None
 
 
 # Which road wins when an event lists several. Most restrictive first, so a closure on any
 # listed road is never hidden behind an open one; a stated ALL_LANES_OPEN outranks a road
 # whose state is unknown.
-_ACCESS_RANK = {"NO_ACCESS": 3, "CAUTION": 2}
+_ACCESS_RANK = {"NO_ACCESS": 4, "ACCESS_ONLY": 3, "CAUTION": 2, "INFO": 1}
 
 
 def _drivebc_access(evt, closure_id=None):
@@ -285,7 +318,7 @@ def _drivebc_access(evt, closure_id=None):
                          f"Open511 v1.0 value; treated as absent.")
             direction = None
         access, closure_type = _open511_road_access(state, direction)
-        rank = _ACCESS_RANK.get(access, 1 if state == "ALL_LANES_OPEN" else 0)
+        rank = _ACCESS_RANK.get(access, 0)
         candidates.append((rank, state, direction, access, closure_type,
                            _feed_text(road.get('name'))))
 
@@ -580,17 +613,20 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
                         headline_lower = (desc.get('Headline') or "").lower()
                         is_closed = "road closed" in desc_lower or "full closure" in desc_lower or "road closed" in headline_lower or "full closure" in headline_lower
 
-                        # No stated type and no "road closed" text -> unknown, not CAUTION.
-                        # Operator 2026-09-16 (#91): "for all I know it's purely
-                        # informational alerts". Only a stated type raises it.
-                        emergency_access = None
-                        closure_type = None
-                        if highest_bit == 262144:
-                            emergency_access = "NO_ACCESS"
-                            closure_type = "FULL_CLOSURE"
-                        elif highest_bit in (65536, 32768, 16384) or is_closed:
-                            emergency_access = "ACCESS_ONLY"
-                            closure_type = "LANE_RESTRICTION"
+                        # The tier is the stated type's (MUNICIPAL511_TIERS, operator 2026-09-17).
+                        emergency_access, closure_type = MUNICIPAL511_TIERS.get(highest_bit, (None, None))
+                        if highest_bit != MUNICIPAL511_UNKNOWN_TYPE and highest_bit not in MUNICIPAL511_TIERS:
+                            logger.error(
+                                f"Municipal 511 issue {issue.get('IssueId')}: RoadClosureType {rct!r} "
+                                f"is not one of the vendor's twenty values; tier null.")
+                        # The "road closed" / "full closure" text rule now only raises a record
+                        # whose type states nothing (0 Unknown, or an unrecognised value). A stated
+                        # type wins over it: the type is the feed's structured field, and the text
+                        # rule was never sourced. Measured 2026-09-16, the one record where they
+                        # disagree is Alternating Traffic noting "full closure dec 5" -- a future
+                        # date in a note -- which the type serves as CAUTION, not ACCESS_ONLY.
+                        if emergency_access is None and is_closed:
+                            emergency_access, closure_type = "ACCESS_ONLY", "LANE_RESTRICTION"
 
                         start_dt = None
                         end_dt = None
@@ -665,9 +701,8 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
         active_closure_ids.add(cid)
 
         # Stored as null, never defaulted (#91). Counted, not logged per record: one line
-        # per sync, below. A stated ALL_LANES_OPEN is information, not a gap.
-        if ((item["closure_type"] is None or item["emergency_access"] is None)
-                and item.get("road_state") != "ALL_LANES_OPEN"):
+        # per sync, below. INFO is a stated tier, not a gap; only a null tier is counted.
+        if item["emergency_access"] is None:
             # DriveBC rows carry source "DriveBC Open511"; Municipal 511 rows carry the
             # issuing organisation ("City of Coquitlam", "BC MOTI Gateway").
             feed = "DriveBC Open511" if item["source"] == "DriveBC Open511" else "Municipal 511"

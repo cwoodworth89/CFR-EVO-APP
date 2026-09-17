@@ -90,9 +90,78 @@ export const savedViewFromParcel = (parcel) => {
   };
 };
 
+/** Whether two points are the same coordinate, where a bearing has no direction. */
+const samePoint = (aLat, aLng, bLat, bLng) => Number(aLat) === Number(bLat) && Number(aLng) === Number(bLng);
+
 /**
- * The view to show when nothing is saved: the camera at the arrival point, looking at the
- * parcel. Null when the call carries no usable coordinates (Tier 1, CLAUDE.md 5).
+ * The centre of a lot, from the parcel polygon the dispatch record carries (`target.rings`,
+ * GeoJSON order: [[lng, lat], ...], outer ring first). The area-weighted centroid of the outer
+ * ring, planar in degrees -- at lot scale the curvature error is far below a metre. Falls back
+ * to the vertex mean for a degenerate ring. Null when there is no usable ring.
+ */
+export const lotCentre = (rings) => {
+  const ring = Array.isArray(rings) ? rings[0] : null;
+  if (!Array.isArray(ring)) return null;
+  const pts = ring
+    .filter((p) => Array.isArray(p) && p.length >= 2 && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1])))
+    .map((p) => [Number(p[0]), Number(p[1])]);
+  if (pts.length >= 2 && samePoint(pts[0][1], pts[0][0], pts.at(-1)[1], pts.at(-1)[0])) pts.pop();
+  if (pts.length < 3) return null;
+  // Relative to the first vertex: the cross products of raw coordinates (about -122.8 x 49.3)
+  // cancel catastrophically at lot scale, where vertices differ in the 5th decimal place.
+  const [ox, oy] = pts[0];
+  let a2 = 0, cx = 0, cy = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const x0 = pts[i][0] - ox, y0 = pts[i][1] - oy;
+    const x1 = pts[(i + 1) % pts.length][0] - ox, y1 = pts[(i + 1) % pts.length][1] - oy;
+    const cross = x0 * y1 - x1 * y0;
+    a2 += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+  }
+  if (Math.abs(a2) < 1e-18) {
+    const n = pts.length;
+    return { lat: pts.reduce((t, p) => t + p[1], 0) / n, lng: pts.reduce((t, p) => t + p[0], 0) / n };
+  }
+  return { lat: oy + cy / (3 * a2), lng: ox + cx / (3 * a2) };
+};
+
+/**
+ * What the camera should face. The lot centre when the call carries a parcel polygon, else
+ * the call's own point (a junction, a block, a street section). Null without either.
+ * Punch list #93, operator 2026-09-16: build the proposal as made -- lot centre, else the
+ * target point.
+ */
+export const aimPointForCall = (call) => {
+  if (!call) return null;
+  const centre = lotCentre(call.target?.rings ?? call.rings);
+  if (centre && isCoord(centre.lat, centre.lng)) return { ...centre, kind: 'lot' };
+  const lat = call.target?.lat ?? call.lat;
+  const lng = call.target?.lng ?? call.lng;
+  return isCoord(lat, lng) ? { lat: Number(lat), lng: Number(lng), kind: 'point' } : null;
+};
+
+/** Heading from a camera position to an aim point, or null when there is no direction:
+ *  no aim point, or the two are the same coordinate. Never 0 by default (CLAUDE.md 6.1). */
+export const headingToAim = (camLat, camLng, aim) => {
+  if (!aim || !isCoord(camLat, camLng) || samePoint(camLat, camLng, aim.lat, aim.lng)) return null;
+  return bearingDegrees(Number(camLat), Number(camLng), aim.lat, aim.lng);
+};
+
+/**
+ * The view to show when nothing is saved, before Google has said where the nearest panorama
+ * stands: the camera at the call's point, facing the aim point. Null when the call carries no
+ * usable coordinates (Tier 1, CLAUDE.md 5).
+ *
+ * `heading` is null when there is no direction to face -- a call with no parcel polygon,
+ * whose aim point IS its camera point. It used to fall to 0 here, and it always did:
+ * toActiveCall sets `lat` to `target.lat`, so the camera and the aim were one point and every
+ * unsaved tile faced due north (punch list #93, measured 2026-09-16: 46% of 41 parcel calls
+ * faced more than 90 degrees away from the lot). A null heading is shown as "not aimed",
+ * never as north.
+ *
+ * `aim` rides along so the panorama position from Google can be turned into the heading
+ * (viewFromMetadata, and the interactive view's own search in useStreetViewPanorama).
  */
 export const defaultViewForCall = (call) => {
   if (!call) return null;
@@ -101,12 +170,77 @@ export const defaultViewForCall = (call) => {
   if (!isCoord(lat, lng)) return null;
   const camLat = Number(lat);
   const camLng = Number(lng);
-  const tLat = Number(call.target?.lat ?? lat);
-  const tLng = Number(call.target?.lng ?? lng);
-  const heading = (isCoord(tLat, tLng) && (tLat !== camLat || tLng !== camLng))
-    ? bearingDegrees(camLat, camLng, tLat, tLng)
-    : 0;
-  return { lat: camLat, lng: camLng, heading, pitch: DEFAULT_PITCH, fov: DEFAULT_FOV, panoId: '' };
+  const aim = aimPointForCall(call);
+  return {
+    lat: camLat,
+    lng: camLng,
+    heading: headingToAim(camLat, camLng, aim),
+    pitch: DEFAULT_PITCH,
+    fov: DEFAULT_FOV,
+    panoId: '',
+    aim,
+  };
+};
+
+// ---------------------------------------------------------------------------------------
+// Street View Static API metadata (punch list #93, operator's permission 2026-09-16).
+//
+// One request per unsaved call, to find where the nearest panorama actually stands so the
+// heading can be computed from there. Google, "Street View Image Metadata" (read 2026-09-16):
+// "Street View Static API metadata requests are available at no charge. No quota is consumed
+// when you request metadata." Registered in docs/external_calls.md 4.1.
+
+/** The metadata request for a view's point: the same search the image request makes. */
+export const streetViewMetadataUrl = (view, apiKey) => {
+  if (!view || !apiKey || !isCoord(view.lat, view.lng)) return '';
+  return `https://maps.googleapis.com/maps/api/streetview/metadata?location=${view.lat},${view.lng}`
+    + `&radius=${STATIC_SEARCH_RADIUS_M}&source=outdoor&key=${apiKey}`;
+};
+
+/**
+ * The view from a metadata answer: the camera at the panorama Google found, pinned to it by
+ * id so the image is from the panorama the heading was computed for, facing the aim point.
+ * Null unless the answer is OK with a usable position and id.
+ */
+export const viewFromMetadata = (defaultView, meta) => {
+  if (!defaultView || meta?.status !== 'OK') return null;
+  const lat = meta.location?.lat;
+  const lng = meta.location?.lng;
+  if (!isCoord(lat, lng) || !meta.pano_id) return null;
+  return {
+    ...defaultView,
+    lat: Number(lat),
+    lng: Number(lng),
+    panoId: String(meta.pano_id),
+    heading: headingToAim(lat, lng, defaultView.aim),
+  };
+};
+
+/**
+ * Which picture the tile shows, as one decision (punch list #93, the fallback chain):
+ *
+ *   saved view                         -> 'saved'       the operator's view, untouched
+ *   no usable coordinates              -> 'standby'     Tier 1
+ *   metadata not answered yet          -> 'resolving'   no image requested yet
+ *   metadata OK                        -> 'metadata'    pano pinned, heading from the pano
+ *   metadata ZERO_RESULTS              -> 'no-imagery'  "No Street View available"
+ *   any other answer, or no answer     -> 'fallback'    the location request, heading from
+ *     (REQUEST_DENIED, OVER_QUERY_LIMIT,                 the call's point to the lot centre
+ *      UNKNOWN_ERROR, a failed fetch, no key)
+ *   a picture with no direction        -> 'no-heading'  the tile says it is not aimed
+ *
+ * Offline is decided before this: the panel shows "Street View needs the internet".
+ */
+export const resolveStreetView = ({ savedView, defaultView, meta }) => {
+  if (savedView) return { kind: 'saved', view: savedView };
+  if (!defaultView) return { kind: 'standby', view: null };
+  if (!meta) return { kind: 'resolving', view: null };
+  if (meta.status === 'ZERO_RESULTS') return { kind: 'no-imagery', view: null, reason: meta.status };
+  const fromPano = viewFromMetadata(defaultView, meta);
+  const view = fromPano || defaultView;
+  const kind = fromPano ? 'metadata' : 'fallback';
+  if (!Number.isFinite(view.heading)) return { kind: 'no-heading', view: null, reason: meta.status, from: kind };
+  return { kind, view, reason: meta.status };
 };
 
 /**
@@ -119,7 +253,8 @@ export const defaultViewForCall = (call) => {
 export const viewsMatch = (live, view) => {
   if (!live || !view) return false;
   if (view.panoId && live.panoId && live.panoId !== view.panoId) return false;
-  return Math.abs(live.heading - view.heading) < 0.5
+  const headingMatches = !Number.isFinite(view.heading) || Math.abs(live.heading - view.heading) < 0.5;
+  return headingMatches
     && Math.abs(live.pitch - view.pitch) < 0.5
     && Math.abs(live.fov - view.fov) < 0.01;
 };
@@ -136,7 +271,9 @@ export const viewsMatch = (live, view) => {
 export const STATIC_SEARCH_RADIUS_M = 100;
 
 export const staticStreetViewUrl = (view, apiKey, size = '640x400') => {
-  if (!view || !apiKey) return '';
+  // No heading, no image: without one the API faces a direction of its own choosing, which
+  // would read as an aimed picture. The panel says "not aimed" instead (#93).
+  if (!view || !apiKey || !Number.isFinite(view.heading)) return '';
   const where = view.panoId
     ? `pano=${encodeURIComponent(view.panoId)}`
     : `location=${view.lat},${view.lng}&radius=${STATIC_SEARCH_RADIUS_M}&source=outdoor`;
@@ -151,6 +288,8 @@ export const embedStreetViewUrl = (view, apiKey) => {
   if (!apiKey) {
     return `https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${view.lng}!3d${view.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sca`;
   }
+  // No heading, no heading parameter: Math.round(null) is 0, the silent north of #93.
+  const heading = Number.isFinite(view.heading) ? `&heading=${Math.round(view.heading)}` : '';
   return `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${view.lat},${view.lng}`
-    + `&heading=${Math.round(view.heading)}&pitch=${Math.round(view.pitch)}`;
+    + `${heading}&pitch=${Math.round(view.pitch)}`;
 };

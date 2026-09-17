@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps, isGoogleMapsAuthFailed, onGoogleMapsAuthFailure } from '../utils/googleMapsLoader';
-import { fovToZoom, zoomToFov, viewsMatch } from '../utils/streetViewGeometry';
+import { fovToZoom, zoomToFov, viewsMatch, headingToAim } from '../utils/streetViewGeometry';
 
 // Where to look for imagery when the view names no panorama: outdoor imagery nearest the
 // camera point, first within 50 m, then 100 m. Inherited from the panel (2026-08), where
@@ -100,7 +100,18 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
           if (cancelled || !pano) return;
           if (st === mapsApi.StreetViewStatus.OK && data?.location?.pano) {
             pano.setPano(data.location.pano);
-            pano.setPov({ heading: target.heading, pitch: target.pitch });
+            // Face the lot from where this panorama actually stands (#93). `aim` is set only
+            // on an unsaved view; a saved view keeps its heading, never overridden.
+            // StreetViewLocation.latLng: "The latlng of the panorama" (Maps JS reference).
+            const at = data.location.latLng;
+            const fromPano = (target.aim && at) ? headingToAim(at.lat(), at.lng(), target.aim) : null;
+            const heading = Number.isFinite(fromPano) ? fromPano : target.heading;
+            if (Number.isFinite(heading)) {
+              pano.setPov({ heading, pitch: target.pitch });
+              record({ heading });
+            } else {
+              console.error('Street View: no heading for the interactive view; the SDK keeps its own direction.');
+            }
             pano.setZoom(fovToZoom(target.fov));
             pano.setVisible(true);
             noImageryRef.current = false;
@@ -122,7 +133,8 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
       const v = viewRef.current;
       container.innerHTML = '';
       pano = new maps.StreetViewPanorama(container, {
-        pov: { heading: v.heading, pitch: v.pitch },
+        // A null heading is not sent as 0 (#93); the search below aims the camera.
+        ...(Number.isFinite(v.heading) ? { pov: { heading: v.heading, pitch: v.pitch } } : {}),
         zoom: fovToZoom(v.fov),
         ...(v.panoId ? { pano: v.panoId } : {}),
         fullscreenControl: false,
@@ -205,7 +217,7 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
         // No id: move the camera to the point and re-aim; the SDK snaps to the nearest
         // panorama itself, which is the same search the construction path runs.
         pano.setPosition({ lat: view.lat, lng: view.lng });
-        pano.setPov({ heading: view.heading, pitch: view.pitch });
+        if (Number.isFinite(view.heading)) pano.setPov({ heading: view.heading, pitch: view.pitch });
         pano.setZoom(fovToZoom(view.fov));
       }
     } catch (e) {

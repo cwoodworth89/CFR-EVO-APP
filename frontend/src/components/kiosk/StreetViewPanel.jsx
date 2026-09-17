@@ -6,6 +6,7 @@ import { sanitizeAddress } from '../../utils/addressUtils';
 import { apiClient } from '../../apiClient';
 import {
   savedViewFromParcel, defaultViewForCall, staticStreetViewUrl, embedStreetViewUrl,
+  streetViewMetadataUrl, resolveStreetView,
 } from '../../utils/streetViewGeometry';
 import TileFrame from './TileFrame';
 
@@ -35,6 +36,10 @@ import TileFrame from './TileFrame';
  *   * The compact tile is a Static API image at the view; the interactive panorama and
  *     the save live behind Expand (operator, 2026-09-06). If the image fails, the tile
  *     falls back to the interactive view and says so.
+ *   * With no saved view, the tile first asks the Street View metadata endpoint where the
+ *     nearest panorama stands, and faces the lot from there (punch list #93, operator
+ *     2026-09-16). The chain -- saved, metadata, no imagery, fallback, not aimed -- is one
+ *     pure decision, resolveStreetView in utils/streetViewGeometry.js.
  *
  * What still needs the operator: Street View Static API and Maps JavaScript API on the
  * key's restrictions in the Cloud console. The panel says which one is missing.
@@ -50,7 +55,11 @@ export default function StreetViewPanel({ activeCall }) {
   const [saveStatus, setSaveStatus] = useState(null);        // null | 'saving' | 'saved' | 'error'
   const [savedView, setSavedView] = useState(null);          // from public.parcels, or null
   const [lookupFailed, setLookupFailed] = useState(false);
+  const [lookupSettled, setLookupSettled] = useState(false);   // the saved-view lookup has answered
   const [staticFailed, setStaticFailed] = useState(false);
+  // The metadata answer for the current camera point: { key, status, pano_id, location } or
+  // { key, status: 'FETCH_FAILED' }. Keyed so an answer never applies to a different call.
+  const [panoMeta, setPanoMeta] = useState(null);
 
   // Reset the per-address verdicts when the address changes, during render (React's
   // documented pattern) so no frame shows the previous address's state.
@@ -59,6 +68,8 @@ export default function StreetViewPanel({ activeCall }) {
     setAddrKey(cleanAddrKey);
     setSavedView(null);
     setLookupFailed(false);
+    setLookupSettled(false);
+    setPanoMeta(null);
     setStaticFailed(false);
     setSaveStatus(null);
     setIsExpanded(false);
@@ -74,25 +85,77 @@ export default function StreetViewPanel({ activeCall }) {
         if (cancelled) return;
         setSavedView(res?.found ? savedViewFromParcel(res.parcel) : null);
         setLookupFailed(false);
+        setLookupSettled(true);
       })
       .catch((err) => {
         if (cancelled) return;
         console.warn('Parcel lookup for the saved Street View failed:', err);
         setLookupFailed(true);
+        setLookupSettled(true);
       });
     return () => { cancelled = true; };
   }, [cleanAddrKey]);
 
-  // The view to show: the operator's saved one, else the camera at the arrival point
-  // looking at the parcel. Memoised so the hook applies it only when it actually changes.
-  const view = useMemo(
-    () => savedView || defaultViewForCall(activeCall),
-    // activeCall's identity changes on every MQTT update; only its coordinates matter here.
+  // The view with nothing saved and before Google has answered: the camera at the call's
+  // point, facing the lot centre (heading null when there is no direction to face).
+  // Memoised on the coordinates and the polygon; activeCall's identity changes on every MQTT
+  // update.
+  const defaultView = useMemo(
+    () => defaultViewForCall(activeCall),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [savedView, activeCall?.lat, activeCall?.lng, activeCall?.front_lat, activeCall?.front_lng, activeCall?.target?.lat, activeCall?.target?.lng],
+    [activeCall?.lat, activeCall?.lng, activeCall?.front_lat, activeCall?.front_lng, activeCall?.target?.lat, activeCall?.target?.lng, activeCall?.target?.rings, activeCall?.rings],
   );
+  const metaKey = defaultView ? `${defaultView.lat},${defaultView.lng}` : '';
 
-  const staticUrl = staticStreetViewUrl(view, apiKey);
+  // One metadata request per unsaved call (#93), once the saved-view lookup has answered, so
+  // an address with a saved view never makes one. Only setState in the answer's callbacks.
+  useEffect(() => {
+    if (!lookupSettled || savedView || !defaultView || !apiKey || !isOnline) return undefined;
+    if (panoMeta?.key === metaKey) return undefined;
+    const url = streetViewMetadataUrl(defaultView, apiKey);
+    if (!url) return undefined;
+    let cancelled = false;
+    fetch(url)
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (json?.status !== 'OK' && json?.status !== 'ZERO_RESULTS') {
+          console.error('Street View metadata answered', json?.status, json?.error_message || '',
+            '- the tile falls back to the location request, aimed from the call point.');
+        }
+        setPanoMeta({ ...json, key: metaKey });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Street View metadata request failed:', err,
+          '- the tile falls back to the location request, aimed from the call point.');
+        setPanoMeta({ key: metaKey, status: 'FETCH_FAILED' });
+      });
+    return () => { cancelled = true; };
+  }, [lookupSettled, savedView, defaultView, apiKey, isOnline, panoMeta?.key, metaKey]);
+
+  // Which picture: saved, metadata, no imagery, fallback, or not aimed (#93).
+  const metaForView = !apiKey ? { status: 'NO_KEY' } : (panoMeta?.key === metaKey ? panoMeta : null);
+  const resolution = resolveStreetView({
+    savedView,
+    defaultView,
+    meta: (lookupSettled || !cleanAddrKey) ? metaForView : null,
+  });
+  const tileHasPicture = resolution.kind === 'saved' || resolution.kind === 'metadata' || resolution.kind === 'fallback';
+
+  // No direction to face is said on the tile, and loudly here: it used to be a silent 0.
+  useEffect(() => {
+    if (resolution.kind !== 'no-heading') return;
+    console.error('Street View: no heading could be computed for', activeCall?.address,
+      '(no parcel polygon, and no panorama position from Google:', resolution.reason, ').',
+      'The tile says it is not aimed rather than face an arbitrary direction.');
+  }, [resolution.kind, resolution.reason, activeCall?.address]);
+
+  // The tile's view is the resolution's; the expanded view also works while resolving or not
+  // aimed, from the default view, and aims itself from the SDK's own panorama search.
+  const view = resolution.view || defaultView;
+
+  const staticUrl = tileHasPicture ? staticStreetViewUrl(resolution.view, apiKey) : '';
   const useStaticTile = Boolean(staticUrl) && !staticFailed;
 
   const tileContainerRef = useRef(null);
@@ -100,8 +163,9 @@ export default function StreetViewPanel({ activeCall }) {
   const pano = useStreetViewPanorama({
     containerRef: isExpanded ? modalContainerRef : tileContainerRef,
     containerKey: isExpanded ? 'modal' : 'tile',
-    // Interactive in the expanded view always; in the tile only when the static image failed.
-    enabled: isOnline && Boolean(view) && (isExpanded || !useStaticTile),
+    // Interactive in the expanded view always; in the tile only when the tile has a picture
+    // to show and the static image of it failed.
+    enabled: isOnline && Boolean(view) && (isExpanded || (tileHasPicture && !useStaticTile)),
     apiKey,
     view,
   });
@@ -145,9 +209,29 @@ export default function StreetViewPanel({ activeCall }) {
   // ---------------------------------------------------------------------------------------
   const renderContent = (isModal) => {
     const showStatic = !isModal && useStaticTile;
-    const showEmbed = !showStatic && (sdkDown || !apiKey);
+    // The tile shows nothing of Google's until the chain has a picture for it (#93).
+    const tileWaiting = !isModal && !tileHasPicture;
+    const showEmbed = !tileWaiting && !showStatic && (sdkDown || !apiKey);
     return (
       <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
+        {tileWaiting && resolution.kind === 'resolving' && (
+          <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3">
+            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider motion-safe:animate-pulse">Finding the nearest panorama…</div>
+          </div>
+        )}
+        {tileWaiting && resolution.kind === 'no-imagery' && (
+          <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+            <p className="text-slate-200 text-sm font-mono font-bold">No Street View available</p>
+            <span className="text-[10px] text-slate-500 font-mono">Google has no imagery near this location</span>
+          </div>
+        )}
+        {tileWaiting && resolution.kind === 'no-heading' && (
+          <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+            <p className="text-amber-300 text-sm font-mono font-bold">Street View not aimed</p>
+            <span className="text-[10px] text-slate-400 font-mono leading-snug">No parcel outline and no panorama position to face it from. Expand to look around.</span>
+          </div>
+        )}
         {showStatic && (
           <img
             src={staticUrl}
@@ -160,7 +244,7 @@ export default function StreetViewPanel({ activeCall }) {
             takes over and the header says "live". An <img> error carries no status, so a
             key problem and "no imagery here" look the same from this side; the console has
             the code either way (operator, 2026-09-08: the amber box was in the picture). */}
-        {!showStatic && !showEmbed && pano.status === 'loading' && (
+        {!tileWaiting && !showStatic && !showEmbed && pano.status === 'loading' && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
             <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider motion-safe:animate-pulse">Loading Street View…</div>
@@ -170,7 +254,7 @@ export default function StreetViewPanel({ activeCall }) {
             ZERO_RESULTS (hooks/useStreetViewPanorama.js). Distinct from loading (spinner),
             offline ("needs the internet") and a rejected key (amber note + embed).
             Operator's wording, 2026-09-15, 6000 Quarry Rd. */}
-        {!showStatic && !showEmbed && pano.status === 'none' && (
+        {!tileWaiting && !showStatic && !showEmbed && pano.status === 'none' && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
             <p className="text-slate-200 text-sm font-mono font-bold">No Street View available</p>
             <span className="text-[10px] text-slate-500 font-mono">Google has no imagery near this location</span>
@@ -195,7 +279,7 @@ export default function StreetViewPanel({ activeCall }) {
             className="w-full h-full"
           />
         )}
-        {!showStatic && !showEmbed && (
+        {!tileWaiting && !showStatic && !showEmbed && (
           <div
             ref={isModal ? modalContainerRef : tileContainerRef}
             style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}

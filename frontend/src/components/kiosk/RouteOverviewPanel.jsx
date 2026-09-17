@@ -12,6 +12,7 @@ import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
 import { hydrantCardModel } from '../../utils/hydrantCard';
 import { routeFitOptions, snapFitOptions, centredSnapPoints } from '../map/fitPadding';
 import { MapClickEvents } from '../MapActions';
+import { destinationKey } from '../../utils/arrivalTarget';
 
 // The chrome over the map (artboard 3A of the operator's Claude Design canvas): the route
 // pill top left, the control stack top right in one fixed order, the hydrant card bottom
@@ -98,7 +99,7 @@ function MapInteractivity({ onPan, fittingRef }) {
   return null;
 }
 
-export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null }) {
+export default function RouteOverviewPanel({ activeCall, stationHall, compact = false, onHydrantModel = null, snapRequest = 0, arrival = null, onHallRoute = null }) {
   // Stable identity: a fresh literal here re-triggers every downstream useMemo.
   // Hall 1 front-apron GPS, mirrors FIRE_HALLS["1"] / STATIONS[0].
   const origin = useMemo(() => stationHall || {
@@ -498,6 +499,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             homeHall={origin.id || '1'}
             routingMetrics={persistedUnitMetrics}
             onHomeRouteCalculated={(coords, summary) => { setRouteCoords(coords); setRouteSummary(summary || null); }}
+            // Every hall's router answer, tagged with the destination it was computed to, for the
+            // header when the call's destination has moved on screen (#94). A route to a draft pin
+            // carries the draft's key and is ignored there.
+            onHallRoute={onHallRoute ? (hall, stats) => onHallRoute(hall, stats, destinationKey(routeDest.lat, routeDest.lng)) : undefined}
           />
         )}
 

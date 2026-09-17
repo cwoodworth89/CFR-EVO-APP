@@ -8,7 +8,7 @@ import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { STATIONS } from '../MapConstants';
 import { useCompactViewport } from '../../hooks/useCompactViewport';
 import { useArrivalPoint } from '../../hooks/useArrivalPoint';
-import { resolverTargetFromParcel, applyArrivalToCall } from '../../utils/arrivalTarget';
+import { resolverTargetFromParcel, applyArrivalToCall, unitEtasForMovedCall, destinationKey } from '../../utils/arrivalTarget';
 import ArrivalPointSection from '../hud/ArrivalPointSection';
 import { sanitizeAddress } from '../../utils/addressUtils';
 
@@ -94,6 +94,18 @@ export default function KioskView({ kioskState }) {
     () => (appliedArrival && appliedArrival.callKey === callKey ? applyArrivalToCall(activeCall, appliedArrival.target) : activeCall),
     [activeCall, appliedArrival, callKey],
   );
+  const destinationMoved = displayCall !== activeCall;
+
+  // The router's live answer per hall, tagged with the destination it was computed to. Used by
+  // the header only once the destination has moved (#94); an unmoved call keeps its recorded
+  // figures. Only an answer for the current destination is ever read.
+  const [hallRoutes, setHallRoutes] = useState({ destKey: '', byHall: {} });
+  const onHallRoute = useCallback((hall, stats, destKey) => {
+    setHallRoutes((prev) => ({
+      destKey,
+      byHall: { ...(prev.destKey === destKey ? prev.byHall : {}), [String(hall)]: stats },
+    }));
+  }, []);
   // Closed until the operator asks for it from the review strip. Open, it borrows the aerial
   // cell rather than adding a fourth: the tiles keep their size and the screen its shape
   // (operator, 2026-09-10: "it squishes the other PIP screens").
@@ -175,13 +187,19 @@ export default function KioskView({ kioskState }) {
   // (api/routers/dispatches.py, `if not metrics`). Take the first list with entries in it.
   const persistedMetrics = [activeCall?.routing_metrics, activeCall?.target?.routing_metrics]
     .find((m) => Array.isArray(m) && m.length > 0) || [];
+  // A destination moved on a replay (#94): each unit's hall stays as recorded, its ETA and
+  // distance are the router's live answer to the new point, and unknown until that answers --
+  // never the recorded figure for the old point (utils/arrivalTarget.js unitEtasForMovedCall).
+  const movedDestKey = destinationMoved ? destinationKey(rawDestLat, rawDestLng) : '';
   const unitEtas = (hasCoords && Array.isArray(persistedMetrics) && persistedMetrics.length > 0)
-    ? persistedMetrics.map((m) => ({
-        unit: m.unit,
-        hallId: m.origin_hall != null ? String(m.origin_hall) : null,
-        etaMin: m.eta_minutes ?? null,
-        distKm: m.road_distance_km ?? m.distance_km ?? null,
-      }))
+    ? (destinationMoved
+      ? unitEtasForMovedCall(persistedMetrics, hallRoutes.destKey === movedDestKey ? hallRoutes.byHall : {})
+      : persistedMetrics.map((m) => ({
+          unit: m.unit,
+          hallId: m.origin_hall != null ? String(m.origin_hall) : null,
+          etaMin: m.eta_minutes ?? null,
+          distKm: m.road_distance_km ?? m.distance_km ?? null,
+        })))
     : [];
 
   const talkGroup = activeCall?.radio_channel || activeCall?.target?.radio_channel || activeCall?.talk_group || activeCall?.talkGroup || activeCall?.tg || null;
@@ -356,6 +374,7 @@ export default function KioskView({ kioskState }) {
             onHydrantModel={setHydrantModel}
             snapRequest={snapRequest}
             arrival={showArrival ? arrival : null}
+            onHallRoute={onHallRoute}
           />
         </section>
 

@@ -69,3 +69,36 @@ export function applyArrivalToCall(call, target) {
     },
   };
 }
+
+/** The key a route result is tagged with: the destination it was computed to. */
+export const destinationKey = (lat, lng) => (lat == null || lng == null ? '' : `${Number(lat)},${Number(lng)}`);
+
+/**
+ * The header's unit ETAs for a call whose destination has been moved on screen (#94). Operator,
+ * 2026-09-17: "Update the ETA. This is informational and not statistical. Run time truths are
+ * stored in the CAD software using truck GPS."
+ *
+ * Each unit keeps its recorded hall (routing_metrics origin_hall); its ETA and road distance are
+ * the router's live answer from that hall to the moved destination (`/api/route`, the same
+ * eta_minutes and distance_km the route pill shows -- CLAUDE.md 6.2, nothing derived). Unknown
+ * until that hall's route answers, and unknown for good if the answer is degraded (no router:
+ * great-circle distance, no ETA) or never comes. The recorded figure for the old point is never
+ * shown for the new one.
+ *
+ * `hallStats`: { [hallId]: { etaMinutes, distanceKm, degraded } } for the moved destination only.
+ */
+export function unitEtasForMovedCall(persistedMetrics, hallStats) {
+  if (!Array.isArray(persistedMetrics)) return [];
+  const stats = hallStats || {};
+  return persistedMetrics.map((m) => {
+    const hallId = m?.origin_hall != null ? String(m.origin_hall) : null;
+    const live = hallId != null ? stats[hallId] : null;
+    const usable = live && !live.degraded;
+    return {
+      unit: m?.unit,
+      hallId,
+      etaMin: usable && live.etaMinutes != null ? live.etaMinutes : null,
+      distKm: usable && live.distanceKm != null ? live.distanceKm : null,
+    };
+  });
+}

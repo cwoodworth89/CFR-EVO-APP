@@ -619,13 +619,13 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
                             logger.error(
                                 f"Municipal 511 issue {issue.get('IssueId')}: RoadClosureType {rct!r} "
                                 f"is not one of the vendor's twenty values; tier null.")
-                        # The "road closed" / "full closure" text rule now only raises a record
-                        # whose type states nothing (0 Unknown, or an unrecognised value). A stated
-                        # type wins over it: the type is the feed's structured field, and the text
-                        # rule was never sourced. Measured 2026-09-16, the one record where they
-                        # disagree is Alternating Traffic noting "full closure dec 5" -- a future
-                        # date in a note -- which the type serves as CAUTION, not ACCESS_ONLY.
-                        if emergency_access is None and is_closed:
+                        # "road closed" / "full closure" in the text raises the record to
+                        # ACCESS_ONLY whatever its stated type -- CAUTION, INFO or none -- and never
+                        # lowers one: a stated NO_ACCESS stays NO_ACCESS. Operator ruling 2026-09-17
+                        # (#91): "Added text should elevate as necessary." Measured on the
+                        # 2026-09-16 pull, it raises one stated record: Alternating Traffic (CAUTION)
+                        # noting "full closure dec 5".
+                        if is_closed and _ACCESS_RANK.get(emergency_access, 0) < _ACCESS_RANK["ACCESS_ONLY"]:
                             emergency_access, closure_type = "ACCESS_ONLY", "LANE_RESTRICTION"
 
                         start_dt = None

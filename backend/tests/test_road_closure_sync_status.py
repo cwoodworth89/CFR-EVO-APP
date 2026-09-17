@@ -595,16 +595,20 @@ class FeedGapTests(unittest.TestCase):
                        muni_paths=[_PATH])
         self.assertFalse(any(m.startswith("ERROR:") for m in logs.output))
 
-    def test_a_stated_type_wins_over_the_road_closed_text(self):
-        # The measured disagreement: Alternating Traffic whose note reads "full closure dec 5".
+    def test_road_closed_text_raises_any_lower_tier_and_never_lowers_one(self):
+        # Operator 2026-09-17: "Added text should elevate as necessary." The measured case is
+        # Alternating Traffic noting "full closure dec 5".
         self._sync([], muni_issues=[
             _muni_issue(issue_id=1, rct=2048, base="5515441 - full closure dec 5"),
             _muni_issue(issue_id=2, rct=8, base="Road closed to pedestrians"),
             _muni_issue(issue_id=3, rct=0, base="Road closed for paving."),
-        ], muni_paths=[_PATH, _PATH2, _PATH3])
+            _muni_issue(issue_id=4, rct=262144, base="Road closed, full closure"),
+            _muni_issue(issue_id=5, rct=32, base="Lane closed."),
+        ], muni_paths=[_PATH, _PATH2, _PATH3, _PATH, _PATH2])
         tiers = {r.closure_id: r.emergency_access for r in self._rows()}
-        self.assertEqual(tiers, {"muni_1_0": "CAUTION", "muni_2_0": "INFO",
-                                 "muni_3_0": "ACCESS_ONLY"})
+        self.assertEqual(tiers, {"muni_1_0": "ACCESS_ONLY", "muni_2_0": "ACCESS_ONLY",
+                                 "muni_3_0": "ACCESS_ONLY", "muni_4_0": "NO_ACCESS",
+                                 "muni_5_0": "CAUTION"})
 
     def test_info_ranks_below_caution_and_above_unknown_across_roads(self):
         row = self._one(roads=[_road("ALL_LANES_OPEN", "BOTH"), _road("SOME_LANES_CLOSED", "BOTH")])

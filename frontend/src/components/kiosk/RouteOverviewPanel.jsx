@@ -153,9 +153,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   // Where the route lines end. While an arrival point is being set from a replay they follow the
   // draft pin, then the saved point, as the console's Explore mode does (MapBoard `routeDest`), so
   // the approach can be judged here rather than on the next call (operator, 2026-09-14). Only a
-  // replay with the arrival panel open passes `arrival`; closing it returns the routes to where the
-  // recorded call went. The call's own pin never moves, and a call with no location gets no route
-  // at all (CLAUDE.md s5).
+  // replay with the arrival panel open passes `arrival`. Once saved, the arrival point is the
+  // call's own destination (KioskView applies it, punch list #94), so the pin moves to it and the
+  // route stays there after the panel closes; before #94 closing it sent the route back to the
+  // recorded point. A call with no location gets no route at all (CLAUDE.md s5).
   const routeDest = useMemo(() => {
     if (!hasValidCoords) return null;
     const draft = arrival?.draft;
@@ -433,7 +434,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
             back to the recorded call's pin and a save read as "the pin jumps back": the operator
             saved 1144 Inlet St five times on 2026-09-14, and every save had landed. Emerald is the
             confirmed colour (kiosk-responsive-ergonomics skill), as the Arrival point notice uses. */}
-        {arrival && !arrival.draft && arrival.parcel?.entrance_lat != null && arrival.parcel?.entrance_lng != null && (
+        {/* Since #94 a saved point becomes the call's destination and the pin moves onto it, so the
+            dot is drawn only where the two differ: an arrival point saved before this replay,
+            which this call on screen has not taken. */}
+        {arrival && !arrival.draft && arrival.parcel?.entrance_lat != null && arrival.parcel?.entrance_lng != null
+          && !(destination && Number(arrival.parcel.entrance_lat) === destination.lat && Number(arrival.parcel.entrance_lng) === destination.lng) && (
           <CircleMarker
             center={[arrival.parcel.entrance_lat, arrival.parcel.entrance_lng]}
             radius={10}

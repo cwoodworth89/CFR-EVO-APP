@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import RouteOverviewPanel from './RouteOverviewPanel';
 import DetailStack from '../DetailStack';
 import PrePlanModal from './PrePlanModal';
@@ -8,6 +8,7 @@ import ApproximateLocationBanner from './ApproximateLocationBanner';
 import { STATIONS } from '../MapConstants';
 import { useCompactViewport } from '../../hooks/useCompactViewport';
 import { useArrivalPoint } from '../../hooks/useArrivalPoint';
+import { resolverTargetFromParcel, applyArrivalToCall } from '../../utils/arrivalTarget';
 import ArrivalPointSection from '../hud/ArrivalPointSection';
 import { sanitizeAddress } from '../../utils/addressUtils';
 
@@ -73,7 +74,26 @@ export default function KioskView({ kioskState }) {
   // and not on the padlock, at the operator's word -- but a LIVE call renders none of this:
   // the crew is watching that one and nobody unlocked anything to put it there.
   const isReview = isReviewMode || Boolean(activeCall?.isReview);
-  const arrival = useArrivalPoint({ address: isReview ? sanitizeAddress(activeCall?.address || '') : '' });
+
+  // A saved (or cleared) arrival point applies to the call on screen, not only the next one
+  // (punch list #94, operator 2026-09-17: closing the editor "the route jumps back", the pin
+  // never having moved). The save returns the parcel row; the call on screen takes the
+  // destination the resolver would give the next call from it (utils/arrivalTarget.js). Held
+  // here, per call, so closing the editor keeps it; a different call starts clean. Nothing
+  // changes until the operator saves or clears on this screen: the replay shows the call as
+  // recorded until then.
+  const callKey = activeCall?.dispatch_id || activeCall?.id || activeCall?.address || '';
+  const [appliedArrival, setAppliedArrival] = useState(null);   // { callKey, target }
+  const onArrivalSaved = useCallback((saved) => {
+    setAppliedArrival({ callKey, target: resolverTargetFromParcel(saved) });
+  }, [callKey]);
+  const arrival = useArrivalPoint({ address: isReview ? sanitizeAddress(activeCall?.address || '') : '', onSaved: onArrivalSaved });
+  // The call every panel below reads: the recorded call, or the recorded call with the applied
+  // arrival point as its destination. The dispatch record itself is never rewritten.
+  const displayCall = useMemo(
+    () => (appliedArrival && appliedArrival.callKey === callKey ? applyArrivalToCall(activeCall, appliedArrival.target) : activeCall),
+    [activeCall, appliedArrival, callKey],
+  );
   // Closed until the operator asks for it from the review strip. Open, it borrows the aerial
   // cell rather than adding a fourth: the tiles keep their size and the screen its shape
   // (operator, 2026-09-10: "it squishes the other PIP screens").
@@ -137,8 +157,8 @@ export default function KioskView({ kioskState }) {
   // Tier 1 (CLAUDE.md §5): coordinates are never guessed. If the geocoder did not
   // resolve a location, destLat/destLng stay null, all routing output is suppressed,
   // and the unresolved-location warning is shown instead.
-  const rawDestLat = activeCall?.lat ?? activeCall?.target?.lat ?? null;
-  const rawDestLng = activeCall?.lng ?? activeCall?.target?.lng ?? null;
+  const rawDestLat = displayCall?.lat ?? displayCall?.target?.lat ?? null;
+  const rawDestLng = displayCall?.lng ?? displayCall?.target?.lng ?? null;
 
   const hasCoords = rawDestLat != null && rawDestLng != null &&
     !isNaN(Number(rawDestLat)) && !isNaN(Number(rawDestLng)) &&
@@ -200,8 +220,8 @@ export default function KioskView({ kioskState }) {
   // An operator-set arrival point: say so, and why, so the crew reads the pin as a ruling
   // rather than a wrong guess (#49). 'entrance' is the operator's; 'front' is the parcel's
   // own frontage and needs no notice.
-  const arrivalSet = activeCall?.target?.arrival_point === 'entrance';
-  const entranceNote = activeCall?.target?.entrance_note || null;
+  const arrivalSet = displayCall?.target?.arrival_point === 'entrance';
+  const entranceNote = displayCall?.target?.entrance_note || null;
   const hasNotices = arrivalSet;
 
   return (
@@ -330,7 +350,7 @@ export default function KioskView({ kioskState }) {
       <main className="flex-none lg:flex-1 p-2 lg:p-3 flex flex-col lg:flex-row gap-2 lg:gap-3 min-h-0 lg:overflow-hidden">
         <section className="h-[52dvh] lg:h-auto lg:flex-1 min-w-0 min-h-0 flex-shrink-0 lg:flex-shrink">
           <RouteOverviewPanel
-            activeCall={activeCall}
+            activeCall={displayCall}
             stationHall={KIOSK_HALL}
             compact={compact}
             onHydrantModel={setHydrantModel}
@@ -345,7 +365,7 @@ export default function KioskView({ kioskState }) {
             On a phone the tiles are tabs under the map, a little over half a screen tall. */}
         <section className="h-[56dvh] lg:h-auto flex-shrink-0 lg:flex-none lg:w-[clamp(360px,38.5%,740px)] min-h-0">
           <DetailStack
-            call={activeCall}
+            call={displayCall}
             compact={compact}
             aerialOverride={showArrival ? (
               <div className="w-full h-full overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 lg:px-4 lg:py-3">
@@ -354,7 +374,7 @@ export default function KioskView({ kioskState }) {
                   {/* The parcel row is the system of record for every future call to this
                       address, so a ruling made while replaying an old call is a production
                       change, not one scoped to the replay. Say so where it is made. */}
-                  <span className="font-mono text-[10px] text-amber-300/90">Applies to the next call at this address</span>
+                  <span className="font-mono text-[10px] text-amber-300/90">Applies to this call now and to every future call at this address</span>
                 </div>
                 <ArrivalPointSection
                   standalone

@@ -134,13 +134,17 @@ export default function StreetViewPanel({ activeCall }) {
     return () => { cancelled = true; };
   }, [lookupSettled, savedView, defaultView, apiKey, isOnline, panoMeta?.key, metaKey]);
 
-  // Which picture: saved, metadata, no imagery, fallback, or not aimed (#93).
-  const metaForView = !apiKey ? { status: 'NO_KEY' } : (panoMeta?.key === metaKey ? panoMeta : null);
-  const resolution = resolveStreetView({
-    savedView,
-    defaultView,
-    meta: (lookupSettled || !cleanAddrKey) ? metaForView : null,
-  });
+  // Which picture: saved, metadata, no imagery, fallback, or not aimed (#93). Memoised: the
+  // panel re-renders every second on a live call, and an unmemoised resolution gave the
+  // panorama hook a new view object each time.
+  const resolution = useMemo(() => {
+    const metaForView = !apiKey ? { status: 'NO_KEY' } : (panoMeta?.key === metaKey ? panoMeta : null);
+    return resolveStreetView({
+      savedView,
+      defaultView,
+      meta: (lookupSettled || !cleanAddrKey) ? metaForView : null,
+    });
+  }, [apiKey, panoMeta, metaKey, savedView, defaultView, lookupSettled, cleanAddrKey]);
   const tileHasPicture = resolution.kind === 'saved' || resolution.kind === 'metadata' || resolution.kind === 'fallback';
 
   // No direction to face is said on the tile, and loudly here: it used to be a silent 0.
@@ -155,6 +159,10 @@ export default function StreetViewPanel({ activeCall }) {
   // coordinates -- not aimed and no imagery included -- so Expand always opens at the nearest
   // panorama and the view can be set for next time (operator, 2026-09-16).
   const view = resolution.expandView;
+  // When the panorama may be re-aimed: a different call (address or point), or a saved view
+  // arriving or changing. Nothing else -- not a re-render, not the metadata answering while
+  // the expanded view is open (its own search has already placed the camera).
+  const viewKey = `${cleanAddrKey}|${metaKey}|${savedView ? `saved:${savedView.panoId}:${savedView.heading}:${savedView.pitch}:${savedView.fov}` : 'unsaved'}`;
 
   const staticUrl = tileHasPicture ? staticStreetViewUrl(resolution.view, apiKey) : '';
   const useStaticTile = Boolean(staticUrl) && !staticFailed;
@@ -169,6 +177,7 @@ export default function StreetViewPanel({ activeCall }) {
     enabled: isOnline && Boolean(view) && (isExpanded || (tileHasPicture && !useStaticTile)),
     apiKey,
     view,
+    viewKey,
   });
   const sdkDown = pano.authFailed || pano.status === 'unavailable';
 

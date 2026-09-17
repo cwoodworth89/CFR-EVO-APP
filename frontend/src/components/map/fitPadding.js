@@ -112,6 +112,28 @@ export function routeFitOptions(map, { panelEl = null, panelSide = 'left', overl
   return options;
 }
 
+/**
+ * The points a snap fits, made symmetric about the call: every point is paired with its
+ * mirror through the call, so the box's centre IS the call. Leaflet 1.9.4 puts a fitted box's
+ * centre at the centre of the padded area (Map.js _getBoundsCenterZoom: centre of the
+ * projected box plus half of paddingBottomRight - paddingTopLeft), so the call lands at the
+ * centre of the map left visible by the control stack. Before this the box was the call plus
+ * the picked hydrants as they lie, whose centre is wherever the hydrants pull it -- on the
+ * approach side -- and the call sat off to a corner (operator, 2026-09-16, 1251 Hornby: upper
+ * left third). Every point is still inside the box, so every pick stays on screen; when the
+ * picks all lie to one side the box is up to twice as wide and the zoom may be one level out.
+ * Points as [lat, lng]; the mirror is taken in degrees, linear at a few hundred metres.
+ */
+export function centredSnapPoints(center, points = []) {
+  const [cLat, cLng] = center;
+  const out = [[cLat, cLng]];
+  for (const p of points) {
+    if (!Array.isArray(p) || !Number.isFinite(p[0]) || !Number.isFinite(p[1])) continue;
+    out.push([p[0], p[1]], [2 * cLat - p[0], 2 * cLng - p[1]]);
+  }
+  return out;
+}
+
 /** Options for `map.fitBounds` on the snap: equal measured padding, the caller's zoom cap. */
 export function snapFitOptions(map, { panelEl = null, panelSide = 'left', overlays = null, maxZoom, animate = false } = {}) {
   const { width, height, panel } = measure(map, panelEl);

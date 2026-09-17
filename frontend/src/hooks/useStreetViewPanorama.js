@@ -11,7 +11,7 @@ const SEARCH_RADII_M = [50, 100];
 /**
  * A Google Street View panorama in a container, driven by a view object.
  *
- *   const pano = useStreetViewPanorama({ containerRef, enabled, apiKey, view, containerKey });
+ *   const pano = useStreetViewPanorama({ containerRef, enabled, apiKey, view, viewKey, containerKey });
  *   pano.status      'idle' | 'loading' | 'ready' | 'none' | 'unavailable'
  *                    'none' = Google answered ZERO_RESULTS at every search radius: there is no
  *                    imagery here. Only that answer sets it; a search that never answers
@@ -24,7 +24,13 @@ const SEARCH_RADII_M = [50, 100];
  * goes away, pushes a CHANGED view onto a live panorama without rebuilding it, and reads
  * the camera back for a save. The panel never touches `window.google`.
  *
- * Two rules that came from defects (#35a):
+ * Three rules that came from defects (#35a, #93):
+ *   * A view is applied ONCE per `viewKey` -- when the panorama opens, and again only when the
+ *     key changes (a new call, or a saved view arriving). After that the SDK owns position and
+ *     camera. The panel re-renders every second on a live call (the elapsed clock in
+ *     useKioskQueue), and #93 handed this hook a new view object on each of those renders; the
+ *     apply effect re-aimed on every one, so arrow travel, pan and zoom snapped back within a
+ *     second (operator, 2026-09-16, 2985 Delahaye). Object identity is not a safe trigger.
  *   * A view is applied only when the panorama is not already showing it, so a save --
  *     which comes back from the database as "the view changed" -- does not re-aim a camera
  *     that is exactly there.
@@ -32,7 +38,7 @@ const SEARCH_RADII_M = [50, 100];
  *     SDK enforces a container-dependent minimum and re-fires zoom_changed with it
  *     (docs/standards/dependency-behaviour.md).
  */
-export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, containerKey = 'default' }) {
+export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, viewKey = null, containerKey = 'default' }) {
   const [status, setStatus] = useState('idle');
   const [authFailed, setAuthFailed] = useState(() => isGoogleMapsAuthFailed());
   const panoRef = useRef(null);
@@ -41,6 +47,9 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
   viewRef.current = view;
   const aimRef = useRef(null);    // the live panorama's imagery search, for the apply effect
   const noImageryRef = useRef(false);  // the last search ended ZERO_RESULTS; status_changed must not overwrite it
+  const viewKeyRef = useRef(viewKey);
+  viewKeyRef.current = viewKey;
+  const appliedKeyRef = useRef(null);  // the viewKey the live panorama was last aimed for
 
   useEffect(() => onGoogleMapsAuthFailure(() => setAuthFailed(true)), []);
 
@@ -147,6 +156,7 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
         visible: true,
       });
       panoRef.current = pano;
+      appliedKeyRef.current = viewKeyRef.current;   // construction is the one application
       liveRef.current = { heading: v.heading, pitch: v.pitch, fov: v.fov, lat: v.lat, lng: v.lng, panoId: v.panoId || '' };
 
       pano.addListener('pov_changed', () => {
@@ -185,6 +195,7 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
       panoRef.current = null;
       liveRef.current = null;
       aimRef.current = null;
+      appliedKeyRef.current = null;
       noImageryRef.current = false;
       if (container) container.innerHTML = '';
     };
@@ -194,10 +205,13 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantPanorama, apiKey, containerKey, authFailed]);
 
-  // Apply a changed view to the live panorama, unless it is already showing it.
+  // Apply a view to the live panorama when its KEY changes -- a new call, or a saved view
+  // arriving -- never because the panel re-rendered, and not if it is already showing it.
   useEffect(() => {
     const pano = panoRef.current;
     if (!pano || !view || (status !== 'ready' && status !== 'none')) return;
+    if (appliedKeyRef.current === viewKey) return;
+    appliedKeyRef.current = viewKey;
     if (viewsMatch(liveRef.current, view)) return;
     try {
       if (view.panoId) {
@@ -223,7 +237,7 @@ export function useStreetViewPanorama({ containerRef, enabled, apiKey, view, con
     } catch (e) {
       console.warn('Could not apply the Street View view:', e);
     }
-  }, [view, status]);
+  }, [view, viewKey, status]);
 
   /** The camera as it stands now, as a view object; null without a panorama. */
   const readView = useCallback(() => {

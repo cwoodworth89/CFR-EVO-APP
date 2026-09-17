@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fitPadding, snapPadding, MAX_PADDED_SHARE } from '../src/components/map/fitPadding.js';
+import { fitPadding, snapPadding, MAX_PADDED_SHARE, centredSnapPoints } from '../src/components/map/fitPadding.js';
 
 // The dispatch map's own numbers, so the kiosk fit is unchanged by sharing the formula:
 // a 1596 x 936 map (the operator's 1916-wide screen minus the sidebar) with the 320 px
@@ -64,4 +64,21 @@ test('snap pads every side equally and clamps the same way', () => {
   assert.deepEqual(wide.paddingBottomRight, [94, 94]);
   const narrow = snapPadding({ width: 73, height: 788, panel: { width: 320, offsetLeft: 12 }, panelSide: 'left' });
   assert.ok(narrow.paddingTopLeft[0] + narrow.paddingBottomRight[0] <= 73 * MAX_PADDED_SHARE + 1);
+});
+
+// The snap's box is centred on the call, so Leaflet centres the call in the padded area.
+test('snap points are symmetric about the call and keep every pick inside', () => {
+  const call = [49.28, -122.80];
+  // Two hydrants both south-west of the call, on the approach: the old box centred between them.
+  const picks = [[49.2790, -122.8012], [49.2786, -122.8005]];
+  const pts = centredSnapPoints(call, picks);
+  const lats = pts.map((p) => p[0]); const lngs = pts.map((p) => p[1]);
+  const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const midLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+  assert.ok(Math.abs(midLat - call[0]) < 1e-12 && Math.abs(midLng - call[1]) < 1e-12);
+  for (const [la, ln] of picks) {
+    assert.ok(la >= Math.min(...lats) && la <= Math.max(...lats) && ln >= Math.min(...lngs) && ln <= Math.max(...lngs));
+  }
+  assert.deepEqual(centredSnapPoints(call, []), [call]);
+  assert.deepEqual(centredSnapPoints(call, [[NaN, 1], null]), [call]);
 });

@@ -10,7 +10,7 @@ import { BASE_LAYERS, CADASTRAL_MIN_ZOOM } from '../MapConstants';
 import { useRouteHydrants } from '../../hooks/useRouteHydrants';
 import PickedHydrantsLayer from '../map/PickedHydrantsLayer';
 import { hydrantCardModel } from '../../utils/hydrantCard';
-import { routeFitOptions, snapFitOptions } from '../map/fitPadding';
+import { routeFitOptions, snapFitOptions, centredSnapPoints } from '../map/fitPadding';
 import { MapClickEvents } from '../MapActions';
 
 // The chrome over the map (artboard 3A of the operator's Claude Design canvas): the route
@@ -266,7 +266,7 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
     setUserPanned(false);
     setViewMode('call');
     markFitting(mapInstance, fittingRef);
-    const points = [[destination.lat, destination.lng]];
+    const points = [];
     for (const h of routeHydrants.picks) {
       if (h.lat != null && h.lng != null) points.push([Number(h.lat), Number(h.lng)]);
     }
@@ -282,11 +282,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
     // Instant, not animated: a snap is a cut, and an animated four-level zoom sits at
     // Leaflet's animation threshold and is scheduled on requestAnimationFrame, which is
     // where it can fail to start (measured on the workstation, 2026-09-08).
-    if (points.length === 1) {
-      mapInstance.setView(points[0], 18, { animate: false });
-    } else {
-      mapInstance.fitBounds(L.latLngBounds(points), snapFitOptions(mapInstance, { overlays: getOverlays(), maxZoom: 18, animate: false }));
-    }
+    // The call at the centre of the visible map (centredSnapPoints, operator 2026-09-16).
+    // Also with no picks: a one-point box capped at 18 takes Leaflet's padded-centre path,
+    // where setView used to centre on the whole container, under the control stack's side.
+    const centred = centredSnapPoints([destination.lat, destination.lng], points);
+    mapInstance.fitBounds(L.latLngBounds(centred), snapFitOptions(mapInstance, { overlays: getOverlays(), maxZoom: 18, animate: false }));
   };
 
   // Off the route: a snap, or a drag or wheel by hand. The one button then offers the way

@@ -176,8 +176,8 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
   const [userPanned, setUserPanned] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   // 'route': the whole run from the hall; 'call': the final approach, close in, with the
-  // parcel and the picked hydrants (operator, 2026-09-08). SNAP TO CALL and RE-CENTRE sit
-  // in the control stack; RE-CENTRE is live only once the view has left the route.
+  // parcel and the picked hydrants (operator, 2026-09-08). One button toggles between them,
+  // SNAP TO CALL / SHOW ROUTE, as the console's MapViewControls does (operator, 2026-09-16).
   const [viewMode, setViewMode] = useState('route');
   const fittingRef = useRef(false);
   // What floats over the map, measured for the fits: the control stack (right) and the
@@ -289,7 +289,11 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
     }
   };
 
-  // RE-CENTRE has something to do once the view has left the route: a drag, a wheel, or a snap.
+  // Off the route: a snap, or a drag or wheel by hand. The one button then offers the way
+  // back. The console shows a separate RE-CENTER ON ROUTE pill after a drag; nothing floats
+  // over this map's lower half (2026-09-10), so the button carries that case too, and the
+  // way back is still one tap. SNAP TO CALL returns once the view is back on the route; the
+  // header's hydrant TAP TO ZOOM snaps from anywhere.
   const offRoute = userPanned || viewMode === 'call';
 
   // The hydrant card lives in the header now (operator, 2026-09-10), but the picks are
@@ -361,10 +365,13 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
       </div>
 
       {/* The control stack, top right, the console's mirrored (artboard 3A): the zoom readout,
-          SNAP TO CALL, RE-CENTRE, and the zoom buttons, in one fixed order so each is in the
-          same place at 03:00. RE-CENTRE is dim until a drag, a wheel or a snap has moved the
-          view off the route (operator, 2026-09-06: it used to shout on every call). On a phone
-          the readout and the zoom buttons go: pinch does that. */}
+          one SNAP TO CALL / SHOW ROUTE button, and the zoom buttons, in one fixed order so each
+          is in the same place at 03:00. The button is the console's (MapViewControls.jsx): it
+          reads SNAP TO CALL on the route and SHOW ROUTE once the view has left it.
+          Operator, 2026-09-16: "combine snap to call and re-centre map just like in explore
+          mode." It replaces the separate RE-CENTRE (2026-09-06: dim until the view left the
+          route). No title: the label is the whole instruction, and a touch screen never shows
+          one. On a phone the readout and the zoom buttons go: pinch does that. */}
       {hasValidCoords && (
         <div ref={controlsRef} className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-2">
           {!compact && (
@@ -375,21 +382,10 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
           )}
           <button
             type="button"
-            onClick={snapToCall}
-            title="Close in on the parcel and the picked hydrants"
-            className={`${CONTROL} cursor-pointer ${viewMode === 'call' ? 'text-slate-400' : 'text-slate-50'}`}
+            onClick={offRoute ? handleRecenter : snapToCall}
+            className={`${CONTROL} cursor-pointer text-slate-50`}
           >
-            Snap to call
-          </button>
-          <button
-            type="button"
-            onClick={handleRecenter}
-            disabled={!offRoute}
-            aria-disabled={!offRoute}
-            title="Back to the whole route from the hall"
-            className={`${CONTROL} ${offRoute ? 'text-slate-50 cursor-pointer' : 'text-slate-500 cursor-default'}`}
-          >
-            Re-centre
+            {offRoute ? 'Show route' : 'Snap to call'}
           </button>
           {!compact && (
             <div className="flex flex-col gap-2 mt-1">

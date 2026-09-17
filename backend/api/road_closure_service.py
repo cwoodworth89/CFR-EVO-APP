@@ -279,11 +279,12 @@ def _drivebc_access(evt, closure_id=None):
             direction = None
         access, closure_type = _open511_road_access(state, direction)
         rank = _ACCESS_RANK.get(access, 1 if state == "ALL_LANES_OPEN" else 0)
-        candidates.append((rank, state, direction, access, closure_type))
+        candidates.append((rank, state, direction, access, closure_type,
+                           _feed_text(road.get('name'))))
 
     if not candidates:
         return {"emergency_access": None, "closure_type": None, "road_state": None,
-                "road_direction": None, "feed_severity": feed_severity}
+                "road_direction": None, "feed_severity": feed_severity, "road_name": None}
 
     if len({(c[1], c[2]) for c in candidates}) > 1:
         logger.warning(
@@ -291,9 +292,10 @@ def _drivebc_access(evt, closure_id=None):
             f"{[(c[1], c[2]) for c in candidates]}; serving the most restrictive."
         )
     # max() keeps the first of equal rank, i.e. the feed's own order.
-    rank, state, direction, access, closure_type = max(candidates, key=lambda c: c[0])
+    rank, state, direction, access, closure_type, road_name = max(candidates, key=lambda c: c[0])
+    # road_name is the name of the road the tier was taken from, as the feed sent it.
     return {"emergency_access": access, "closure_type": closure_type, "road_state": state,
-            "road_direction": direction, "feed_severity": feed_severity}
+            "road_direction": direction, "feed_severity": feed_severity, "road_name": road_name}
 
 
 def _feed_text(value):
@@ -470,7 +472,10 @@ def _ingest_road_closures(db: Session, source_results: dict, skipped: dict):
                 # Parsed values, not the raw roads[]: an out-of-spec state already has its
                 # own ERROR line naming it, and one line per problem is the rule (#91).
                 "raw_severity": f"roads[].state={access['road_state']!r}",
-                "street_name": _feed_text(evt.get('road_name')),
+                # roads[].name of the road the tier came from (#92). Open511 has no top-level
+                # road_name: reading one discarded every DriveBC road name (0 of 286 events
+                # carried it, 286 of 286 carried roads[].name, 2026-09-16). Absent -> null.
+                "street_name": access["road_name"],
                 "source": "DriveBC Open511",
                 "closure_type": access["closure_type"],
                 "emergency_access": access["emergency_access"],

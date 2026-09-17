@@ -487,6 +487,16 @@ class FeedGapTests(unittest.TestCase):
         row = self._one(roads=[_road(_ABSENT, "BOTH"), _road("ALL_LANES_OPEN", "BOTH")])
         self.assertEqual(row.road_state, "ALL_LANES_OPEN")
 
+    def test_drivebc_street_is_the_name_of_the_road_the_tier_came_from(self):
+        # Measured shape: no top-level road_name, the name in roads[] (#92, RIDE-100086).
+        row = self._one(road_name=_ABSENT, roads=[dict(_road("ALL_LANES_OPEN", "BOTH"), name="Highway 7B")])
+        self.assertEqual(row.street_name, "Highway 7B")
+        row = self._one(road_name=_ABSENT, roads=[dict(_road("ALL_LANES_OPEN", "BOTH"), name="Highway 1"),
+                                                  dict(_road("CLOSED", "BOTH"), name="Highway 7")])
+        self.assertEqual((row.street_name, row.emergency_access), ("Highway 7", "NO_ACCESS"))
+        row = self._one(road_name=_ABSENT, roads=[{k: v for k, v in _road("CLOSED", "BOTH").items() if k != "name"}])
+        self.assertIsNone(row.street_name)
+
     def test_municipal_rows_carry_no_open511_fields(self):
         self._sync([], muni_issues=[_muni_issue(issue_id=9, rct=262144)], muni_paths=[_PATH])
         (row,) = self._rows()

@@ -41,14 +41,6 @@ export function LeftSidebar({
   // One row per hall when the All Hall Approaches layer is on: the router's own distance and
   // time from each hall to the target (MapBoard builds it; CLAUDE.md 6.2).
   hallApproaches = [],
-  // Road access filter toggles
-  // Road access filter toggles
-  filterNoAccess,
-  setFilterNoAccess,
-  filterAccessOnly,
-  setFilterAccessOnly,
-  filterCaution,
-  setFilterCaution,
 
 }) {
   const isExplore = appMode === "EXPLORE";
@@ -511,42 +503,9 @@ export function LeftSidebar({
                        </div>
                     </div>
 
-                    {/* 3. Road Hazards, Access Level & Closure Timeframe */}
-                    <div className={`flex flex-col gap-2 transition-all duration-300 ${!showRoadClosures && 'opacity-35 pointer-events-none'}`}>
-                       <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-wider font-mono border-b border-slate-850 pb-1.5">ROAD HAZARDS & CLOSURES</h3>
-                       <div className="flex flex-col gap-2 mt-1.5">
-                          <div className="flex flex-col gap-1.5">
-                             <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wider">Access Severity</span>
-                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer touch:min-h-11">
-                                <input 
-                                   type="checkbox" 
-                                   checked={filterNoAccess || filterAccessOnly} 
-                                   onChange={(e) => {
-                                      setFilterNoAccess(e.target.checked);
-                                      setFilterAccessOnly(e.target.checked);
-                                   }} 
-                                   className="rounded border-slate-850 bg-slate-950 text-red-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
-                                />
-                                <span className="flex items-center gap-2 font-medium">
-                                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm"></span>
-                                   <span>Full Road Closures</span>
-                                </span>
-                             </label>
-                             <label className="flex items-center gap-2.5 text-xs text-slate-350 cursor-pointer touch:min-h-11">
-                                <input 
-                                   type="checkbox" 
-                                   checked={filterCaution} 
-                                   onChange={(e) => setFilterCaution(e.target.checked)} 
-                                   className="rounded border-slate-850 bg-slate-950 text-yellow-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 touch:w-5 touch:h-5 cursor-pointer" 
-                                />
-                                <span className="flex items-center gap-2 font-medium">
-                                   <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block shadow-sm"></span>
-                                   <span>Lane Restrictions & Construction</span>
-                                </span>
-                             </label>
-                           </div>
-                        </div>
-                     </div>
+                    {/* The access filters (Full Road Closures, Lane Restrictions & Construction) moved into
+                        the road closure sidebar as four buckets (operator 2026-09-17). The Road
+                        Closures layer switch above stays here. */}
                   </div>
                </div>
            )}

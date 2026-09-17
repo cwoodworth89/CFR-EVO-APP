@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {
   accessKey, accessStyle, passesAccessFilter, closureKey, sameClosure, ACCESS_UNKNOWN,
   closureText, NO_TEXT, closureFeedCounts, ACCESS_INFO, roadRestriction, feedSeverityLine,
-  DRIVEBC_SOURCE,
+  DRIVEBC_SOURCE, accessBucket, countByBucket, groupByBucket, BUCKETS, DEFAULT_BUCKET_FILTER, ALL_BUCKETS_ON,
 } from '../src/utils/closureAccess.js';
 
-const ALL_OFF = { filterNoAccess: false, filterAccessOnly: false, filterCaution: false };
-const ALL_ON = { filterNoAccess: true, filterAccessOnly: true, filterCaution: true };
+const ALL_OFF = { WARNING: false, CAUTION: false, INFO: false, UNSPECIFIED: false };
+const ALL_ON = ALL_BUCKETS_ON;
 
 test('the three feed states keep their labels', () => {
   assert.equal(accessStyle({ emergencyAccess: 'NO_ACCESS' }).label, 'FULL CLOSURE');
@@ -31,15 +31,55 @@ test('N/A is visually distinct from every tier', () => {
   }
 });
 
-test('each toggle governs only its own tier', () => {
-  assert.equal(passesAccessFilter({ emergencyAccess: 'NO_ACCESS' }, { ...ALL_OFF, filterNoAccess: true }), true);
-  assert.equal(passesAccessFilter({ emergencyAccess: 'NO_ACCESS' }, { ...ALL_ON, filterNoAccess: false }), false);
-  assert.equal(passesAccessFilter({ emergencyAccess: 'ACCESS_ONLY' }, { ...ALL_ON, filterAccessOnly: false }), false);
-  assert.equal(passesAccessFilter({ emergencyAccess: 'CAUTION' }, { ...ALL_ON, filterCaution: false }), false);
+test('four buckets: Warning is NO_ACCESS and ACCESS_ONLY; Info is INFO or all lanes open; the rest Unspecified', () => {
+  assert.equal(accessBucket({ emergencyAccess: 'NO_ACCESS' }), 'WARNING');
+  assert.equal(accessBucket({ emergencyAccess: 'ACCESS_ONLY' }), 'WARNING');
+  assert.equal(accessBucket({ emergencyAccess: 'CAUTION' }), 'CAUTION');
+  assert.equal(accessBucket({ emergencyAccess: 'INFO' }), 'INFO');                              // served from GIS's rebuild
+  assert.equal(accessBucket({ emergencyAccess: null, roadState: 'ALL_LANES_OPEN' }), 'INFO');   // the api before it
+  assert.equal(accessBucket({ emergencyAccess: null }), 'UNSPECIFIED');
+  assert.equal(accessBucket({ emergencyAccess: 'SOMETHING_NEW' }), 'UNSPECIFIED');
+  assert.equal(accessKey({ emergencyAccess: 'INFO' }), ACCESS_INFO);
+  assert.equal(accessStyle({ emergencyAccess: 'INFO' }).label, 'INFO');
+  assert.deepEqual(BUCKETS, ['WARNING', 'CAUTION', 'INFO', 'UNSPECIFIED']);
 });
 
-test('an N/A closure passes with every toggle off', () => {
-  assert.equal(passesAccessFilter({ emergencyAccess: null }, ALL_OFF), true);
+test('each toggle governs only its own bucket, with no pass-through', () => {
+  for (const [c, bucket] of [
+    [{ emergencyAccess: 'NO_ACCESS' }, 'WARNING'], [{ emergencyAccess: 'ACCESS_ONLY' }, 'WARNING'],
+    [{ emergencyAccess: 'CAUTION' }, 'CAUTION'], [{ emergencyAccess: 'INFO' }, 'INFO'], [{ emergencyAccess: null }, 'UNSPECIFIED'],
+  ]) {
+    assert.equal(passesAccessFilter(c, { ...ALL_OFF, [bucket]: true }), true, bucket);
+    assert.equal(passesAccessFilter(c, { ...ALL_ON, [bucket]: false }), false, bucket);
+  }
+  assert.equal(passesAccessFilter({ emergencyAccess: null }, ALL_OFF), false);   // N/A no longer passes by default
+  assert.equal(passesAccessFilter({ emergencyAccess: 'CAUTION' }, null), false);
+});
+
+test('defaults: Warning and Caution on, Info and Unspecified off', () => {
+  assert.deepEqual({ ...DEFAULT_BUCKET_FILTER }, { WARNING: true, CAUTION: true, INFO: false, UNSPECIFIED: false });
+});
+
+test('counts and grouping on both live shapes (today, and after GIS\'s rebuild)', () => {
+  const at = (access, startDate) => ({ emergencyAccess: access, startDate });
+  // Today: 67 N/A, 3 ACCESS_ONLY, 1 NO_ACCESS.
+  const today = [...Array(67)].map(() => at(null)).concat([...Array(3)].map(() => at('ACCESS_ONLY')), [at('NO_ACCESS')]);
+  assert.deepEqual(countByBucket(today), { WARNING: 4, CAUTION: 0, INFO: 0, UNSPECIFIED: 67 });
+  assert.equal(today.filter((c) => passesAccessFilter(c, DEFAULT_BUCKET_FILTER)).length, 4);
+  // After: ~48 CAUTION, 10 INFO, 10 N/A, 5 ACCESS_ONLY, 1 NO_ACCESS.
+  const after = [...Array(48)].map(() => at('CAUTION')).concat(
+    [...Array(10)].map(() => at('INFO')), [...Array(10)].map(() => at(null)), [...Array(5)].map(() => at('ACCESS_ONLY')), [at('NO_ACCESS')]);
+  assert.deepEqual(countByBucket(after), { WARNING: 6, CAUTION: 48, INFO: 10, UNSPECIFIED: 10 });
+  assert.equal(after.filter((c) => passesAccessFilter(c, DEFAULT_BUCKET_FILTER)).length, 54);
+  // Grouping: bucket order, empty buckets absent, newest start first, no start last.
+  const g = groupByBucket([
+    at('CAUTION', '2026-09-01'), at(null, '2026-09-02'), at('NO_ACCESS', '2026-08-01'),
+    at('ACCESS_ONLY', '2026-09-10'), at('CAUTION', null), at('CAUTION', '2026-09-05'),
+  ]);
+  assert.deepEqual(g.map((x) => x.bucket), ['WARNING', 'CAUTION', 'UNSPECIFIED']);
+  assert.deepEqual(g[0].closures.map((c) => c.startDate), ['2026-09-10', '2026-08-01']);
+  assert.deepEqual(g[1].closures.map((c) => c.startDate), ['2026-09-05', '2026-09-01', null]);
+  assert.deepEqual(groupByBucket([]), []);
 });
 
 test('keys prefer rowId, fall back to id, and two unidentified closures never match', () => {
@@ -76,15 +116,14 @@ test('feed counts match what the kiosk renders, and no list is null not zero', (
 // maps from the measured live feed (2026-09-16): emergencyAccess is what the backend derives.
 const DBC = (over) => ({ source: DRIVEBC_SOURCE, emergencyAccess: null, roadState: null,
   roadDirection: null, feedSeverity: null, ...over });
-const ALL_TOGGLES_OFF = { filterNoAccess: false, filterAccessOnly: false, filterCaution: false };
-
-test('MAJOR with all lanes open is INFO, not a tier, and passes every toggle', () => {
+test('MAJOR with all lanes open is INFO, not a tier, and follows the Info toggle', () => {
   const c = DBC({ feedSeverity: 'MAJOR', roadState: 'ALL_LANES_OPEN' });
   assert.equal(accessKey(c), ACCESS_INFO);
   assert.equal(accessStyle(c).label, 'INFO');
   assert.equal(roadRestriction(c), 'All lanes open');
   assert.equal(feedSeverityLine(c), 'DriveBC traffic impact: MAJOR');
-  assert.equal(passesAccessFilter(c, ALL_TOGGLES_OFF), true);
+  assert.equal(passesAccessFilter(c, DEFAULT_BUCKET_FILTER), false);   // Info is off by default
+  assert.equal(passesAccessFilter(c, { ...DEFAULT_BUCKET_FILTER, INFO: true }), true);
 });
 
 test('MINOR, closed both directions, is NO ACCESS', () => {

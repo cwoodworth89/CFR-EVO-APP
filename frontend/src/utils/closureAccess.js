@@ -64,10 +64,16 @@ const ACCESS = {
   },
 };
 
-/** The access key for a closure: one of the three tiers, ACCESS_INFO, or ACCESS_UNKNOWN. */
+/**
+ * The access key for a closure: one of the three tiers, ACCESS_INFO, or ACCESS_UNKNOWN.
+ * `emergencyAccess: "INFO"` is served by the api from 2026-09-17 (gis-spatial-engineer: municipal
+ * Info labels and DriveBC ALL_LANES_OPEN). The `roadState` inference stays so a frontend ahead of
+ * that api still reads an all-lanes-open DriveBC event as Info.
+ */
 export function accessKey(closure) {
   const v = closure?.emergencyAccess;
   if (v === 'NO_ACCESS' || v === 'ACCESS_ONLY' || v === 'CAUTION') return v;
+  if (v === 'INFO') return ACCESS_INFO;
   return closure?.roadState === 'ALL_LANES_OPEN' ? ACCESS_INFO : ACCESS_UNKNOWN;
 }
 
@@ -77,17 +83,68 @@ export function accessStyle(closure) {
 }
 
 /**
- * Whether the three access toggles let a closure through. An N/A or INFO closure always
- * passes: the operator ruled both are kept and shown, and no toggle names either, so hiding
- * one behind a toggle would make it disappear because a known tier was switched off.
+ * The four display buckets the closure sidebar's toggles name (operator ruling 2026-09-17):
+ * Warning is NO_ACCESS and ACCESS_ONLY together ("both"), Caution is CAUTION, Info is INFO, and
+ * Unspecified is everything the feed did not state (N/A). In this order everywhere: toggles,
+ * grouping, counts.
  */
-export function passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, filterCaution }) {
+export const BUCKETS = Object.freeze(['WARNING', 'CAUTION', 'INFO', 'UNSPECIFIED']);
+
+export const BUCKET_LABELS = Object.freeze({
+  WARNING: 'Warning', CAUTION: 'Caution', INFO: 'Info', UNSPECIFIED: 'Unspecified',
+});
+
+/**
+ * Which buckets show by default, every load (operator 2026-09-17: "Info/Low Impact events hidden
+ * by default. Caution Events and Warning Events displayed by default"; Unspecified off, ruled
+ * after). Not persisted: a hidden bucket is never carried over from an earlier session.
+ */
+export const DEFAULT_BUCKET_FILTER = Object.freeze({ WARNING: true, CAUTION: true, INFO: false, UNSPECIFIED: false });
+
+/** Every bucket on: the dispatch display's route map, which has no filter controls. */
+export const ALL_BUCKETS_ON = Object.freeze({ WARNING: true, CAUTION: true, INFO: true, UNSPECIFIED: true });
+
+/** The bucket a closure belongs to. */
+export function accessBucket(closure) {
   switch (accessKey(closure)) {
-    case 'NO_ACCESS': return !!filterNoAccess;
-    case 'ACCESS_ONLY': return !!filterAccessOnly;
-    case 'CAUTION': return !!filterCaution;
-    default: return true;
+    case 'NO_ACCESS':
+    case 'ACCESS_ONLY': return 'WARNING';
+    case 'CAUTION': return 'CAUTION';
+    case ACCESS_INFO: return 'INFO';
+    default: return 'UNSPECIFIED';
   }
+}
+
+/**
+ * Whether the bucket toggles let a closure through -- the one test both the sidebar list and the
+ * map markers use, so the two can never disagree. No pass-through: a bucket that is off hides
+ * its closures, Info and Unspecified included, and the toggle's count says how many.
+ */
+export function passesAccessFilter(closure, bucketFilter) {
+  return Boolean(bucketFilter && bucketFilter[accessBucket(closure)]);
+}
+
+/** Closures per bucket, for the counts on the toggles: { WARNING: n, CAUTION: n, ... }. */
+export function countByBucket(closures) {
+  const counts = { WARNING: 0, CAUTION: 0, INFO: 0, UNSPECIFIED: 0 };
+  for (const c of closures || []) counts[accessBucket(c)] += 1;
+  return counts;
+}
+
+/**
+ * One hall's closures as subgroups: bucket order, empty buckets left out, newest start first
+ * inside each (a closure with no start sorts last, as the list did before).
+ */
+export function groupByBucket(closures) {
+  const byBucket = { WARNING: [], CAUTION: [], INFO: [], UNSPECIFIED: [] };
+  for (const c of closures || []) byBucket[accessBucket(c)].push(c);
+  const startMs = (c) => {
+    const t = c?.start instanceof Date ? c.start.getTime() : (c?.startDate ? new Date(c.startDate).getTime() : NaN);
+    return Number.isFinite(t) ? t : -Infinity;
+  };
+  return BUCKETS
+    .filter((b) => byBucket[b].length > 0)
+    .map((b) => ({ bucket: b, closures: byBucket[b].slice().sort((x, y) => startMs(y) - startMs(x)) }));
 }
 
 /**

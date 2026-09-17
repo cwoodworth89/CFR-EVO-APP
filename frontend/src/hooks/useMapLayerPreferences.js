@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { DEFAULT_BUCKET_FILTER } from '../utils/closureAccess';
 import { MODE_DEFAULTS } from '../components/MapConstants';
 
 /**
@@ -31,10 +32,9 @@ export function useMapLayerPreferences() {
   const [showNext24h, setShowNext24h] = useState(false);
   const [showNext7d, setShowNext7d] = useState(false);
 
-  // Road closure emergency-access filters
-  const [filterNoAccess, setFilterNoAccess] = useState(true);
-  const [filterAccessOnly, setFilterAccessOnly] = useState(true);
-  const [filterCaution, setFilterCaution] = useState(true);
+  // Road closure bucket filters -- Warning, Caution, Info, Unspecified -- set from the closure
+  // sidebar and read by both the list and the map (operator 2026-09-17). Defaults every load.
+  const [closureBuckets, setClosureBuckets] = useState(DEFAULT_BUCKET_FILTER);
 
   /**
    * Reset the layer preferences that a mode change owns.
@@ -66,13 +66,11 @@ export function useMapLayerPreferences() {
     showActiveNow, setShowActiveNow,
     showNext24h, setShowNext24h,
     showNext7d, setShowNext7d,
-    filterNoAccess, setFilterNoAccess,
-    filterAccessOnly, setFilterAccessOnly,
-    filterCaution, setFilterCaution,
+    closureBuckets, setClosureBuckets,
     applyModeDefaults,
   }), [
     mapStyle, showLabels, showHydrants, showZones, showRoadClosures,
     showRailroadCrossings, showFireHalls, showAllHalls, showActiveNow, showNext24h, showNext7d,
-    filterNoAccess, filterAccessOnly, filterCaution, applyModeDefaults,
+    closureBuckets, applyModeDefaults,
   ]);
 }

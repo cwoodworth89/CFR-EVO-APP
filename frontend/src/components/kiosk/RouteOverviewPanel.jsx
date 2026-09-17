@@ -13,6 +13,7 @@ import { hydrantCardModel } from '../../utils/hydrantCard';
 import { routeFitOptions, snapFitOptions, centredSnapPoints } from '../map/fitPadding';
 import { MapClickEvents } from '../MapActions';
 import { destinationKey } from '../../utils/arrivalTarget';
+import { ALL_BUCKETS_ON } from '../../utils/closureAccess';
 
 // The chrome over the map (artboard 3A of the operator's Claude Design canvas): the route
 // pill top left, the control stack top right in one fixed order, the hydrant card bottom
@@ -156,7 +157,9 @@ export default function RouteOverviewPanel({ activeCall, stationHall, compact = 
 
   // All severities, active now. No filter controls on the dispatch map by design.
   const { activeClosures } = useRoadClosures({
-    filterNoAccess: true, filterAccessOnly: true, filterCaution: true,
+    // Every bucket: this map has no filter controls, and it drew every closure before the
+    // explore sidebar's buckets existed (operator 2026-09-17 ruled those for explore mode).
+    closureBuckets: ALL_BUCKETS_ON,
     showActiveNow: true, showNext24h: false, showNext7d: false,
   });
 

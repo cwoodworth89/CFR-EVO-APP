@@ -1,5 +1,5 @@
 import React from 'react';
-import { accessStyle, passesAccessFilter, closureKey, closureText, roadRestriction, feedSeverityLine } from '../../utils/closureAccess';
+import { accessStyle, passesAccessFilter, closureKey, closureText, roadRestriction, feedSeverityLine, BUCKETS, BUCKET_LABELS, DEFAULT_BUCKET_FILTER, countByBucket, groupByBucket } from '../../utils/closureAccess';
 
 /** Hall labels and their badge classes. Static, so it lives at module scope: as a literal
  *  inside the component it was rebuilt every render and read by the useMemo below without
@@ -30,6 +30,17 @@ function closureMapPoint(closure) {
     ?? (Array.isArray(closure.polyline) && closure.polyline.length > 0 ? toPoint(closure.polyline[0]) : null);
 }
 
+/** Bucket colours, the same families as the closure lines on the map (closureAccess.js). */
+const BUCKET_ON_CLASS = {
+  WARNING: 'border-red-500/60 text-red-300',
+  CAUTION: 'border-yellow-500/60 text-yellow-300',
+  INFO: 'border-cyan-500/60 text-cyan-300',
+  UNSPECIFIED: 'border-slate-500/60 text-slate-200',
+};
+const BUCKET_DOT_CLASS = {
+  WARNING: 'bg-red-500', CAUTION: 'bg-yellow-500', INFO: 'bg-cyan-400', UNSPECIFIED: 'bg-slate-400',
+};
+
 export function RightSidebar({ 
   // A phone: a drawer over the right of the map rather than a column beside it.
   compact = false,
@@ -38,9 +49,10 @@ export function RightSidebar({
   appMode, 
   roadClosures, 
   showRoadClosures, 
-  filterNoAccess,
-  filterAccessOnly,
-  filterCaution,
+  // Warning / Caution / Info / Unspecified: shown by the toggles at the top of this sidebar, and
+  // the same state filters the map (useRoadClosures). Owned by useMapLayerPreferences.
+  closureBuckets = DEFAULT_BUCKET_FILTER,
+  setClosureBuckets = null,
   showActiveNow = true,
   showNext24h = false,
   showNext7d = false,
@@ -61,10 +73,10 @@ export function RightSidebar({
     }));
   };
 
-  const groupedClosures = React.useMemo(() => {
+  const { groupedClosures, bucketCounts } = React.useMemo(() => {
     const now = new Date();
 
-    const filtered = roadClosures
+    const inTimeframe = roadClosures
       .map(closure => {
         const start = closure.startDate ? new Date(closure.startDate) : null;
         const end = closure.endDate ? new Date(closure.endDate) : null;
@@ -92,8 +104,6 @@ export function RightSidebar({
       })
       .filter(closure => {
         if (closure.isExpired) return false;
-        // An N/A closure (no severity from the feed, #91) passes every access toggle.
-        if (!passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, filterCaution })) return false;
 
         const isCurrentlyActive = closure.isActive;
         const is24hFuture = closure.isFuture && closure.start && ((closure.start.getTime() - now.getTime()) <= 24 * 3600 * 1000);
@@ -106,6 +116,11 @@ export function RightSidebar({
 
         return matchesTimeframe;
       });
+
+    // The count on each toggle is every closure in its bucket for the current timeframe, shown
+    // or not, so a bucket that is switched off never vanishes silently (CLAUDE.md 6.1).
+    const counts = countByBucket(inTimeframe);
+    const filtered = inTimeframe.filter(closure => passesAccessFilter(closure, closureBuckets));
 
     const groups = { "1": [], "2": [], "3": [], "4": [], OTHER: [] };
     filtered.forEach(closure => {
@@ -125,33 +140,30 @@ export function RightSidebar({
       }
     });
 
-    Object.keys(groups).forEach(key => {
-      groups[key].sort((a, b) => {
-        const aTime = a.start ? a.start.getTime() : 0;
-        const bTime = b.start ? b.start.getTime() : 0;
-        return bTime - aTime; // Newest first
-      });
-    });
-
     let order = ["1", "2", "3", "4", "OTHER"];
     if (homeHall === "1") order = ["1", "2", "3", "4", "OTHER"];
     else if (homeHall === "2") order = ["2", "1", "3", "4", "OTHER"];
     else if (homeHall === "3") order = ["3", "1", "2", "4", "OTHER"];
     else if (homeHall === "4") order = ["4", "1", "2", "3", "OTHER"];
 
-    return order
+    // Hall, then impact (operator 2026-09-17: "group by hall, but maybe we change to display a
+    // subgroup by impact, then dates inside those groups"): Warning, Caution, Info, Unspecified,
+    // empty ones left out, newest start first inside each (groupByBucket).
+    const halls = order
       .map(hallKey => ({
         unit: hallKey,
-        closures: groups[hallKey],
+        count: groups[hallKey].length,
+        buckets: groupByBucket(groups[hallKey]),
         ...GROUP_DEFS[hallKey]
       }))
-      .filter(g => g.closures.length > 0);
+      .filter(g => g.count > 0);
+    return { groupedClosures: halls, bucketCounts: counts };
     // showActiveNow / showNext24h / showNext7d were read by the filter above and missing
     // from this list. Nothing has ever called their setters -- useMapLayerPreferences
     // returns them but no control is wired -- so the values never changed and the stale
     // grouping never showed. Latent, not live, and listed now so that wiring a timeframe
     // toggle is a UI change rather than a UI change plus a silent bug.
-  }, [roadClosures, zones, homeHall, filterNoAccess, filterAccessOnly, filterCaution,
+  }, [roadClosures, zones, homeHall, closureBuckets,
       showActiveNow, showNext24h, showNext7d]);
 
   const isExplore = appMode === "EXPLORE";
@@ -235,6 +247,35 @@ export function RightSidebar({
                </div>
              )}
 
+             {/* Bucket toggles, at the top of the sidebar (operator 2026-09-17: "move and rename the
+                 filtering toggles to inside the road closures side bar, at the top, and let them
+                 filter the list and map"). Buttons with the state in words and the count on each,
+                 sized for a finger; nothing in a tooltip. Hidden with the layer off, like the list. */}
+             {showRoadClosures && (
+               <div className="flex-shrink-0 px-4 pt-3 grid grid-cols-2 gap-2">
+                 {BUCKETS.map((bucket) => {
+                   const on = Boolean(closureBuckets?.[bucket]);
+                   return (
+                     <button
+                       key={bucket}
+                       type="button"
+                       aria-pressed={on}
+                       onClick={() => setClosureBuckets && setClosureBuckets((prev) => ({ ...(prev || DEFAULT_BUCKET_FILTER), [bucket]: !prev?.[bucket] }))}
+                       className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 touch:py-3 font-mono text-[11px] font-bold uppercase tracking-wide cursor-pointer transition ${
+                         on ? `${BUCKET_ON_CLASS[bucket]} bg-slate-950` : 'border-slate-800 bg-slate-900 text-slate-500'
+                       }`}
+                     >
+                       <span className="flex items-center gap-1.5 min-w-0">
+                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${on ? BUCKET_DOT_CLASS[bucket] : 'bg-slate-700'}`}></span>
+                         <span className="truncate">{BUCKET_LABELS[bucket]}</span>
+                       </span>
+                       <span className={on ? '' : 'text-slate-600'}>({bucketCounts[bucket]})</span>
+                     </button>
+                   );
+                 })}
+               </div>
+             )}
+
              {/* Alerts Card List */}
              <div className="p-4 flex-grow overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 {showRoadClosures ? (
@@ -251,13 +292,22 @@ export function RightSidebar({
                                           <span>{collapsedGroups[group.unit] ? "▶" : "▼"}</span>
                                           <span>📍 {group.label}</span>
                                         </span>
-                                        <span className="opacity-75 font-mono">{group.closures.length}</span>
+                                        <span className="opacity-75 font-mono">{group.count}</span>
                                     </div>
                                     
                                     {/* Group Closures */}
                                     {!collapsedGroups[group.unit] && (
                                       <div className="flex flex-col gap-2 pl-1 border-l border-slate-800/40">
-                                        {group.closures.map((closure, idx) => {
+                                        {group.buckets.map((sub) => (
+                                        <div key={sub.bucket} className="flex flex-col gap-2">
+                                          <div className="flex items-center justify-between px-1 pt-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                                            <span className="flex items-center gap-1.5">
+                                              <span className={`w-1.5 h-1.5 rounded-full ${BUCKET_DOT_CLASS[sub.bucket]}`}></span>
+                                              {BUCKET_LABELS[sub.bucket]}
+                                            </span>
+                                            <span className="text-slate-500">{sub.closures.length}</span>
+                                          </div>
+                                        {sub.closures.map((closure, idx) => {
                                           const mapPoint = closureMapPoint(closure);
                                           const access = accessStyle(closure);
                                           const restriction = roadRestriction(closure);
@@ -340,13 +390,15 @@ export function RightSidebar({
                                             </div>
                                           );
                                         })}
+                                        </div>
+                                        ))}
                                       </div>
                                     )}
                                 </div>
                             ))
                         ) : (
                             <div className="text-center py-12 text-slate-650 text-xs italic">
-                               No matching alerts found.
+                               No closures in the buckets switched on.
                             </div>
                         )}
                     </div>

@@ -17,7 +17,7 @@ const REFRESH_MS = 300000; // 5 minutes
  * of the backend's last attempt to sync the feeds (`syncStatus`, punch list #89).
  */
 export function useRoadClosures({
-  filterNoAccess, filterAccessOnly, filterCaution,
+  closureBuckets,
   showActiveNow, showNext24h, showNext7d,
 }) {
   const [roadClosures, setRoadClosures] = useState([]);
@@ -76,8 +76,8 @@ export function useRoadClosures({
   // Closures the map and the alert count actually render, by access severity and by
   // timeframe window.
   const activeClosures = useMemo(() => roadClosures.filter(closure => {
-    // An N/A closure (no severity from the feed, #91) passes every access toggle.
-    if (!passesAccessFilter(closure, { filterNoAccess, filterAccessOnly, filterCaution })) return false;
+    // The same bucket test the sidebar list uses (utils/closureAccess.js), one state for both.
+    if (!passesAccessFilter(closure, closureBuckets)) return false;
 
     const now = new Date();
     const isCurrentlyActive = closure.isActive;
@@ -89,7 +89,7 @@ export function useRoadClosures({
       || (showNext24h && is24hFuture)
       || (showNext7d && is7dFuture);
   }), [
-    roadClosures, filterNoAccess, filterAccessOnly, filterCaution,
+    roadClosures, closureBuckets,
     showActiveNow, showNext24h, showNext7d,
   ]);
 

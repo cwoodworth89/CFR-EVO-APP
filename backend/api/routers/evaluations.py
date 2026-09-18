@@ -4,7 +4,7 @@ Provides Whisper STT Word Error Rate (WER) history, parsing accuracy, and statio
 """
 import logging
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Query, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
@@ -26,10 +26,15 @@ def _num(v):
 
 
 @router.get("/api/evaluations")
-def get_evaluations(db: Session = Depends(get_db)):
-    """Retrieves chronological benchmark evaluation history and WER/CER regression records."""
+def get_evaluations(summary: bool = Query(False), db: Session = Depends(get_db)):
+    """Retrieves chronological benchmark evaluation history and WER/CER regression records.
+
+    `summary=true` leaves out the per-run `metrics` jsonb, most of the response's weight
+    (1.8 MB for 84 rows, measured 2026-09-18); the review dashboard reads only the headline
+    figures. The default response is unchanged (tools/backtest_regression.py posts here).
+    """
     history = db.query(EvaluationHistoryModel).order_by(EvaluationHistoryModel.created_at.asc()).all()
-    return [
+    rows = [
         {
             "id": str(h.id),
             "timestamp": h.created_at.isoformat() if h.created_at else None,
@@ -50,6 +55,10 @@ def get_evaluations(db: Session = Depends(get_db)):
         }
         for h in history
     ]
+    if summary:
+        for r in rows:
+            r.pop("metrics", None)
+    return rows
 
 
 @router.post("/api/evaluations")

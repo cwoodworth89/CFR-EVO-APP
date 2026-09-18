@@ -178,6 +178,21 @@ export const apiClient = {
       return await res.json();
     },
 
+    // List rows for the review table (`summary=true`, 2026-09-18): the full record's shape
+    // without routing_metrics, the second and third transcripts, or the target keys the table
+    // does not read. Each row carries `summary: true`; fetchOne gives the full record.
+    async fetchSummary({ limit = 100, offset = 0 } = {}) {
+      const res = await fetch(`${API_BASE_URL}/api/dispatches?summary=true&limit=${limit}&offset=${offset}`, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    },
+
+    async fetchOne(id) {
+      const res = await fetch(`${API_BASE_URL}/api/dispatches/${encodeURIComponent(id)}`, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      return await res.json();
+    },
+
 
     async create(payload) {
       const res = await fetch(`${API_BASE_URL}/api/dispatches`, {
@@ -210,8 +225,9 @@ export const apiClient = {
   },
 
   evaluations: {
-    async fetchAll() {
-      const res = await fetch(`${API_BASE_URL}/api/evaluations`, { headers: getHeaders() });
+    // `summary: true` leaves out each run's `metrics` jsonb (98% of the response, 2026-09-18).
+    async fetchAll({ summary = false } = {}) {
+      const res = await fetch(`${API_BASE_URL}/api/evaluations${summary ? '?summary=true' : ''}`, { headers: getHeaders() });
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       return await res.json();
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { apiClient, resolveApiUrl } from '../apiClient';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import SystemMetricsPanel from './admin/SystemMetricsPanel';
@@ -8,8 +8,20 @@ import VerificationSidebar from './review/VerificationSidebar';
 import { toTitleCase } from './review/verificationConstants';
 import { getReviewFlags } from '../utils/reviewFlags';
 
+// How many of the newest calls load first and show before "show all" (operator 2026-09-18:
+// "default 100, show all").
+const FIRST_PAGE = 100;
+
 export default function DispatchReview({ onClose, onReviewCall }) {
   const [calls, setCalls] = useState([]);
+  // The table shows the newest FIRST_PAGE matches until the operator asks for all (operator
+  // 2026-09-18). Search and filters always run over every loaded row.
+  const [showAll, setShowAll] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  // A row being opened: its full record is on the way (list rows are summaries).
+  const [openingId, setOpeningId] = useState(null);
+  const [openError, setOpenError] = useState(null);
+  const openSeq = useRef(0);
   const [evalHistory, setEvalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCall, setSelectedCall] = useState(null);
@@ -69,30 +81,57 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const prevAudioUrlRef = useRef(null);
   const formContainerRef = useRef(null);
 
-  // Load calls from local FastAPI gateway
+  // Load calls from local FastAPI gateway.
+  //
+  // 2026-09-18, operator: the dashboard took tens of seconds to load. Measured over his link:
+  // the full list was 2.4 MB (25.5 s) and evaluations 1.8 MB (11.9 s), fetched one after the
+  // other, with the badge and the table waiting on both. Now:
+  //   1. evaluations start at once, lean (no `metrics`), and gate nothing;
+  //   2. the newest FIRST_PAGE summary rows land -> the badge goes green, the table draws;
+  //   3. the rest of the summary rows follow in the background, so search and filters cover
+  //      every call. A row's full record is fetched when it is opened (handleSelectCall).
   const fetchCalls = async () => {
     setLoading(true);
     setDbStatus('checking');
     setDbError(null);
+    apiClient.evaluations.fetchAll({ summary: true })
+      .then((evalData) => setEvalHistory(evalData || []))
+      .catch(() => { /* non-fatal: the metrics tab shows its unknowns */ });
+    let first = [];
     try {
-      const data = await apiClient.dispatches.fetchAll();
-      setCalls(data || []);
-      
-      try {
-        const evalData = await apiClient.evaluations.fetchAll();
-        setEvalHistory(evalData || []);
-      } catch {
-        // non-fatal
-      }
+      first = (await apiClient.dispatches.fetchSummary({ limit: FIRST_PAGE })) || [];
+      setCalls(first);
       setDbStatus('connected');
     } catch (err) {
       console.error('Error fetching dispatches:', err);
       setDbStatus('disconnected');
       setDbError(err.message || String(err));
-    } finally {
       setLoading(false);
+      return;
+    }
+    setLoading(false);
+    if (first.length < FIRST_PAGE) return;
+    setLoadingOlder(true);
+    try {
+      const rest = (await apiClient.dispatches.fetchSummary({ limit: 5000, offset: FIRST_PAGE })) || [];
+      // Keep anything already in the list (an MQTT insert, a row opened meanwhile) as it is.
+      setCalls((prev) => {
+        const have = new Set(prev.map((c) => c.id));
+        return prev.concat(rest.filter((c) => !have.has(c.id)));
+      });
+    } catch (err) {
+      console.error('Error fetching older dispatches:', err);
+    } finally {
+      setLoadingOlder(false);
     }
   };
+
+  // A list row is a summary (`summary: true`); anything that shows or saves a call needs the
+  // full record. Saving from a summary would write its partial `target` back over the stored one.
+  const loadFull = useCallback(async (call) => {
+    if (!call || !call.summary) return call;
+    return apiClient.dispatches.fetchOne(call.dispatch_id || call.id);
+  }, []);
 
   useEffect(() => {
     // 1. Get initial session on mount
@@ -263,8 +302,41 @@ export default function DispatchReview({ onClose, onReviewCall }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCall?.id, selectedCall?.audio_url]);
 
-  const handleSelectCall = (call) => {
-    setSelectedCall(call);
+  // Open a row: fetch its full record, then select it and put it in the list in the summary's
+  // place, so opening it again is immediate. The last row asked for wins.
+  const handleSelectCall = async (call) => {
+    if (!call) return;
+    const seq = ++openSeq.current;
+    setOpenError(null);
+    if (!call.summary) {
+      setOpeningId(null);
+      setSelectedCall(call);
+      return;
+    }
+    setOpeningId(call.id);
+    try {
+      const full = await loadFull(call);
+      if (seq !== openSeq.current) return;
+      setSelectedCall(full);
+      setCalls((prev) => prev.map((c) => (c.id === full.id ? full : c)));
+    } catch (err) {
+      if (seq !== openSeq.current) return;
+      console.error('Error opening dispatch:', err);
+      setOpenError(`Could not open ${call.dispatch_id || call.id}: ${err.message || err}`);
+    } finally {
+      if (seq === openSeq.current) setOpeningId(null);
+    }
+  };
+
+  // Replay needs the whole record too.
+  const handleReviewCall = async (call) => {
+    if (typeof onReviewCall !== 'function') return;
+    try {
+      onReviewCall(await loadFull(call));
+    } catch (err) {
+      console.error('Error opening dispatch for replay:', err);
+      setOpenError(`Could not open ${call?.dispatch_id || call?.id} for replay: ${err.message || err}`);
+    }
   };
 
   const handlePrefillDefaults = () => {
@@ -317,8 +389,9 @@ export default function DispatchReview({ onClose, onReviewCall }) {
     }
   };
 
-  // Filtered calls list based on search query and status/unit/tone filters
-  const filteredCalls = calls.filter((c) => {
+  // Filtered calls list based on search query and status/unit/tone filters. Memoised: with
+  // "show all" it runs over every loaded row, and it ran on every render before.
+  const filteredCalls = useMemo(() => calls.filter((c) => {
     const query = searchQuery.toLowerCase();
     const address = (c.target?.address || c.address || '').toLowerCase();
     const incident = (c.incident_type || '').toLowerCase();
@@ -365,11 +438,20 @@ export default function DispatchReview({ onClose, onReviewCall }) {
     }
 
     return true;
-  });
+  }), [calls, searchQuery, statusFilter, toneFilter, unitFilter]);
+  const visibleCalls = useMemo(
+    () => (showAll ? filteredCalls : filteredCalls.slice(0, FIRST_PAGE)),
+    [filteredCalls, showAll],
+  );
 
   const handleSubmitReview = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!selectedCall) return;
+    // Never save from a summary row: its `target` is partial and the save writes `target`.
+    if (selectedCall.summary) {
+      alert('This call is still loading; try again in a moment.');
+      return;
+    }
 
     setSubmitting(true);
     setSuccessMsg('');
@@ -426,7 +508,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
       const nextCall = (currentIndex >= 0 && currentIndex + 1 < filteredCalls.length) ? filteredCalls[currentIndex + 1] : null;
 
       if (nextCall) {
-        setSelectedCall(nextCall);
+        handleSelectCall(nextCall);
         if (formContainerRef.current) {
           formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -666,7 +748,13 @@ export default function DispatchReview({ onClose, onReviewCall }) {
         <div className="flex-grow flex gap-5 min-h-0 w-full overflow-hidden">
           <ReviewTable
             calls={calls}
-            filteredCalls={filteredCalls}
+            filteredCalls={visibleCalls}
+            totalMatches={filteredCalls.length}
+            showAll={showAll}
+            onShowAll={setShowAll}
+            loadingOlder={loadingOlder}
+            openingId={openingId}
+            openError={openError}
             selectedCall={selectedCall}
             onSelectCall={handleSelectCall}
             searchQuery={searchQuery}
@@ -681,7 +769,7 @@ export default function DispatchReview({ onClose, onReviewCall }) {
             dbStatus={dbStatus}
             dbError={dbError}
             onRetryFetch={fetchCalls}
-            onReviewCall={onReviewCall}
+            onReviewCall={handleReviewCall}
             onDeleteCall={handleDeleteCall}
           />
 

@@ -66,15 +66,73 @@ def serialize_call(call: LiveCallModel) -> dict:
     }
 
 
+# The `target` keys a list row carries in summary mode: what the review table, its filters and
+# its open-flag count read (frontend ReviewTable.jsx, DispatchReview.jsx filteredCalls,
+# utils/reviewFlags.js, review/reviewFormat.js getCallTones). Everything else in `target` --
+# rings, candidates, segment, routing_metrics, notes -- comes with the full record, fetched from
+# GET /api/dispatches/{id} when a row is selected.
+SUMMARY_TARGET_KEYS = ("address", "map_coords_accurate", "tone_name", "review_flags",
+                       "review_flag_count", "is_test")
+
+
+def serialize_call_summary(call: LiveCallModel) -> dict:
+    """A list row for the review table: the full record's shape, lighter.
+
+    Operator 2026-09-18: the review dashboard took tens of seconds to load. Measured over the
+    operator's link the full list was 2.4 MB for 693 rows (target 781 kB, routing_metrics
+    320 kB, three transcripts 454 kB in the database). Summary mode drops routing_metrics, the
+    sanitized and verified transcripts, origins, created_at (a copy of timestamp), audio_url and
+    audio_duration, and every `target` key the table does not read.
+    raw_transcript stays: the review search matches it. `summary: True` marks the row so the
+    client never saves a review from it -- the save writes `target` back, and a partial target
+    would overwrite the stored one.
+    """
+    target = call.target if isinstance(call.target, dict) else {}
+    row = {
+        "summary": True,
+        "id": call.id,
+        "dispatch_id": call.dispatch_id,
+        "timestamp": call.timestamp.isoformat() if call.timestamp else None,
+        "incident_type": call.incident_type,
+        "responding_units": call.responding_units or [],
+        "target": {k: target[k] for k in SUMMARY_TARGET_KEYS if k in target},
+        "feedback_submitted": call.feedback_submitted,
+    }
+    # Optional fields are sent only when they hold something: a missing key reads as null to
+    # every reader of a list row (`call.x ?? call.target?.x`, `x && x.length`), and across 693
+    # rows the key names of empty fields were a third of the summary's weight.
+    optional = {
+        "raw_transcript": call.raw_transcript,
+        "verified_address": call.verified_address,
+        "verified_incident": call.verified_incident,
+        "verified_units": call.verified_units or None,
+        "verified_map_grid": call.verified_map_grid,
+        "verified_talkgroup": call.verified_talkgroup,
+        "verified_response_type": call.verified_response_type,
+        "verified_x_street_1": call.verified_x_street_1,
+        "verified_x_street_2": call.verified_x_street_2,
+        "quality_rating": call.quality_rating,
+        "model_updated": call.model_updated,
+    }
+    row.update({k: v for k, v in optional.items() if v not in (None, "", [])})
+    return row
+
+
 @router.get("")
 def get_dispatches(
     limit: int = Query(500, ge=1, le=5000),
     offset: int = Query(0, ge=0),
+    summary: bool = Query(False),
     db: Session = Depends(get_db)
 ):
-    """Retrieves paginated dispatch records ordered by newest first."""
+    """Retrieves paginated dispatch records ordered by newest first.
+
+    `summary=true` returns list rows (serialize_call_summary) for the review table; the default
+    response is the full record, unchanged for every other caller.
+    """
     calls = db.query(LiveCallModel).order_by(desc(LiveCallModel.timestamp)).offset(offset).limit(limit).all()
-    return [serialize_call(c) for c in calls]
+    serialize = serialize_call_summary if summary else serialize_call
+    return [serialize(c) for c in calls]
 
 
 @router.post("")

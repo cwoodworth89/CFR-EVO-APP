@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { formatTimestampPT, getCallTones } from './reviewFormat';
 import { getReviewFlags, flagLabel } from '../../utils/reviewFlags';
 
@@ -43,6 +43,13 @@ function SystemVsVerified({ system, verified, submitted, className = '' }) {
 
 export default function ReviewTable({
   filteredCalls = [],
+  // Everything matching the search and filters; filteredCalls is the part drawn.
+  totalMatches = null,
+  showAll = false,
+  onShowAll = null,
+  loadingOlder = false,
+  openingId = null,
+  openError = null,
   selectedCall,
   onSelectCall,
   searchQuery,
@@ -60,12 +67,25 @@ export default function ReviewTable({
   onReviewCall,
   onDeleteCall,
 }) {
+  // Tones and open flags once per row per list, not on every render of every row.
+  const rowMeta = useMemo(
+    () => new Map(filteredCalls.map((c) => [c, { tones: getCallTones(c), flags: getReviewFlags(c) }])),
+    [filteredCalls],
+  );
+  const matches = totalMatches ?? filteredCalls.length;
+  const hidden = Math.max(0, matches - filteredCalls.length);
   return (
     <div className="flex-grow flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden">
+      {openError && (
+        <div className="mb-3 flex-shrink-0 rounded-lg border border-rose-700/60 bg-rose-950/40 px-3 py-2 text-xs font-mono text-rose-200">
+          {openError}
+        </div>
+      )}
       {/* Search and Header */}
       <div className="flex justify-between items-center gap-4 mb-4 flex-shrink-0">
         <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-300">
-          Captured Dispatches ({filteredCalls.length})
+          Captured Dispatches ({filteredCalls.length === matches ? matches : `${filteredCalls.length} of ${matches}`})
+          {loadingOlder && <span className="ml-2 text-[10px] font-mono normal-case text-slate-500">loading older calls…</span>}
         </h2>
         <input
           type="text"
@@ -181,8 +201,10 @@ export default function ReviewTable({
               </thead>
               <tbody>
                 {filteredCalls.map((call) => {
-                  const isSelected = selectedCall?.id === call.id || (selectedCall?.dispatch_id && selectedCall.dispatch_id === call.dispatch_id);
-                  const rowTones = getCallTones(call);
+                  const isOpening = openingId != null && openingId === call.id;
+                  const isSelected = isOpening || selectedCall?.id === call.id || (selectedCall?.dispatch_id && selectedCall.dispatch_id === call.dispatch_id);
+                  const meta = rowMeta.get(call);
+                  const rowTones = meta ? meta.tones : getCallTones(call);
                   return (
                     <tr
                       key={call.id || call.dispatch_id}
@@ -236,7 +258,7 @@ export default function ReviewTable({
                             percentage, which blended address correctness with metadata
                             completeness and threw away which was which (#45). */}
                         {(() => {
-                          const flags = getReviewFlags(call);
+                          const flags = meta ? meta.flags : getReviewFlags(call);
                           if (flags.length === 0) {
                             return <span className="text-emerald-400 font-mono text-[11px] font-bold">✓ 0</span>;
                           }
@@ -334,6 +356,33 @@ export default function ReviewTable({
                 })}
               </tbody>
             </table>
+            {/* Newest FIRST_PAGE by default; the rest on request (operator 2026-09-18). Search
+                and filters already cover every loaded call, so this only draws more rows. */}
+            {(hidden > 0 || (showAll && onShowAll && matches > filteredCalls.length)) && (
+              <div className="flex items-center justify-center gap-3 py-3 text-xs font-mono text-slate-400">
+                <span>Showing {filteredCalls.length} of {matches}{loadingOlder ? ' (older calls still loading)' : ''}</span>
+                {onShowAll && (
+                  <button
+                    type="button"
+                    onClick={() => onShowAll(true)}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 touch:py-2.5 font-bold uppercase tracking-wide text-slate-200 hover:border-slate-500 cursor-pointer"
+                  >
+                    Show all {matches}
+                  </button>
+                )}
+              </div>
+            )}
+            {showAll && onShowAll && hidden === 0 && matches > 100 && (
+              <div className="flex justify-center py-3">
+                <button
+                  type="button"
+                  onClick={() => onShowAll(false)}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 touch:py-2.5 font-mono text-xs font-bold uppercase tracking-wide text-slate-300 hover:border-slate-500 cursor-pointer"
+                >
+                  Show newest 100
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

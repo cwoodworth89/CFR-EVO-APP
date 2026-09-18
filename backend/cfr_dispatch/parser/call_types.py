@@ -139,6 +139,53 @@ def _name_the_qualifier(matched: str, norm_transcript: str, call_types: List[str
     return best[2]
 
 
+def split_incident_type(segment: str, call_types: List[str], aliases: dict = None):
+    """The call type at the head of a sanitised "<incident> <address>" segment, and the
+    segment with the call type's words taken out: (canonical term, remainder), or
+    (None, segment) when no call type appears verbatim.
+
+    One decision, made once. parser/announcement.py isolated the address with a substring
+    loop of its own over CALL_TYPES -- canonical spellings only, no aliases, no qualifier
+    naming -- while the call type on the record came from match_incident_type below, which
+    has both. They disagreed on where the call type ends whenever the heard qualifier was
+    not verbatim in CALL_TYPES: "wildland fire smoldering david avenue and genest way" gave
+    the record "Wildland Fire - Smouldering" through the alias and the address "Smoldering
+    David Avenue And Genest Way", which public.intersections cannot answer, so the kiosk
+    showed LOCATION UNRESOLVED (DISP-2026-A018E9, 2026-09-18 21:09Z). A house number hides
+    the defect, because announcement.py strips everything before the first digits; only an
+    intersection address is exposed, and DISP-2026-FC1B29 had lost one the same way.
+
+    The words taken are exactly the ones the matcher attributed to the call type: the
+    candidate that appears verbatim (canonical or alias, longest first, as in
+    match_incident_type), plus the heard window _name_the_qualifier named a qualifier from.
+    Whole words, first occurrence: the old loop's substring `replace` found "assist" inside
+    "assistance" and removed every occurrence in the segment.
+    """
+    if aliases is None:
+        aliases = CALL_TYPE_ALIASES
+    norm = " ".join(re.sub(r'\s*-\s*', ' ', (segment or "").lower()).split())
+    words = norm.split()
+
+    candidates = [(ct, ct) for ct in call_types]
+    candidates += [(alias, canon) for alias, canon in aliases.items()]
+    candidates.sort(key=lambda pair: len(pair[0]), reverse=True)
+
+    for match_text, canonical in candidates:
+        cand = re.sub(r'\s*-\s*', ' ', match_text.lower()).split()
+        n = len(cand)
+        start = next((i for i in range(len(words) - n + 1) if words[i:i + n] == cand), -1)
+        if start < 0:
+            continue
+        end = start + n
+        # The qualifier is named from the words after this occurrence, as match_incident_type
+        # names it, and its window goes with the category.
+        named = _name_the_qualifier(canonical, " ".join(words[start:]), call_types)
+        if named != canonical:
+            end += len(re.sub(r'\s*-\s*', ' ', named[len(canonical) + 3:]).split())
+        return named, " ".join(words[:start] + words[end:])
+    return None, norm
+
+
 def match_incident_type(transcript: str, call_types: List[str], aliases: dict = None,
                         units_vocabulary=None) -> str:
     """Matches transcript text to incident/call types using exact substring or fuzzy matching.

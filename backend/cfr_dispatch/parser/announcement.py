@@ -18,7 +18,7 @@ from cfr_dispatch.config import (
 )
 
 from .sanitize import sanitize_transcript
-from .call_types import CALL_TYPES, match_incident_type
+from .call_types import CALL_TYPES, match_incident_type, split_incident_type
 from .channels import match_radio_channel
 from .location import (
     normalize_street_suffix,
@@ -69,19 +69,16 @@ def parse_dispatch_announcement(announcement_text: str, units_vocab: List[str]) 
                 
             call_type_and_address_segment = remainder[:address_end_idx].strip()
             
-            # Match Call Type within the segment to isolate the Address
-            matched_call_type = None
-            address_part = call_type_and_address_segment
-            
-            # Sort call types by length descending to match longest phrases first
-            for ct in CALL_TYPES:
-                ct_clean = sanitize_transcript(ct)
-                if ct_clean in call_type_and_address_segment:
-                    matched_call_type = ct
-                    address_part = call_type_and_address_segment.replace(ct_clean, "").strip()
-                    break
-            else:
-                # If call type didn't match exactly, isolate address by finding the first digits (house number)
+            # The call type and where it ends are one decision, made in call_types.py with
+            # the same candidates (canonical terms and recognition aliases) and the same
+            # qualifier naming that give the record its call type. The substring loop this
+            # replaces ran over CALL_TYPES alone, stopped at "wildland fire" when the STT
+            # wrote "smoldering", and left the qualifier at the head of the address:
+            # "Smoldering David Avenue And Genest Way", LOCATION UNRESOLVED on the kiosk
+            # (DISP-2026-A018E9, 2026-09-18).
+            matched_call_type, address_part = split_incident_type(call_type_and_address_segment, CALL_TYPES)
+            if matched_call_type is None:
+                # No call type appears verbatim: isolate the address by the first digits (house number)
                 digit_match = re.search(r'\b\d+\b', call_type_and_address_segment)
                 if digit_match:
                     address_part = call_type_and_address_segment[digit_match.start():].strip()

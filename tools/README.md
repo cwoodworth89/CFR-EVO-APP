@@ -78,6 +78,7 @@ Reach for these while debugging something specific.
 |:--|:--|
 | `inspect_dispatch.py` | Dumps one dispatch record by id as JSON. Run on the host with the project venv; refuses to run without a Postgres `DATABASE_URL` (the API's own SQLite fallback was removed in #61; the check stays for a clearer message). Rewritten 2026-09-04: the original imported a module that never existed and had never run. |
 | `clean_old_dispatches.py` | Lists old dispatches for review. **Deletion requires manual confirmation.** |
+| `reparse_dispatch.py` | Re-runs one stored dispatch's `raw_transcript` through the worker's phase-2 parse and target resolution and re-records it on the same row: `sanitized_transcript`, `incident_type`, `responding_units`, `target`, nothing else, old values kept under `target.reparsed_from`. Never publishes to MQTT or ntfy, never creates a row, refuses when the re-parse places no location. `--dry-run` first. Runs on the kiosk in the agent's venv from `backend/`. Built for DISP-2026-A018E9 after f91bdedd (2026-09-18). |
 | `update_streetview.py` | Refreshes Street View heading/pitch/fov for parcels. |
 
 ## Audio and DSP analysis

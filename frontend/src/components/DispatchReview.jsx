@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { apiClient, resolveApiUrl } from '../apiClient';
+import { listenerView, LISTENER } from '../utils/listenerStatus';
 import { useDispatchListener } from '../hooks/useDispatchListener';
 import SystemMetricsPanel from './admin/SystemMetricsPanel';
 import ReviewTable from './review/ReviewTable';
@@ -32,8 +33,10 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const [dbError, setDbError] = useState(null);
 
   // RF Listener status state
-  const [listenerStatus, setListenerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
-  const [listenerDetails, setListenerDetails] = useState(null);
+  // The listener as the api reports it (utils/listenerStatus.js): checking | capturing | online |
+  // offline, with the dispatch id, device, engine and message. Capturing is the signal the operator
+  // reads before restarting the agent by hand (81f308ac: "a restart now loses the call").
+  const [listener, setListener] = useState(() => listenerView(null));
   const [activeTab, setActiveTab] = useState('review'); // 'review' | 'metrics'
 
   // Auth session states
@@ -154,11 +157,9 @@ export default function DispatchReview({ onClose, onReviewCall }) {
   const checkListenerStatus = async () => {
     try {
       const data = await apiClient.listener.fetchStatus();
-      setListenerStatus(data.status === 'online' ? 'online' : 'offline');
-      setListenerDetails(data);
+      setListener(listenerView(data));
     } catch (e) {
-      setListenerStatus('offline');
-      setListenerDetails({ message: e.message || 'Listener status unreachable' });
+      setListener(listenerView(null, e.message || 'Listener status unreachable'));
     }
   };
 
@@ -663,28 +664,46 @@ export default function DispatchReview({ onClose, onReviewCall }) {
                 DB Error
               </span>
             )}
-            {listenerStatus === 'online' && (
-              <span 
-                className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250 cursor-help"
-                title={`RF Listener Online | Device: ${listenerDetails?.device || 'Default'} | Engine: ${listenerDetails?.stt_engine || 'Whisper'}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 motion-safe:animate-pulse"></span>
-                📡 LISTENER ONLINE
+            {/* The listener, in words on the page -- no tooltip (81f308ac; hover-only is ruled out).
+                CAPTURING is filled amber and heavy so it cannot be missed: a restart now loses
+                the call and its audio. */}
+            {listener.state === LISTENER.CAPTURING && (
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-slate-950 bg-amber-400 border-2 border-amber-200 px-2.5 py-1 rounded-full font-mono font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-amber-500/30">
+                  <span className="h-2 w-2 rounded-full bg-red-600 motion-safe:animate-pulse"></span>
+                  📡 CAPTURING{listener.dispatchId ? ` ${listener.dispatchId}` : ''}
+                </span>
+                <span className="text-[11px] text-amber-300 font-mono font-bold normal-case tracking-normal">
+                  {listener.message}
+                </span>
               </span>
             )}
-            {listenerStatus === 'checking' && (
+            {listener.state === LISTENER.ONLINE && (
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in fade-in duration-250">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                  📡 LISTENER ONLINE
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono normal-case tracking-normal">
+                  Device: {listener.device} · Engine: {listener.engine}
+                </span>
+              </span>
+            )}
+            {listener.state === LISTENER.CHECKING && (
               <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-sky-400 motion-safe:animate-ping"></span>
                 📡 CHECKING LISTENER...
               </span>
             )}
-            {listenerStatus === 'offline' && (
-              <span 
-                className="text-[10px] text-rose-400 bg-rose-500/15 border border-rose-500/40 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300 shadow-sm cursor-help"
-                title={listenerDetails?.message || 'RF Listener offline or process died!'}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 motion-safe:animate-ping"></span>
-                ⚠️ LISTENER OFFLINE
+            {listener.state === LISTENER.OFFLINE && (
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-rose-400 bg-rose-500/15 border border-rose-500/40 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 animate-in shake duration-300 shadow-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 motion-safe:animate-ping"></span>
+                  ⚠️ LISTENER OFFLINE
+                </span>
+                {listener.message && (
+                  <span className="text-[10px] text-rose-300 font-mono normal-case tracking-normal">{listener.message}</span>
+                )}
               </span>
             )}
           </h1>

@@ -135,11 +135,50 @@ def get_dispatches(
     return [serialize(c) for c in calls]
 
 
+def _fold_is_test(data: dict, existing: Optional[LiveCallModel] = None) -> None:
+    """Move a top-level `is_test` from the request body into `target`, in place.
+
+    `is_test` marks a genuine pipeline test dispatch (CLAUDE.md 6.5). It lands in `target`
+    rather than in a column of its own because every reader already looks there:
+    SUMMARY_TARGET_KEYS above names it, so a summary list row carries it, and
+    frontend/src/utils/dispatchModel.js:122 reads `record.is_test ?? target.is_test`. Both
+    served shapes therefore carry it with no change to either serialiser and no migration.
+
+    It is folded here, at the API boundary, rather than written into `target` by the
+    producer, because phase 2's correction replaces `target` wholesale
+    (cfr_dispatch/pipeline/payload_builder.py:509) -- a value the producer put inside
+    `target` would be erased by the correction that follows it. Folding on the way in means
+    every write that names the flag sets it, whichever `target` it arrives with.
+
+    Absent means absent. With exclude_unset, a request that sent no `is_test` -- every
+    caller other than the pipeline -- leaves `target` untouched, and an explicit null
+    writes nothing either. A row never acquires a fabricated False (CLAUDE.md 6.1).
+    """
+    if "is_test" not in data:
+        return
+    flag = data.pop("is_test")   # popped either way: there is no is_test column to set
+    if flag is None:
+        return
+
+    target = data.get("target")
+    if isinstance(target, dict):
+        target = dict(target)
+    elif existing is not None and isinstance(existing.target, dict):
+        # No target in this request: merge into the stored one. A new dict, not a mutation
+        # -- SQLAlchemy does not track in-place changes to a JSON column.
+        target = dict(existing.target)
+    else:
+        target = {}
+    target["is_test"] = bool(flag)
+    data["target"] = target
+
+
 @router.post("")
 def create_or_upsert_dispatch(payload: DispatchCreateSchema, db: Session = Depends(get_db)):
     """Creates a new dispatch record or updates an existing record by dispatch_id, broadcasting via MQTT."""
     existing = db.query(LiveCallModel).filter(LiveCallModel.dispatch_id == payload.dispatch_id).first()
     data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    _fold_is_test(data, existing)
 
     if existing:
         for key, val in data.items():
@@ -229,6 +268,7 @@ def update_dispatch(dispatch_id: str, payload: DispatchUpdateSchema, db: Session
         raise HTTPException(status_code=404, detail="Dispatch record not found")
 
     data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    _fold_is_test(data, call)
     for key, val in data.items():
         setattr(call, key, val)
 

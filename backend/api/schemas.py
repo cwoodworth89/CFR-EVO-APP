@@ -23,6 +23,15 @@ class DispatchCreateSchema(BaseModel):
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
     verify_location: Optional[bool] = False
+    # Marks a genuine pipeline test dispatch (CLAUDE.md 6.5). The pipeline has sent it at
+    # the top level since the flag existed (cfr_dispatch/pipeline/payload_builder.py:496),
+    # but there was no field here, so Pydantic dropped it silently and 0 of 700 stored rows
+    # carried it -- no corpus figure could exclude a test call. There is no is_test column:
+    # _fold_is_test() in routers/dispatches.py moves it into `target`.
+    #
+    # Default None, not False: with exclude_unset a request that sent nothing writes
+    # nothing, so a row never acquires a fabricated False (CLAUDE.md 6.1).
+    is_test: Optional[bool] = None
     origins: Optional[List[str]] = []
     audio_url: Optional[str] = None
     audio_duration: Optional[float] = None
@@ -70,6 +79,11 @@ class DispatchUpdateSchema(BaseModel):
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
     verify_location: Optional[bool] = None
+    # See DispatchCreateSchema.is_test. Needed on the UPDATE side too because phase 2's
+    # correction branch replaces `target` wholesale (pipeline/payload_builder.py:509,
+    # phase2.py:527): without this the flag phase 1 wrote would be erased by the very
+    # correction that follows it. Phase 2 already sends it (phase2.py:520, 557, 572).
+    is_test: Optional[bool] = None
     origins: Optional[List[str]] = None
     audio_url: Optional[str] = None
     audio_duration: Optional[float] = None

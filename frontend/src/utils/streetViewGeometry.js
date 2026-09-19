@@ -57,6 +57,9 @@ export const bearingDegrees = (fromLat, fromLng, toLat, toLng) => {
 };
 
 const isCoord = (lat, lng) => {
+  // null, undefined and '' are missing, not zero: Number(null) is 0, so a row with a null
+  // latitude and a real longitude used to pass as latitude 0 (found 2026-09-19; CLAUDE.md 6.1).
+  if (lat == null || lng == null || lat === '' || lng === '') return false;
   const a = Number(lat);
   const b = Number(lng);
   return Number.isFinite(a) && Number.isFinite(b) && !(a === 0 && b === 0);
@@ -302,4 +305,61 @@ export const embedStreetViewUrl = (view, apiKey) => {
   const heading = Number.isFinite(view.heading) ? `&heading=${Math.round(view.heading)}` : '';
   return `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${view.lat},${view.lng}`
     + `${heading}&pitch=${Math.round(view.pitch)}`;
+};
+
+// ---------------------------------------------------------------------------------------
+// A saved view whose panorama id Google has re-issued (backlog, operator-approved 2026-09-19).
+//
+// Google, "Street View Image Metadata": "Panoramas may change IDs over time, so don't persist
+// this ID"; the Maps JavaScript reference calls StreetViewLocation.pano "stable within a session
+// but unstable across sessions". A saved view stores pano_id beside the camera's own position
+// (public.parcels.streetview_lat/lng, written from the live panorama's getPosition), so the
+// position is the durable part and the id a hint.
+//
+// Order, cheapest first: the tile asks for the image by the stored id as it always has -- no
+// extra request while the id is valid. Only if that image fails does the panel ask the metadata
+// endpoint for the panorama at the saved position, and request the image by the id it returns,
+// with the saved heading, pitch and fov unchanged. One extra metadata request (free, no quota),
+// only in the re-issued case.
+
+/** Search radius around the saved position when the stored id no longer resolves. Google states
+ *  on the metadata page that "the panorama imagery is accurate to 50 meters"; the saved position
+ *  is a panorama's own position, so a re-issued panorama at the same spot is within that. Wider
+ *  would start to reach panoramas on other streets, which the 100 m unsaved search accepts
+ *  because it has no better point to start from. */
+export const SAVED_RERESOLVE_RADIUS_M = 50;
+
+/** Whether a failed saved-view image should be retried by position: a saved view with an id and
+ *  a position, online, with a key, and not already retried for this view. */
+export const shouldReResolveSaved = ({ savedView, isOnline, apiKey, alreadyTried }) =>
+  Boolean(savedView && savedView.panoId && isCoord(savedView.lat, savedView.lng) && isOnline && apiKey && !alreadyTried);
+
+/** The metadata request for a saved view's own position. */
+export const savedViewMetadataUrl = (savedView, apiKey) => {
+  if (!savedView || !apiKey || !isCoord(savedView.lat, savedView.lng)) return '';
+  return `https://maps.googleapis.com/maps/api/streetview/metadata?location=${savedView.lat},${savedView.lng}`
+    + `&radius=${SAVED_RERESOLVE_RADIUS_M}&source=outdoor&key=${apiKey}`;
+};
+
+/**
+ * What a saved view becomes after the metadata answer for its position:
+ *   'moved'      -> a different panorama is there now: the view with that id and its position,
+ *                   the saved heading, pitch and fov untouched;
+ *   'same'       -> the stored id is still the one there, so the image failed for another
+ *                   reason: fall back to the interactive view as before;
+ *   'none'       -> ZERO_RESULTS: no imagery at the saved position any more;
+ *   'unresolved' -> any other answer or a failed fetch: fall back to the interactive view.
+ * The saved row in the database is not touched; saving again from Expand records the new id.
+ */
+export const resolveSavedRetry = (savedView, meta) => {
+  if (!savedView) return { outcome: 'unresolved', view: null };
+  if (meta?.status === 'ZERO_RESULTS') return { outcome: 'none', view: null };
+  const lat = meta?.location?.lat;
+  const lng = meta?.location?.lng;
+  if (meta?.status !== 'OK' || !meta.pano_id || !isCoord(lat, lng)) return { outcome: 'unresolved', view: null };
+  if (String(meta.pano_id) === String(savedView.panoId)) return { outcome: 'same', view: null };
+  return {
+    outcome: 'moved',
+    view: { ...savedView, lat: Number(lat), lng: Number(lng), panoId: String(meta.pano_id) },
+  };
 };

@@ -7,6 +7,7 @@ import { apiClient } from '../../apiClient';
 import {
   savedViewFromParcel, defaultViewForCall, staticStreetViewUrl, embedStreetViewUrl,
   streetViewMetadataUrl, resolveStreetView,
+  shouldReResolveSaved, savedViewMetadataUrl, resolveSavedRetry,
 } from '../../utils/streetViewGeometry';
 import TileFrame from './TileFrame';
 
@@ -57,6 +58,9 @@ export default function StreetViewPanel({ activeCall }) {
   const [lookupFailed, setLookupFailed] = useState(false);
   const [lookupSettled, setLookupSettled] = useState(false);   // the saved-view lookup has answered
   const [staticFailed, setStaticFailed] = useState(false);
+  // A saved view's image failing is retried once by the saved position (the stored pano id may
+  // have been re-issued by Google): { key, pending } while asking, then { key, outcome, view }.
+  const [savedRetry, setSavedRetry] = useState(null);
   // The metadata answer for the current camera point: { key, status, pano_id, location } or
   // { key, status: 'FETCH_FAILED' }. Keyed so an answer never applies to a different call.
   const [panoMeta, setPanoMeta] = useState(null);
@@ -71,6 +75,7 @@ export default function StreetViewPanel({ activeCall }) {
     setLookupSettled(false);
     setPanoMeta(null);
     setStaticFailed(false);
+    setSavedRetry(null);
     setSaveStatus(null);
     setIsExpanded(false);
   }
@@ -137,14 +142,21 @@ export default function StreetViewPanel({ activeCall }) {
   // Which picture: saved, metadata, no imagery, fallback, or not aimed (#93). Memoised: the
   // panel re-renders every second on a live call, and an unmemoised resolution gave the
   // panorama hook a new view object each time.
+  // The saved view as it will be shown: the stored one, or -- once a failed image has been
+  // re-resolved by position to a different panorama -- that panorama, with the saved heading,
+  // pitch and fov unchanged. Saved views still always win (resolveStreetView's first branch).
+  const savedKey = savedView ? `${savedView.panoId}|${savedView.lat},${savedView.lng}` : '';
+  const retryForView = savedRetry && savedRetry.key === savedKey ? savedRetry : null;
+  const shownSavedView = retryForView?.outcome === 'moved' ? retryForView.view : savedView;
+
   const resolution = useMemo(() => {
     const metaForView = !apiKey ? { status: 'NO_KEY' } : (panoMeta?.key === metaKey ? panoMeta : null);
     return resolveStreetView({
-      savedView,
+      savedView: shownSavedView,
       defaultView,
       meta: (lookupSettled || !cleanAddrKey) ? metaForView : null,
     });
-  }, [apiKey, panoMeta, metaKey, savedView, defaultView, lookupSettled, cleanAddrKey]);
+  }, [apiKey, panoMeta, metaKey, shownSavedView, defaultView, lookupSettled, cleanAddrKey]);
   const tileHasPicture = resolution.kind === 'saved' || resolution.kind === 'metadata' || resolution.kind === 'fallback';
 
   // No direction to face is said on the tile, and loudly here: it used to be a silent 0.
@@ -162,9 +174,38 @@ export default function StreetViewPanel({ activeCall }) {
   // When the panorama may be re-aimed: a different call (address or point), or a saved view
   // arriving or changing. Nothing else -- not a re-render, not the metadata answering while
   // the expanded view is open (its own search has already placed the camera).
-  const viewKey = `${cleanAddrKey}|${metaKey}|${savedView ? `saved:${savedView.panoId}:${savedView.heading}:${savedView.pitch}:${savedView.fov}` : 'unsaved'}`;
+  // A re-resolved saved view counts as the saved view changing: one re-apply, then the SDK owns it.
+  const viewKey = `${cleanAddrKey}|${metaKey}|${shownSavedView ? `saved:${shownSavedView.panoId}:${shownSavedView.heading}:${shownSavedView.pitch}:${shownSavedView.fov}` : 'unsaved'}`;
 
-  const staticUrl = tileHasPicture ? staticStreetViewUrl(resolution.view, apiKey) : '';
+  // The tile's image failed. For a saved view with a stored pano id, ask once where the panorama
+  // at the saved position is now before giving up on the static tile (resolveSavedRetry); every
+  // other failure, and a retry that finds the same id or cannot answer, goes to the interactive
+  // view exactly as before.
+  const onStaticError = () => {
+    if (resolution.kind === 'saved' && !retryForView
+        && shouldReResolveSaved({ savedView, isOnline, apiKey, alreadyTried: false })) {
+      const key = savedKey;
+      setSavedRetry({ key, pending: true });
+      fetch(savedViewMetadataUrl(savedView, apiKey))
+        .then((res) => res.json())
+        .catch(() => ({ status: 'FETCH_FAILED' }))
+        .then((meta) => {
+          const r = resolveSavedRetry(savedView, meta);
+          if (r.outcome !== 'moved') {
+            console.error('Street View: the saved view\'s image failed and its position gave', meta?.status,
+              r.outcome === 'same' ? '(same panorama id)' : '', '- falling back to the interactive view.');
+          }
+          setSavedRetry((prev) => (prev && prev.key === key ? { key, outcome: r.outcome, view: r.view } : prev));
+          if (r.outcome === 'same' || r.outcome === 'unresolved') setStaticFailed(true);
+        });
+      return;
+    }
+    setStaticFailed(true);
+  };
+  const savedNoImagery = retryForView?.outcome === 'none';
+  const savedRetrying = Boolean(retryForView?.pending);
+
+  const staticUrl = tileHasPicture && !savedNoImagery && !savedRetrying ? staticStreetViewUrl(resolution.view, apiKey) : '';
   const useStaticTile = Boolean(staticUrl) && !staticFailed;
 
   const tileContainerRef = useRef(null);
@@ -220,17 +261,17 @@ export default function StreetViewPanel({ activeCall }) {
   const renderContent = (isModal) => {
     const showStatic = !isModal && useStaticTile;
     // The tile shows nothing of Google's until the chain has a picture for it (#93).
-    const tileWaiting = !isModal && !tileHasPicture;
+    const tileWaiting = !isModal && (!tileHasPicture || savedRetrying || savedNoImagery);
     const showEmbed = !tileWaiting && !showStatic && (sdkDown || !apiKey);
     return (
       <div className="w-full h-full relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
-        {tileWaiting && resolution.kind === 'resolving' && (
+        {tileWaiting && (resolution.kind === 'resolving' || savedRetrying) && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
             <div className="text-indigo-300 text-xs font-mono font-bold tracking-wider motion-safe:animate-pulse">Finding the nearest panorama…</div>
           </div>
         )}
-        {tileWaiting && resolution.kind === 'no-imagery' && (
+        {tileWaiting && (resolution.kind === 'no-imagery' || savedNoImagery) && (
           <div className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
             <p className="text-slate-200 text-sm font-mono font-bold">No Street View available</p>
             <span className="text-[10px] text-slate-500 font-mono">Google has no imagery near this location</span>
@@ -247,7 +288,7 @@ export default function StreetViewPanel({ activeCall }) {
             src={staticUrl}
             alt={`Street View of ${activeCall?.address || 'the target'}`}
             className="w-full h-full object-cover"
-            onError={() => setStaticFailed(true)}
+            onError={onStaticError}
           />
         )}
         {/* A static miss is not a failure the crew needs to read about: the interactive view

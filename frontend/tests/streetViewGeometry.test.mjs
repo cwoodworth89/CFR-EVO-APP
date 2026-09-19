@@ -5,6 +5,7 @@ import {
   fovToZoom, zoomToFov, clampStaticFov, bearingDegrees, savedViewFromParcel, defaultViewForCall,
   viewsMatch, staticStreetViewUrl, STATIC_FOV_MAX, DEFAULT_FOV,
   lotCentre, aimPointForCall, headingToAim, streetViewMetadataUrl, viewFromMetadata, resolveStreetView,
+  shouldReResolveSaved, savedViewMetadataUrl, resolveSavedRetry, SAVED_RERESOLVE_RADIUS_M,
 } from '../src/utils/streetViewGeometry.js';
 
 test('fov and zoom round-trip at full precision, zoom 0 included', () => {
@@ -197,4 +198,56 @@ test('a saved view comes from the camera position, never from the frontage', () 
   });
   assert.equal(both.lat, 49.2705);
   assert.equal(both.lng, -122.7905);
+});
+
+// A saved view whose pano id Google may have re-issued (backlog, 2026-09-19).
+const SAVED = { lat: 49.2801, lng: -122.8003, heading: 214, pitch: 13, fov: 127.31, panoId: 'OLD_ID' };
+
+test('saved view, id still valid: the image goes by the stored id and no metadata is asked', () => {
+  assert.match(staticStreetViewUrl(SAVED, 'KEY'), /pano=OLD_ID&heading=214&pitch=13&fov=120/);
+  // A retry is only for a failed image; with the image loading, nothing asks.
+  assert.equal(resolveSavedRetry(SAVED, { status: 'OK', pano_id: 'OLD_ID', location: { lat: 49.2801, lng: -122.8003 } }).outcome, 'same');
+});
+
+test('saved view, id re-issued: resolved by position, saved heading/pitch/fov unchanged', () => {
+  assert.ok(shouldReResolveSaved({ savedView: SAVED, isOnline: true, apiKey: 'KEY', alreadyTried: false }));
+  assert.equal(
+    savedViewMetadataUrl(SAVED, 'KEY'),
+    `https://maps.googleapis.com/maps/api/streetview/metadata?location=49.2801,-122.8003&radius=${SAVED_RERESOLVE_RADIUS_M}&source=outdoor&key=KEY`,
+  );
+  assert.equal(SAVED_RERESOLVE_RADIUS_M, 50);
+  const r = resolveSavedRetry(SAVED, { status: 'OK', pano_id: 'NEW_ID', location: { lat: 49.28012, lng: -122.80028 } });
+  assert.equal(r.outcome, 'moved');
+  assert.deepEqual(
+    [r.view.panoId, r.view.lat, r.view.lng, r.view.heading, r.view.pitch, r.view.fov],
+    ['NEW_ID', 49.28012, -122.80028, 214, 13, 127.31],
+  );
+  assert.match(staticStreetViewUrl(r.view, 'KEY'), /pano=NEW_ID&heading=214&pitch=13/);
+  // Retried once only.
+  assert.ok(!shouldReResolveSaved({ savedView: SAVED, isOnline: true, apiKey: 'KEY', alreadyTried: true }));
+});
+
+test('saved view, nothing at the saved position any more, or no usable answer', () => {
+  assert.equal(resolveSavedRetry(SAVED, { status: 'ZERO_RESULTS' }).outcome, 'none');
+  for (const meta of [{ status: 'NOT_FOUND' }, { status: 'REQUEST_DENIED' }, { status: 'FETCH_FAILED' },
+                      { status: 'OK', location: { lat: 49.28, lng: -122.8 } }, null]) {
+    assert.equal(resolveSavedRetry(SAVED, meta).outcome, 'unresolved', JSON.stringify(meta));
+  }
+});
+
+test('saved view with no position is not a saved view (0 such rows, measured 2026-09-19)', () => {
+  // savedViewFromParcel returns null without streetview_lat/lng, so the default-view path runs.
+  assert.equal(savedViewFromParcel({ streetview_heading: 90, streetview_pano_id: 'X', streetview_lat: null, streetview_lng: null }), null);
+  assert.ok(!shouldReResolveSaved({ savedView: { ...SAVED, lat: null, lng: null }, isOnline: true, apiKey: 'KEY', alreadyTried: false }));
+  assert.equal(savedViewMetadataUrl({ ...SAVED, lat: null }, 'KEY'), '');
+  // A null latitude beside a real longitude is missing, not 0 (isCoord, fixed the same day).
+  assert.equal(savedViewFromParcel({ streetview_heading: 90, streetview_lat: null, streetview_lng: -122.8 }), null);
+  assert.equal(defaultViewForCall({ lat: null, lng: -122.8 }), null);
+});
+
+test('offline: no re-resolve, no request', () => {
+  assert.ok(!shouldReResolveSaved({ savedView: SAVED, isOnline: false, apiKey: 'KEY', alreadyTried: false }));
+  assert.ok(!shouldReResolveSaved({ savedView: SAVED, isOnline: true, apiKey: '', alreadyTried: false }));
+  // A saved view with no stored id already goes by position (the pre-existing location= request).
+  assert.ok(!shouldReResolveSaved({ savedView: { ...SAVED, panoId: '' }, isOnline: true, apiKey: 'KEY', alreadyTried: false }));
 });

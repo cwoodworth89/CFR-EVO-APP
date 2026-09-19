@@ -112,15 +112,21 @@ except ModuleNotFoundError:
     from api.routers.dispatches import serialize_call
     from api.routers.audio import RECORDINGS_DIR
 
-# Ensure database tables exist
-Base.metadata.create_all(bind=engine)
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager to handle application startup and background tasks."""
+    # Create any missing model tables. This ran at module scope until 2026-09-19, so *any*
+    # process that merely imported this module issued DDL against DATABASE_URL -- which is
+    # the kiosk's Postgres, the only database this system has (api/database.py:21). A local
+    # test run created public.road_closure_sync_status there on 2026-09-16, before the
+    # operator had rebuilt the container. Nothing about the container changes: its CMD is
+    # `python -m backend.api.server`, which hands "backend.api.server:app" to uvicorn, and
+    # uvicorn runs this lifespan to completion before it serves a request -- so the tables
+    # still exist before the first caller. An import on its own now writes nothing.
+    Base.metadata.create_all(bind=engine)
     init_mqtt()
     sync_thread = threading.Thread(target=run_periodic_road_closure_sync, daemon=True)
     sync_thread.start()

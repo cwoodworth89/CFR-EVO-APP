@@ -1,14 +1,26 @@
 """
 Comprehensive Integration Tests for Decomposed FastAPI Routers in CFR EVO.
 Tests auth, dispatches, parcels, streetview, routing, road closures, evaluations, audio, and tiles.
+
+**This suite runs against a throwaway SQLite file and never touches the kiosk.** Until
+2026-09-19 it did: `api.database`'s engine is bound to `DATABASE_URL`, which points at the
+kiosk's PostgreSQL -- the only database this system has -- so the suite ran `create_all`
+there and then created, updated and deleted `TEST-ROUTER-DISPATCH-999` and a
+`5000 TESTING WAY` parcel in production. The parcel row was found there on 2026-09-06 with a
+saved Street View, reading as a real address (backlog #35a).
 """
+import atexit
 import os
 import sys
+import tempfile
+import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import jwt
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Add project root and backend dir to sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,49 +35,72 @@ if ROOT_DIR not in sys.path:
 # 503. A test key, not a secret: it signs nothing outside this process.
 os.environ.setdefault("JWT_SECRET", "unit-test-signing-key")
 
+# --- the throwaway database ---------------------------------------------------------------
+# `api.database` cannot be pointed at a test database: it refuses any non-PostgreSQL URL and
+# exits the process when Postgres is unreachable, both deliberately (punch-list #61 -- the
+# SQLite fallback it replaced let a whole agent's work land in a file nobody read). So it is
+# replaced with a stub bound to a temp-file SQLite engine *before* anything imports it, which
+# is the pattern already used by test_road_closure_sync_status.py:24-59.
+#
+# Both spellings are stubbed. `backend/` and `backend/api/` have no __init__.py, so `api.X`
+# and `backend.api.X` are two namespace-package routes to the same source file and would
+# otherwise import as two separate module objects with two separate engines -- this file
+# imports `api.server`, while `api/server.py` internally prefers `backend.api.database`.
+# One stub object under both names keeps the whole graph on one engine and one MetaData.
+#
+# The real entries are put back afterwards: other files in this directory (for instance
+# test_parcels_and_streetview_api.py) import the same modules and do want the kiosk.
+_DB_FD, _DB_PATH = tempfile.mkstemp(prefix="cfr_test_api_routers_", suffix=".sqlite")
+os.close(_DB_FD)
+TEST_DATABASE_URL = "sqlite:///" + _DB_PATH.replace("\\", "/")
+
+
+@atexit.register
+def _drop_test_database():
+    try:
+        os.unlink(_DB_PATH)
+    except OSError:
+        pass
+
+
+_SWAPPED = [n for n in list(sys.modules)
+            if n in ("api", "backend.api") or n.startswith(("api.", "backend.api."))]
+_SAVED = {n: sys.modules.pop(n) for n in _SWAPPED}
+
+test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+_db_stub = types.ModuleType("api.database")
+_db_stub.DATABASE_URL = TEST_DATABASE_URL
+_db_stub.Base = declarative_base()
+_db_stub.engine = test_engine
+_db_stub.SessionLocal = TestSessionLocal
+
+
+def _test_get_db():
+    """The stub's `get_db`. Every router captured *this* object at import (`Depends(get_db)`),
+    so it is also the key `app.dependency_overrides` has to be keyed on."""
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+_db_stub.get_db = _test_get_db
+sys.modules["api.database"] = _db_stub
+sys.modules["backend.api.database"] = _db_stub
+
+# `backend.api.*` first, and this order is load-bearing: every module under backend/api/
+# prefers that spelling internally (server.py:27, parcels.py:16, streetview.py:10,
+# evaluations.py:12, road_closures.py:17). Importing `api.*` here instead produced a SECOND
+# module object per source file, so every model class was declared twice on one MetaData --
+# and because `extend_existing=True` re-appends each `index=True` column's Index, create_all
+# then emitted `CREATE UNIQUE INDEX ix_dispatches_dispatch_id` twice and failed. Against
+# Postgres that stayed invisible, because create_all skips tables that already exist there.
 try:
-    from api.server import app, health_check
-    from api.database import Base, engine, SessionLocal
-    from api.models import LiveCallModel, ParcelModel
-    from api.schemas import (
-        LoginRequest,
-        DispatchCreateSchema,
-        DispatchUpdateSchema,
-        FeedbackSchema,
-        ParcelCameraOverrideSchema,
-        StreetViewOverrideSchema
-    )
-    from api.routers.auth import login, get_session, get_me, logout
-    from api.routers.dispatches import (
-        get_dispatches,
-        create_or_upsert_dispatch,
-        get_dispatch_by_id,
-        update_dispatch,
-        submit_dispatch_feedback,
-        get_dispatch_stats,
-        get_unverified_dispatches,
-        delete_dispatch,
-        serialize_call
-    )
-    from api.routers.parcels import (
-        lookup_parcel,
-        search_parcels,
-        save_parcel_streetview,
-        get_parcels_in_bbox,
-        _clean_streetview_address
-    )
-    from api.routers.streetview import (
-        get_all_streetview_overrides,
-        get_streetview_override,
-        save_streetview_override
-    )
-    from api.routers.evaluations import get_evaluations, get_metrics_summary
-    from api.routers.audio import get_listener_status
-    from api.routers.road_closures import get_road_closures, invalidate_road_closures_cache
-    from api.routers.tiles import _serve_tile
-except ModuleNotFoundError:
     from backend.api.server import app, health_check
-    from backend.api.database import Base, engine, SessionLocal
+    from backend.api.database import Base, engine, SessionLocal, get_db
     from backend.api.models import LiveCallModel, ParcelModel
     from backend.api.schemas import (
         LoginRequest,
@@ -103,9 +138,94 @@ except ModuleNotFoundError:
     from backend.api.routers.audio import get_listener_status
     from backend.api.routers.road_closures import get_road_closures, invalidate_road_closures_cache
     from backend.api.routers.tiles import _serve_tile
+except ModuleNotFoundError:
+    from api.server import app, health_check
+    from api.database import Base, engine, SessionLocal, get_db
+    from api.models import LiveCallModel, ParcelModel
+    from api.schemas import (
+        LoginRequest,
+        DispatchCreateSchema,
+        DispatchUpdateSchema,
+        FeedbackSchema,
+        ParcelCameraOverrideSchema,
+        StreetViewOverrideSchema
+    )
+    from api.routers.auth import login, get_session, get_me, logout
+    from api.routers.dispatches import (
+        get_dispatches,
+        create_or_upsert_dispatch,
+        get_dispatch_by_id,
+        update_dispatch,
+        submit_dispatch_feedback,
+        get_dispatch_stats,
+        get_unverified_dispatches,
+        delete_dispatch,
+        serialize_call
+    )
+    from api.routers.parcels import (
+        lookup_parcel,
+        search_parcels,
+        save_parcel_streetview,
+        get_parcels_in_bbox,
+        _clean_streetview_address
+    )
+    from api.routers.streetview import (
+        get_all_streetview_overrides,
+        get_streetview_override,
+        save_streetview_override
+    )
+    from api.routers.evaluations import get_evaluations, get_metrics_summary
+    from api.routers.audio import get_listener_status
+    from api.routers.road_closures import get_road_closures, invalidate_road_closures_cache
+    from api.routers.tiles import _serve_tile
 
-# Ensure database schema exists
+# Put the real modules back for the other test files in this directory, which import the
+# same names and do want the kiosk. The objects imported above keep referring to the stub.
+for _name in reversed(_SWAPPED):
+    sys.modules[_name] = _SAVED[_name]
+for _name in ("api.database", "backend.api.database"):
+    if sys.modules.get(_name) is _db_stub:
+        del sys.modules[_name]
+
+# Build the schema in the temp file. Every model is now registered on the stub's Base, so
+# this is the whole schema; on PostgreSQL the DDL is unchanged (models.py declares JSON/ARRAY
+# /UUID as `.with_variant(...)` types that still render JSONB, ARRAY and UUID there).
 Base.metadata.create_all(bind=engine)
+
+# FastAPI resolves `Depends(get_db)` by the function object the router captured at import.
+# The stub supplied that object, so the app is already on the temp database; the override is
+# the explicit statement of it, and setUpModule asserts no route escaped.
+app.dependency_overrides[get_db] = _test_get_db
+
+
+def setUpModule():
+    """Fail loudly rather than run against Postgres.
+
+    The whole point of this file is that it cannot reach the kiosk. That claim is checkable
+    in two ways and both are checked here, because the failure mode being guarded against --
+    the suite quietly finding the real engine again -- looks exactly like a passing run.
+    """
+    assert engine.url.get_backend_name() == "sqlite", f"router suite bound to {engine.url!r}"
+    assert str(engine.url) == TEST_DATABASE_URL, f"router suite bound to {engine.url!r}"
+
+    escaped = []
+
+    def _walk(dependant, path):
+        # Recursive: require_admin and friends carry their own sub-dependants, so a get_db
+        # one level down would be invisible to a single-level check.
+        for dep in getattr(dependant, "dependencies", None) or []:
+            call = getattr(dep, "call", None)
+            if getattr(call, "__name__", "") == "get_db" and call not in app.dependency_overrides:
+                escaped.append(f"{path} -> {call!r}")
+            _walk(dep, path)
+
+    for route in app.routes:
+        _walk(getattr(route, "dependant", None), getattr(route, "path", route))
+    assert not escaped, "routes reach an un-overridden get_db: " + "; ".join(escaped)
+
+
+def tearDownModule():
+    app.dependency_overrides.pop(get_db, None)
 
 
 class TestAPIRouters(unittest.TestCase):
@@ -114,6 +234,12 @@ class TestAPIRouters(unittest.TestCase):
 
     def tearDown(self):
         self.db.close()
+
+    def test_suite_database_is_disposable(self):
+        """The guard for backlog #35a: this file must never be able to write to the kiosk."""
+        self.assertEqual(self.db.get_bind().url.get_backend_name(), "sqlite")
+        self.assertEqual(str(self.db.get_bind().url), TEST_DATABASE_URL)
+        self.assertTrue(os.path.isfile(_DB_PATH))
 
     def test_health_check(self):
         res = health_check()
@@ -207,9 +333,10 @@ class TestAPIRouters(unittest.TestCase):
         self.assertEqual(del_res["status"], "success")
 
     def test_parcels_and_streetview_router(self):
-        # The row this test writes lands in the only Postgres there is -- the kiosk's live
-        # parcels table -- and it was found there as a real-looking address with a saved
-        # Street View (2026-09-06). Remove it when the test ends, pass or fail.
+        # This row used to land in the only Postgres there is -- the kiosk's live parcels
+        # table -- where it was found on 2026-09-06 as a real-looking address with a saved
+        # Street View (#35a). It now goes to the temp SQLite file built at the top of this
+        # module. The cleanup stays so the tests do not depend on each other's order.
         def _remove_test_parcel():
             self.db.query(ParcelModel).filter(ParcelModel.address == "5000 TESTING WAY").delete(synchronize_session=False)
             self.db.commit()

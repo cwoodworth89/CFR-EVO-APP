@@ -12,6 +12,11 @@ except ModuleNotFoundError:
 SafeJSON = JSON().with_variant(JSONB(), "postgresql")
 SafeArray = JSON().with_variant(PG_ARRAY(String), "postgresql")
 SafeUUID = String(36).with_variant(UUID(as_uuid=True), "postgresql")
+# PostgreSQL renders this BIGSERIAL for an autoincrement primary key, exactly as a bare
+# BigInteger does (verified against SQLAlchemy 2.0.51's compiler, 2026-09-19 -- the DDL
+# strings are identical). SQLite only autoincrements a column typed INTEGER, so a BIGINT
+# primary key there takes no generated id and every insert fails the NOT NULL constraint.
+SafeBigInt = BigInteger().with_variant(Integer, "sqlite")
 
 class LiveCallModel(Base):
     __tablename__ = "dispatches"
@@ -77,7 +82,13 @@ class EvaluationHistoryModel(Base):
     git_hash = Column(String, nullable=True)
     period_start = Column(Date, nullable=True)
     period_end = Column(Date, nullable=True)
-    metrics = Column(JSONB, nullable=True)
+    # SafeJSON, not a bare JSONB: it compiles to the identical `JSONB` on PostgreSQL
+    # (verified against SQLAlchemy 2.0.51's compiler, 2026-09-19) and to `JSON` elsewhere.
+    # The bare type was the one column in this file not using the variants declared above,
+    # and it made Base.metadata.create_all unrenderable on any non-PostgreSQL dialect --
+    # which is what a test database has to be, now that the router suite no longer runs
+    # against the kiosk. The kiosk's schema is unchanged.
+    metrics = Column(SafeJSON, nullable=True)
     notes = Column(Text, nullable=True)
 
 
@@ -178,7 +189,7 @@ class ParcelModel(Base):
 
 
     # System
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(SafeBigInt, primary_key=True, index=True, autoincrement=True)
     parcel_uuid = Column(SafeUUID, default=lambda: str(uuid.uuid4()), nullable=False)
 
     # From Addresses.shp

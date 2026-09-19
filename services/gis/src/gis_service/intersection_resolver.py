@@ -379,16 +379,40 @@ class IntersectionResolver:
         If nothing matches the grid, the candidates are returned UNCHANGED rather than
         emptied: a grid that matches no candidate means the grid and the street pair
         disagree, which the operator needs to see, not something to silently resolve.
+
+        Filter by touch, rank by containment (punch list #96, 2026-09-19). A junction on a
+        zone line lies in both zones -- zone lines run along roads -- so a candidate matches
+        when the grid is ANY of its `grids` (every zone within geocoder.ZONE_TOUCH_M). When
+        more than one candidate touches the grid, those whose single `grid`
+        (public.zone_for_point) IS the announced grid are preferred, which keeps every
+        double crossing that resolved automatically before resolving the same way. Measured
+        over all 80 multi-junction street pairs: this changes 18 (pair, grid) outcomes, all of
+        them from "none of these junctions lie in map grid" -- 10 to an automatic resolution,
+        8 to a candidate selector without that false note -- and turns no automatic
+        resolution into a selector. Ranking instead by "no other zone within 5 m" would have
+        turned 12 automatic resolutions into selectors.
         """
         if target_map_grid is None:
             return candidates, None
         target = re.sub(r'^(?:GRID|ZONE)\s*', '', str(target_map_grid).strip(),
-                        flags=re.IGNORECASE)
-        matched = [c for c in candidates
-                   if str(c.get("grid", "")).strip()
-                   and str(c.get("grid", "")).strip().lower() == target.lower()]
+                        flags=re.IGNORECASE).lower()
+
+        def primary(c):
+            return str(c.get("grid") or "").strip().lower()
+
+        def touched(c):
+            grids = {str(g).strip().lower() for g in (c.get("grids") or []) if g is not None}
+            if primary(c):
+                grids.add(primary(c))
+            return grids
+
+        matched = [c for c in candidates if target in touched(c)]
         if not matched:
             return candidates, f"none of these junctions lie in map grid {target}"
+        if len(matched) > 1:
+            inside = [c for c in matched if primary(c) == target]
+            if inside:
+                matched = inside
         return matched, None
 
     def resolve_candidates(self, candidates: List[dict], target_map_grid: str | int = None,

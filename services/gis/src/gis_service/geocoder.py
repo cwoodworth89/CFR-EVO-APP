@@ -25,6 +25,16 @@ from .intersection_resolver import IntersectionResolver
 from .spatial_queries import SpatialQueryEngine
 
 
+# A junction "lies in" every zone within this many metres (punch list #96). The same 5 m the
+# canonical public.zone_for_point already uses to close hairline slivers between zone polygons
+# (backend/migrations/2026-08-22_canonical_zone_for_point.sql, "EDGE TOLERANCE": zones are
+# hundreds of metres across, so 5 m cannot reach past an adjacent zone).
+ZONE_TOUCH_M = 5.0
+# Bounding-box prefilter for that test; must cover 5 m in every direction. 0.0001 degrees is
+# ~7.3 m of longitude at 49.35 N (the city's northern extent) and ~11 m of latitude.
+ZONE_TOUCH_BOX_DEG = 0.0001
+
+
 class CoquitlamDataValidator:
     """
     Authoritative Municipal Geocoder and Spatial Validation Engine.
@@ -73,18 +83,33 @@ class CoquitlamDataValidator:
                     -- The grid is DERIVED, not stored. intersections.zone_id was a
                     -- denormalized copy of this same function's result and was free to
                     -- drift from the geometry it came from, so the column was dropped.
+                    --
+                    -- zone_ids is every zone within ZONE_TOUCH_M of the junction (punch list
+                    -- #96). Zone lines run along roads, so a junction is on two or more zones
+                    -- as a rule, not an exception: 584 of 1,994 lie within 1 m of two or more
+                    -- (measured 2026-09-19). zone_for_point still answers ONE grid for the
+                    -- junction; this set is what an announced grid may match. `&&` against a
+                    -- box a little wider than 5 m keeps it index-usable; the distance is in
+                    -- metres in UTM 10N (EPSG:26910), the form closure_spatial.py uses.
                     SELECT street_a, street_b, intersection_key, lat, lng,
-                           public.zone_for_point(geom) AS zone_id, candidate_index
-                    FROM public.intersections
+                           public.zone_for_point(geom) AS zone_id, candidate_index,
+                           (SELECT array_agg(z.map_name::text)
+                              FROM public.zones z
+                             WHERE z.geom && ST_Expand(i.geom, :box_deg)
+                               AND ST_DWithin(ST_Transform(z.geom, 26910),
+                                              ST_Transform(i.geom, 26910), :touch_m)) AS zone_ids
+                    FROM public.intersections i
                     ORDER BY intersection_key, candidate_index;
-                """)).fetchall()
+                """), {"touch_m": ZONE_TOUCH_M, "box_deg": ZONE_TOUCH_BOX_DEG}).fetchall()
                 for row in res:
-                    street_a, street_b, raw_key, lat, lng, zone_id, candidate_index = row
+                    street_a, street_b, raw_key, lat, lng, zone_id, candidate_index, zone_ids = row
                     cand = {
                         "name": f"{street_a} & {street_b}".title(),
                         "lat": float(lat),
                         "lng": float(lng),
                         "grid": str(zone_id).strip() if zone_id is not None else None,
+                        # Every grid the junction lies on or within ZONE_TOUCH_M of (#96).
+                        "grids": sorted({str(z).strip() for z in (zone_ids or []) if z is not None}),
                         "description": f"{street_a} & {street_b}",
                         "candidate_index": int(candidate_index) if candidate_index is not None else 0
                     }

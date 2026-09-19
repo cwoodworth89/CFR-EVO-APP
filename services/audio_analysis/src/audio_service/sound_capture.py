@@ -18,23 +18,50 @@ def capture_full_dispatch(
     phase_1_check_interval_s: float = 5.0,
     end_of_dispatch_rms_threshold: float = 30.0,
     end_of_dispatch_silence_s: float = 8.0,
-    units_vocabulary = None
+    units_vocabulary = None,
+    heartbeat_cb = None,
+    heartbeat_interval_s: float = 5.0
 ):
-    """Captures continuous dispatch audio until END_OF_DISPATCH_SILENCE_S is reached, pushing Phase 1 checks periodically."""
+    """Captures continuous dispatch audio until END_OF_DISPATCH_SILENCE_S is reached, pushing Phase 1 checks periodically.
+
+    `heartbeat_cb` is a zero-argument callable invoked every `heartbeat_interval_s` while the
+    capture runs. Control stays inside this function for the whole broadcast, so the caller's
+    own liveness loop is not running; without this the listener reads as dead from partway
+    into every capture. What the callback writes, and where, is the caller's business -- this
+    module stays free of the backend's status file (CLAUDE.md s2).
+    """
     logging.info(f"STATE: CAPTURING DISPATCH (ID: {dispatch_id})")
     audio_buffer = initial_buffer if initial_buffer is not None else []
     max_chunks = int((sample_rate / blocksize) * max_duration_s)
     start_chunk = len(audio_buffer)
     silence_start_time = None
     last_check_time = time.time()
-    
+    last_heartbeat_time = time.time()
+
     for i in range(start_chunk, max_chunks):
         try:
             pcm, _ = stream.read(blocksize)
             audio_buffer.append(pcm)
-            
+
             # Periodic Phase 1 Check trigger
             current_time = time.time()
+
+            # Liveness while capturing. On a timer, not on every read: a block is 1024
+            # samples = 64 ms at 16 kHz, so writing the status file on each read would be
+            # ~15 file writes a second inside the one loop that must not stall, for no extra
+            # signal. The interval the caller passes is well inside the staleness threshold
+            # the status endpoint applies, so several writes can be missed before anything
+            # reads as dead.
+            if heartbeat_cb is not None and current_time - last_heartbeat_time >= heartbeat_interval_s:
+                last_heartbeat_time = current_time
+                try:
+                    heartbeat_cb()
+                except Exception as e:
+                    # A heartbeat is telemetry and must never end a capture: the enclosing
+                    # `except` below breaks out of the loop, which would truncate the
+                    # broadcast in progress over a failed status write.
+                    logging.warning(f"[{dispatch_id}] Capture heartbeat failed: {e}")
+
             duration_s = (len(audio_buffer) * blocksize) / sample_rate
             if duration_s >= min_phase_1_duration_s and (current_time - last_check_time >= phase_1_check_interval_s):
                 last_check_time = current_time

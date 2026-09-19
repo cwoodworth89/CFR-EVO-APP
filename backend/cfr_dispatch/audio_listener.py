@@ -33,7 +33,7 @@ from cfr_dispatch.config.dsp import (
     END_OF_DISPATCH_SILENCE_S
 )
 from cfr_dispatch.config.hardware import DEVICE_ID, AUDIO_SAMPLE_RATE
-from cfr_dispatch.config.runtime import VERBOSITY_LEVEL
+from cfr_dispatch.config.runtime import VERBOSITY_LEVEL, LISTENER_HEARTBEAT_INTERVAL_S
 from cfr_dispatch.config.vocab import UNITS_VOCABULARY
 from cfr_dispatch.shutdown import stop_requested
 from audio_service import (
@@ -47,17 +47,48 @@ from audio_service import (
     resolve_audio_device
 )
 
-def update_listener_heartbeat():
-    """Writes heartbeat timestamp and process metadata to data/listener_status.json."""
+# The two states the listener itself can be in. Read back by GET /api/listener/status
+# (backend/api/routers/audio.py), which adds the third -- unresponsive -- from the age of the
+# file, because a stopped process cannot write its own death.
+LISTENER_STATE_IDLE = "idle"
+LISTENER_STATE_CAPTURING = "capturing"
+
+# Written here, read by backend/api/routers/audio.py, which reaches the same path from its own
+# side of the container boundary (host ./backend/data is bind-mounted to /app/backend/data).
+# Module-level so a test can point both ends at a temporary file.
+LISTENER_STATUS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+LISTENER_STATUS_FILE = os.path.join(LISTENER_STATUS_DIR, "listener_status.json")
+
+
+def update_listener_heartbeat(state: str = LISTENER_STATE_IDLE,
+                              device_name: str | None = None,
+                              dispatch_id: str | None = None,
+                              capture_started: str | None = None):
+    """Writes heartbeat timestamp, listener state and process metadata to data/listener_status.json.
+
+    `state` separates "alive and waiting" from "alive and mid-broadcast": they are different
+    facts at the moment a restart is being decided (a restart during a capture loses the call
+    and its recording -- 2026-09-05, punch-list #70).
+    """
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        status_dir = os.path.join(base_dir, "data")
-        os.makedirs(status_dir, exist_ok=True)
-        status_file = os.path.join(status_dir, "listener_status.json")
-        tmp_file = os.path.join(status_dir, "listener_status.json.tmp")
+        os.makedirs(os.path.dirname(LISTENER_STATUS_FILE), exist_ok=True)
+        status_file = LISTENER_STATUS_FILE
+        tmp_file = status_file + ".tmp"
         payload = {
+            # Kept as-is: the console's reader is `data.status === 'online'`
+            # (frontend/src/components/DispatchReview.jsx:157). A capture is alive, so it is
+            # still online; `state` below is the finer signal.
             "status": "online",
-            "device": DEVICE_ID,
+            "state": state,
+            "dispatch_id": dispatch_id,
+            "capture_started": capture_started,
+            # The name of the device the stream was actually opened on -- not the
+            # AUDIO_DEVICE_ID setting, which is what this field used to carry. None when the
+            # capture resolved no device; the endpoint renders that as '--' rather than
+            # inventing a name (CLAUDE.md s6.1). It must never be resolve_audio_device()'s
+            # failure text ("SoundDevice Query Failed (...)"), which sits in the same slot as
+            # a real name and reads like one.
+            "device": device_name,
             "stt_engine": "whisper",   # the only engine; CLAUDE.md s1 forbids cloud STT
             "last_heartbeat": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "pid": os.getpid()
@@ -110,13 +141,23 @@ def run_audio_listener_loop(dispatch_queue):
         return
 
     with sd.InputStream(samplerate=AUDIO_SAMPLE_RATE, channels=1, blocksize=blocksize, dtype='int16', device=dev_idx) as stream:
+        # The device name the heartbeat reports. Only a resolved device has a name:
+        # resolve_audio_device returns its failure text in the name slot with dev_idx None
+        # ("SoundDevice Query Failed (...)", "Default Input Device"), and that must not reach
+        # the console as a device name (CLAUDE.md s6.1). Preference goes to the device the
+        # stream actually opened on, which is the authoritative answer to "what are we
+        # listening to" -- dev_name is the pre-open lookup.
+        resolved_device_name = dev_name if dev_idx is not None else None
         try:
             device_info = sd.query_devices(stream.device, 'input')
+            opened_name = device_info.get('name')
+            if opened_name:
+                resolved_device_name = opened_name
             logging.info(f"Successfully opened audio stream on: '{device_info.get('name', 'Unknown')}'")
         except Exception as e:
             logging.warning(f"Could not query audio device name: {e}")
         time.sleep(1.0)
-        
+
         last_hb_time = 0
         while True:
             logging.debug("STATE: LISTENING_FOR_TONE")
@@ -129,10 +170,11 @@ def run_audio_listener_loop(dispatch_queue):
 
             while True:
                 current_time = time.time()
-                if current_time - last_hb_time >= 5.0:
-                    update_listener_heartbeat()
+                if current_time - last_hb_time >= LISTENER_HEARTBEAT_INTERVAL_S:
+                    update_listener_heartbeat(state=LISTENER_STATE_IDLE,
+                                              device_name=resolved_device_name)
                     last_hb_time = current_time
-                    
+
                 # A stop requested while nothing is being captured is honoured now; during a
                 # tone analysis (3.5 s) or a dispatch capture it is honoured when that ends
                 # (punch-list #70).
@@ -236,6 +278,20 @@ def run_audio_listener_loop(dispatch_queue):
 
             # Dispatch Audio Stream Capture
             dispatch_id = f"DISP-{time.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
+
+            # Control is about to leave this loop for the whole broadcast, so the idle
+            # heartbeat above stops. capture_full_dispatch calls this back on a timer; the
+            # first write happens here so the capturing state and the dispatch id are visible
+            # from the first moment rather than up to one interval later.
+            capture_started = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+            def _capture_heartbeat(_id=dispatch_id, _started=capture_started):
+                update_listener_heartbeat(state=LISTENER_STATE_CAPTURING,
+                                          device_name=resolved_device_name,
+                                          dispatch_id=_id,
+                                          capture_started=_started)
+
+            _capture_heartbeat()
             dispatch_buffer = capture_full_dispatch(
                 stream,
                 blocksize,
@@ -249,7 +305,9 @@ def run_audio_listener_loop(dispatch_queue):
                 phase_1_check_interval_s=PHASE_1_CHECK_INTERVAL_S,
                 end_of_dispatch_rms_threshold=END_OF_DISPATCH_RMS_THRESHOLD,
                 end_of_dispatch_silence_s=END_OF_DISPATCH_SILENCE_S,
-                units_vocabulary=UNITS_VOCABULARY
+                units_vocabulary=UNITS_VOCABULARY,
+                heartbeat_cb=_capture_heartbeat,
+                heartbeat_interval_s=LISTENER_HEARTBEAT_INTERVAL_S
             )
             if dispatch_buffer:
                 logging.info(f"[{dispatch_id}] Queueing finalized dispatch for background processing...")
@@ -262,6 +320,12 @@ def run_audio_listener_loop(dispatch_queue):
                     "tone_name": matched_tone,
                     "units_vocab": UNITS_VOCABULARY
                 })
+
+            # Back to waiting. Written after the enqueue, not before it, so the capturing
+            # state holds until the buffer is safely handed to the worker.
+            update_listener_heartbeat(state=LISTENER_STATE_IDLE,
+                                      device_name=resolved_device_name)
+            last_hb_time = time.time()
 
             if stop_requested():
                 logging.info("Stop requested; the capture in progress has ended and been queued. Listener exiting.")

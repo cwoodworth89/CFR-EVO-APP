@@ -16,3 +16,14 @@ WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")                         
 INTEGRATION_PAYLOAD_OPTION = 2                        # 1: Lightweight, 2: Full parcel rings
 ENABLE_NTFY_PUSH = True
 VERBOSITY_LEVEL = int(os.environ.get("VERBOSITY_LEVEL", "1"))  # 0: Muted, 1: Standard, 2: Verbose, 3: Trace
+
+# How often the audio listener writes backend/data/listener_status.json, idle and mid-capture
+# alike (audio_listener.py update_listener_heartbeat).
+#
+# Paired with LISTENER_STALE_AFTER_S = 30.0 in backend/api/routers/audio.py, the age at which
+# GET /api/listener/status calls the listener unresponsive. That threshold is the reader's; this
+# is the writer's, chosen so six writes fit inside it -- five consecutive writes must be missed
+# before the console reads a live listener as dead. It is also the interval the idle listening
+# loop already used as a literal, so the system has one heartbeat cadence rather than two.
+# backend/tests/test_listener_heartbeat.py fails if the ratio between the two drops below 6.
+LISTENER_HEARTBEAT_INTERVAL_S = 5.0

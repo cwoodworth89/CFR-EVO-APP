@@ -10,6 +10,7 @@ there and then created, updated and deleted `TEST-ROUTER-DISPATCH-999` and a
 saved Street View, reading as a real address (backlog #35a).
 """
 import atexit
+import logging
 import os
 import sys
 import tempfile
@@ -57,15 +58,29 @@ TEST_DATABASE_URL = "sqlite:///" + _DB_PATH.replace("\\", "/")
 
 @atexit.register
 def _drop_test_database():
+    # dispose() first: the engine's pool can still hold an open handle on the file, and
+    # Windows refuses to unlink a file that is open, so an unlink without it left a stray
+    # .sqlite in %TEMP% on every run. Reported rather than swallowed -- a cleanup that
+    # cannot say it failed is how the litter went unnoticed.
+    test_engine.dispose()
     try:
         os.unlink(_DB_PATH)
-    except OSError:
-        pass
+    except OSError as exc:
+        logging.warning("could not remove the router suite's temp database %s: %s", _DB_PATH, exc)
 
 
-_SWAPPED = [n for n in list(sys.modules)
+def _api_module_names():
+    """Every `api.*` / `backend.api.*` entry currently in sys.modules."""
+    return [n for n in list(sys.modules)
             if n in ("api", "backend.api") or n.startswith(("api.", "backend.api."))]
-_SAVED = {n: sys.modules.pop(n) for n in _SWAPPED}
+
+
+# Saved, not merely noted: the restore below has to put back *exactly* this set. An earlier
+# version re-installed only the names that already existed, which left every module first
+# imported under the stub -- server, models, schemas, every router -- in sys.modules still
+# bound to the SQLite engine and the stub Base. Which database a later test file reached then
+# depended on collection order. The sibling pattern is test_road_closure_sync_status.py:53-57.
+_SAVED = {n: sys.modules.pop(n) for n in _api_module_names()}
 
 test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
@@ -179,13 +194,13 @@ except ModuleNotFoundError:
     from api.routers.road_closures import get_road_closures, invalidate_road_closures_cache
     from api.routers.tiles import _serve_tile
 
-# Put the real modules back for the other test files in this directory, which import the
-# same names and do want the kiosk. The objects imported above keep referring to the stub.
-for _name in reversed(_SWAPPED):
-    sys.modules[_name] = _SAVED[_name]
-for _name in ("api.database", "backend.api.database"):
-    if sys.modules.get(_name) is _db_stub:
-        del sys.modules[_name]
+# Restore sys.modules to exactly what it was before the swap, for the other test files in
+# this directory that import the same names and do want the kiosk. Drop everything the block
+# above imported under the stub first -- otherwise those modules stay behind, bound to the
+# SQLite engine. The objects imported above keep referring to the stub, which is the point.
+for _name in _api_module_names():
+    del sys.modules[_name]
+sys.modules.update(_SAVED)
 
 # Build the schema in the temp file. Every model is now registered on the stub's Base, so
 # this is the whole schema; on PostgreSQL the DDL is unchanged (models.py declares JSON/ARRAY

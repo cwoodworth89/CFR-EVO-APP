@@ -14,13 +14,52 @@ test_dispatch_summary.py, so this runs anywhere without touching DATABASE_URL (t
 """
 import os
 import sys
+import types
 import unittest
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy.orm import declarative_base
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+# --- no database, and now that is true of the imports too -----------------------------------
+# The route functions are exercised with MagicMock sessions, but importing them reaches
+# `api.database`, which probes the kiosk's PostgreSQL at import and sys.exit()s when it cannot
+# reach it (punch-list #61). So this file opened a connection to production on every run with
+# Tailscale up, and with the link down took the *whole* pytest session down with it: a
+# SystemExit during collection surfaces as INTERNALERROR, which aborts every other file too.
+#
+# `api.database` is replaced with a stub carrying no engine at all before the imports below,
+# and sys.modules is restored to exactly its previous contents afterwards. Both spellings are
+# stubbed because backend/ and backend/api/ have no __init__.py, so `api.X` and `backend.api.X`
+# are two namespace routes to one source file -- api/models.py asks for `api.database` even
+# when it is itself imported as `backend.api.models`. The pattern, and the reason the restore
+# has to be exact rather than additive, are in test_api_routers.py:66-92 and
+# test_road_closure_sync_status.py:24-59.
+#
+# LiveCallModel only needs a declarative Base to be declared against; it needs no engine, and
+# _row() builds instances that are never persisted.
+
+
+def _api_module_names():
+    return [n for n in list(sys.modules)
+            if n in ("api", "backend.api") or n.startswith(("api.", "backend.api."))]
+
+
+_SAVED_API_MODULES = {n: sys.modules.pop(n) for n in _api_module_names()}
+
+_db_stub = types.ModuleType("api.database")
+_db_stub.DATABASE_URL = "postgresql://stub/no-database-in-this-test"
+_db_stub.Base = declarative_base()
+_db_stub.engine = None
+_db_stub.SessionLocal = None
+_db_stub.get_db = lambda: None
+sys.modules["api.database"] = _db_stub
+sys.modules["backend.api.database"] = _db_stub
 
 from backend.api.models import LiveCallModel  # noqa: E402
 from backend.api.schemas import DispatchCreateSchema, DispatchUpdateSchema  # noqa: E402
+from backend.api.routers import dispatches as dispatches_router  # noqa: E402
 from backend.api.routers.dispatches import (  # noqa: E402
     SUMMARY_TARGET_KEYS,
     create_or_upsert_dispatch,
@@ -29,6 +68,17 @@ from backend.api.routers.dispatches import (  # noqa: E402
     update_dispatch,
     _settle_is_test,
 )
+
+# Restore sys.modules exactly: drop what was imported under the stub, then put back what was
+# there before. The names bound above keep referring to the stub-backed modules, which is the
+# point. It is also why the helpers below patch `dispatches_router` as an object rather than
+# by its dotted path: patch("backend.api.routers.dispatches....") resolves its target by
+# importing that name, and once it is no longer in sys.modules that import would build a
+# fresh module against the REAL api.database -- reconnecting to the kiosk at the first
+# _create() call, which is the thing this block exists to prevent.
+for _name in _api_module_names():
+    del sys.modules[_name]
+sys.modules.update(_SAVED_API_MODULES)
 
 DISPATCH_ID = "DISP-2026-TEST01"
 
@@ -42,14 +92,14 @@ def _db(existing=None):
 def _create(**body):
     """POST /api/dispatches with no row present, returning the serialized record."""
     payload = DispatchCreateSchema(**{"dispatch_id": DISPATCH_ID, **body})
-    with patch("backend.api.routers.dispatches.publish_mqtt_event"):
+    with patch.object(dispatches_router, "publish_mqtt_event"):
         return create_or_upsert_dispatch(payload, db=_db())
 
 
 def _patch(existing, **body):
     """PATCH /api/dispatches/{id} against `existing`, returning the serialized record."""
     payload = DispatchUpdateSchema(**body)
-    with patch("backend.api.routers.dispatches.publish_mqtt_event"):
+    with patch.object(dispatches_router, "publish_mqtt_event"):
         return update_dispatch(DISPATCH_ID, payload, db=_db(existing))
 
 

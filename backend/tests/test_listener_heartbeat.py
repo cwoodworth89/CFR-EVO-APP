@@ -15,19 +15,59 @@ import os
 import queue
 import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import patch
 
 import numpy as np
+from sqlalchemy.orm import declarative_base
 
 _BACKEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 _WORKSPACE = os.path.join(_BACKEND, "..")
 sys.path.insert(0, os.path.abspath(_BACKEND))
 sys.path.insert(0, os.path.abspath(os.path.join(_WORKSPACE, "services", "audio_analysis", "src")))
 
+# --- no database, and now that is true of the imports too -----------------------------------
+# `api.routers` imports every router, and each router imports `api.database`, which probes the
+# kiosk's PostgreSQL at import and sys.exit()s when it cannot reach it (punch-list #61). So
+# this file -- which touches no database -- opened a connection to production on every run
+# with Tailscale up, and with it down took the *whole* pytest session down: a SystemExit during
+# collection surfaces as INTERNALERROR, which aborts every other file too.
+#
+# `api.database` is therefore replaced with a stub carrying no engine at all before the import
+# below, and sys.modules is restored to exactly its previous contents afterwards. Both
+# spellings are stubbed because backend/ and backend/api/ have no __init__.py, so `api.X` and
+# `backend.api.X` are two namespace routes to one file (api/models.py prefers `api.database`,
+# api/routers/*.py prefer `backend.api.database`). Pattern:
+# test_road_closure_sync_status.py:24-59 and test_api_routers.py:66-92.
+
+
+def _api_module_names():
+    return [n for n in list(sys.modules)
+            if n in ("api", "backend.api") or n.startswith(("api.", "backend.api."))]
+
+
+_SAVED_API_MODULES = {n: sys.modules.pop(n) for n in _api_module_names()}
+
+_db_stub = types.ModuleType("api.database")
+_db_stub.DATABASE_URL = "postgresql://stub/no-database-in-this-test"
+_db_stub.Base = declarative_base()
+_db_stub.engine = None
+_db_stub.SessionLocal = None
+_db_stub.get_db = lambda: None
+sys.modules["api.database"] = _db_stub
+sys.modules["backend.api.database"] = _db_stub
+
 from audio_service import sound_capture  # noqa: E402
 from api.routers import audio as audio_router  # noqa: E402
 from cfr_dispatch.config.runtime import LISTENER_HEARTBEAT_INTERVAL_S  # noqa: E402
+
+# Restore sys.modules exactly: drop everything imported under the stub, then put back what
+# was there before. `audio_router` keeps referring to the stub-backed module, which is fine --
+# it reads a heartbeat file and never touches a session.
+for _name in _api_module_names():
+    del sys.modules[_name]
+sys.modules.update(_SAVED_API_MODULES)
 
 # The kiosk's MAX_DISPATCH_DURATION_S (backend/cfr_dispatch/config/dsp.py:11). Real captures
 # measured 2026-09-19 ran 25.8-58.2 s; this is the cap they run against.

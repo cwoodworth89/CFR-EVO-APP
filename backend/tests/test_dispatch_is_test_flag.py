@@ -27,7 +27,7 @@ from backend.api.routers.dispatches import (  # noqa: E402
     serialize_call,
     serialize_call_summary,
     update_dispatch,
-    _fold_is_test,
+    _settle_is_test,
 )
 
 DISPATCH_ID = "DISP-2026-TEST01"
@@ -67,7 +67,7 @@ def _row(**over):
 class TestIsTestReachesTheRow(unittest.TestCase):
     def test_there_is_no_is_test_column(self):
         """Why it goes in `target`: the model has no attribute to set, and the live table has
-        no such column (information_schema, kiosk, 2026-09-19). _fold_is_test must therefore
+        no such column (information_schema, kiosk, 2026-09-19). _settle_is_test must therefore
         pop the key -- LiveCallModel(**data) would raise on an unexpected kwarg."""
         self.assertFalse(hasattr(LiveCallModel, "is_test"))
 
@@ -109,7 +109,7 @@ class TestIsTestReachesTheRow(unittest.TestCase):
         """INTEGRATION_PAYLOAD_OPTION == 1 sends `address` instead of `target`
         (payload_builder.py:506). The flag still has to land somewhere."""
         data = {"dispatch_id": DISPATCH_ID, "is_test": True}
-        _fold_is_test(data, None)
+        _settle_is_test(data, None)
         self.assertEqual(data["target"], {"is_test": True})
 
     def test_phase_2_correction_cannot_erase_the_flag(self):
@@ -143,10 +143,115 @@ class TestIsTestReachesTheRow(unittest.TestCase):
         back a new dict or the write is silently lost."""
         stored_target = {"address": "1145 Heffley Cres"}
         data = {"is_test": True}
-        _fold_is_test(data, _row(target=stored_target))
+        _settle_is_test(data, _row(target=stored_target))
         self.assertNotIn("is_test", stored_target)
         self.assertIs(data["target"]["is_test"], True)
         self.assertIsNot(data["target"], stored_target)
+
+
+class TestEveryPhase2UpdateShapePreservesIt(unittest.TestCase):
+    """Phase 2 sends four different UPDATE shapes and only three name `is_test`.
+
+    The fourth is the common one. Audit on 3096dbc6: the agreement branch (phase2.py:387 --
+    phase 1 and phase 2 agreeing on the address, the normal outcome) replaces `target`
+    wholesale and sends no `is_test`, because its replacement is a spread of the phase-1
+    target held in the worker's memory (phase2.py:313, worker.py:65), which never carried
+    the flag. Folding a top-level flag is therefore not enough: the API has to carry a
+    stored one across any `target` replacement that does not name it.
+
+    Each shape below is transcribed from the call site named in its comment.
+    """
+
+    def _phase_1_created_a_test_dispatch(self):
+        """POST as phase 1 sends it (payload_builder.py:487-509), returning the stored row."""
+        served = _create(
+            is_test=True,
+            incident_type="*TEST* Medical Aid",
+            responding_units=["E1"],
+            raw_transcript="Coquitlam engine one",
+            sanitized_transcript="Coquitlam engine one",
+            verify_location=False,
+            target={"address": "1145 Heffley Cres", "lat": 49.28, "lng": -122.79,
+                    "map_grid": "68", "review_flags": [], "review_flag_count": 0},
+        )
+        self.assertIs(served["target"]["is_test"], True, "phase 1 create must store the flag")
+        return _row(target=served["target"])
+
+    def test_agreement_branch_the_common_path_keeps_the_flag(self):
+        """phase2.py:371-387. No `is_test`, and `target` replaced wholesale. This is the one
+        that erased it: every cleanly-geocoded test dispatch went through here."""
+        stored = self._phase_1_created_a_test_dispatch()
+        # target_payload as phase2.py:313 builds it: a spread of the phase-1 target with
+        # phase 2's answers over it. Note there is no is_test key anywhere in this PATCH.
+        replacement = {"address": "1145 Heffley Cres", "lat": 49.28, "lng": -122.79,
+                       "x_street_1": "Austin Ave", "x_street_2": None, "map_grid": "68",
+                       "map_grid_source": "parcel", "radio_channel": "TAC2",
+                       "routing_metrics": [{"unit": "E1", "eta_minutes": 4}],
+                       "review_flags": [], "review_flag_count": 0}
+        served = _patch(
+            stored,
+            verify_location=False, audio_url="/api/audio/x.wav", audio_duration=28.4,
+            raw_transcript="Coquitlam engine one", sanitized_transcript="Coquitlam engine one",
+            incident_type="*TEST* Medical Aid", responding_units=["E1"],
+            routing_metrics=replacement["routing_metrics"], target=replacement,
+        )
+        self.assertIs(served["target"]["is_test"], True)
+        # Phase 2's own answers still win -- preserving one key must not resurrect the rest.
+        self.assertEqual(served["target"]["radio_channel"], "TAC2")
+        self.assertEqual(served["target"]["x_street_1"], "Austin Ave")
+
+    def test_correction_branch_keeps_the_flag(self):
+        """phase2.py:512-527. Sends is_test AND replaces target."""
+        stored = self._phase_1_created_a_test_dispatch()
+        replacement = {"address": "1963 Lougheed Hwy", "lat": 49.25, "lng": -122.88,
+                       "review_flags": ["ADDRESS_CORRECTED"], "review_flag_count": 1}
+        served = _patch(
+            stored,
+            verify_location=False, audio_url="/api/audio/x.wav", audio_duration=28.4,
+            raw_transcript="Coquitlam engine one", sanitized_transcript="corrected",
+            incident_type="*TEST* Medical Aid", responding_units=["E1"], is_test=True,
+            routing_metrics=[], target=replacement,
+        )
+        self.assertIs(served["target"]["is_test"], True)
+        self.assertEqual(served["target"]["address"], "1963 Lougheed Hwy")
+
+    def test_geocode_failed_branch_keeps_the_flag(self):
+        """phase2.py:553-558. Sends is_test, no target."""
+        stored = self._phase_1_created_a_test_dispatch()
+        served = _patch(
+            stored,
+            verify_location=True, audio_url="/api/audio/x.wav", audio_duration=28.4,
+            raw_transcript="Coquitlam engine one", sanitized_transcript="full", is_test=True,
+        )
+        self.assertIs(served["target"]["is_test"], True)
+        self.assertEqual(served["target"]["address"], "1145 Heffley Cres")
+
+    def test_no_candidate_branch_keeps_the_flag(self):
+        """phase2.py:568-573. Sends is_test, no target."""
+        stored = self._phase_1_created_a_test_dispatch()
+        served = _patch(
+            stored,
+            verify_location=False, audio_url="/api/audio/x.wav", audio_duration=28.4,
+            raw_transcript="Coquitlam engine one", sanitized_transcript="full", is_test=True,
+        )
+        self.assertIs(served["target"]["is_test"], True)
+
+    def test_a_genuine_call_is_not_turned_into_a_test_by_the_carry_forward(self):
+        """The carry-forward must preserve False as faithfully as True, and must not invent
+        a key on a row that never had one."""
+        genuine = _row(target={"address": "1145 Heffley Cres", "is_test": False})
+        served = _patch(genuine, target={"address": "1145 Heffley Cres", "map_grid": "68"})
+        self.assertIs(served["target"]["is_test"], False)
+
+        unmarked = _row(target={"address": "1145 Heffley Cres"})
+        served = _patch(unmarked, target={"address": "1145 Heffley Cres", "map_grid": "68"})
+        self.assertNotIn("is_test", served["target"])
+
+    def test_an_incoming_target_that_names_the_flag_wins_over_the_stored_one(self):
+        """Precedence: a replacement carrying its own answer is not overruled by history."""
+        stored = _row(target={"address": "1145 Heffley Cres", "is_test": True})
+        served = _patch(stored, target={"address": "1145 Heffley Cres", "is_test": False})
+        self.assertIs(served["target"]["is_test"], False)
 
 
 if __name__ == "__main__":

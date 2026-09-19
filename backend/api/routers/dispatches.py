@@ -135,8 +135,9 @@ def get_dispatches(
     return [serialize(c) for c in calls]
 
 
-def _fold_is_test(data: dict, existing: Optional[LiveCallModel] = None) -> None:
-    """Move a top-level `is_test` from the request body into `target`, in place.
+def _settle_is_test(data: dict, existing: Optional[LiveCallModel] = None) -> None:
+    """Settle `target.is_test` for this write: fold in a top-level flag, and never let a
+    `target` replacement silently drop one already stored.
 
     `is_test` marks a genuine pipeline test dispatch (CLAUDE.md 6.5). It lands in `target`
     rather than in a column of its own because every reader already looks there:
@@ -144,31 +145,47 @@ def _fold_is_test(data: dict, existing: Optional[LiveCallModel] = None) -> None:
     frontend/src/utils/dispatchModel.js:122 reads `record.is_test ?? target.is_test`. Both
     served shapes therefore carry it with no change to either serialiser and no migration.
 
-    It is folded here, at the API boundary, rather than written into `target` by the
-    producer, because phase 2's correction replaces `target` wholesale
-    (cfr_dispatch/pipeline/payload_builder.py:509) -- a value the producer put inside
-    `target` would be erased by the correction that follows it. Folding on the way in means
-    every write that names the flag sets it, whichever `target` it arrives with.
+    Carrying forward is the half that matters, and it is not belt-and-braces. Phase 2 sends
+    four different UPDATE shapes, and the one on the COMMON path -- phase 1 and phase 2
+    agreeing on the address, pipeline/phase2.py:387 -- replaces `target` wholesale and names
+    no `is_test` at all. Its replacement is a spread of the phase-1 target held in the
+    worker's memory (phase2.py:313, worker.py:65), which never carried the flag: the fold
+    happens here, at the API, so the producer's own copy cannot know about it. Without the
+    carry-forward, the flag written at create is erased by the routine phase-2 update on
+    every test dispatch that geocodes cleanly.
 
-    Absent means absent. With exclude_unset, a request that sent no `is_test` -- every
-    caller other than the pipeline -- leaves `target` untouched, and an explicit null
-    writes nothing either. A row never acquires a fabricated False (CLAUDE.md 6.1).
+    Preserving rather than requiring each writer to resend is deliberate. `is_test` is fixed
+    when the call is captured; nothing downstream re-decides whether a broadcast was a test.
+    An UPDATE replaces the geocoding answer, so it has no authority over the call's identity,
+    and a rule that every writer must remember to resend has already failed once here -- at
+    three sites out of four. Precedence: an explicit top-level flag wins, then an `is_test`
+    the incoming `target` carries, then the stored value.
+
+    Absent still means absent. When nobody names it and nothing is stored, `target` is left
+    alone, so a row never acquires a fabricated False (CLAUDE.md 6.1). An explicit null says
+    "unknown", which does not clear a value already measured.
     """
-    if "is_test" not in data:
-        return
-    flag = data.pop("is_test")   # popped either way: there is no is_test column to set
+    flag = data.pop("is_test", None)   # popped either way: there is no is_test column to set
+    incoming = data.get("target")
+    replacing = isinstance(incoming, dict)
+    stored = existing.target if existing is not None and isinstance(existing.target, dict) else {}
+
     if flag is None:
+        if not replacing or "is_test" in incoming:
+            # Nothing to do: either no `target` is being replaced, so the stored flag is
+            # untouched, or the replacement already carries its own answer.
+            return
+        if "is_test" not in stored or stored["is_test"] is None:
+            return
+        flag = stored["is_test"]   # carry it across the replacement
+    elif not replacing and bool(stored.get("is_test")) == bool(flag) and "is_test" in stored:
+        # Already stored, and this write replaces no target: rewriting it would turn a
+        # narrow PATCH into a full `target` write for nothing.
         return
 
-    target = data.get("target")
-    if isinstance(target, dict):
-        target = dict(target)
-    elif existing is not None and isinstance(existing.target, dict):
-        # No target in this request: merge into the stored one. A new dict, not a mutation
-        # -- SQLAlchemy does not track in-place changes to a JSON column.
-        target = dict(existing.target)
-    else:
-        target = {}
+    # A new dict, not a mutation -- SQLAlchemy does not track in-place changes to a JSON
+    # column, so mutating `existing.target` would be silently lost.
+    target = dict(incoming) if replacing else dict(stored)
     target["is_test"] = bool(flag)
     data["target"] = target
 
@@ -178,7 +195,7 @@ def create_or_upsert_dispatch(payload: DispatchCreateSchema, db: Session = Depen
     """Creates a new dispatch record or updates an existing record by dispatch_id, broadcasting via MQTT."""
     existing = db.query(LiveCallModel).filter(LiveCallModel.dispatch_id == payload.dispatch_id).first()
     data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
-    _fold_is_test(data, existing)
+    _settle_is_test(data, existing)
 
     if existing:
         for key, val in data.items():
@@ -268,7 +285,7 @@ def update_dispatch(dispatch_id: str, payload: DispatchUpdateSchema, db: Session
         raise HTTPException(status_code=404, detail="Dispatch record not found")
 
     data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
-    _fold_is_test(data, call)
+    _settle_is_test(data, call)
     for key, val in data.items():
         setattr(call, key, val)
 

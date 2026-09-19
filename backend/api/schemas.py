@@ -27,7 +27,7 @@ class DispatchCreateSchema(BaseModel):
     # the top level since the flag existed (cfr_dispatch/pipeline/payload_builder.py:496),
     # but there was no field here, so Pydantic dropped it silently and 0 of 700 stored rows
     # carried it -- no corpus figure could exclude a test call. There is no is_test column:
-    # _fold_is_test() in routers/dispatches.py moves it into `target`.
+    # _settle_is_test() in routers/dispatches.py moves it into `target`.
     #
     # Default None, not False: with exclude_unset a request that sent nothing writes
     # nothing, so a row never acquires a fabricated False (CLAUDE.md 6.1).
@@ -79,10 +79,15 @@ class DispatchUpdateSchema(BaseModel):
     raw_transcript: Optional[str] = None
     sanitized_transcript: Optional[str] = None
     verify_location: Optional[bool] = None
-    # See DispatchCreateSchema.is_test. Needed on the UPDATE side too because phase 2's
-    # correction branch replaces `target` wholesale (pipeline/payload_builder.py:509,
-    # phase2.py:527): without this the flag phase 1 wrote would be erased by the very
-    # correction that follows it. Phase 2 already sends it (phase2.py:520, 557, 572).
+    # See DispatchCreateSchema.is_test. Accepted on the UPDATE side because phase 2 sends it
+    # on three of its four paths (phase2.py:520, 557, 572) and each replaces or touches
+    # `target`.
+    #
+    # The fourth, phase2.py:387, is the COMMON one -- phase 1 and phase 2 agreeing on the
+    # address -- and it sends no is_test while replacing `target` wholesale. A field here
+    # cannot fix that, so it is not what protects the flag: _settle_is_test() carries a
+    # stored is_test across any `target` replacement that does not name one. Setting it here
+    # is the explicit override, not the safety net.
     is_test: Optional[bool] = None
     origins: Optional[List[str]] = None
     audio_url: Optional[str] = None
